@@ -1,0 +1,27 @@
+projects:
+  - name: creatyss
+    path: ../CREATYSS
+    type: next-prisma
+    required_docs:
+      - AGENTS.md
+      - docs/architecture
+      - docs/domains
+      - docs/roadmap/projet-creatyss.md
+    validation:
+      - pnpm run typecheck
+      - pnpm run lint
+
+  - name: lp-infra
+    path: ../lp-infra
+    type: infra
+    required_docs:
+      - README.md
+      - docs
+    validation: []
+
+  - name: n8n
+    path: ../n8n
+    type: automation
+    required_docs:
+      - README.md
+    validation: []
