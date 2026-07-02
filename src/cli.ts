@@ -10,6 +10,7 @@ import { loadConfig } from "./core/config.js";
 import { docExists } from "./core/docs.js";
 import { getGitBranch, getGitState, isGitRepository } from "./core/git.js";
 import { findProject, getRequiredProjectName } from "./core/project.js";
+import { buildProjectSnapshot } from "./intelligence/project-snapshot.js";
 import { terminal } from "./ui/terminal.js";
 
 function status(): void {
@@ -18,39 +19,38 @@ function status(): void {
   terminal.header("Status");
 
   for (const project of config.projects) {
-    const projectPath = resolve(project.path);
-    const branch = getGitBranch(projectPath);
-    const state = getGitState(projectPath);
+    const snapshot = buildProjectSnapshot(project);
 
-    terminal.section(project.name);
-    terminal.info(`Path: ${projectPath}`);
-    terminal.info(`Type: ${project.type}`);
+    terminal.section(snapshot.project.name);
+    terminal.info(`Path: ${snapshot.project.path}`);
+    terminal.info(`Type: ${snapshot.project.type}`);
 
-    if (project.requires_git === false) {
+    if (!snapshot.git.requiresGit) {
       terminal.warning("Git: not required");
-    } else if (state === "clean") {
-      terminal.success(`Git: ${branch} / clean`);
+    } else if (snapshot.git.clean) {
+      terminal.success(`Git: ${snapshot.git.branch} / clean`);
     } else {
-      terminal.warning(`Git: ${branch} / dirty`);
+      terminal.warning(`Git: ${snapshot.git.branch} / dirty`);
     }
 
     terminal.info("Docs:");
-    for (const doc of project.required_docs) {
-      const exists = docExists(projectPath, doc);
-      if (exists) {
-        terminal.success(doc);
-      } else if (project.optional === true) {
-        terminal.warning(`${doc} missing`);
+    for (const doc of snapshot.docs.required) {
+      if (snapshot.docs.missing.includes(doc)) {
+        if (project.optional === true) {
+          terminal.warning(`${doc} missing`);
+        } else {
+          terminal.error(`${doc} missing`);
+        }
       } else {
-        terminal.error(`${doc} missing`);
+        terminal.success(doc);
       }
     }
 
     terminal.info("Validation:");
-    if (project.validation.length === 0) {
+    if (!snapshot.validation.configured) {
       terminal.warning("No validation command configured");
     } else {
-      for (const command of project.validation) {
+      for (const command of snapshot.validation.commands) {
         terminal.success(command);
       }
     }
