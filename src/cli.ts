@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { printProjectContext } from "./commands/context.js";
 import { loadConfig } from "./core/config.js";
 import { docExists } from "./core/docs.js";
 import { getGitBranch, getGitState, isGitRepository } from "./core/git.js";
@@ -86,7 +87,24 @@ if (command === "status") {
   status();
 } else if (command === "doctor") {
   doctor();
+} else if (command === "context") {
+  const projectName = process.argv[3];
+
+  if (!projectName) {
+    console.error("Usage: pnpm loop context <project>");
+    process.exit(1);
+  }
+
+  const config = loadConfig();
+  const project = config.projects.find((candidate) => candidate.name === projectName);
+
+  if (!project) {
+    console.error(`Unknown project: ${projectName}`);
+    process.exit(1);
+  }
+
+  printProjectContext(project);
 } else {
-  console.error("Usage: pnpm loop status|doctor");
+  console.error("Usage: pnpm loop status|doctor|context <project>");
   process.exit(1);
 }
