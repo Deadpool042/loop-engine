@@ -7,6 +7,7 @@ import { printReviewContext } from "./commands/review.js";
 import { loadConfig } from "./core/config.js";
 import { docExists } from "./core/docs.js";
 import { getGitBranch, getGitState, isGitRepository } from "./core/git.js";
+import { findProject, getRequiredProjectName } from "./core/project.js";
 import { terminal } from "./ui/terminal.js";
 
 function status(): void {
@@ -116,49 +117,31 @@ if (command === "status") {
 } else if (command === "doctor") {
   doctor();
 } else if (command === "context") {
-  const projectName = process.argv[3];
-
-  if (!projectName) {
-    console.error("Usage: pnpm loop context <project>");
-    process.exit(1);
-  }
-
   const config = loadConfig();
-  const project = config.projects.find((candidate) => candidate.name === projectName);
+  const projectName = getRequiredProjectName(process.argv, "context");
+  const project = findProject(config, projectName);
 
   if (!project) {
-    console.error(`Unknown project: ${projectName}`);
+    terminal.error(`Unknown project: ${projectName}`);
     process.exit(1);
   }
 
   printProjectContext(project);
 } else if (command === "validate") {
-  const projectName = process.argv[3];
-
-  if (!projectName) {
-    console.error("Usage: pnpm loop validate <project>");
-    process.exit(1);
-  }
-
   const config = loadConfig();
-  const project = config.projects.find((candidate) => candidate.name === projectName);
+  const projectName = getRequiredProjectName(process.argv, "validate");
+  const project = findProject(config, projectName);
 
   if (!project) {
-    console.error(`Unknown project: ${projectName}`);
+    terminal.error(`Unknown project: ${projectName}`);
     process.exit(1);
   }
 
   await validateProject(project);
 } else if (command === "review") {
-  const projectName = process.argv[3];
-
-  if (!projectName) {
-    terminal.error("Usage: pnpm loop review <project>");
-    process.exit(1);
-  }
-
   const config = loadConfig();
-  const project = config.projects.find((candidate) => candidate.name === projectName);
+  const projectName = getRequiredProjectName(process.argv, "review");
+  const project = findProject(config, projectName);
 
   if (!project) {
     terminal.error(`Unknown project: ${projectName}`);
