@@ -1,45 +1,17 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { execSync } from "node:child_process";
-import YAML from "yaml";
 
-type ProjectConfig = {
-  name: string;
-  path: string;
-  type: string;
-  required_docs: string[];
-  validation: string[];
-};
-
-type Config = {
-  projects: ProjectConfig[];
-};
-
-function run(command: string, cwd: string): string {
-  try {
-    return execSync(command, {
-      cwd,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    return "unknown";
-  }
-}
-
-function loadConfig(): Config {
-  const raw = readFileSync("projects.yaml", "utf8");
-  return YAML.parse(raw) as Config;
-}
+import { loadConfig } from "./core/config.js";
+import { docExists } from "./core/docs.js";
+import { getGitBranch, getGitState, isGitRepository } from "./core/git.js";
 
 function status(): void {
   const config = loadConfig();
 
   for (const project of config.projects) {
     const projectPath = resolve(project.path);
-    const branch = run("git branch --show-current", projectPath);
-    const gitStatus = run("git status --short", projectPath);
-    const state = gitStatus.length === 0 ? "clean" : "dirty";
+    const branch = getGitBranch(projectPath);
+    const state = getGitState(projectPath);
 
     console.log(`\n${project.name}`);
     console.log(`Path: ${projectPath}`);
@@ -48,7 +20,7 @@ function status(): void {
 
     console.log("Docs:");
     for (const doc of project.required_docs) {
-      const exists = existsSync(resolve(projectPath, doc));
+      const exists = docExists(projectPath, doc);
       console.log(`- ${exists ? "OK" : "MISSING"} ${doc}`);
     }
 
@@ -63,7 +35,6 @@ function status(): void {
   }
 }
 
-
 function doctor(): void {
   const config = loadConfig();
   let hasError = false;
@@ -71,7 +42,7 @@ function doctor(): void {
   for (const project of config.projects) {
     const projectPath = resolve(project.path);
     const projectExists = existsSync(projectPath);
-    const gitDirExists = existsSync(resolve(projectPath, ".git"));
+    const gitDirExists = isGitRepository(projectPath);
 
     console.log(`\n${project.name}`);
     console.log(`Path: ${projectPath}`);
@@ -90,7 +61,7 @@ function doctor(): void {
     }
 
     for (const doc of project.required_docs) {
-      const exists = existsSync(resolve(projectPath, doc));
+      const exists = docExists(projectPath, doc);
       if (!exists) {
         hasError = true;
       }
