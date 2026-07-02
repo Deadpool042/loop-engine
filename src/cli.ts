@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { printProjectContext } from "./commands/context.js";
+import { validateProject } from "./commands/validate.js";
 import { loadConfig } from "./core/config.js";
 import { docExists } from "./core/docs.js";
 import { getGitBranch, getGitState, isGitRepository } from "./core/git.js";
@@ -104,7 +105,24 @@ if (command === "status") {
   }
 
   printProjectContext(project);
+} else if (command === "validate") {
+  const projectName = process.argv[3];
+
+  if (!projectName) {
+    console.error("Usage: pnpm loop validate <project>");
+    process.exit(1);
+  }
+
+  const config = loadConfig();
+  const project = config.projects.find((candidate) => candidate.name === projectName);
+
+  if (!project) {
+    console.error(`Unknown project: ${projectName}`);
+    process.exit(1);
+  }
+
+  validateProject(project);
 } else {
-  console.error("Usage: pnpm loop status|doctor|context <project>");
+  console.error("Usage: pnpm loop status|doctor|context <project>|validate <project>");
   process.exit(1);
 }
