@@ -5,6 +5,7 @@ import { printProjectContext } from "./commands/context.js";
 import { validateProject } from "./commands/validate.js";
 import { printReviewContext } from "./commands/review.js";
 import { printWorkspaceSummary } from "./commands/summary.js";
+import { printHelp } from "./commands/help.js";
 import { loadConfig } from "./core/config.js";
 import { docExists } from "./core/docs.js";
 import { getGitBranch, getGitState, isGitRepository } from "./core/git.js";
@@ -111,9 +112,11 @@ function doctor(): void {
   }
 }
 
-const command = process.argv[2];
+const command = process.argv[2] ?? "help";
 
-if (command === "status") {
+if (command === "help" || command === "--help" || command === "-h") {
+  printHelp();
+} else if (command === "status") {
   status();
 } else if (command === "summary") {
   printWorkspaceSummary(loadConfig());
@@ -153,6 +156,6 @@ if (command === "status") {
 
   printReviewContext(project);
 } else {
-  terminal.error("Usage: pnpm loop status|summary|doctor|context <project>|validate <project>|review <project>");
+  terminal.error("Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>");
   process.exit(1);
 }
