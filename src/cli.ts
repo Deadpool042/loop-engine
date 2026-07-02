@@ -6,6 +6,7 @@ import { validateProject } from "./commands/validate.js";
 import { loadConfig } from "./core/config.js";
 import { docExists } from "./core/docs.js";
 import { getGitBranch, getGitState, isGitRepository } from "./core/git.js";
+import { terminal } from "./ui/terminal.js";
 
 function status(): void {
   const config = loadConfig();
@@ -41,39 +42,43 @@ function doctor(): void {
   const config = loadConfig();
   let hasError = false;
 
+  terminal.header("Doctor");
+
   for (const project of config.projects) {
     const projectPath = resolve(project.path);
     const projectExists = existsSync(projectPath);
     const gitDirExists = isGitRepository(projectPath);
 
-    console.log(`\n${project.name}`);
-    console.log(`Path: ${projectPath}`);
+    terminal.section(project.name);
+    terminal.info(`Path: ${projectPath}`);
 
     if (!projectExists) {
       hasError = true;
-      console.log("- ERROR project path does not exist");
+      terminal.error("Project path does not exist");
       continue;
     }
 
     if (!gitDirExists) {
       hasError = true;
-      console.log("- ERROR project is not a Git repository");
+      terminal.error("Project is not a Git repository");
     } else {
-      console.log("- OK Git repository detected");
+      terminal.success("Git repository detected");
     }
 
     for (const doc of project.required_docs) {
       const exists = docExists(projectPath, doc);
       if (!exists) {
         hasError = true;
+        terminal.error(`${doc} missing`);
+      } else {
+        terminal.success(`${doc}`);
       }
-      console.log(`- ${exists ? "OK" : "MISSING"} ${doc}`);
     }
 
     if (project.validation.length === 0) {
-      console.log("- INFO no validation command configured");
+      terminal.warning("No validation command configured");
     } else {
-      console.log(`- OK ${project.validation.length} validation command(s) configured`);
+      terminal.success(`${project.validation.length} validation command(s) configured`);
     }
   }
 
