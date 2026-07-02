@@ -121,7 +121,7 @@ if (command === "status") {
     process.exit(1);
   }
 
-  validateProject(project);
+  await validateProject(project);
 } else {
   console.error("Usage: pnpm loop status|doctor|context <project>|validate <project>");
   process.exit(1);
