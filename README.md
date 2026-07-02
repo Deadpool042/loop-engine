@@ -24,7 +24,8 @@ Loop Engine ne modifie pas les dépôts pilotés.
 
 ## Commandes
 
-- `pnpm loop status` : affiche l'état des projets configurés.
+- `pnpm loop summary` : affiche une vue compacte du workspace.
+- `pnpm loop status` : affiche l'état détaillé des projets configurés.
 - `pnpm loop doctor` : vérifie la cohérence des chemins, docs et contraintes Git.
 - `pnpm loop context creatyss` : prépare un contexte court pour reprendre un projet.
 - `pnpm loop validate creatyss` : lance les validations configurées.
