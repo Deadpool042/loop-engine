@@ -11,28 +11,39 @@ import { terminal } from "./ui/terminal.js";
 function status(): void {
   const config = loadConfig();
 
+  terminal.header("Status");
+
   for (const project of config.projects) {
     const projectPath = resolve(project.path);
     const branch = getGitBranch(projectPath);
     const state = getGitState(projectPath);
 
-    console.log(`\n${project.name}`);
-    console.log(`Path: ${projectPath}`);
-    console.log(`Type: ${project.type}`);
-    console.log(`Git: ${branch} / ${state}`);
+    terminal.section(project.name);
+    terminal.info(`Path: ${projectPath}`);
+    terminal.info(`Type: ${project.type}`);
 
-    console.log("Docs:");
-    for (const doc of project.required_docs) {
-      const exists = docExists(projectPath, doc);
-      console.log(`- ${exists ? "OK" : "MISSING"} ${doc}`);
+    if (state === "clean") {
+      terminal.success(`Git: ${branch} / clean`);
+    } else {
+      terminal.warning(`Git: ${branch} / dirty`);
     }
 
-    console.log("Validation:");
+    terminal.info("Docs:");
+    for (const doc of project.required_docs) {
+      const exists = docExists(projectPath, doc);
+      if (exists) {
+        terminal.success(doc);
+      } else {
+        terminal.error(`${doc} missing`);
+      }
+    }
+
+    terminal.info("Validation:");
     if (project.validation.length === 0) {
-      console.log("- none");
+      terminal.warning("No validation command configured");
     } else {
       for (const command of project.validation) {
-        console.log(`- ${command}`);
+        terminal.success(command);
       }
     }
   }
