@@ -2,7 +2,7 @@
 
 Orchestrateur local léger pour piloter les projets de développement sans IA automatique par défaut.
 
-Objectifs V0 :
+## Objectifs V0
 
 - lister les projets locaux ;
 - détecter leur état Git ;
@@ -11,4 +11,36 @@ Objectifs V0 :
 - limiter la consommation de tokens ;
 - garder les décisions humaines.
 
-Ce projet ne modifie pas les dépôts pilotés.
+Loop Engine ne modifie pas les dépôts pilotés.
+
+## Principes
+
+- 0 IA automatique.
+- 0 token consommé par défaut.
+- Pas de commit automatique.
+- Pas de push automatique.
+- Les validations locales passent avant toute revue IA.
+- Les projets pilotés restent indépendants.
+
+## Commandes
+
+- `pnpm loop status` : affiche l'état des projets configurés.
+- `pnpm loop doctor` : vérifie la cohérence des chemins, docs et contraintes Git.
+- `pnpm loop context creatyss` : prépare un contexte court pour reprendre un projet.
+- `pnpm loop validate creatyss` : lance les validations configurées.
+- `pnpm loop review creatyss` : prépare un contexte de revue basé sur Git sans appeler d'IA.
+
+## Configuration
+
+Les projets sont déclarés dans `projects.yaml`.
+
+Champs optionnels :
+
+- `optional: true`
+- `requires_git: false`
+
+## Philosophie
+
+Automatiser le déterministe.  
+Limiter l'IA au jugement.  
+Garder l'humain sur les décisions.
