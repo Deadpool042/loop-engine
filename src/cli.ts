@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import { printProjectContext } from "./commands/context.js";
 import { validateProject } from "./commands/validate.js";
+import { printReviewContext } from "./commands/review.js";
 import { loadConfig } from "./core/config.js";
 import { docExists } from "./core/docs.js";
 import { getGitBranch, getGitState, isGitRepository } from "./core/git.js";
@@ -148,7 +149,24 @@ if (command === "status") {
   }
 
   await validateProject(project);
+} else if (command === "review") {
+  const projectName = process.argv[3];
+
+  if (!projectName) {
+    terminal.error("Usage: pnpm loop review <project>");
+    process.exit(1);
+  }
+
+  const config = loadConfig();
+  const project = config.projects.find((candidate) => candidate.name === projectName);
+
+  if (!project) {
+    terminal.error(`Unknown project: ${projectName}`);
+    process.exit(1);
+  }
+
+  printReviewContext(project);
 } else {
-  console.error("Usage: pnpm loop status|doctor|context <project>|validate <project>");
+  terminal.error("Usage: pnpm loop status|doctor|context <project>|validate <project>|review <project>");
   process.exit(1);
 }
