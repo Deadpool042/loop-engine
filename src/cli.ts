@@ -63,11 +63,59 @@ function status(): void {
   }
 }
 
+
+function doctor(): void {
+  const config = loadConfig();
+  let hasError = false;
+
+  for (const project of config.projects) {
+    const projectPath = resolve(project.path);
+    const projectExists = existsSync(projectPath);
+    const gitDirExists = existsSync(resolve(projectPath, ".git"));
+
+    console.log(`\n${project.name}`);
+    console.log(`Path: ${projectPath}`);
+
+    if (!projectExists) {
+      hasError = true;
+      console.log("- ERROR project path does not exist");
+      continue;
+    }
+
+    if (!gitDirExists) {
+      hasError = true;
+      console.log("- ERROR project is not a Git repository");
+    } else {
+      console.log("- OK Git repository detected");
+    }
+
+    for (const doc of project.required_docs) {
+      const exists = existsSync(resolve(projectPath, doc));
+      if (!exists) {
+        hasError = true;
+      }
+      console.log(`- ${exists ? "OK" : "MISSING"} ${doc}`);
+    }
+
+    if (project.validation.length === 0) {
+      console.log("- INFO no validation command configured");
+    } else {
+      console.log(`- OK ${project.validation.length} validation command(s) configured`);
+    }
+  }
+
+  if (hasError) {
+    process.exitCode = 1;
+  }
+}
+
 const command = process.argv[2];
 
 if (command === "status") {
   status();
+} else if (command === "doctor") {
+  doctor();
 } else {
-  console.error("Usage: pnpm loop status");
+  console.error("Usage: pnpm loop status|doctor");
   process.exit(1);
 }
