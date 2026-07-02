@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 
 import { type ProjectConfig } from "../core/config.js";
+import { terminal } from "../ui/terminal.js";
 
 function formatDuration(startedAt: number): string {
   const elapsedMs = Date.now() - startedAt;
@@ -17,24 +18,26 @@ function formatDuration(startedAt: number): string {
 }
 
 function startSpinner(label: string, startedAt: number): NodeJS.Timeout {
-  const frames = ["-", "\\", "|", "/"];
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   let index = 0;
 
   return setInterval(() => {
     const frame = frames[index % frames.length];
     index += 1;
-    process.stdout.write(`\r${frame} ${label} (${formatDuration(startedAt)})`);
-  }, 150);
+    terminal.writeInline(`${frame} ${label} (${formatDuration(startedAt)})`);
+  }, 120);
 }
 
 function stopSpinner(timer: NodeJS.Timeout): void {
   clearInterval(timer);
-  process.stdout.write("\r\x1b[K");
+  terminal.clearLine();
 }
 
-function runValidationCommand(command: string, cwd: string): number {
+function runValidationCommand(command: string, cwd: string): Promise<number> {
   const startedAt = Date.now();
-  const timer = startSpinner(`Running ${command}`, startedAt);
+
+  terminal.step(command);
+  const timer = startSpinner("Running", startedAt);
 
   const child = spawn(command, {
     cwd,
@@ -45,30 +48,42 @@ function runValidationCommand(command: string, cwd: string): number {
   return new Promise<number>((resolvePromise) => {
     child.on("close", (code) => {
       stopSpinner(timer);
-      console.log(`- ${code === 0 ? "OK" : "FAILED"} ${command} (${formatDuration(startedAt)})`);
+
+      if (code === 0) {
+        terminal.success(`${command} (${formatDuration(startedAt)})`);
+      } else {
+        terminal.error(`${command} (${formatDuration(startedAt)})`);
+      }
+
       resolvePromise(code ?? 1);
     });
-  }) as unknown as number;
+  });
 }
 
 export async function validateProject(project: ProjectConfig): Promise<void> {
   const projectPath = resolve(project.path);
+  const startedAt = Date.now();
+
+  terminal.header("Validate");
+  terminal.info(`Project: ${project.name}`);
+  terminal.info(`Path: ${projectPath}`);
 
   if (project.validation.length === 0) {
-    console.log(`No validation command configured for ${project.name}.`);
+    terminal.warning(`No validation command configured for ${project.name}.`);
     return;
   }
 
-  console.log(`Validation for ${project.name}`);
+  terminal.section("Validation");
 
   for (const command of project.validation) {
     const code = await runValidationCommand(command, projectPath);
 
     if (code !== 0) {
-      console.error(`\nValidation failed: ${command}`);
+      terminal.error(`Validation failed: ${command}`);
       process.exit(code);
     }
   }
 
-  console.log(`Validation passed for ${project.name}.`);
+  terminal.section("Result");
+  terminal.success(`Validation passed for ${project.name} (${formatDuration(startedAt)}).`);
 }
