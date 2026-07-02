@@ -22,6 +22,8 @@ projects:
   - name: n8n
     path: ../n8n
     type: automation
+    optional: true
+    requires_git: false
     required_docs:
       - README.md
     validation: []

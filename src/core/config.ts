@@ -7,6 +7,8 @@ export type ProjectConfig = {
   type: string;
   required_docs: string[];
   validation: string[];
+  optional?: boolean;
+  requires_git?: boolean;
 };
 
 export type Config = {

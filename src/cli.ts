@@ -22,7 +22,9 @@ function status(): void {
     terminal.info(`Path: ${projectPath}`);
     terminal.info(`Type: ${project.type}`);
 
-    if (state === "clean") {
+    if (project.requires_git === false) {
+      terminal.warning("Git: not required");
+    } else if (state === "clean") {
       terminal.success(`Git: ${branch} / clean`);
     } else {
       terminal.warning(`Git: ${branch} / dirty`);
@@ -33,6 +35,8 @@ function status(): void {
       const exists = docExists(projectPath, doc);
       if (exists) {
         terminal.success(doc);
+      } else if (project.optional === true) {
+        terminal.warning(`${doc} missing`);
       } else {
         terminal.error(`${doc} missing`);
       }
@@ -69,7 +73,9 @@ function doctor(): void {
       continue;
     }
 
-    if (!gitDirExists) {
+    if (project.requires_git === false) {
+      terminal.warning("Git repository not required");
+    } else if (!gitDirExists) {
       hasError = true;
       terminal.error("Project is not a Git repository");
     } else {
@@ -79,8 +85,12 @@ function doctor(): void {
     for (const doc of project.required_docs) {
       const exists = docExists(projectPath, doc);
       if (!exists) {
-        hasError = true;
-        terminal.error(`${doc} missing`);
+        if (project.optional === true) {
+          terminal.warning(`${doc} missing`);
+        } else {
+          hasError = true;
+          terminal.error(`${doc} missing`);
+        }
       } else {
         terminal.success(`${doc}`);
       }
