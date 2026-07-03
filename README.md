@@ -30,6 +30,7 @@ Loop Engine ne modifie pas les dépôts pilotés.
 - `pnpm loop context creatyss` : prépare un contexte court pour reprendre un projet.
 - `pnpm loop validate creatyss` : lance les validations configurées.
 - `pnpm loop review creatyss` : prépare un contexte de revue basé sur Git sans appeler d'IA.
+- `pnpm loop next creatyss` : affiche la prochaine action sûre pour un projet.
 
 ## Configuration
 
