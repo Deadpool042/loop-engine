@@ -6,7 +6,8 @@
   "scripts": {
     "loop": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/**/*.test.ts"
+    "test": "tsx --test tests/**/*.test.ts",
+    "validate": "pnpm run typecheck && pnpm run test"
   },
   "dependencies": {
     "tsx": "^4.20.5",
