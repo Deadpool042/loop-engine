@@ -27,6 +27,15 @@ export function printProjectContext(project: ProjectConfig): void {
     }
   }
 
+  terminal.section("Roadmap");
+  if (!snapshot.roadmap.available) {
+    terminal.warning("Aucune roadmap configurée.");
+  } else {
+    for (const roadmapPath of snapshot.roadmap.paths) {
+      terminal.success(roadmapPath);
+    }
+  }
+
   terminal.section("Validation");
   if (!snapshot.validation.configured) {
     terminal.warning("Aucune commande configurée.");
