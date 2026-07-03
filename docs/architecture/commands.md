@@ -107,3 +107,26 @@ Avant d'ajouter une nouvelle commande :
 3. garder `cli.ts` comme routeur minimal ;
 4. garder la commande courte et lisible ;
 5. ajouter une validation ou un test si la commande influence une décision.
+
+
+## Sorties JSON
+
+Certaines commandes exposent une sortie JSON destinée aux scripts, OpenClaw, n8n ou un futur dashboard.
+
+Commandes concernées :
+
+- `pnpm loop summary --json`
+- `pnpm loop next <project> --json`
+- `pnpm loop prompt <project> --json`
+
+Chaque sortie JSON doit inclure `schemaVersion: 1`.
+
+`schemaVersion` permet de faire évoluer les contrats sans casser les intégrations existantes.
+
+Règles :
+
+- ne pas supprimer un champ JSON sans incrémenter `schemaVersion`
+- préférer ajouter des champs optionnels
+- documenter toute évolution de contrat
+- tester les sorties JSON critiques avant intégration externe
+
