@@ -5,7 +5,7 @@ import { printReviewContext } from "./commands/review.js";
 import { printWorkspaceSummary, printWorkspaceSummaryJson } from "./commands/summary.js";
 import { printHelp } from "./commands/help.js";
 import { printNextProjectAction, printNextProjectActionJson } from "./commands/next.js";
-import { printProjectPrompt } from "./commands/prompt.js";
+import { printProjectPrompt, printProjectPromptJson } from "./commands/prompt.js";
 import { printStatus } from "./commands/status.js";
 import { printDoctor } from "./commands/doctor.js";
 import { loadConfig } from "./core/config.js";
@@ -83,7 +83,11 @@ if (command === "help" || command === "--help" || command === "-h") {
     process.exit(1);
   }
 
-  printProjectPrompt(project);
+  if (process.argv.includes("--json")) {
+    printProjectPromptJson(project);
+  } else {
+    printProjectPrompt(project);
+  }
 } else {
   terminal.error("Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>|next <project>|prompt <project>");
   process.exit(1);

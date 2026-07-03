@@ -86,3 +86,34 @@ export function printProjectPrompt(project: ProjectConfig): void {
   console.log("- Ne pas ajouter de dépendance inutile.");
   console.log("- Lancer les validations configurées avant review ou commit.");
 }
+
+
+export function printProjectPromptJson(project: ProjectConfig): void {
+  const snapshot = buildProjectSnapshot(project);
+  const selectedCandidate = selectRoadmapCandidate(snapshot.roadmap.candidates);
+
+  console.log(
+    JSON.stringify(
+      {
+        project: snapshot.project,
+        git: snapshot.git,
+        docs: snapshot.docs,
+        roadmap: {
+          ...snapshot.roadmap,
+          selectedCandidate,
+        },
+        validation: snapshot.validation,
+        instructions: [
+          "Lire les sources listées avant toute intervention significative.",
+          "Respecter l'architecture et les conventions du projet.",
+          "Travailler par micro-lots sûrs et réversibles.",
+          "Ne pas modifier de fichiers hors périmètre sans justification explicite.",
+          "Ne pas ajouter de dépendance inutile.",
+          "Lancer les validations configurées avant review ou commit.",
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+}
