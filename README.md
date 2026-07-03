@@ -34,6 +34,7 @@ Loop Engine ne modifie pas les dépôts pilotés.
 - `pnpm loop next creatyss` : affiche la prochaine action sûre pour un projet.
 - `pnpm loop next creatyss --json` : affiche la prochaine action sûre en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop prompt creatyss` : génère un prompt court à coller dans un assistant IA.
+- `pnpm loop prompt creatyss --json` : génère le contexte de prompt en JSON pour scripts, OpenClaw, n8n ou dashboard.
 
 ## Configuration
 
