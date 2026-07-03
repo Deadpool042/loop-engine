@@ -41,19 +41,29 @@ export function printNextProjectAction(project: ProjectConfig): void {
 
     terminal.section("Roadmap candidate");
 
-    const firstCandidate = snapshot.roadmap.candidates[0];
+    const safeCandidate = snapshot.roadmap.candidates.find(
+      (candidate) => candidate.kind === "safe",
+    );
+    const warningCandidate = snapshot.roadmap.candidates.find(
+      (candidate) => candidate.kind === "warning",
+    );
+    const blockedCandidate = snapshot.roadmap.candidates.find(
+      (candidate) => candidate.kind === "blocked",
+    );
 
-    if (firstCandidate) {
-      if (firstCandidate.kind === "safe") {
-        terminal.success("Safe candidate detected");
-      } else if (firstCandidate.kind === "warning") {
-        terminal.warning("Sensitive candidate detected");
+    const selectedCandidate = safeCandidate ?? warningCandidate ?? blockedCandidate;
+
+    if (selectedCandidate) {
+      if (selectedCandidate.kind === "safe") {
+        terminal.success("Safe candidate selected");
+      } else if (selectedCandidate.kind === "warning") {
+        terminal.warning("Sensitive candidate selected");
       } else {
-        terminal.error("Blocked candidate detected");
+        terminal.error("Only blocked candidates detected");
       }
 
-      terminal.info(`${firstCandidate.path}:${firstCandidate.line}`);
-      terminal.info(firstCandidate.text);
+      terminal.info(`${selectedCandidate.path}:${selectedCandidate.line}`);
+      terminal.info(selectedCandidate.text);
     } else {
       terminal.warning("No roadmap candidate detected.");
     }
