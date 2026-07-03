@@ -71,3 +71,19 @@ Cette boucle reste déterministe :
 - aucune modification automatique ;
 - aucune validation implicite hors des commandes configurées.
 
+
+## Structure du projet
+
+- `src/cli.ts` : routeur CLI minimal.
+- `src/commands/` : commandes utilisateur et cas d'usage.
+- `src/core/` : primitives bas niveau comme config, Git, docs et résolution projet.
+- `src/intelligence/` : états calculés, ProjectSnapshot, roadmap et sélection de candidats.
+- `src/ui/` : helpers d'affichage terminal.
+
+Les commandes doivent consommer le `ProjectSnapshot` plutôt que relire directement Git, les docs ou la roadmap.
+
+Voir aussi :
+
+- `docs/architecture/commands.md`
+- `docs/architecture/project-intelligence.md`
+
