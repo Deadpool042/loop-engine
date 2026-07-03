@@ -6,6 +6,7 @@ import { validateProject } from "./commands/validate.js";
 import { printReviewContext } from "./commands/review.js";
 import { printWorkspaceSummary } from "./commands/summary.js";
 import { printHelp } from "./commands/help.js";
+import { printNextProjectAction } from "./commands/next.js";
 import { loadConfig } from "./core/config.js";
 import { docExists } from "./core/docs.js";
 import { getGitBranch, getGitState, isGitRepository } from "./core/git.js";
@@ -155,7 +156,18 @@ if (command === "help" || command === "--help" || command === "-h") {
   }
 
   printReviewContext(project);
+} else if (command === "next") {
+  const config = loadConfig();
+  const projectName = getRequiredProjectName(process.argv, "next");
+  const project = findProject(config, projectName);
+
+  if (!project) {
+    terminal.error(`Unknown project: ${projectName}`);
+    process.exit(1);
+  }
+
+  printNextProjectAction(project);
 } else {
-  terminal.error("Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>");
+  terminal.error("Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>|next <project>");
   process.exit(1);
 }
