@@ -29,3 +29,12 @@ projects:
     required_docs:
       - README.md
     validation: []
+
+  - name: loop-engine
+    path: .
+    type: node-cli
+    required_docs:
+      - README.md
+      - docs/architecture/project-intelligence.md
+    validation:
+      - pnpm run validate
