@@ -119,6 +119,7 @@ export function printNextProjectActionJson(project: ProjectConfig): void {
   console.log(
     JSON.stringify(
       {
+        schemaVersion: 1,
         project: snapshot.project,
         git: snapshot.git,
         roadmap: {

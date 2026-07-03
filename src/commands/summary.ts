@@ -35,5 +35,5 @@ export function printWorkspaceSummary(config: Config): void {
 export function printWorkspaceSummaryJson(config: Config): void {
   const snapshots = config.projects.map((project) => buildProjectSnapshot(project));
 
-  console.log(JSON.stringify({ projects: snapshots }, null, 2));
+  console.log(JSON.stringify({ schemaVersion: 1, projects: snapshots }, null, 2));
 }
