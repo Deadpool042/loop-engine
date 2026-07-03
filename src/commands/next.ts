@@ -75,6 +75,7 @@ export function printNextProjectAction(project: ProjectConfig): void {
       }
 
       terminal.info(`Kind: ${selectedCandidate.kind}`);
+      terminal.info(`Status: ${selectedCandidate.status}`);
       terminal.info(`Reason: ${selectedCandidate.reason}`);
       terminal.info(`${selectedCandidate.path}:${selectedCandidate.line}`);
       terminal.info(selectedCandidate.text);

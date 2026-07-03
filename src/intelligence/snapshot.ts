@@ -37,6 +37,7 @@ export type ProjectSnapshot = Readonly<{
       text: string;
       kind: "safe" | "warning" | "blocked";
       reason: string;
+      status: "todo" | "in_progress" | "done" | "unknown";
     }>[];
   }>;
 

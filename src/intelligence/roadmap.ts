@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { type ProjectConfig } from "../core/config.js";
 
 export type RoadmapCandidateKind = "safe" | "warning" | "blocked";
+export type RoadmapCandidateStatus = "todo" | "in_progress" | "done" | "unknown";
 
 export type RoadmapCandidate = Readonly<{
   path: string;
@@ -11,6 +12,7 @@ export type RoadmapCandidate = Readonly<{
   text: string;
   kind: RoadmapCandidateKind;
   reason: string;
+  status: RoadmapCandidateStatus;
 }>;
 
 const CANDIDATE_PATTERNS = [
@@ -49,6 +51,23 @@ const WARNING_PATTERNS = [
   "sécurité",
   "securite",
 ] as const;
+
+
+function detectCandidateStatus(line: string): RoadmapCandidateStatus {
+  if (line.includes("- [ ]")) {
+    return "todo";
+  }
+
+  if (line.includes("- [x]") || line.includes("- [X]")) {
+    return "done";
+  }
+
+  if (line.includes("⏳") || line.includes("En cours") || line.includes("en cours")) {
+    return "in_progress";
+  }
+
+  return "unknown";
+}
 
 function classifyCandidateLine(line: string): Readonly<{
   kind: RoadmapCandidateKind;
@@ -119,6 +138,7 @@ export function findRoadmapCandidates(
         text: trimmed,
         kind: classification.kind,
         reason: classification.reason,
+        status: detectCandidateStatus(trimmed),
       });
     });
   }

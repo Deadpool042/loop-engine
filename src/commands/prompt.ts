@@ -54,6 +54,7 @@ export function printProjectPrompt(project: ProjectConfig): void {
       console.log("- Aucun candidat détecté.");
     } else {
       console.log(`- Kind : ${selectedCandidate.kind}`);
+      console.log(`- Status : ${selectedCandidate.status}`);
       console.log(`- Reason : ${selectedCandidate.reason}`);
       console.log(`- Location : ${selectedCandidate.path}:${selectedCandidate.line}`);
       console.log(`- Text : ${selectedCandidate.text}`);
