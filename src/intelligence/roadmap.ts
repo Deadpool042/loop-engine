@@ -3,10 +3,13 @@ import { resolve } from "node:path";
 
 import { type ProjectConfig } from "../core/config.js";
 
+export type RoadmapCandidateKind = "safe" | "warning" | "blocked";
+
 export type RoadmapCandidate = Readonly<{
   path: string;
   line: number;
   text: string;
+  kind: RoadmapCandidateKind;
 }>;
 
 const CANDIDATE_PATTERNS = [
@@ -17,6 +20,40 @@ const CANDIDATE_PATTERNS = [
   "Prochain",
   "prochain",
 ] as const;
+
+
+const BLOCKED_PATTERNS = [
+  "production finale",
+  "prod",
+  "paiement",
+  "migration",
+  "delete",
+  "supprimer",
+] as const;
+
+const WARNING_PATTERNS = [
+  "déploiement",
+  "deploiement",
+  "vps",
+  "dns",
+  "bascule",
+  "sécurité",
+  "securite",
+] as const;
+
+function classifyCandidateLine(line: string): RoadmapCandidateKind {
+  const normalized = line.toLowerCase();
+
+  if (BLOCKED_PATTERNS.some((pattern) => normalized.includes(pattern))) {
+    return "blocked";
+  }
+
+  if (WARNING_PATTERNS.some((pattern) => normalized.includes(pattern))) {
+    return "warning";
+  }
+
+  return "safe";
+}
 
 function isCandidateLine(line: string): boolean {
   return CANDIDATE_PATTERNS.some((pattern) => line.includes(pattern));
@@ -49,6 +86,7 @@ export function findRoadmapCandidates(
         path: roadmapPath,
         line: index + 1,
         text: trimmed,
+        kind: classifyCandidateLine(trimmed),
       });
     });
   }

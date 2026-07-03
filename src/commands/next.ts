@@ -44,7 +44,14 @@ export function printNextProjectAction(project: ProjectConfig): void {
     const firstCandidate = snapshot.roadmap.candidates[0];
 
     if (firstCandidate) {
-      terminal.success("Candidate detected");
+      if (firstCandidate.kind === "safe") {
+        terminal.success("Safe candidate detected");
+      } else if (firstCandidate.kind === "warning") {
+        terminal.warning("Sensitive candidate detected");
+      } else {
+        terminal.error("Blocked candidate detected");
+      }
+
       terminal.info(`${firstCandidate.path}:${firstCandidate.line}`);
       terminal.info(firstCandidate.text);
     } else {
