@@ -14,6 +14,7 @@ export function printHelp(): void {
   terminal.info("pnpm loop context <project> --json — contexte projet en JSON");
   terminal.info("pnpm loop validate <project>       — lance les validations configurées");
   terminal.info("pnpm loop review <project>         — prépare un contexte de revue Git");
+  terminal.info("pnpm loop review <project> --json  — contexte de revue Git en JSON");
   terminal.info("pnpm loop next <project>           — prochaine action sûre");
   terminal.info("pnpm loop next <project> --json    — prochaine action en JSON");
   terminal.info("pnpm loop prompt <project>         — prompt court à copier");

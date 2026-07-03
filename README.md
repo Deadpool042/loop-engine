@@ -32,6 +32,7 @@ Loop Engine ne modifie pas les dépôts pilotés.
 - `pnpm loop context creatyss --json` : affiche le contexte projet en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop validate creatyss` : lance les validations configurées.
 - `pnpm loop review creatyss` : prépare un contexte de revue basé sur Git sans appeler d'IA.
+- `pnpm loop review creatyss --json` : prépare un contexte de revue Git en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop next creatyss` : affiche la prochaine action sûre pour un projet.
 - `pnpm loop next creatyss --json` : affiche la prochaine action sûre en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop prompt creatyss` : génère un prompt court à coller dans un assistant IA.

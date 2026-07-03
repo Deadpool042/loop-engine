@@ -118,6 +118,7 @@ Commandes concernées :
 - `pnpm loop summary --json`
 - `pnpm loop next <project> --json`
 - `pnpm loop prompt <project> --json`
+- `pnpm loop review <project> --json`
 
 Chaque sortie JSON doit inclure `schemaVersion: 1`.
 
@@ -140,6 +141,7 @@ Tests actuels :
 - `summary --json` expose `schemaVersion` et `projects`.
 - `next <project> --json` expose `schemaVersion` et `roadmap.selectedCandidate`.
 - `prompt <project> --json` expose `schemaVersion` et `instructions`.
+- `review <project> --json` expose `schemaVersion` et `diffStat`.
 
 Ces tests protègent les intégrations futures :
 
