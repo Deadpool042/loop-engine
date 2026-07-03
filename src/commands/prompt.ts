@@ -44,6 +44,36 @@ export function printProjectPrompt(project: ProjectConfig): void {
     for (const roadmapPath of snapshot.roadmap.paths) {
       console.log(`- ${roadmapPath}`);
     }
+
+    const safeCandidate = snapshot.roadmap.candidates.find(
+      (candidate) => candidate.kind === "safe",
+    );
+    const warningCandidate = snapshot.roadmap.candidates.find(
+      (candidate) => candidate.kind === "warning",
+    );
+    const blockedCandidate = snapshot.roadmap.candidates.find(
+      (candidate) => candidate.kind === "blocked",
+    );
+
+    const selectedCandidate = safeCandidate ?? warningCandidate ?? blockedCandidate;
+
+    console.log("");
+    console.log("## Candidat roadmap");
+    if (!selectedCandidate) {
+      console.log("- Aucun candidat détecté.");
+    } else {
+      console.log(`- Kind : ${selectedCandidate.kind}`);
+      console.log(`- Reason : ${selectedCandidate.reason}`);
+      console.log(`- Location : ${selectedCandidate.path}:${selectedCandidate.line}`);
+      console.log(`- Text : ${selectedCandidate.text}`);
+
+      if (selectedCandidate.kind === "blocked") {
+        console.log("- Attention : ne pas démarrer ce candidat directement.");
+        console.log("- Action recommandée : choisir un prérequis plus petit et réversible.");
+      } else if (selectedCandidate.kind === "warning") {
+        console.log("- Attention : candidat sensible, à cadrer avant implémentation.");
+      }
+    }
   }
 
   console.log("");
