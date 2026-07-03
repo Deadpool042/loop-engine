@@ -6,8 +6,10 @@
 
 - Sortie JSON versionnée avec `schemaVersion: 1`.
 - `summary --json`.
+- `context <project> --json`.
 - `next <project> --json`.
 - `prompt <project> --json`.
+- `review <project> --json`.
 - Tests de contrats JSON.
 - Documentation des contrats JSON.
 - Documentation des tests JSON.
