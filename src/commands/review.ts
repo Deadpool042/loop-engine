@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
-import { resolve } from "node:path";
 
 import { type ProjectConfig } from "../core/config.js";
+import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import { terminal } from "../ui/terminal.js";
 
 function run(command: string, cwd: string): string {
@@ -33,21 +33,25 @@ function printBlock(title: string, content: string): void {
 }
 
 export function printReviewContext(project: ProjectConfig): void {
-  const projectPath = resolve(project.path);
+  const snapshot = buildProjectSnapshot(project);
 
-  terminal.header(`Review • ${project.name}`);
-  terminal.info(`Project: ${project.name}`);
-  terminal.info(`Path: ${projectPath}`);
+  terminal.header(`Review • ${snapshot.project.name}`);
+  terminal.info(`Project: ${snapshot.project.name}`);
+  terminal.info(`Path: ${snapshot.project.path}`);
 
-  printBlock("Git status", run("git status --short", projectPath));
-  printBlock("Diff stat", run("git diff --stat", projectPath));
-  printBlock("Diff", run("git diff", projectPath));
+  if (!snapshot.git.requiresGit) {
+    terminal.warning("Git repository not required.");
+  } else {
+    printBlock("Git status", run("git status --short", snapshot.project.path));
+    printBlock("Diff stat", run("git diff --stat", snapshot.project.path));
+    printBlock("Diff", run("git diff", snapshot.project.path));
+  }
 
   terminal.section("Validation");
-  if (project.validation.length === 0) {
+  if (!snapshot.validation.configured) {
     terminal.warning("No validation command configured.");
   } else {
-    for (const command of project.validation) {
+    for (const command of snapshot.validation.commands) {
       terminal.success(command);
     }
   }
