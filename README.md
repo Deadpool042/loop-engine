@@ -47,3 +47,8 @@ Champs optionnels :
 Automatiser le déterministe.  
 Limiter l'IA au jugement.  
 Garder l'humain sur les décisions.
+
+## Validation locale
+
+- `pnpm run typecheck` : vérifie le typage TypeScript.
+- `pnpm run test` : lance les tests unitaires Node.
