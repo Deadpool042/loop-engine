@@ -83,6 +83,7 @@ export function printNextProjectAction(project: ProjectConfig): void {
         terminal.error("Only blocked candidates detected");
       }
 
+      terminal.info(`Kind: ${selectedCandidate.kind}`);
       terminal.info(`${selectedCandidate.path}:${selectedCandidate.line}`);
       terminal.info(selectedCandidate.text);
     } else {
