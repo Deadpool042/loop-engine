@@ -91,5 +91,6 @@ Voir aussi :
 
 - `docs/architecture/commands.md`
 - `docs/architecture/project-intelligence.md`
+- `docs/architecture/roadmap-reader.md`
 - `docs/integrations/json-consumers.md`
 
