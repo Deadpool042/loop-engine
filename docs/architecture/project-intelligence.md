@@ -59,6 +59,14 @@ Chaque candidat est classé en trois niveaux :
 - `warning` : candidat sensible qui nécessite une revue humaine renforcée.
 - `blocked` : candidat trop risqué pour être démarré directement.
 
+Chaque candidat expose aussi une `reason` déterministe expliquant le classement.
+
+Exemples :
+
+- `no sensitive keyword detected`
+- `contains "migration"`
+- `contains "bascule"`
+
 La classification V1 repose sur des mots-clés.
 
 Candidats `blocked` :
