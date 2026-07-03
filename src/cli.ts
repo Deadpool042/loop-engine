@@ -2,7 +2,7 @@
 import { printProjectContext } from "./commands/context.js";
 import { validateProject } from "./commands/validate.js";
 import { printReviewContext } from "./commands/review.js";
-import { printWorkspaceSummary } from "./commands/summary.js";
+import { printWorkspaceSummary, printWorkspaceSummaryJson } from "./commands/summary.js";
 import { printHelp } from "./commands/help.js";
 import { printNextProjectAction } from "./commands/next.js";
 import { printProjectPrompt } from "./commands/prompt.js";
@@ -17,6 +17,8 @@ const command = process.argv[2] ?? "help";
 
 if (command === "help" || command === "--help" || command === "-h") {
   printHelp();
+} else if (command === "summary" && process.argv.includes("--json")) {
+  printWorkspaceSummaryJson(loadConfig());
 } else if (command === "status") {
   printStatus(loadConfig());
 } else if (command === "summary") {

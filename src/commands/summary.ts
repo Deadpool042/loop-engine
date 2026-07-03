@@ -31,3 +31,9 @@ export function printWorkspaceSummary(config: Config): void {
     );
   }
 }
+
+export function printWorkspaceSummaryJson(config: Config): void {
+  const snapshots = config.projects.map((project) => buildProjectSnapshot(project));
+
+  console.log(JSON.stringify({ projects: snapshots }, null, 2));
+}
