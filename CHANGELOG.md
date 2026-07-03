@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-03 — V1.1 JSON et contrats
+
+### Ajouté
+
+- Sortie JSON versionnée avec `schemaVersion: 1`.
+- `summary --json`.
+- `next <project> --json`.
+- `prompt <project> --json`.
+- Tests de contrats JSON.
+- Documentation des contrats JSON.
+- Documentation des tests JSON.
+
+### Confirmé
+
+- Les sorties JSON sont destinées aux scripts, OpenClaw, n8n et futurs dashboards.
+- Toute sortie JSON publique doit rester versionnée.
+- Toute évolution de contrat doit être documentée et testée.
+
+---
+
 ## 2026-07-03 — V1 locale
 
 ### Ajouté
