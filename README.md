@@ -52,3 +52,4 @@ Garder l'humain sur les décisions.
 
 - `pnpm run typecheck` : vérifie le typage TypeScript.
 - `pnpm run test` : lance les tests unitaires Node.
+- `pnpm run validate` : lance le typecheck puis les tests.
