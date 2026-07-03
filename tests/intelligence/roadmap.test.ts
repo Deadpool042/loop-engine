@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { type ProjectConfig } from "../../src/core/config.js";
 import {
   findRoadmapCandidates,
   selectRoadmapCandidate,
   type RoadmapCandidate,
 } from "../../src/intelligence/roadmap.js";
-import { type ProjectConfig } from "../../src/core/config.js";
 
 function candidate(kind: RoadmapCandidate["kind"], text: string): RoadmapCandidate {
   return {
@@ -18,6 +18,31 @@ function candidate(kind: RoadmapCandidate["kind"], text: string): RoadmapCandida
     text,
     kind,
     reason: kind === "safe" ? "no sensitive keyword detected" : `contains "${text}"`,
+    status: "unknown",
+  };
+}
+
+function setupRoadmap(content: string): {
+  project: ProjectConfig;
+  projectPath: string;
+  cleanup: () => void;
+} {
+  const projectPath = mkdtempSync(join(tmpdir(), "loop-roadmap-"));
+  const roadmapPath = "roadmap.md";
+
+  writeFileSync(join(projectPath, roadmapPath), content);
+
+  return {
+    project: {
+      name: "test",
+      path: ".",
+      type: "test",
+      required_docs: [],
+      validation: [],
+      roadmap: [roadmapPath],
+    },
+    projectPath,
+    cleanup: () => rmSync(projectPath, { recursive: true, force: true }),
   };
 }
 
@@ -58,30 +83,6 @@ describe("selectRoadmapCandidate", () => {
 });
 
 describe("findRoadmapCandidates", () => {
-  function setupRoadmap(content: string): {
-    project: ProjectConfig;
-    projectPath: string;
-    cleanup: () => void;
-  } {
-    const projectPath = mkdtempSync(join(tmpdir(), "loop-roadmap-"));
-    const roadmapPath = "roadmap.md";
-
-    writeFileSync(join(projectPath, roadmapPath), content);
-
-    return {
-      project: {
-        name: "test",
-        path: ".",
-        type: "test",
-        required_docs: [],
-        validation: [],
-        roadmap: [roadmapPath],
-      },
-      projectPath,
-      cleanup: () => rmSync(projectPath, { recursive: true, force: true }),
-    };
-  }
-
   it("classifies safe roadmap candidates", () => {
     const { project, projectPath, cleanup } = setupRoadmap(
       "- [ ] Petite mise à jour documentation",
@@ -131,3 +132,60 @@ describe("findRoadmapCandidates", () => {
   });
 });
 
+describe("roadmap candidate status", () => {
+  it("detects todo candidates", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "- [ ] Ajouter une page admin",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.status, "todo");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("detects done candidates", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "- [x] Ajouter une page admin",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.status, "done");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("detects in progress candidates", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "⏳ En cours — stabilisation roadmap",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.status, "in_progress");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("uses unknown status when no status marker is found", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "Lot 12 — Stabilisation roadmap",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.status, "unknown");
+    } finally {
+      cleanup();
+    }
+  });
+});

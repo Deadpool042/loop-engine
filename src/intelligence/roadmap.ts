@@ -17,6 +17,8 @@ export type RoadmapCandidate = Readonly<{
 
 const CANDIDATE_PATTERNS = [
   "- [ ]",
+  "- [x]",
+  "- [X]",
   "TODO",
   "À faire",
   "A faire",
