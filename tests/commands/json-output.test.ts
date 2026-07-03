@@ -46,6 +46,17 @@ describe("json outputs", () => {
     assert.ok("selectedCandidate" in json.roadmap);
   });
 
+
+  it("review --json exposes schemaVersion and diffStat", () => {
+    const json = runJson("pnpm exec tsx src/cli.ts review loop-engine --json") as {
+      schemaVersion?: unknown;
+      diffStat?: unknown;
+    };
+
+    assert.equal(json.schemaVersion, 1);
+    assert.equal(typeof json.diffStat, "string");
+  });
+
   it("prompt --json exposes schemaVersion and instructions", () => {
     const json = runJson("pnpm exec tsx src/cli.ts prompt loop-engine --json") as {
       schemaVersion?: unknown;

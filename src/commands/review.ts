@@ -63,3 +63,32 @@ export function printReviewContext(project: ProjectConfig): void {
   terminal.info("Check validation commands before commit.");
   terminal.info("Prefer small, reversible changes.");
 }
+
+
+export function printReviewContextJson(project: ProjectConfig): void {
+  const snapshot = buildProjectSnapshot(project);
+
+  const gitStatus = snapshot.git.requiresGit
+    ? run("git status --short", snapshot.project.path)
+    : "";
+
+  const diffStat = snapshot.git.requiresGit
+    ? run("git diff --stat", snapshot.project.path)
+    : "";
+
+  console.log(
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        project: snapshot.project,
+        git: snapshot.git,
+        gitStatus,
+        diffStat,
+        validation: snapshot.validation,
+        health: snapshot.health,
+      },
+      null,
+      2,
+    ),
+  );
+}

@@ -1,7 +1,7 @@
 
 import { printProjectContext, printProjectContextJson } from "./commands/context.js";
 import { validateProject } from "./commands/validate.js";
-import { printReviewContext } from "./commands/review.js";
+import { printReviewContext, printReviewContextJson } from "./commands/review.js";
 import { printWorkspaceSummary, printWorkspaceSummaryJson } from "./commands/summary.js";
 import { printHelp } from "./commands/help.js";
 import { printNextProjectAction, printNextProjectActionJson } from "./commands/next.js";
@@ -61,7 +61,11 @@ if (command === "help" || command === "--help" || command === "-h") {
     process.exit(1);
   }
 
-  printReviewContext(project);
+  if (process.argv.includes("--json")) {
+    printReviewContextJson(project);
+  } else {
+    printReviewContext(project);
+  }
 } else if (command === "next") {
   const config = loadConfig();
   const projectName = getRequiredProjectName(process.argv, "next");
