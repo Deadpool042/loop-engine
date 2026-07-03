@@ -39,6 +39,16 @@ export function printNextProjectAction(project: ProjectConfig): void {
       terminal.success(roadmapPath);
     }
 
+    const firstCandidate = snapshot.roadmap.candidates[0];
+
+    if (firstCandidate) {
+      terminal.info(
+        `Candidate: ${firstCandidate.path}:${firstCandidate.line} — ${firstCandidate.text}`,
+      );
+    } else {
+      terminal.warning("No roadmap candidate detected.");
+    }
+
     terminal.info("Next action: open the roadmap and select the next safe micro-lot.");
   }
 

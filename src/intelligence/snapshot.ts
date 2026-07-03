@@ -31,6 +31,11 @@ export type ProjectSnapshot = Readonly<{
   roadmap: Readonly<{
     available: boolean;
     paths: readonly string[];
+    candidates: readonly Readonly<{
+      path: string;
+      line: number;
+      text: string;
+    }>[];
   }>;
 
   health: ProjectHealth;
