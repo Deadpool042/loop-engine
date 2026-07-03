@@ -29,6 +29,7 @@ Loop Engine ne modifie pas les dépôts pilotés.
 - `pnpm loop status` : affiche l'état détaillé des projets configurés.
 - `pnpm loop doctor` : vérifie la cohérence des chemins, docs et contraintes Git.
 - `pnpm loop context creatyss` : prépare un contexte court pour reprendre un projet.
+- `pnpm loop context creatyss --json` : affiche le contexte projet en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop validate creatyss` : lance les validations configurées.
 - `pnpm loop review creatyss` : prépare un contexte de revue basé sur Git sans appeler d'IA.
 - `pnpm loop next creatyss` : affiche la prochaine action sûre pour un projet.
