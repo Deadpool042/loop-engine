@@ -36,6 +36,7 @@ export type ProjectSnapshot = Readonly<{
       line: number;
       text: string;
       kind: "safe" | "warning" | "blocked";
+      reason: string;
     }>[];
   }>;
 

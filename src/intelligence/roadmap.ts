@@ -10,6 +10,7 @@ export type RoadmapCandidate = Readonly<{
   line: number;
   text: string;
   kind: RoadmapCandidateKind;
+  reason: string;
 }>;
 
 const CANDIDATE_PATTERNS = [
@@ -49,18 +50,38 @@ const WARNING_PATTERNS = [
   "securite",
 ] as const;
 
-function classifyCandidateLine(line: string): RoadmapCandidateKind {
+function classifyCandidateLine(line: string): Readonly<{
+  kind: RoadmapCandidateKind;
+  reason: string;
+}> {
   const normalized = line.toLowerCase();
 
-  if (BLOCKED_PATTERNS.some((pattern) => normalized.includes(pattern))) {
-    return "blocked";
+  const blockedPattern = BLOCKED_PATTERNS.find((pattern) =>
+    normalized.includes(pattern),
+  );
+
+  if (blockedPattern) {
+    return {
+      kind: "blocked",
+      reason: `contains "${blockedPattern}"`,
+    };
   }
 
-  if (WARNING_PATTERNS.some((pattern) => normalized.includes(pattern))) {
-    return "warning";
+  const warningPattern = WARNING_PATTERNS.find((pattern) =>
+    normalized.includes(pattern),
+  );
+
+  if (warningPattern) {
+    return {
+      kind: "warning",
+      reason: `contains "${warningPattern}"`,
+    };
   }
 
-  return "safe";
+  return {
+    kind: "safe",
+    reason: "no sensitive keyword detected",
+  };
 }
 
 function isCandidateLine(line: string): boolean {
@@ -90,11 +111,14 @@ export function findRoadmapCandidates(
         return;
       }
 
+      const classification = classifyCandidateLine(trimmed);
+
       candidates.push({
         path: roadmapPath,
         line: index + 1,
         text: trimmed,
-        kind: classifyCandidateLine(trimmed),
+        kind: classification.kind,
+        reason: classification.reason,
       });
     });
   }
