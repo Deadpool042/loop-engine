@@ -69,7 +69,15 @@ export function printNextProjectAction(project: ProjectConfig): void {
     }
 
     terminal.section("Next action");
-    terminal.info("Open the roadmap and select the next safe micro-lot.");
+    if (selectedCandidate?.kind === "blocked") {
+      terminal.warning("Do not start this candidate directly.");
+      terminal.info("Open the roadmap and choose a smaller safe prerequisite.");
+    } else if (selectedCandidate?.kind === "warning") {
+      terminal.warning("Review this candidate carefully before starting.");
+      terminal.info("Prefer a smaller safe prerequisite if possible.");
+    } else {
+      terminal.info("Open the roadmap and select the next safe micro-lot.");
+    }
   }
 
   terminal.section("Validation");
