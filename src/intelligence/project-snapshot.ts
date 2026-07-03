@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 
 import { type ProjectConfig } from "../core/config.js";
 import { docExists } from "../core/docs.js";
-import { getGitBranch, getGitState } from "../core/git.js";
+import { getGitBranch, getGitState, getGitStatusText, getLastCommit } from "../core/git.js";
 import { type ProjectSnapshot } from "./snapshot.js";
 
 export function buildProjectSnapshot(
@@ -24,6 +24,16 @@ export function buildProjectSnapshot(
       ? "n/a"
       : getGitBranch(projectPath);
 
+  const statusText =
+    project.requires_git === false
+      ? ""
+      : getGitStatusText(projectPath);
+
+  const lastCommit =
+    project.requires_git === false
+      ? null
+      : getLastCommit(projectPath);
+
   const health: ProjectSnapshot["health"] =
     missingDocs.length === 0 ? "good" : "warning";
 
@@ -38,6 +48,8 @@ export function buildProjectSnapshot(
       branch,
       clean,
       requiresGit: project.requires_git !== false,
+      statusText,
+      lastCommit,
     },
 
     docs: {

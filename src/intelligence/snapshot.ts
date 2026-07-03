@@ -11,6 +11,11 @@ export type ProjectSnapshot = Readonly<{
     branch: string;
     clean: boolean;
     requiresGit: boolean;
+    statusText: string;
+    lastCommit: Readonly<{
+      hash: string;
+      message: string;
+    }> | null;
   }>;
 
   docs: Readonly<{
