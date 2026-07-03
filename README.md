@@ -53,3 +53,21 @@ Garder l'humain sur les décisions.
 - `pnpm run typecheck` : vérifie le typage TypeScript.
 - `pnpm run test` : lance les tests unitaires Node.
 - `pnpm run validate` : lance le typecheck puis les tests.
+
+## Auto-pilotage local
+
+Loop Engine est déclaré dans `projects.yaml` comme projet `loop-engine`.
+
+Cela permet d'utiliser la CLI sur elle-même :
+
+- `pnpm loop summary`
+- `pnpm loop context loop-engine`
+- `pnpm loop validate loop-engine`
+- `pnpm loop review loop-engine`
+
+Cette boucle reste déterministe :
+
+- aucun appel IA automatique ;
+- aucune modification automatique ;
+- aucune validation implicite hors des commandes configurées.
+
