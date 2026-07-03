@@ -2,6 +2,12 @@
 
 ## 2026-07-03 — V1.1 JSON et contrats
 
+Tag local : `v1.1-local-json`
+
+
+Tag local : `v1.1-local-json`
+
+
 ### Ajouté
 
 - Sortie JSON versionnée avec `schemaVersion: 1`.
