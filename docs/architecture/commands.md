@@ -130,3 +130,23 @@ Règles :
 - documenter toute évolution de contrat
 - tester les sorties JSON critiques avant intégration externe
 
+
+## Tests des contrats JSON
+
+Les sorties JSON critiques doivent être couvertes par des tests.
+
+Tests actuels :
+
+- `summary --json` expose `schemaVersion` et `projects`.
+- `next <project> --json` expose `schemaVersion` et `roadmap.selectedCandidate`.
+- `prompt <project> --json` expose `schemaVersion` et `instructions`.
+
+Ces tests protègent les intégrations futures :
+
+- scripts locaux ;
+- OpenClaw ;
+- n8n ;
+- dashboard web.
+
+Toute nouvelle sortie JSON publique doit être ajoutée aux tests de contrat.
+
