@@ -37,3 +37,51 @@ Champs prévus :
 - aucune dépendance à un fournisseur IA
 - aucune consommation de tokens par défaut
 - architecture extensible
+
+---
+
+## Roadmap candidates
+
+Le moteur peut détecter des candidats simples dans les fichiers déclarés dans `roadmap`.
+
+La détection V1 est volontairement naïve. Elle repère les lignes contenant :
+
+- `- [ ]`
+- `TODO`
+- `À faire`
+- `A faire`
+- `Prochain`
+- `prochain`
+
+Chaque candidat est classé en trois niveaux :
+
+- `safe` : candidat a priori compatible avec un micro-lot.
+- `warning` : candidat sensible qui nécessite une revue humaine renforcée.
+- `blocked` : candidat trop risqué pour être démarré directement.
+
+La classification V1 repose sur des mots-clés.
+
+Candidats `blocked` :
+
+- `production finale`
+- `prod`
+- `paiement`
+- `migration`
+- `delete`
+- `supprimer`
+
+Candidats `warning` :
+
+- `déploiement`
+- `deploiement`
+- `VPS`
+- `DNS`
+- `bascule`
+- `sécurité`
+- `securite`
+
+La commande `next` doit préférer un candidat `safe`, puis `warning`, puis `blocked`.
+
+Si seul un candidat `blocked` est disponible, Loop Engine ne doit pas le présenter comme prochain micro-lot sûr. Il doit inviter à ouvrir la roadmap et choisir un prérequis plus petit et réversible.
+
+Cette logique reste déterministe et ne consomme aucun token.
