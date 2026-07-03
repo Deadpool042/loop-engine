@@ -1,5 +1,6 @@
 import { type ProjectConfig } from "../core/config.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
+import { selectRoadmapCandidate } from "../intelligence/roadmap.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printNextProjectAction(project: ProjectConfig): void {
@@ -62,17 +63,7 @@ export function printNextProjectAction(project: ProjectConfig): void {
 
     terminal.section("Selected roadmap candidate");
 
-    const safeCandidate = snapshot.roadmap.candidates.find(
-      (candidate) => candidate.kind === "safe",
-    );
-    const warningCandidate = snapshot.roadmap.candidates.find(
-      (candidate) => candidate.kind === "warning",
-    );
-    const blockedCandidate = snapshot.roadmap.candidates.find(
-      (candidate) => candidate.kind === "blocked",
-    );
-
-    const selectedCandidate = safeCandidate ?? warningCandidate ?? blockedCandidate;
+    const selectedCandidate = selectRoadmapCandidate(snapshot.roadmap.candidates);
 
     if (selectedCandidate) {
       if (selectedCandidate.kind === "safe") {
