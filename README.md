@@ -25,6 +25,7 @@ Loop Engine ne modifie pas les dépôts pilotés.
 ## Commandes
 
 - `pnpm loop summary` : affiche une vue compacte du workspace.
+- `pnpm loop summary --json` : affiche la vue workspace en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop status` : affiche l'état détaillé des projets configurés.
 - `pnpm loop doctor` : vérifie la cohérence des chemins, docs et contraintes Git.
 - `pnpm loop context creatyss` : prépare un contexte court pour reprendre un projet.
