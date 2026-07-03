@@ -19,6 +19,14 @@ const CANDIDATE_PATTERNS = [
   "A faire",
   "Prochain",
   "prochain",
+  "Prochain lot",
+  "prochain lot",
+  "Lot ",
+  "lot ",
+  "H1-L",
+  "H2-L",
+  "H3-L",
+  "⏳",
 ] as const;
 
 
