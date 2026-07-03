@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "loop": "tsx src/cli.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "tsx": "^4.20.5",
