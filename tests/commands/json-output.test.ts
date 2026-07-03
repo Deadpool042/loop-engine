@@ -23,6 +23,16 @@ describe("json outputs", () => {
     assert.ok(Array.isArray(json.projects));
   });
 
+  it("context --json exposes schemaVersion and docs", () => {
+    const json = runJson("pnpm exec tsx src/cli.ts context loop-engine --json") as {
+      schemaVersion?: unknown;
+      docs?: unknown;
+    };
+
+    assert.equal(json.schemaVersion, 1);
+    assert.ok(json.docs);
+  });
+
   it("next --json exposes schemaVersion and selected candidate field", () => {
     const json = runJson("pnpm exec tsx src/cli.ts next loop-engine --json") as {
       schemaVersion?: unknown;

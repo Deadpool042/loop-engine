@@ -1,5 +1,5 @@
 
-import { printProjectContext } from "./commands/context.js";
+import { printProjectContext, printProjectContextJson } from "./commands/context.js";
 import { validateProject } from "./commands/validate.js";
 import { printReviewContext } from "./commands/review.js";
 import { printWorkspaceSummary, printWorkspaceSummaryJson } from "./commands/summary.js";
@@ -35,7 +35,11 @@ if (command === "help" || command === "--help" || command === "-h") {
     process.exit(1);
   }
 
-  printProjectContext(project);
+  if (process.argv.includes("--json")) {
+    printProjectContextJson(project);
+  } else {
+    printProjectContext(project);
+  }
 } else if (command === "validate") {
   const config = loadConfig();
   const projectName = getRequiredProjectName(process.argv, "validate");
