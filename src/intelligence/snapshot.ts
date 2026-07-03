@@ -28,5 +28,10 @@ export type ProjectSnapshot = Readonly<{
     configured: boolean;
   }>;
 
+  roadmap: Readonly<{
+    available: boolean;
+    paths: readonly string[];
+  }>;
+
   health: ProjectHealth;
 }>;

@@ -10,6 +10,8 @@ projects:
     validation:
       - pnpm run typecheck
       - pnpm run lint
+    roadmap:
+      - docs/roadmap/projet-creatyss.md
 
   - name: lp-infra
     path: ../lp-infra

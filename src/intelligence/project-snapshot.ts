@@ -34,6 +34,10 @@ export function buildProjectSnapshot(
       ? null
       : getLastCommit(projectPath);
 
+  const roadmapPaths = project.roadmap ?? [];
+
+  const roadmapAvailable = roadmapPaths.length > 0;
+
   const health: ProjectSnapshot["health"] =
     missingDocs.length === 0 ? "good" : "warning";
 
@@ -60,6 +64,11 @@ export function buildProjectSnapshot(
     validation: {
       commands: project.validation,
       configured: project.validation.length > 0,
+    },
+
+    roadmap: {
+      available: roadmapAvailable,
+      paths: roadmapPaths,
     },
 
     health,
