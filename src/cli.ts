@@ -4,7 +4,7 @@ import { validateProject } from "./commands/validate.js";
 import { printReviewContext } from "./commands/review.js";
 import { printWorkspaceSummary, printWorkspaceSummaryJson } from "./commands/summary.js";
 import { printHelp } from "./commands/help.js";
-import { printNextProjectAction } from "./commands/next.js";
+import { printNextProjectAction, printNextProjectActionJson } from "./commands/next.js";
 import { printProjectPrompt } from "./commands/prompt.js";
 import { printStatus } from "./commands/status.js";
 import { printDoctor } from "./commands/doctor.js";
@@ -68,7 +68,11 @@ if (command === "help" || command === "--help" || command === "-h") {
     process.exit(1);
   }
 
-  printNextProjectAction(project);
+  if (process.argv.includes("--json")) {
+    printNextProjectActionJson(project);
+  } else {
+    printNextProjectAction(project);
+  }
 } else if (command === "prompt") {
   const config = loadConfig();
   const projectName = getRequiredProjectName(process.argv, "prompt");

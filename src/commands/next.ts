@@ -110,3 +110,26 @@ export function printNextProjectAction(project: ProjectConfig): void {
   terminal.info("4. Run validation.");
   terminal.info("5. Run review before commit.");
 }
+
+
+export function printNextProjectActionJson(project: ProjectConfig): void {
+  const snapshot = buildProjectSnapshot(project);
+  const selectedCandidate = selectRoadmapCandidate(snapshot.roadmap.candidates);
+
+  console.log(
+    JSON.stringify(
+      {
+        project: snapshot.project,
+        git: snapshot.git,
+        roadmap: {
+          ...snapshot.roadmap,
+          selectedCandidate,
+        },
+        validation: snapshot.validation,
+        health: snapshot.health,
+      },
+      null,
+      2,
+    ),
+  );
+}
