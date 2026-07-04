@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-07-03 — V1.2 Roadmap Reader
+
+### Ajouté
+
+- Statut déterministe des candidats roadmap (`todo`, `in_progress`, `done`, `unknown`).
+- Les candidats `done` sont ignorés lors de la sélection.
+- Détection enrichie des statuts Markdown (`- [ ]`, `- [x]`, `⏳`, `En cours`).
+- Tests couvrant les statuts roadmap.
+- Documentation de l'architecture du Roadmap Reader.
+- Documentation des règles de sélection et des mots-clés sensibles.
+
+### Amélioré
+
+- Réduction des faux positifs des mots-clés bloquants.
+- `prod` n'est plus considéré comme un mot-clé bloquant.
+- `mise en production` devient un signal bloquant explicite.
+
+### Confirmé
+
+- Sélection : `safe` → `warning` → `blocked`.
+- Les candidats terminés ne sont jamais proposés comme prochaine action.
+- Les règles restent déterministes, sans IA et explicables.
+
+---
+
 ## 2026-07-03 — V1.1 JSON et contrats
 
 Tag local : `v1.1-local-json`
