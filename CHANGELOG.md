@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-04 — V1.3.2 JSON check
+
+### Ajouté
+
+- Commande `json-check`.
+- Vérification des sorties JSON publiques :
+  - `summary --json`
+  - `context <project> --json`
+  - `next <project> --json`
+  - `prompt <project> --json`
+  - `review <project> --json`
+
+### Confirmé
+
+- Les sorties JSON publiques restent parsables.
+- Chaque sortie JSON publique expose `schemaVersion: 1`.
+
+---
+
 ## 2026-07-04 — V1.3.1 JSON roadmap compact
 
 ### Ajouté
