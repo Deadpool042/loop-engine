@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-04 — V1.3 Roadmap selected candidate
+
+### Ajouté
+
+- `snapshot.roadmap.selectedCandidate`.
+- Centralisation de la sélection roadmap dans le `ProjectSnapshot`.
+- `next` et `prompt` consomment le candidat sélectionné depuis le snapshot.
+- Documentation de `selectedCandidate` dans le Roadmap Reader.
+
+### Confirmé
+
+- `ProjectSnapshot` reste la source de vérité pour les commandes.
+- Les commandes ne doivent pas recalculer la sélection roadmap.
+- Le comportement CLI reste inchangé.
+
+---
+
 ## 2026-07-03 — V1.2 Roadmap Reader
 
 ### Ajouté
