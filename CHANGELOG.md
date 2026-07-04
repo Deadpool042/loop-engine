@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-04 — V1.3.1 JSON roadmap compact
+
+### Ajouté
+
+- `snapshot.roadmap.stats`.
+- Statistiques roadmap : `total`, `todo`, `inProgress`, `done`, `unknown`, `safe`, `warning`, `blocked`.
+
+### Corrigé
+
+- Les sorties JSON publiques sont compactes.
+- Les sorties JSON publiques n'exposent plus toute la liste `roadmap.candidates` par défaut.
+- Les sorties JSON peuvent être redirigées vers fichier et parsées par Node.
+
+### Confirmé
+
+- Les JSON publics exposent `roadmap.available`, `roadmap.paths`, `roadmap.selectedCandidate` et `roadmap.stats`.
+- La liste complète `roadmap.candidates` reste interne au `ProjectSnapshot`.
+- Toute exposition publique de `roadmap.candidates` devra passer par une option explicite dédiée.
+
+---
+
 ## 2026-07-04 — V1.3 Roadmap selected candidate
 
 ### Ajouté
