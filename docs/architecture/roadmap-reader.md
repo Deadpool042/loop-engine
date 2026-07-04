@@ -113,3 +113,34 @@ Le Roadmap Reader ne doit pas :
 
 pnpm run validate
 git status –short
+
+
+## Sélection V1.2
+
+La sélection ignore les candidats dont le `status` est `done`.
+
+Parmi les candidats restants, l'ordre de préférence est :
+
+1. premier candidat `safe` ;
+2. sinon premier candidat `warning` ;
+3. sinon premier candidat `blocked` ;
+4. sinon aucun candidat sélectionné.
+
+Un candidat `blocked` peut être affiché pour information, mais il ne doit pas être présenté comme un micro-lot sûr.
+
+---
+
+## Raffinement des mots-clés sensibles
+
+La classification doit éviter les faux positifs trop larges.
+
+Règles appliquées :
+
+- `prod` n'est pas un mot-clé bloquant, car il peut apparaître dans `produit`.
+- `production finale` reste bloquant.
+- `mise en production` est bloquant.
+- `paiement`, `migration`, `delete` et `supprimer` sont bloquants.
+- `déploiement`, `deploiement`, `VPS`, `DNS`, `bascule`, `sécurité` et `securite` restent sensibles (`warning`).
+
+Objectif : détecter les vrais risques sans bloquer des lots ordinaires comme une fiche produit.
+
