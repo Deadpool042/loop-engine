@@ -42,6 +42,25 @@ export function buildProjectSnapshot(
   const roadmapCandidates = findRoadmapCandidates(project, projectPath);
   const selectedRoadmapCandidate = selectRoadmapCandidate(roadmapCandidates);
 
+  const roadmapStats = {
+    total: roadmapCandidates.length,
+    todo: roadmapCandidates.filter((candidate) => candidate.status === "todo").length,
+    inProgress: roadmapCandidates.filter(
+      (candidate) => candidate.status === "in_progress",
+    ).length,
+    done: roadmapCandidates.filter((candidate) => candidate.status === "done").length,
+    unknown: roadmapCandidates.filter(
+      (candidate) => candidate.status === "unknown",
+    ).length,
+    safe: roadmapCandidates.filter((candidate) => candidate.kind === "safe").length,
+    warning: roadmapCandidates.filter(
+      (candidate) => candidate.kind === "warning",
+    ).length,
+    blocked: roadmapCandidates.filter(
+      (candidate) => candidate.kind === "blocked",
+    ).length,
+  };
+
   const health: ProjectSnapshot["health"] =
     missingDocs.length === 0 ? "good" : "warning";
 
@@ -75,6 +94,7 @@ export function buildProjectSnapshot(
       paths: roadmapPaths,
       candidates: roadmapCandidates,
       selectedCandidate: selectedRoadmapCandidate,
+      stats: roadmapStats,
     },
 
     health,

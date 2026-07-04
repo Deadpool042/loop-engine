@@ -47,6 +47,16 @@ export type ProjectSnapshot = Readonly<{
       reason: string;
       status: "todo" | "in_progress" | "done" | "unknown";
     }> | null;
+    stats: Readonly<{
+      total: number;
+      todo: number;
+      inProgress: number;
+      done: number;
+      unknown: number;
+      safe: number;
+      warning: number;
+      blocked: number;
+    }>;
   }>;
 
   health: ProjectHealth;
