@@ -37,7 +37,7 @@ const CANDIDATE_PATTERNS = [
 
 const BLOCKED_PATTERNS = [
   "production finale",
-  "prod",
+  "mise en production",
   "paiement",
   "migration",
   "delete",

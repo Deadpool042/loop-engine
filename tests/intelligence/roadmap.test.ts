@@ -132,6 +132,37 @@ describe("findRoadmapCandidates", () => {
     }
   });
 
+
+  it("does not block generic product wording", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "- [ ] Ajouter une fiche produit simple",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.kind, "safe");
+      assert.equal(candidates[0]?.reason, "no sensitive keyword detected");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("blocks explicit production rollout wording", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "- [ ] Préparer la mise en production",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.kind, "blocked");
+      assert.equal(candidates[0]?.reason, 'contains "mise en production"');
+    } finally {
+      cleanup();
+    }
+  });
+
   it("classifies blocked roadmap candidates", () => {
     const { project, projectPath, cleanup } = setupRoadmap(
       "- [ ] Bascule production finale creatyss.com",
