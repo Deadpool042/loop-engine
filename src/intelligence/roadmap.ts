@@ -152,9 +152,13 @@ export function findRoadmapCandidates(
 export function selectRoadmapCandidate(
   candidates: readonly RoadmapCandidate[],
 ): RoadmapCandidate | null {
-  const safeCandidate = candidates.find((candidate) => candidate.kind === "safe");
-  const warningCandidate = candidates.find((candidate) => candidate.kind === "warning");
-  const blockedCandidate = candidates.find((candidate) => candidate.kind === "blocked");
+  const activeCandidates = candidates.filter(
+    (candidate) => candidate.status !== "done",
+  );
+
+  const safeCandidate = activeCandidates.find((candidate) => candidate.kind === "safe");
+  const warningCandidate = activeCandidates.find((candidate) => candidate.kind === "warning");
+  const blockedCandidate = activeCandidates.find((candidate) => candidate.kind === "blocked");
 
   return safeCandidate ?? warningCandidate ?? blockedCandidate ?? null;
 }

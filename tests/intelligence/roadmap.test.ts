@@ -75,6 +75,23 @@ describe("selectRoadmapCandidate", () => {
     assert.equal(selected?.kind, "blocked");
   });
 
+
+  it("ignores done candidates when selecting the next roadmap candidate", () => {
+    const selected = selectRoadmapCandidate([
+      {
+        ...candidate("safe", "done docs update"),
+        status: "done",
+      },
+      {
+        ...candidate("warning", "bascule DNS"),
+        status: "todo",
+      },
+    ]);
+
+    assert.equal(selected?.kind, "warning");
+    assert.equal(selected?.status, "todo");
+  });
+
   it("returns null when no candidate exists", () => {
     const selected = selectRoadmapCandidate([]);
 
