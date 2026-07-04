@@ -152,3 +152,31 @@ Ces tests protègent les intégrations futures :
 
 Toute nouvelle sortie JSON publique doit être ajoutée aux tests de contrat.
 
+
+## Roadmap JSON compact
+
+Les sorties JSON publiques ne doivent pas exposer toute la liste `roadmap.candidates` par défaut.
+
+Motifs :
+
+- éviter des payloads trop volumineux
+- permettre la redirection vers fichier
+- garder les sorties consommables par Node, n8n, OpenClaw et dashboards
+- limiter les données au nécessaire pour une décision
+
+Structure publique recommandée :
+
+- `roadmap.available`
+- `roadmap.paths`
+- `roadmap.selectedCandidate`
+- `roadmap.stats.total`
+- `roadmap.stats.todo`
+- `roadmap.stats.inProgress`
+- `roadmap.stats.done`
+- `roadmap.stats.unknown`
+- `roadmap.stats.safe`
+- `roadmap.stats.warning`
+- `roadmap.stats.blocked`
+
+La liste complète `roadmap.candidates` peut rester disponible dans le `ProjectSnapshot` interne, mais elle ne doit pas être exposée dans les sorties JSON publiques sans option explicite dédiée.
+
