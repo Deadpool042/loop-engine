@@ -1,6 +1,5 @@
 import { type ProjectConfig } from "../core/config.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
-import { selectRoadmapCandidate } from "../intelligence/roadmap.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printNextProjectAction(project: ProjectConfig): void {
@@ -63,7 +62,7 @@ export function printNextProjectAction(project: ProjectConfig): void {
 
     terminal.section("Selected roadmap candidate");
 
-    const selectedCandidate = selectRoadmapCandidate(snapshot.roadmap.candidates);
+    const selectedCandidate = snapshot.roadmap.selectedCandidate;
 
     if (selectedCandidate) {
       if (selectedCandidate.kind === "safe") {
@@ -115,7 +114,7 @@ export function printNextProjectAction(project: ProjectConfig): void {
 
 export function printNextProjectActionJson(project: ProjectConfig): void {
   const snapshot = buildProjectSnapshot(project);
-  const selectedCandidate = selectRoadmapCandidate(snapshot.roadmap.candidates);
+  const selectedCandidate = snapshot.roadmap.selectedCandidate;
 
   console.log(
     JSON.stringify(

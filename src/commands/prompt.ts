@@ -1,6 +1,5 @@
 import { type ProjectConfig } from "../core/config.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
-import { selectRoadmapCandidate } from "../intelligence/roadmap.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printProjectPrompt(project: ProjectConfig): void {
@@ -46,7 +45,7 @@ export function printProjectPrompt(project: ProjectConfig): void {
       console.log(`- ${roadmapPath}`);
     }
 
-    const selectedCandidate = selectRoadmapCandidate(snapshot.roadmap.candidates);
+    const selectedCandidate = snapshot.roadmap.selectedCandidate;
 
     console.log("");
     console.log("## Candidat roadmap");
@@ -91,7 +90,7 @@ export function printProjectPrompt(project: ProjectConfig): void {
 
 export function printProjectPromptJson(project: ProjectConfig): void {
   const snapshot = buildProjectSnapshot(project);
-  const selectedCandidate = selectRoadmapCandidate(snapshot.roadmap.candidates);
+  const selectedCandidate = snapshot.roadmap.selectedCandidate;
 
   console.log(
     JSON.stringify(

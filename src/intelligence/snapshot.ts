@@ -39,6 +39,14 @@ export type ProjectSnapshot = Readonly<{
       reason: string;
       status: "todo" | "in_progress" | "done" | "unknown";
     }>[];
+    selectedCandidate: Readonly<{
+      path: string;
+      line: number;
+      text: string;
+      kind: "safe" | "warning" | "blocked";
+      reason: string;
+      status: "todo" | "in_progress" | "done" | "unknown";
+    }> | null;
   }>;
 
   health: ProjectHealth;
