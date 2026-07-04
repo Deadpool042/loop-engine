@@ -5,6 +5,8 @@
 ### Ajouté
 
 - Commande `json-check`.
+- `pnpm run validate` inclut maintenant `json-check`.
+- `pnpm run validate` inclut maintenant `json-check`.
 - Vérification des sorties JSON publiques :
   - `summary --json`
   - `context <project> --json`
