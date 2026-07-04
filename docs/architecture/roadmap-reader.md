@@ -144,3 +144,22 @@ Règles appliquées :
 
 Objectif : détecter les vrais risques sans bloquer des lots ordinaires comme une fiche produit.
 
+
+## Candidat sélectionné
+
+Le candidat roadmap sélectionné est exposé dans le `ProjectSnapshot` via :
+
+- `snapshot.roadmap.selectedCandidate`
+
+Ce champ est calculé une seule fois lors de la construction du snapshot.
+
+Les commandes doivent consommer ce champ plutôt que rappeler directement `selectRoadmapCandidate`.
+
+Objectif :
+
+- garder `ProjectSnapshot` comme source de vérité ;
+- éviter les duplications entre `next`, `prompt` et futures commandes ;
+- faciliter les sorties JSON et intégrations externes.
+
+`selectedCandidate` peut être `null` si aucun candidat actif n'est disponible.
+
