@@ -123,14 +123,14 @@ export function printNextProjectActionJson(project: ProjectConfig): void {
         project: snapshot.project,
         git: snapshot.git,
         roadmap: {
-          ...snapshot.roadmap,
+          available: snapshot.roadmap.available,
+          paths: snapshot.roadmap.paths,
           selectedCandidate,
+          stats: snapshot.roadmap.stats,
         },
         validation: snapshot.validation,
         health: snapshot.health,
       },
-      null,
-      2,
     ),
   );
 }
