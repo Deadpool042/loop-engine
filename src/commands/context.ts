@@ -63,12 +63,15 @@ export function printProjectContextJson(project: ProjectConfig): void {
         project: snapshot.project,
         git: snapshot.git,
         docs: snapshot.docs,
-        roadmap: snapshot.roadmap,
+        roadmap: {
+          available: snapshot.roadmap.available,
+          paths: snapshot.roadmap.paths,
+          selectedCandidate: snapshot.roadmap.selectedCandidate,
+          stats: snapshot.roadmap.stats,
+        },
         validation: snapshot.validation,
         health: snapshot.health,
       },
-      null,
-      2,
     ),
   );
 }

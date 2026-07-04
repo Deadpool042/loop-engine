@@ -100,8 +100,10 @@ export function printProjectPromptJson(project: ProjectConfig): void {
         git: snapshot.git,
         docs: snapshot.docs,
         roadmap: {
-          ...snapshot.roadmap,
+          available: snapshot.roadmap.available,
+          paths: snapshot.roadmap.paths,
           selectedCandidate,
+          stats: snapshot.roadmap.stats,
         },
         validation: snapshot.validation,
         instructions: [
@@ -113,8 +115,6 @@ export function printProjectPromptJson(project: ProjectConfig): void {
           "Lancer les validations configurées avant review ou commit.",
         ],
       },
-      null,
-      2,
     ),
   );
 }

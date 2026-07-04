@@ -87,8 +87,6 @@ export function printReviewContextJson(project: ProjectConfig): void {
         validation: snapshot.validation,
         health: snapshot.health,
       },
-      null,
-      2,
     ),
   );
 }

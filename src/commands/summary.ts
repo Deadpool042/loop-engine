@@ -33,7 +33,19 @@ export function printWorkspaceSummary(config: Config): void {
 }
 
 export function printWorkspaceSummaryJson(config: Config): void {
-  const snapshots = config.projects.map((project) => buildProjectSnapshot(project));
+  const projects = config.projects.map((project) => {
+    const snapshot = buildProjectSnapshot(project);
 
-  console.log(JSON.stringify({ schemaVersion: 1, projects: snapshots }, null, 2));
+    return {
+      ...snapshot,
+      roadmap: {
+        available: snapshot.roadmap.available,
+        paths: snapshot.roadmap.paths,
+        selectedCandidate: snapshot.roadmap.selectedCandidate,
+        stats: snapshot.roadmap.stats,
+      },
+    };
+  });
+
+  console.log(JSON.stringify({ schemaVersion: 1, projects }));
 }
