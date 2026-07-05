@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-05 — V1.8.2 Local RAG index
+
+### Ajouté
+
+- Commande `rag-index`.
+- Génération de `.loop-engine/rag-index.json`.
+- Index local reconstructible des sources documentaires autorisées.
+- `.loop-engine/` ignoré par Git.
+
+### Confirmé
+
+- Aucun embedding obligatoire.
+- Aucun service externe.
+- Aucune IA automatique.
+- Index supprimable et reconstructible.
+
+---
+
 ## 2026-07-05 — V1.8 Memory layer audit
 
 ### Ajouté

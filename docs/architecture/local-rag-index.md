@@ -60,3 +60,17 @@ Aucune donnée métier importante ne doit exister uniquement dans l'index.
 - Pas de service externe obligatoire.
 - Pas d'écriture dans les projets inspectés.
 - Sources toujours traçables.
+
+
+## Commande V1
+
+La commande disponible est :
+
+- `pnpm exec tsx src/cli.ts rag-index`
+
+Elle reconstruit :
+
+- `.loop-engine/rag-index.json`
+
+Le dossier `.loop-engine/` est local, reconstructible et ignoré par Git.
+
