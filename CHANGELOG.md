@@ -8,6 +8,11 @@
 - Script `pnpm run rag-search -- <query>`.
 - Recherche locale déterministe dans `.loop-engine/rag-index.json`.
 - Scoring simple par occurrences.
+- Test de la commande `rag-search`.
+
+### Corrigé
+
+- `rag-search` ignore le séparateur npm `--`.
 
 ### Confirmé
 
