@@ -31,7 +31,8 @@ if (command === "help" || command === "--help" || command === "-h") {
 } else if (command === "rag-index") {
   runRagIndex();
 } else if (command === "rag-search") {
-  runRagSearch(process.argv.slice(3).join(" "));
+  const query = process.argv.slice(3).filter((argument) => argument !== "--").join(" ");
+  runRagSearch(query);
 } else if (command === "doctor") {
   printDoctor(loadConfig());
 } else if (command === "context") {
