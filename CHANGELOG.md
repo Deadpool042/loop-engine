@@ -6,6 +6,8 @@
 
 - Cadrage V1.7 des intégrations read-only.
 - Documentation d'intégration n8n read-only.
+- Checklist n8n read-only.
+- Liens README vers la documentation n8n.
 - Règles de notification n8n.
 - Garde-fous d'automatisation.
 
