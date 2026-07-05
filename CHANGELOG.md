@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-05 — V1.9 RAG section-level index
+
+### Ajouté
+
+- Index RAG par sections Markdown.
+- Champs `sectionTitle` et `headingLevel`.
+- Affichage des titres de section dans `rag-search`.
+- Tests section-level pour `rag-index` et `rag-search`.
+
+### Confirmé
+
+- Aucun embedding.
+- Aucun service externe.
+- Aucune IA automatique.
+- Index toujours local et reconstructible.
+
+---
+
 ## 2026-07-05 — V1.9 RAG section-level design
 
 ### Ajouté

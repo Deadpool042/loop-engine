@@ -52,3 +52,24 @@ Le fichier généré reste :
 - `.loop-engine/rag-index.json`
 
 Le `schemaVersion` devra être incrémenté si la structure change de manière incompatible.
+
+
+## Implémentation
+
+L'index local RAG indexe désormais les sections Markdown.
+
+Commande :
+
+- `pnpm run rag-index`
+
+Chaque entrée contient :
+
+- `path`
+- `title`
+- `sectionTitle`
+- `headingLevel`
+- `content`
+- `contentHash`
+
+La recherche affiche aussi le titre de section via `rag-search`.
+
