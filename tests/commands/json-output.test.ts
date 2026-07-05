@@ -37,13 +37,19 @@ describe("json outputs", () => {
     const json = runJson("pnpm exec tsx src/cli.ts next loop-engine --json") as {
       schemaVersion?: unknown;
       roadmap?: {
-        selectedCandidate?: unknown;
+        selectedCandidate?: {
+          priority?: unknown;
+        } | null;
       };
     };
 
     assert.equal(json.schemaVersion, 1);
     assert.ok(json.roadmap);
     assert.ok("selectedCandidate" in json.roadmap);
+
+    if (json.roadmap.selectedCandidate) {
+      assert.equal(typeof json.roadmap.selectedCandidate.priority, "string");
+    }
   });
 
 
