@@ -5,6 +5,7 @@
 ### Ajouté
 
 - Cadrage V1.7 des intégrations read-only.
+- Index des intégrations dans `docs/integrations/README.md`.
 - Documentation d'intégration OpenClaw read-only.
 - Checklist OpenClaw read-only.
 - Liens README vers la documentation OpenClaw.
