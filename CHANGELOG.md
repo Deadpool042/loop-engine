@@ -7,6 +7,7 @@
 - Audit Memory / RAG / Graph.
 - Spécification `docs/architecture/memory-layer.md`.
 - Checklist `docs/architecture/memory-layer-checklist.md`.
+- Spécification `docs/architecture/local-rag-index.md`.
 - Liens README vers la documentation mémoire.
 - Cadrage d'une future couche mémoire read-only.
 
