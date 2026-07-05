@@ -21,4 +21,22 @@ describe("rag-search command", () => {
     assert.match(output, /Results for "roadmap":/);
     assert.match(output, /docs\//);
   });
+
+  it("prints snippets for matching results", () => {
+    rmSync(".loop-engine", { recursive: true, force: true });
+
+    execSync("pnpm run rag-index", {
+      cwd: process.cwd(),
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const output = execSync("pnpm run rag-search -- roadmap", {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    assert.match(output, /score \d+/);
+    assert.match(output, /\n  .+/);
+  });
 });
