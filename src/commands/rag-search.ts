@@ -26,6 +26,24 @@ function countOccurrences(content: string, query: string): number {
   return normalizedContent.split(normalizedQuery).length - 1;
 }
 
+
+function buildSnippet(content: string, query: string): string {
+  const normalizedContent = content.toLowerCase();
+  const normalizedQuery = query.toLowerCase();
+  const matchIndex = normalizedContent.indexOf(normalizedQuery);
+
+  if (matchIndex === -1) {
+    return "";
+  }
+
+  const start = Math.max(0, matchIndex - 80);
+  const end = Math.min(content.length, matchIndex + query.length + 80);
+  const prefix = start > 0 ? "... " : "";
+  const suffix = end < content.length ? " ..." : "";
+
+  return `${prefix}${content.slice(start, end).replace(/\s+/g, " ").trim()}${suffix}`;
+}
+
 export function runRagSearch(query: string | undefined): void {
   if (!query || query.trim().length === 0) {
     console.error("Usage: pnpm exec tsx src/cli.ts rag-search <query>");
@@ -69,5 +87,9 @@ export function runRagSearch(query: string | undefined): void {
 
   for (const result of results) {
     console.log(`- ${result.document.path} — ${result.document.title} — score ${result.score}`);
+    const snippet = buildSnippet(result.document.content, normalizedQuery);
+    if (snippet) {
+      console.log(`  ${snippet}`);
+    }
   }
 }
