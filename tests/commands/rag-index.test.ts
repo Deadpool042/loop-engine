@@ -18,11 +18,16 @@ describe("rag-index command", () => {
       readFileSync(".loop-engine/rag-index.json", "utf8"),
     ) as {
       schemaVersion?: unknown;
-      documents?: unknown;
+      documents?: Array<{
+        sectionTitle?: unknown;
+        headingLevel?: unknown;
+      }>;
     };
 
     assert.equal(index.schemaVersion, 1);
     assert.ok(Array.isArray(index.documents));
     assert.ok(index.documents.length > 0);
+    assert.equal(typeof index.documents[0]?.sectionTitle, "string");
+    assert.equal(typeof index.documents[0]?.headingLevel, "number");
   });
 });
