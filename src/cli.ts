@@ -31,8 +31,12 @@ if (command === "help" || command === "--help" || command === "-h") {
 } else if (command === "rag-index") {
   runRagIndex();
 } else if (command === "rag-search") {
-  const query = process.argv.slice(3).filter((argument) => argument !== "--").join(" ");
-  runRagSearch(query);
+  const json = process.argv.includes("--json");
+  const query = process.argv
+    .slice(3)
+    .filter((argument) => argument !== "--" && argument !== "--json")
+    .join(" ");
+  runRagSearch(query, { json });
 } else if (command === "doctor") {
   printDoctor(loadConfig());
 } else if (command === "context") {

@@ -46,15 +46,23 @@ function buildSnippet(content: string, query: string): string {
   return `${prefix}${content.slice(start, end).replace(/\s+/g, " ").trim()}${suffix}`;
 }
 
-export function runRagSearch(query: string | undefined): void {
+export function runRagSearch(query: string | undefined, options?: { json?: boolean }): void {
   if (!query || query.trim().length === 0) {
-    console.error("Usage: pnpm exec tsx src/cli.ts rag-search <query>");
+    if (options?.json) {
+      console.log(JSON.stringify({ schemaVersion: 1, query: query ?? "", results: [], error: "missing_query" }));
+    } else {
+      console.error("Usage: pnpm exec tsx src/cli.ts rag-search <query>");
+    }
     process.exitCode = 1;
     return;
   }
 
   if (!existsSync(INDEX_PATH)) {
-    console.error(`Missing ${INDEX_PATH}. Run pnpm run rag-index first.`);
+    if (options?.json) {
+      console.log(JSON.stringify({ schemaVersion: 1, query, results: [], error: "missing_index" }));
+    } else {
+      console.error(`Missing ${INDEX_PATH}. Run pnpm run rag-index first.`);
+    }
     process.exitCode = 1;
     return;
   }
@@ -79,6 +87,24 @@ export function runRagSearch(query: string | undefined): void {
       return left.document.path.localeCompare(right.document.path);
     })
     .slice(0, 5);
+
+  if (options?.json) {
+    console.log(
+      JSON.stringify({
+        schemaVersion: 1,
+        query: normalizedQuery,
+        results: results.map((result) => ({
+          path: result.document.path,
+          title: result.document.title,
+          sectionTitle: result.document.sectionTitle ?? null,
+          headingLevel: result.document.headingLevel ?? null,
+          score: result.score,
+          snippet: buildSnippet(result.document.content, normalizedQuery),
+        })),
+      }),
+    );
+    return;
+  }
 
   if (results.length === 0) {
     console.log(`No result for "${normalizedQuery}".`);
