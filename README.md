@@ -107,4 +107,5 @@ Voir aussi :
 - `docs/architecture/roadmap-reader.md`
 - `docs/integrations/json-consumers.md`
 - `docs/integrations/n8n-read-only.md`
+- `docs/integrations/n8n-read-only-checklist.md`
 

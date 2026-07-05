@@ -95,3 +95,11 @@ Cette intégration ne définit pas encore :
 - une persistance historique
 - des alertes avancées
 - un système d'acquittement
+
+
+## Checklist
+
+Avant toute création réelle de workflow n8n, utiliser :
+
+- `docs/integrations/n8n-read-only-checklist.md`
+
