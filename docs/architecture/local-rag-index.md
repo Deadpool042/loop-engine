@@ -93,3 +93,17 @@ La recherche V1 est déterministe :
 - aucun embedding ;
 - aucun appel IA.
 
+
+## Snippets de recherche
+
+`rag-search` affiche un court extrait pour chaque résultat.
+
+Règles V1 :
+
+- premier match insensible à la casse ;
+- environ 80 caractères avant/après ;
+- espaces et retours ligne normalisés ;
+- préfixe/suffixe `...` si l'extrait est tronqué ;
+- aucun appel IA ;
+- aucune dépendance.
+

@@ -5,6 +5,8 @@
 ### Ajouté
 
 - Commande `rag-search`.
+- Snippets dans les résultats `rag-search`.
+- Test des snippets `rag-search`.
 - Script `pnpm run rag-search -- <query>`.
 - Recherche locale déterministe dans `.loop-engine/rag-index.json`.
 - Scoring simple par occurrences.
