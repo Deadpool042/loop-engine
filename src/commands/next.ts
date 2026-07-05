@@ -90,6 +90,17 @@ export function printNextProjectAction(project: ProjectConfig): void {
       terminal.info(`Reason: ${selectedCandidate.reason}`);
       terminal.info(`${selectedCandidate.path}:${selectedCandidate.line}`);
       terminal.info(selectedCandidate.text);
+
+      terminal.section("Decision hint");
+      if (selectedCandidate.kind === "blocked") {
+        terminal.error("Do not start this candidate directly.");
+        terminal.info("Choose a smaller prerequisite first.");
+      } else if (selectedCandidate.kind === "warning") {
+        terminal.warning("Frame this candidate before implementation.");
+        terminal.info("Prefer a short Cowork lot before Code.");
+      } else {
+        terminal.success("Candidate looks compatible with a small reversible lot.");
+      }
     } else {
       terminal.warning("No roadmap candidate detected.");
     }
