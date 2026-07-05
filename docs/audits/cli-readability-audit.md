@@ -68,3 +68,16 @@ Elle expose :
 
 Cette information utilise `snapshot.roadmap.summary` et ne recalcule rien dans la commande.
 
+
+## Amélioration appliquée — Decision hint
+
+La commande `next` affiche désormais une section `Decision hint`.
+
+Elle indique explicitement :
+
+- si un candidat `safe` semble compatible avec un micro-lot ;
+- si un candidat `warning` doit être cadré avant implémentation ;
+- si un candidat `blocked` ne doit pas être démarré directement.
+
+Cette section clarifie la différence entre information roadmap et recommandation d'action.
+

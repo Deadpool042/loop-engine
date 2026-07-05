@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-05 — V1.5 Next decision hint
+
+### Ajouté
+
+- Section `Decision hint` dans `next`.
+- Message explicite selon le type du candidat sélectionné :
+  - `safe`
+  - `warning`
+  - `blocked`
+
+### Confirmé
+
+- Le hint reste purement informatif.
+- Aucune automatisation n'est déclenchée.
+- Les contrats JSON ne changent pas.
+
+---
+
 ## 2026-07-05 — V1.4.2 CLI readability
 
 ### Ajouté
