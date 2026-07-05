@@ -107,6 +107,7 @@ Voir aussi :
 - `docs/architecture/roadmap-reader.md`
 - `docs/architecture/memory-layer.md`
 - `docs/architecture/memory-layer-checklist.md`
+- `docs/architecture/local-rag-index.md`
 - `docs/integrations/README.md`
 - `docs/integrations/json-consumers.md`
 - `docs/integrations/n8n-read-only.md`

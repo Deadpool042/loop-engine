@@ -127,3 +127,12 @@ Avant toute implémentation de la couche mémoire, utiliser :
 
 - `docs/architecture/memory-layer-checklist.md`
 
+
+## Index RAG local
+
+La spécification d'un index RAG local est définie dans :
+
+- `docs/architecture/local-rag-index.md`
+
+Cet index doit rester read-only, reconstructible et non critique.
+
