@@ -164,6 +164,27 @@ export function findRoadmapCandidates(
 }
 
 
+const PRIORITY_ORDER: readonly RoadmapPriority[] = [
+  "p1",
+  "p2",
+  "p3",
+  "default",
+];
+
+function selectByPriority(
+  candidates: readonly RoadmapCandidate[],
+): RoadmapCandidate | null {
+  for (const priority of PRIORITY_ORDER) {
+    const candidate = candidates.find((item) => item.priority === priority);
+
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 export function selectRoadmapCandidate(
   candidates: readonly RoadmapCandidate[],
 ): RoadmapCandidate | null {
@@ -171,9 +192,15 @@ export function selectRoadmapCandidate(
     (candidate) => candidate.status !== "done",
   );
 
-  const safeCandidate = activeCandidates.find((candidate) => candidate.kind === "safe");
-  const warningCandidate = activeCandidates.find((candidate) => candidate.kind === "warning");
-  const blockedCandidate = activeCandidates.find((candidate) => candidate.kind === "blocked");
+  const safeCandidate = selectByPriority(
+    activeCandidates.filter((candidate) => candidate.kind === "safe"),
+  );
+  const warningCandidate = selectByPriority(
+    activeCandidates.filter((candidate) => candidate.kind === "warning"),
+  );
+  const blockedCandidate = selectByPriority(
+    activeCandidates.filter((candidate) => candidate.kind === "blocked"),
+  );
 
   return safeCandidate ?? warningCandidate ?? blockedCandidate ?? null;
 }

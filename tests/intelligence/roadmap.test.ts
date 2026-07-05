@@ -77,6 +77,59 @@ describe("selectRoadmapCandidate", () => {
   });
 
 
+
+  it("prefers higher priority within the same kind", () => {
+    const selected = selectRoadmapCandidate([
+      {
+        ...candidate("safe", "default safe"),
+        priority: "default",
+      },
+      {
+        ...candidate("safe", "p2 safe"),
+        priority: "p2",
+      },
+      {
+        ...candidate("safe", "p1 safe"),
+        priority: "p1",
+      },
+    ]);
+
+    assert.equal(selected?.priority, "p1");
+    assert.equal(selected?.text, "p1 safe");
+  });
+
+  it("does not let warning p1 beat safe default", () => {
+    const selected = selectRoadmapCandidate([
+      {
+        ...candidate("warning", "p1 warning"),
+        priority: "p1",
+      },
+      {
+        ...candidate("safe", "default safe"),
+        priority: "default",
+      },
+    ]);
+
+    assert.equal(selected?.kind, "safe");
+    assert.equal(selected?.priority, "default");
+  });
+
+  it("does not let blocked p1 beat warning default", () => {
+    const selected = selectRoadmapCandidate([
+      {
+        ...candidate("blocked", "p1 blocked"),
+        priority: "p1",
+      },
+      {
+        ...candidate("warning", "default warning"),
+        priority: "default",
+      },
+    ]);
+
+    assert.equal(selected?.kind, "warning");
+    assert.equal(selected?.priority, "default");
+  });
+
   it("ignores done candidates when selecting the next roadmap candidate", () => {
     const selected = selectRoadmapCandidate([
       {
