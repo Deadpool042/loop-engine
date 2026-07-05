@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-05 — V1.8 Memory layer audit
+
+### Ajouté
+
+- Audit Memory / RAG / Graph.
+- Spécification `docs/architecture/memory-layer.md`.
+- Cadrage d'une future couche mémoire read-only.
+
+### Confirmé
+
+- RAG simple prioritaire avant MemPalace ou Graphiti.
+- Aucune mémoire opaque.
+- Aucune écriture automatique.
+- Sources traçables et index reconstructible.
+
+---
+
 ## 2026-07-05 — V1.7 n8n read-only
 
 ### Ajouté
