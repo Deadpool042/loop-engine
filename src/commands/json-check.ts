@@ -6,9 +6,12 @@ const COMMANDS = [
   ["next", "loop-engine", "--json"],
   ["prompt", "loop-engine", "--json"],
   ["review", "loop-engine", "--json"],
+  ["rag-search", "roadmap", "--json"],
 ] as const;
 
 export function runJsonCheck(): void {
+  execFileSync("pnpm", ["run", "rag-index"], { encoding: "utf8" });
+
   let failures = 0;
 
   for (const command of COMMANDS) {
