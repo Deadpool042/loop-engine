@@ -54,3 +54,17 @@ Ajouter dans `next` une section courte `Roadmap summary` affichant :
 
 Cette information existe déjà dans `snapshot.roadmap.summary`.
 
+
+## Amélioration appliquée
+
+La commande `next` affiche désormais une section `Roadmap summary`.
+
+Elle expose :
+
+- candidats actifs ;
+- candidats terminés ;
+- candidats sélectionnables ;
+- présence d'un candidat bloqué.
+
+Cette information utilise `snapshot.roadmap.summary` et ne recalcule rien dans la commande.
+
