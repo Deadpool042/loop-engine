@@ -184,3 +184,27 @@ Cette synthèse est calculée dans `intelligence/`, pas dans les commandes.
 
 Elle sert aux sorties JSON compactes, aux futurs dashboards et aux intégrations read-only.
 
+
+## Priorité roadmap
+
+Chaque candidat roadmap expose une `priority`.
+
+Valeurs V1.6 :
+
+- `p1`
+- `p2`
+- `p3`
+- `default`
+
+La priorité est détectée depuis les marqueurs Markdown `[P1]`, `[P2]` et `[P3]`.
+
+Elle sert uniquement à départager des candidats de même `kind`.
+
+Elle ne remplace pas :
+
+- `kind` pour le risque ;
+- `status` pour la progression ;
+- `reason` pour l'explication.
+
+Les commandes `next` et `prompt` affichent la priorité du candidat sélectionné.
+

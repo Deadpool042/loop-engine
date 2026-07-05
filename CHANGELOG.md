@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-05 — V1.6 Roadmap priorities
+
+### Ajouté
+
+- Modèle de priorité roadmap.
+- Parser `[P1]`, `[P2]`, `[P3]`.
+- Champ `priority` sur les candidats roadmap.
+- Sélection priorisée à `kind` égal.
+- Affichage de la priorité dans `next` et `prompt`.
+
+### Confirmé
+
+- La priorité ne permet pas à un `warning` de passer devant un `safe`.
+- La priorité ne permet pas à un `blocked` de passer devant un `warning`.
+- Les roadmaps existantes restent compatibles via `default`.
+
+---
+
 ## 2026-07-05 — V1.5 Next decision hint
 
 ### Ajouté
