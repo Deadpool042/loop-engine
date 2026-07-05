@@ -57,6 +57,12 @@ export type ProjectSnapshot = Readonly<{
       warning: number;
       blocked: number;
     }>;
+    summary: Readonly<{
+      active: number;
+      done: number;
+      selectable: number;
+      hasBlocked: boolean;
+    }>;
   }>;
 
   health: ProjectHealth;

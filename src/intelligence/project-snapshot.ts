@@ -61,6 +61,13 @@ export function buildProjectSnapshot(
     ).length,
   };
 
+  const roadmapSummary = {
+    active: roadmapStats.total - roadmapStats.done,
+    done: roadmapStats.done,
+    selectable: roadmapCandidates.filter((candidate) => candidate.status !== "done").length,
+    hasBlocked: roadmapStats.blocked > 0,
+  };
+
   const health: ProjectSnapshot["health"] =
     missingDocs.length === 0 ? "good" : "warning";
 
@@ -95,6 +102,7 @@ export function buildProjectSnapshot(
       candidates: roadmapCandidates,
       selectedCandidate: selectedRoadmapCandidate,
       stats: roadmapStats,
+      summary: roadmapSummary,
     },
 
     health,

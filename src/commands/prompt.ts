@@ -104,6 +104,7 @@ export function printProjectPromptJson(project: ProjectConfig): void {
           paths: snapshot.roadmap.paths,
           selectedCandidate,
           stats: snapshot.roadmap.stats,
+          summary: snapshot.roadmap.summary,
         },
         validation: snapshot.validation,
         instructions: [

@@ -68,6 +68,7 @@ export function printProjectContextJson(project: ProjectConfig): void {
           paths: snapshot.roadmap.paths,
           selectedCandidate: snapshot.roadmap.selectedCandidate,
           stats: snapshot.roadmap.stats,
+          summary: snapshot.roadmap.summary,
         },
         validation: snapshot.validation,
         health: snapshot.health,
