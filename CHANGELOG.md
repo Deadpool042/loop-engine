@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-05 — V1.8.3 Local RAG search
+
+### Ajouté
+
+- Commande `rag-search`.
+- Script `pnpm run rag-search -- <query>`.
+- Recherche locale déterministe dans `.loop-engine/rag-index.json`.
+- Scoring simple par occurrences.
+
+### Confirmé
+
+- Aucun embedding.
+- Aucun service externe.
+- Aucune IA automatique.
+- Recherche read-only.
+
+---
+
 ## 2026-07-05 — V1.8.2 Local RAG index
 
 ### Ajouté

@@ -74,3 +74,22 @@ Elle reconstruit :
 
 Le dossier `.loop-engine/` est local, reconstructible et ignoré par Git.
 
+
+## Recherche V1
+
+La commande disponible est :
+
+- `pnpm run rag-search -- <query>`
+
+Elle lit :
+
+- `.loop-engine/rag-index.json`
+
+La recherche V1 est déterministe :
+
+- recherche substring ;
+- score par nombre d'occurrences ;
+- bonus sur le titre et le chemin ;
+- aucun embedding ;
+- aucun appel IA.
+

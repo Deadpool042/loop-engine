@@ -9,7 +9,8 @@
     "test": "tsx --test tests/**/*.test.ts",
     "validate": "pnpm run typecheck && pnpm run test && pnpm run json-check",
     "json-check": "tsx src/cli.ts json-check",
-    "rag-index": "tsx src/cli.ts rag-index"
+    "rag-index": "tsx src/cli.ts rag-index",
+    "rag-search": "tsx src/cli.ts rag-search"
   },
   "dependencies": {
     "tsx": "^4.20.5",
