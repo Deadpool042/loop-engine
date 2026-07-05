@@ -6,6 +6,7 @@ import { printWorkspaceSummary, printWorkspaceSummaryJson } from "./commands/sum
 import { printHelp } from "./commands/help.js";
 import { runJsonCheck } from "./commands/json-check.js";
 import { runRagIndex } from "./commands/rag-index.js";
+import { runRagSearch } from "./commands/rag-search.js";
 import { printNextProjectAction, printNextProjectActionJson } from "./commands/next.js";
 import { printProjectPrompt, printProjectPromptJson } from "./commands/prompt.js";
 import { printStatus } from "./commands/status.js";
@@ -29,6 +30,8 @@ if (command === "help" || command === "--help" || command === "-h") {
   runJsonCheck();
 } else if (command === "rag-index") {
   runRagIndex();
+} else if (command === "rag-search") {
+  runRagSearch(process.argv.slice(3).join(" "));
 } else if (command === "doctor") {
   printDoctor(loadConfig());
 } else if (command === "context") {
