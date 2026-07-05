@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-05 — V1.7 n8n read-only
+
+### Ajouté
+
+- Cadrage V1.7 des intégrations read-only.
+- Documentation d'intégration n8n read-only.
+- Règles de notification n8n.
+- Garde-fous d'automatisation.
+
+### Confirmé
+
+- n8n reste consommateur JSON.
+- Aucune modification automatique n'est autorisée.
+- Aucun commit, push, déploiement ou appel IA automatique.
+
+---
+
 ## 2026-07-05 — V1.6 Roadmap priorities
 
 ### Ajouté

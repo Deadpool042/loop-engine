@@ -106,4 +106,5 @@ Voir aussi :
 - `docs/architecture/project-intelligence.md`
 - `docs/architecture/roadmap-reader.md`
 - `docs/integrations/json-consumers.md`
+- `docs/integrations/n8n-read-only.md`
 
