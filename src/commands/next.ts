@@ -7,6 +7,18 @@ export function printNextProjectAction(project: ProjectConfig): void {
 
   terminal.header(`Next • ${snapshot.project.name}`);
 
+  terminal.section("Roadmap summary");
+  terminal.info(`Active: ${snapshot.roadmap.summary.active}`);
+  terminal.info(`Done: ${snapshot.roadmap.summary.done}`);
+  terminal.info(`Selectable: ${snapshot.roadmap.summary.selectable}`);
+
+  if (snapshot.roadmap.summary.hasBlocked) {
+    terminal.warning("Blocked candidate present.");
+  } else {
+    terminal.success("No blocked candidate.");
+  }
+
+
   terminal.section("Project");
   terminal.info(`Type: ${snapshot.project.type}`);
   terminal.info(`Path: ${snapshot.project.path}`);
