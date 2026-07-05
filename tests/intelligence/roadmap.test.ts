@@ -19,6 +19,7 @@ function candidate(kind: RoadmapCandidate["kind"], text: string): RoadmapCandida
     kind,
     reason: kind === "safe" ? "no sensitive keyword detected" : `contains "${text}"`,
     status: "unknown",
+    priority: "default",
   };
 }
 
@@ -237,3 +238,63 @@ describe("roadmap candidate status", () => {
     }
   });
 });
+
+
+describe("roadmap candidate priority", () => {
+  it("detects p1 priority", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "- [ ] [P1] Corriger le parser roadmap",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.priority, "p1");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("detects p2 priority with spaces and lowercase", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "- [ ] [ p2 ] Améliorer le résumé CLI",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.priority, "p2");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("detects p3 priority", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "- [ ] [P3] Nettoyer la documentation",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.priority, "p3");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("uses default priority when no priority marker is found", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "- [ ] Nettoyer la documentation",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.priority, "default");
+    } finally {
+      cleanup();
+    }
+  });
+});
+

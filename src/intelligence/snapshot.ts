@@ -38,6 +38,7 @@ export type ProjectSnapshot = Readonly<{
       kind: "safe" | "warning" | "blocked";
       reason: string;
       status: "todo" | "in_progress" | "done" | "unknown";
+      priority: "p1" | "p2" | "p3" | "default";
     }>[];
     selectedCandidate: Readonly<{
       path: string;
@@ -46,6 +47,7 @@ export type ProjectSnapshot = Readonly<{
       kind: "safe" | "warning" | "blocked";
       reason: string;
       status: "todo" | "in_progress" | "done" | "unknown";
+      priority: "p1" | "p2" | "p3" | "default";
     }> | null;
     stats: Readonly<{
       total: number;

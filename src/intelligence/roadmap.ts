@@ -5,6 +5,7 @@ import { type ProjectConfig } from "../core/config.js";
 
 export type RoadmapCandidateKind = "safe" | "warning" | "blocked";
 export type RoadmapCandidateStatus = "todo" | "in_progress" | "done" | "unknown";
+export type RoadmapPriority = "p1" | "p2" | "p3" | "default";
 
 export type RoadmapCandidate = Readonly<{
   path: string;
@@ -13,6 +14,7 @@ export type RoadmapCandidate = Readonly<{
   kind: RoadmapCandidateKind;
   reason: string;
   status: RoadmapCandidateStatus;
+  priority: RoadmapPriority;
 }>;
 
 const CANDIDATE_PATTERNS = [
@@ -54,6 +56,18 @@ const WARNING_PATTERNS = [
   "securite",
 ] as const;
 
+
+
+function detectCandidatePriority(line: string): RoadmapPriority {
+  const match = line.match(/\[\s*(p[1-3])\s*\]/i);
+  const priority = match?.[1]?.toLowerCase();
+
+  if (priority === "p1" || priority === "p2" || priority === "p3") {
+    return priority;
+  }
+
+  return "default";
+}
 
 function detectCandidateStatus(line: string): RoadmapCandidateStatus {
   if (line.includes("- [ ]")) {
@@ -141,6 +155,7 @@ export function findRoadmapCandidates(
         kind: classification.kind,
         reason: classification.reason,
         status: detectCandidateStatus(trimmed),
+        priority: detectCandidatePriority(trimmed),
       });
     });
   }
