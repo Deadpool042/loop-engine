@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-04 — V1.4 Roadmap summary
+
+### Ajouté
+
+- `snapshot.roadmap.summary`.
+- Synthèse roadmap :
+  - `active`
+  - `done`
+  - `selectable`
+  - `hasBlocked`
+- Exposition de la synthèse dans les JSON publics compacts.
+
+### Confirmé
+
+- La synthèse est calculée dans `intelligence/`.
+- Les commandes consomment le `ProjectSnapshot`.
+- `json-check` valide les sorties JSON après évolution du contrat.
+
+---
+
 ## 2026-07-04 — V1.3.2 JSON check
 
 ### Ajouté
