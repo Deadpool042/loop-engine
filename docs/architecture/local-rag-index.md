@@ -107,3 +107,17 @@ Règles V1 :
 - aucun appel IA ;
 - aucune dépendance.
 
+
+## Évolution section-level
+
+La prochaine évolution documentée est l'indexation par sections Markdown :
+
+- `docs/architecture/local-rag-sections.md`
+
+Objectif :
+
+- améliorer la précision ;
+- garder l'index local ;
+- rester sans embedding ;
+- rester sans dépendance externe.
+

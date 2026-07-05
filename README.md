@@ -110,6 +110,7 @@ Voir aussi :
 - `docs/architecture/memory-layer.md`
 - `docs/architecture/memory-layer-checklist.md`
 - `docs/architecture/local-rag-index.md`
+- `docs/architecture/local-rag-sections.md`
 - `docs/integrations/README.md`
 - `docs/integrations/json-consumers.md`
 - `docs/integrations/n8n-read-only.md`

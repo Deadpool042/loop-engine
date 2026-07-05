@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-05 — V1.9 RAG section-level design
+
+### Ajouté
+
+- Spécification `docs/architecture/local-rag-sections.md`.
+- Cadrage d'un futur index RAG par sections Markdown.
+- Audit post V1.8 RAG local.
+
+### Confirmé
+
+- Pas d'embeddings en V1.9.
+- Pas de dépendance externe.
+- Index toujours local, reconstructible et read-only.
+
+---
+
 ## 2026-07-05 — V1.8.3 Local RAG search
 
 ### Ajouté
