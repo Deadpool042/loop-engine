@@ -8,7 +8,7 @@ export function printHelp(): void {
   terminal.info("pnpm loop summary --json  — vue workspace en JSON");
   terminal.info("pnpm loop status          — état détaillé des projets");
   terminal.info("pnpm loop json-check      — validate all public JSON outputs");
-  terminal.info("pnpm loop rag-index       — rebuild local RAG index");
+  terminal.info("pnpm run rag-index        — rebuild local RAG index");
   terminal.info("pnpm loop doctor          — vérification config/docs/git");
 
   terminal.section("Project");

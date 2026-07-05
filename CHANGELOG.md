@@ -5,6 +5,7 @@
 ### Ajouté
 
 - Commande `rag-index`.
+- Script `pnpm run rag-index`.
 - Génération de `.loop-engine/rag-index.json`.
 - Index local reconstructible des sources documentaires autorisées.
 - `.loop-engine/` ignoré par Git.
