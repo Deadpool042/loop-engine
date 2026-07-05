@@ -26,8 +26,13 @@ export function printWorkspaceSummary(config: Config): void {
           ? "⚠"
           : "✖";
 
+    const roadmapState =
+      `roadmap A:${snapshot.roadmap.summary.active}` +
+      ` D:${snapshot.roadmap.summary.done}` +
+      ` B:${snapshot.roadmap.summary.hasBlocked ? "yes" : "no"}`;
+
     console.log(
-      `${statusIcon} ${snapshot.project.name.padEnd(12)} ${git.padEnd(8)} ${docs.padEnd(18)} validations ${snapshot.validation.commands.length}`,
+      `${statusIcon} ${snapshot.project.name.padEnd(12)} ${git.padEnd(8)} ${docs.padEnd(18)} validations ${snapshot.validation.commands.length} ${roadmapState}`,
     );
   }
 }
