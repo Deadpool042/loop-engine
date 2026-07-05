@@ -39,4 +39,21 @@ describe("rag-search command", () => {
     assert.match(output, /score \d+/);
     assert.match(output, /\n  .+/);
   });
+
+  it("prints section titles for matching results", () => {
+    rmSync(".loop-engine", { recursive: true, force: true });
+
+    execSync("pnpm run rag-index", {
+      cwd: process.cwd(),
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const output = execSync("pnpm run rag-search -- roadmap", {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    assert.match(output, /— .* — .* — score \d+/);
+  });
 });
