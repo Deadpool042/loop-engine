@@ -56,4 +56,29 @@ describe("rag-search command", () => {
 
     assert.match(output, /— .* — .* — score \d+/);
   });
+
+  it("prints json results when requested", () => {
+    rmSync(".loop-engine", { recursive: true, force: true });
+
+    execSync("pnpm run rag-index", {
+      cwd: process.cwd(),
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const output = execSync("pnpm exec tsx src/cli.ts rag-search roadmap --json", {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const json = JSON.parse(output) as {
+      schemaVersion?: unknown;
+      query?: unknown;
+      results?: unknown;
+    };
+
+    assert.equal(json.schemaVersion, 1);
+    assert.equal(json.query, "roadmap");
+    assert.ok(Array.isArray(json.results));
+  });
 });
