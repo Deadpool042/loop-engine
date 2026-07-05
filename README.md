@@ -106,6 +106,7 @@ Voir aussi :
 - `docs/architecture/project-intelligence.md`
 - `docs/architecture/roadmap-reader.md`
 - `docs/architecture/memory-layer.md`
+- `docs/architecture/memory-layer-checklist.md`
 - `docs/integrations/README.md`
 - `docs/integrations/json-consumers.md`
 - `docs/integrations/n8n-read-only.md`

@@ -119,3 +119,11 @@ Usage possible :
 - Pas de décision autonome.
 - Sources toujours traçables.
 - Reconstruction possible.
+
+
+## Checklist
+
+Avant toute implémentation de la couche mémoire, utiliser :
+
+- `docs/architecture/memory-layer-checklist.md`
+
