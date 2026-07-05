@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-05 — V1.4.2 CLI readability
+
+### Ajouté
+
+- Affichage roadmap compact dans `summary`.
+- Indicateur visuel des roadmaps bloquées dans `summary`.
+- Section `Roadmap summary` dans `next`.
+- Audit lisibilité CLI.
+
+### Confirmé
+
+- Les améliorations CLI humaines ne modifient pas les contrats JSON.
+- Les commandes continuent à consommer `ProjectSnapshot`.
+- `pnpm run validate` couvre typecheck, tests et JSON publics.
+
+---
+
 ## 2026-07-04 — V1.4 Roadmap summary
 
 ### Ajouté
