@@ -163,3 +163,24 @@ Objectif :
 
 `selectedCandidate` peut être `null` si aucun candidat actif n'est disponible.
 
+
+## Synthèse roadmap
+
+Le `ProjectSnapshot` expose une synthèse roadmap via :
+
+- `snapshot.roadmap.summary.active`
+- `snapshot.roadmap.summary.done`
+- `snapshot.roadmap.summary.selectable`
+- `snapshot.roadmap.summary.hasBlocked`
+
+Définitions :
+
+- `active` : nombre total de candidats non terminés.
+- `done` : nombre de candidats terminés.
+- `selectable` : nombre de candidats disponibles pour la sélection, hors `done`.
+- `hasBlocked` : indique si au moins un candidat `blocked` existe dans la roadmap.
+
+Cette synthèse est calculée dans `intelligence/`, pas dans les commandes.
+
+Elle sert aux sorties JSON compactes, aux futurs dashboards et aux intégrations read-only.
+
