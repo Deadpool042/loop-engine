@@ -54,6 +54,18 @@ Automatiser le déterministe.
 Limiter l'IA au jugement.  
 Garder l'humain sur les décisions.
 
+
+### Lecture du summary
+
+La commande `pnpm loop summary` affiche une vue compacte du workspace.
+
+La partie roadmap utilise :
+
+- `A` : candidats actifs ;
+- `D` : candidats terminés ;
+- `🟢` : aucun candidat bloqué ;
+- `🔴` : au moins un candidat bloqué.
+
 ## Validation locale
 
 - `pnpm run typecheck` : vérifie le typage TypeScript.

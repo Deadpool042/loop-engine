@@ -4,6 +4,8 @@
 
 ### Ajouté
 
+- Affichage roadmap compact dans `summary`.
+- Indicateur visuel des roadmaps bloquées dans `summary`.
 - `snapshot.roadmap.summary`.
 - Synthèse roadmap :
   - `active`
