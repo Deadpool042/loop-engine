@@ -6,6 +6,8 @@ type RagDocument = Readonly<{
   id: string;
   path: string;
   title: string;
+  sectionTitle?: string;
+  headingLevel?: number;
   content: string;
   contentHash: string;
 }>;
@@ -86,7 +88,13 @@ export function runRagSearch(query: string | undefined): void {
   console.log(`Results for "${normalizedQuery}":`);
 
   for (const result of results) {
-    console.log(`- ${result.document.path} — ${result.document.title} — score ${result.score}`);
+    const sectionLabel = result.document.sectionTitle
+      ? ` — ${result.document.sectionTitle}`
+      : "";
+
+    console.log(
+      `- ${result.document.path} — ${result.document.title}${sectionLabel} — score ${result.score}`,
+    );
     const snippet = buildSnippet(result.document.content, normalizedQuery);
     if (snippet) {
       console.log(`  ${snippet}`);
