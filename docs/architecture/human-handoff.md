@@ -60,3 +60,23 @@ Créer une commande `handoff <project>` qui affiche :
 - priority/status/kind ;
 - validations ;
 - résultats RAG autour du texte du candidat.
+
+
+## Sortie JSON
+
+La commande `handoff` expose une sortie JSON publique :
+
+- `pnpm exec tsx src/cli.ts handoff <project> --json`
+
+Le payload contient :
+
+- `schemaVersion`
+- `project`
+- `git`
+- `roadmap`
+- `validation`
+- `health`
+- `instructions`
+
+Cette sortie est incluse dans `json-check`.
+

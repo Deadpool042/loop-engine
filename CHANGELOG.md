@@ -6,6 +6,9 @@
 
 - Architecture `Human Handoff`.
 - Commande `handoff <project>`.
+- Sortie `handoff <project> --json`.
+- Test de contrat JSON pour `handoff`.
+- Inclusion de `handoff --json` dans `json-check`.
 - Sortie humaine read-only pour préparer une session assistée.
 - Garde-fous explicites contre l'automatisation.
 
