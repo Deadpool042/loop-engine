@@ -1,6 +1,6 @@
 
 import { printProjectContext, printProjectContextJson } from "./commands/context.js";
-import { printProjectHandoff } from "./commands/handoff.js";
+import { printProjectHandoff, printProjectHandoffJson } from "./commands/handoff.js";
 import { validateProject } from "./commands/validate.js";
 import { printReviewContext, printReviewContextJson } from "./commands/review.js";
 import { printWorkspaceSummary, printWorkspaceSummaryJson } from "./commands/summary.js";
@@ -72,7 +72,11 @@ if (command === "help" || command === "--help" || command === "-h") {
     process.exit(1);
   }
 
-  printProjectHandoff(project);
+  if (process.argv.includes("--json")) {
+    printProjectHandoffJson(project);
+  } else {
+    printProjectHandoff(project);
+  }
 } else if (command === "context") {
   const config = loadConfig();
   const projectName = getRequiredProjectName(process.argv, "context");

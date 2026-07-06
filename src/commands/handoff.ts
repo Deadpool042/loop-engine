@@ -45,3 +45,29 @@ export function printProjectHandoff(project: ProjectConfig): void {
   terminal.info("Use this handoff as context for a human-supervised assistant session.");
   terminal.info("Do not start implementation without explicit human confirmation.");
 }
+
+
+export function printProjectHandoffJson(project: ProjectConfig): void {
+  const snapshot = buildProjectSnapshot(project);
+
+  console.log(
+    JSON.stringify({
+      schemaVersion: 1,
+      project: snapshot.project,
+      git: snapshot.git,
+      roadmap: {
+        available: snapshot.roadmap.available,
+        paths: snapshot.roadmap.paths,
+        selectedCandidate: snapshot.roadmap.selectedCandidate,
+        summary: snapshot.roadmap.summary,
+        stats: snapshot.roadmap.stats,
+      },
+      validation: snapshot.validation,
+      health: snapshot.health,
+      instructions: [
+        "Use this handoff as context for a human-supervised assistant session.",
+        "Do not start implementation without explicit human confirmation.",
+      ],
+    }),
+  );
+}
