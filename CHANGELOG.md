@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-06 — V2.6 CLI consolidation
+
+### Ajouté
+
+- Plan de consolidation V2.
+- Helper interne `resolveProjectOrExit` dans le dispatcher CLI.
+
+### Amélioré
+
+- Réduction de la duplication dans `src/cli.ts`.
+- Les commandes projet réutilisent une résolution commune.
+
+### Confirmé
+
+- Aucun changement de comportement attendu.
+- `pnpm run validate` reste vert après refactor.
+
+---
+
 ## 2026-07-06 — V2.5 JSON structural check
 
 ### Ajouté
