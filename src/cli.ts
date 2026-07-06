@@ -1,5 +1,6 @@
 
 import { printProjectContext, printProjectContextJson } from "./commands/context.js";
+import { printProjectHandoff } from "./commands/handoff.js";
 import { validateProject } from "./commands/validate.js";
 import { printReviewContext, printReviewContextJson } from "./commands/review.js";
 import { printWorkspaceSummary, printWorkspaceSummaryJson } from "./commands/summary.js";
@@ -61,6 +62,17 @@ if (command === "help" || command === "--help" || command === "-h") {
   });
 } else if (command === "doctor") {
   printDoctor(loadConfig());
+} else if (command === "handoff") {
+  const config = loadConfig();
+  const projectName = getRequiredProjectName(process.argv, "handoff");
+  const project = findProject(config, projectName);
+
+  if (!project) {
+    terminal.error(`Unknown project: ${projectName}`);
+    process.exit(1);
+  }
+
+  printProjectHandoff(project);
 } else if (command === "context") {
   const config = loadConfig();
   const projectName = getRequiredProjectName(process.argv, "context");
