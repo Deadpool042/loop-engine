@@ -106,6 +106,7 @@ Les commandes doivent consommer le `ProjectSnapshot` plutôt que relire directem
 Voir aussi :
 
 - `docs/architecture/commands.md`
+- `docs/architecture/json-contracts.md`
 - `docs/architecture/project-intelligence.md`
 - `docs/architecture/roadmap-reader.md`
 - `docs/architecture/memory-layer.md`
