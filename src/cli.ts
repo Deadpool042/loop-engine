@@ -47,7 +47,7 @@ if (command === "help" || command === "--help" || command === "-h") {
     })
     .join(" ");
 
-  runRagSearch(query, { json, limit });
+  runRagSearch(query, limit === undefined ? { json } : { json, limit });
 } else if (command === "doctor") {
   printDoctor(loadConfig());
 } else if (command === "context") {
