@@ -121,3 +121,27 @@ Objectif :
 - rester sans embedding ;
 - rester sans dépendance externe.
 
+
+## Sortie JSON de recherche
+
+`rag-search` expose une sortie JSON publique :
+
+- `pnpm exec tsx src/cli.ts rag-search <query> --json`
+
+Le payload contient :
+
+- `schemaVersion`
+- `query`
+- `results`
+
+Chaque résultat contient :
+
+- `path`
+- `title`
+- `sectionTitle`
+- `headingLevel`
+- `score`
+- `snippet`
+
+Cette sortie est incluse dans `json-check`.
+

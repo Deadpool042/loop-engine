@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-06 — V2.0 RAG search JSON
+
+### Ajouté
+
+- Sortie `rag-search --json`.
+- Test de contrat JSON pour `rag-search`.
+- Inclusion de `rag-search --json` dans `json-check`.
+
+### Confirmé
+
+- La recherche RAG reste read-only.
+- Le JSON public reste compact et parsable.
+- `pnpm run validate` couvre aussi la sortie JSON RAG.
+
+---
+
 ## 2026-07-05 — V1.9 RAG section-level index
 
 ### Ajouté
