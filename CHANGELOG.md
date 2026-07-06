@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-06 — V2.3 Human handoff
+
+### Ajouté
+
+- Architecture `Human Handoff`.
+- Commande `handoff <project>`.
+- Sortie humaine read-only pour préparer une session assistée.
+- Garde-fous explicites contre l'automatisation.
+
+### Confirmé
+
+- Aucun appel IA automatique.
+- Aucun commit ou push automatique.
+- Le handoff reste informatif et supervisé par l'humain.
+
+---
+
 ## 2026-07-06 — V2.2 RAG search path filter
 
 ### Ajouté

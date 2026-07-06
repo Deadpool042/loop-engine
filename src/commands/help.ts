@@ -13,6 +13,7 @@ export function printHelp(): void {
 
   terminal.section("Project");
   terminal.info("pnpm loop context <project>        — contexte court de reprise");
+  terminal.info("pnpm loop handoff <project>        — contexte humain supervisé");
   terminal.info("pnpm loop context <project> --json — contexte projet en JSON");
   terminal.info("pnpm loop validate <project>       — lance les validations configurées");
   terminal.info("pnpm loop review <project>         — prépare un contexte de revue Git");

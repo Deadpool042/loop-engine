@@ -32,6 +32,7 @@ Loop Engine ne modifie pas les dépôts pilotés.
 - `pnpm run rag-index` : reconstruit l'index RAG local dans `.loop-engine/`.
 - `pnpm run rag-search -- <query>` : recherche dans l'index RAG local.
 - `pnpm loop context creatyss` : prépare un contexte court pour reprendre un projet.
+- `pnpm loop handoff creatyss` : prépare un contexte humain supervisé.
 - `pnpm loop context creatyss --json` : affiche le contexte projet en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop validate creatyss` : lance les validations configurées.
 - `pnpm loop review creatyss` : prépare un contexte de revue basé sur Git sans appeler d'IA.
