@@ -8,6 +8,7 @@
 - Helper interne `resolveProjectOrExit` dans le dispatcher CLI.
 - Helper `printJsonError`.
 - Erreur JSON normalisée `unknown_project`.
+- Erreur JSON normalisée `missing_project`.
 
 ### Amélioré
 
