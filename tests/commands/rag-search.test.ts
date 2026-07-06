@@ -89,4 +89,33 @@ describe("rag-search command", () => {
 
     assert.equal(json.results?.length, 2);
   });
+
+  it("filters json results by path prefix", () => {
+    rebuildIndex();
+
+    const output = execSync(
+      "pnpm exec tsx src/cli.ts rag-search roadmap --path docs/architecture --limit 3 --json",
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+
+    const json = JSON.parse(output) as {
+      pathPrefix?: unknown;
+      results?: Array<{ path?: unknown }>;
+    };
+
+    assert.equal(json.pathPrefix, "docs/architecture");
+    assert.ok(Array.isArray(json.results));
+    assert.ok(json.results.length > 0);
+    assert.ok(
+      json.results.every(
+        (result) =>
+          typeof result.path === "string" &&
+          result.path.startsWith("docs/architecture"),
+      ),
+    );
+  });
 });
