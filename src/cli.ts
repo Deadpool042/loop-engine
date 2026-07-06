@@ -15,6 +15,7 @@ import { printDoctor } from "./commands/doctor.js";
 import { loadConfig } from "./core/config.js";
 import { findProject, getRequiredProjectName } from "./core/project.js";
 import { terminal } from "./ui/terminal.js";
+import { printJsonError } from "./commands/json-error.js";
 
 
 
@@ -24,7 +25,11 @@ function resolveProjectOrExit(commandName: string) {
   const project = findProject(config, projectName);
 
   if (!project) {
-    terminal.error(`Unknown project: ${projectName}`);
+    if (process.argv.includes("--json")) {
+      printJsonError("unknown_project", `Unknown project: ${projectName}`);
+    } else {
+      terminal.error(`Unknown project: ${projectName}`);
+    }
     process.exit(1);
   }
 
