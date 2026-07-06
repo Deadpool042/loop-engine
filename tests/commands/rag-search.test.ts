@@ -4,13 +4,17 @@ import { rmSync } from "node:fs";
 import { describe, it } from "node:test";
 
 describe("rag-search command", () => {
-  it("searches the local RAG index through the npm argument separator", () => {
+  function rebuildIndex(): void {
     rmSync(".loop-engine", { recursive: true, force: true });
 
     execSync("pnpm run rag-index", {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
     });
+  }
+
+  it("searches the local RAG index through the npm argument separator", () => {
+    rebuildIndex();
 
     const output = execSync("pnpm run rag-search -- roadmap", {
       cwd: process.cwd(),
@@ -23,12 +27,7 @@ describe("rag-search command", () => {
   });
 
   it("prints snippets for matching results", () => {
-    rmSync(".loop-engine", { recursive: true, force: true });
-
-    execSync("pnpm run rag-index", {
-      cwd: process.cwd(),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    rebuildIndex();
 
     const output = execSync("pnpm run rag-search -- roadmap", {
       cwd: process.cwd(),
@@ -41,12 +40,7 @@ describe("rag-search command", () => {
   });
 
   it("prints section titles for matching results", () => {
-    rmSync(".loop-engine", { recursive: true, force: true });
-
-    execSync("pnpm run rag-index", {
-      cwd: process.cwd(),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    rebuildIndex();
 
     const output = execSync("pnpm run rag-search -- roadmap", {
       cwd: process.cwd(),
@@ -58,12 +52,7 @@ describe("rag-search command", () => {
   });
 
   it("prints json results when requested", () => {
-    rmSync(".loop-engine", { recursive: true, force: true });
-
-    execSync("pnpm run rag-index", {
-      cwd: process.cwd(),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    rebuildIndex();
 
     const output = execSync("pnpm exec tsx src/cli.ts rag-search roadmap --json", {
       cwd: process.cwd(),
@@ -80,5 +69,24 @@ describe("rag-search command", () => {
     assert.equal(json.schemaVersion, 1);
     assert.equal(json.query, "roadmap");
     assert.ok(Array.isArray(json.results));
+  });
+
+  it("limits json results when requested", () => {
+    rebuildIndex();
+
+    const output = execSync(
+      "pnpm exec tsx src/cli.ts rag-search roadmap --limit 2 --json",
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+
+    const json = JSON.parse(output) as {
+      results?: unknown[];
+    };
+
+    assert.equal(json.results?.length, 2);
   });
 });
