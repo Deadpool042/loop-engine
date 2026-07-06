@@ -21,6 +21,16 @@ import { printJsonError } from "./commands/json-error.js";
 
 function resolveProjectOrExit(commandName: string) {
   const config = loadConfig();
+
+  if (!process.argv[3]) {
+    if (process.argv.includes("--json")) {
+      printJsonError("missing_project", `Missing project argument for ${commandName}`);
+    } else {
+      terminal.error(`Missing project argument for ${commandName}`);
+    }
+    process.exit(1);
+  }
+
   const projectName = getRequiredProjectName(process.argv, commandName);
   const project = findProject(config, projectName);
 
