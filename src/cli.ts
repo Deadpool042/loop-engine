@@ -17,6 +17,20 @@ import { findProject, getRequiredProjectName } from "./core/project.js";
 import { terminal } from "./ui/terminal.js";
 
 
+
+function resolveProjectOrExit(commandName: string) {
+  const config = loadConfig();
+  const projectName = getRequiredProjectName(process.argv, commandName);
+  const project = findProject(config, projectName);
+
+  if (!project) {
+    terminal.error(`Unknown project: ${projectName}`);
+    process.exit(1);
+  }
+
+  return project;
+}
+
 const command = process.argv[2] ?? "help";
 
 if (command === "help" || command === "--help" || command === "-h") {
@@ -63,14 +77,7 @@ if (command === "help" || command === "--help" || command === "-h") {
 } else if (command === "doctor") {
   printDoctor(loadConfig());
 } else if (command === "handoff") {
-  const config = loadConfig();
-  const projectName = getRequiredProjectName(process.argv, "handoff");
-  const project = findProject(config, projectName);
-
-  if (!project) {
-    terminal.error(`Unknown project: ${projectName}`);
-    process.exit(1);
-  }
+  const project = resolveProjectOrExit("handoff");
 
   if (process.argv.includes("--json")) {
     printProjectHandoffJson(project);
@@ -78,14 +85,7 @@ if (command === "help" || command === "--help" || command === "-h") {
     printProjectHandoff(project);
   }
 } else if (command === "context") {
-  const config = loadConfig();
-  const projectName = getRequiredProjectName(process.argv, "context");
-  const project = findProject(config, projectName);
-
-  if (!project) {
-    terminal.error(`Unknown project: ${projectName}`);
-    process.exit(1);
-  }
+  const project = resolveProjectOrExit("context");
 
   if (process.argv.includes("--json")) {
     printProjectContextJson(project);
@@ -93,25 +93,11 @@ if (command === "help" || command === "--help" || command === "-h") {
     printProjectContext(project);
   }
 } else if (command === "validate") {
-  const config = loadConfig();
-  const projectName = getRequiredProjectName(process.argv, "validate");
-  const project = findProject(config, projectName);
-
-  if (!project) {
-    terminal.error(`Unknown project: ${projectName}`);
-    process.exit(1);
-  }
+  const project = resolveProjectOrExit("validate");
 
   await validateProject(project);
 } else if (command === "review") {
-  const config = loadConfig();
-  const projectName = getRequiredProjectName(process.argv, "review");
-  const project = findProject(config, projectName);
-
-  if (!project) {
-    terminal.error(`Unknown project: ${projectName}`);
-    process.exit(1);
-  }
+  const project = resolveProjectOrExit("review");
 
   if (process.argv.includes("--json")) {
     printReviewContextJson(project);
@@ -119,14 +105,7 @@ if (command === "help" || command === "--help" || command === "-h") {
     printReviewContext(project);
   }
 } else if (command === "next") {
-  const config = loadConfig();
-  const projectName = getRequiredProjectName(process.argv, "next");
-  const project = findProject(config, projectName);
-
-  if (!project) {
-    terminal.error(`Unknown project: ${projectName}`);
-    process.exit(1);
-  }
+  const project = resolveProjectOrExit("next");
 
   if (process.argv.includes("--json")) {
     printNextProjectActionJson(project);
@@ -134,14 +113,7 @@ if (command === "help" || command === "--help" || command === "-h") {
     printNextProjectAction(project);
   }
 } else if (command === "prompt") {
-  const config = loadConfig();
-  const projectName = getRequiredProjectName(process.argv, "prompt");
-  const project = findProject(config, projectName);
-
-  if (!project) {
-    terminal.error(`Unknown project: ${projectName}`);
-    process.exit(1);
-  }
+  const project = resolveProjectOrExit("prompt");
 
   if (process.argv.includes("--json")) {
     printProjectPromptJson(project);
