@@ -145,3 +145,17 @@ Chaque résultat contient :
 
 Cette sortie est incluse dans `json-check`.
 
+
+## Limite de résultats
+
+`rag-search` supporte une limite de résultats :
+
+- `pnpm run rag-search -- <query> --limit 2`
+- `pnpm exec tsx src/cli.ts rag-search <query> --limit 2 --json`
+
+Règles :
+
+- la limite doit être un entier positif ;
+- si aucune limite valide n'est fournie, la limite par défaut est `5` ;
+- la limite s'applique aux sorties humaines et JSON.
+

@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-06 — V2.1 RAG search limit
+
+### Ajouté
+
+- Option `--limit <n>` pour `rag-search`.
+- Support de `--limit` en sortie humaine et JSON.
+- Test de contrat pour `rag-search --limit`.
+
+### Corrigé
+
+- `rag-search` n'envoie plus `limit: undefined` avec `exactOptionalPropertyTypes`.
+
+### Confirmé
+
+- La limite par défaut reste `5`.
+- La recherche reste read-only et sans dépendance.
+
+---
+
 ## 2026-07-06 — V2.0 RAG search JSON
 
 ### Ajouté
