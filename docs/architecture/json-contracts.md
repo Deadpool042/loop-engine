@@ -93,3 +93,21 @@ Cette validation reste volontairement légère.
 
 Elle sert à détecter les régressions de contrat sans introduire de schéma formel.
 
+
+## Erreurs JSON normalisées
+
+En mode `--json`, les erreurs publiques doivent rester parsables.
+
+Format :
+
+- `schemaVersion`
+- `ok: false`
+- `error.code`
+- `error.message`
+
+Exemple :
+
+- `unknown_project`
+
+Les commandes ne doivent pas sortir de texte terminal brut lorsqu'elles sont appelées avec `--json`.
+
