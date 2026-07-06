@@ -48,7 +48,7 @@ function buildSnippet(content: string, query: string): string {
 
 export function runRagSearch(
   query: string | undefined,
-  options?: { json?: boolean; limit?: number },
+  options?: { json?: boolean; limit?: number; pathPrefix?: string },
 ): void {
   if (!query || query.trim().length === 0) {
     if (options?.json) {
@@ -75,7 +75,13 @@ export function runRagSearch(
 
   const limit = options?.limit && options.limit > 0 ? options.limit : 5;
 
-  const results = index.documents
+  const documents = options?.pathPrefix
+    ? index.documents.filter((document) =>
+        document.path.startsWith(options.pathPrefix ?? ""),
+      )
+    : index.documents;
+
+  const results = documents
     .map((document) => ({
       document,
       score:
@@ -98,6 +104,7 @@ export function runRagSearch(
       JSON.stringify({
         schemaVersion: 1,
         query: normalizedQuery,
+        pathPrefix: options?.pathPrefix ?? null,
         results: results.map((result) => ({
           path: result.document.path,
           title: result.document.title,

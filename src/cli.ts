@@ -35,19 +35,30 @@ if (command === "help" || command === "--help" || command === "-h") {
   const limitIndex = process.argv.indexOf("--limit");
   const limit =
     limitIndex >= 0 ? Number.parseInt(process.argv[limitIndex + 1] ?? "", 10) : undefined;
+  const pathIndex = process.argv.indexOf("--path");
+  const pathPrefix = pathIndex >= 0 ? process.argv[pathIndex + 1] : undefined;
 
   const query = process.argv
     .slice(3)
     .filter((argument, index, argumentsList) => {
-      if (argument === "--" || argument === "--json" || argument === "--limit") {
+      if (
+        argument === "--" ||
+        argument === "--json" ||
+        argument === "--limit" ||
+        argument === "--path"
+      ) {
         return false;
       }
 
-      return argumentsList[index - 1] !== "--limit";
+      return argumentsList[index - 1] !== "--limit" && argumentsList[index - 1] !== "--path";
     })
     .join(" ");
 
-  runRagSearch(query, limit === undefined ? { json } : { json, limit });
+  runRagSearch(query, {
+    ...(json ? { json } : {}),
+    ...(limit === undefined ? {} : { limit }),
+    ...(pathPrefix === undefined ? {} : { pathPrefix }),
+  });
 } else if (command === "doctor") {
   printDoctor(loadConfig());
 } else if (command === "context") {
