@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-06 — V2.5 JSON structural check
+
+### Ajouté
+
+- Validation structurelle dans `json-check`.
+- Vérification de champs publics attendus par commande JSON.
+- Documentation de la validation structurelle.
+
+### Confirmé
+
+- `json-check` reste léger.
+- Aucun schéma formel n'est introduit.
+- `pnpm run validate` couvre les contrats JSON publics.
+
+---
+
 ## 2026-07-06 — V2.4 JSON contracts
 
 ### Ajouté

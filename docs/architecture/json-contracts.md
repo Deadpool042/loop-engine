@@ -73,3 +73,23 @@ Les sorties JSON ne doivent jamais contenir :
 Toutes les commandes JSON doivent être couvertes par :
 
 pnpm exec tsx src/cli.ts json-check
+
+
+## Validation structurelle
+
+`json-check` ne vérifie pas seulement que les sorties sont parsables.
+
+Il vérifie aussi des champs structurants par commande :
+
+- `summary` : `projects`
+- `context` : `project`, `docs`
+- `next` : `project`, `roadmap`
+- `prompt` : `project`, `instructions`
+- `review` : `project`, `diffStat`
+- `handoff` : `project`, `instructions`
+- `rag-search` : `query`, `results`
+
+Cette validation reste volontairement légère.
+
+Elle sert à détecter les régressions de contrat sans introduire de schéma formel.
+
