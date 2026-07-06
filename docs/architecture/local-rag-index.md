@@ -159,3 +159,18 @@ Règles :
 - si aucune limite valide n'est fournie, la limite par défaut est `5` ;
 - la limite s'applique aux sorties humaines et JSON.
 
+
+## Filtre par chemin
+
+`rag-search` supporte un filtre par préfixe de chemin :
+
+- `pnpm run rag-search -- roadmap --path docs/architecture`
+- `pnpm exec tsx src/cli.ts rag-search roadmap --path docs/architecture --json`
+
+Règles :
+
+- le filtre s'applique avant le scoring ;
+- le filtre utilise `startsWith` sur le chemin indexé ;
+- aucune lecture fichier supplémentaire ;
+- la sortie JSON expose `pathPrefix`.
+

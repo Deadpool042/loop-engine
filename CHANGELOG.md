@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-06 — V2.2 RAG search path filter
+
+### Ajouté
+
+- Option `--path <prefix>` pour `rag-search`.
+- Filtre par préfixe de chemin avant scoring.
+- Champ JSON `pathPrefix`.
+- Test de contrat pour `rag-search --path`.
+
+### Confirmé
+
+- Le filtre s'applique aux sorties humaines et JSON.
+- La recherche reste locale, read-only et sans dépendance.
+
+---
+
 ## 2026-07-06 — V2.1 RAG search limit
 
 ### Ajouté
