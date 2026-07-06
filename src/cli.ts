@@ -32,11 +32,22 @@ if (command === "help" || command === "--help" || command === "-h") {
   runRagIndex();
 } else if (command === "rag-search") {
   const json = process.argv.includes("--json");
+  const limitIndex = process.argv.indexOf("--limit");
+  const limit =
+    limitIndex >= 0 ? Number.parseInt(process.argv[limitIndex + 1] ?? "", 10) : undefined;
+
   const query = process.argv
     .slice(3)
-    .filter((argument) => argument !== "--" && argument !== "--json")
+    .filter((argument, index, argumentsList) => {
+      if (argument === "--" || argument === "--json" || argument === "--limit") {
+        return false;
+      }
+
+      return argumentsList[index - 1] !== "--limit";
+    })
     .join(" ");
-  runRagSearch(query, { json });
+
+  runRagSearch(query, { json, limit });
 } else if (command === "doctor") {
   printDoctor(loadConfig());
 } else if (command === "context") {

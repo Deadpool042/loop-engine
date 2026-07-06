@@ -46,7 +46,10 @@ function buildSnippet(content: string, query: string): string {
   return `${prefix}${content.slice(start, end).replace(/\s+/g, " ").trim()}${suffix}`;
 }
 
-export function runRagSearch(query: string | undefined, options?: { json?: boolean }): void {
+export function runRagSearch(
+  query: string | undefined,
+  options?: { json?: boolean; limit?: number },
+): void {
   if (!query || query.trim().length === 0) {
     if (options?.json) {
       console.log(JSON.stringify({ schemaVersion: 1, query: query ?? "", results: [], error: "missing_query" }));
@@ -70,6 +73,8 @@ export function runRagSearch(query: string | undefined, options?: { json?: boole
   const index = JSON.parse(readFileSync(INDEX_PATH, "utf8")) as RagIndex;
   const normalizedQuery = query.trim();
 
+  const limit = options?.limit && options.limit > 0 ? options.limit : 5;
+
   const results = index.documents
     .map((document) => ({
       document,
@@ -86,7 +91,7 @@ export function runRagSearch(query: string | undefined, options?: { json?: boole
 
       return left.document.path.localeCompare(right.document.path);
     })
-    .slice(0, 5);
+    .slice(0, limit);
 
   if (options?.json) {
     console.log(
