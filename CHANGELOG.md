@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-06 — V2.4 JSON contracts
+
+### Ajouté
+
+- Spécification `docs/architecture/json-contracts.md`.
+- Formalisation des sorties JSON publiques.
+- Règles de compatibilité des contrats JSON.
+- Invariants des sorties `--json`.
+
+### Confirmé
+
+- Tous les JSON publics doivent exposer `schemaVersion`.
+- Les sorties JSON ne doivent contenir ni texte décoratif, ni ANSI, ni emoji.
+- `json-check` reste le garde-fou officiel des contrats JSON.
+
+---
+
 ## 2026-07-06 — V2.3 Human handoff
 
 ### Ajouté
