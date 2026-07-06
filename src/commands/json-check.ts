@@ -6,6 +6,7 @@ const COMMANDS = [
   ["next", "loop-engine", "--json"],
   ["prompt", "loop-engine", "--json"],
   ["review", "loop-engine", "--json"],
+  ["handoff", "loop-engine", "--json"],
   ["rag-search", "roadmap", "--json"],
 ] as const;
 
