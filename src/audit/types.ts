@@ -12,6 +12,12 @@ export type AuditSeverity = "info" | "warning" | "error";
 export type AuditStatus = "pass" | "warning" | "fail" | "skipped";
 export type AuditPriority = "low" | "medium" | "high";
 
+export type AuditRecommendation = Readonly<{
+  ruleId: string;
+  priority: AuditPriority;
+  message: string;
+}>;
+
 export type AuditFinding = Readonly<{
   ruleId: string;
   category: AuditCategory;
@@ -46,4 +52,5 @@ export type AuditReport = Readonly<{
     byPriority: Partial<Record<AuditPriority, number>>;
   };
   findings: readonly AuditFinding[];
+  recommendations: readonly AuditRecommendation[];
 }>;

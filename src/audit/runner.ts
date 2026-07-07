@@ -24,6 +24,13 @@ export function runAudit(): AuditReport {
     },
     {},
   );
+  const recommendations = findings
+    .filter((finding) => finding.recommendation)
+    .map((finding) => ({
+      ruleId: finding.ruleId,
+      priority: finding.priority,
+      message: finding.recommendation!,
+    }));
 
   return {
     schemaVersion: 1,
@@ -39,5 +46,6 @@ export function runAudit(): AuditReport {
       byPriority,
     },
     findings,
+    recommendations,
   };
 }
