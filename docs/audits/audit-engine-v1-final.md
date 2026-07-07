@@ -262,7 +262,7 @@ Chaque finding contient :
 
 ## Règles actives
 
-Le moteur contient 15 règles exécutables :
+Le moteur contient 16 règles exécutables :
 
 - `JSON-001` — vérifie que les sorties JSON publiques exposent `schemaVersion` ;
 - `JSON-005` — vérifie que les commandes JSON publiques sont couvertes par `json-check` ;
@@ -279,9 +279,11 @@ Le moteur contient 15 règles exécutables :
 - `AUDIT-008` — vérifie que le statut global d'audit est typé, calculé et affiché.
 - `AUDIT-009` — vérifie que le mode strict d'audit est câblé pour les sorties humaines et JSON.
 - `AUDIT-010` — vérifie que le script `audit:strict` est exposé pour les usages CI.
+- `AUDIT-011` — vérifie que le script `ci` enchaîne la validation générale et l'audit strict.
 - `AUDIT-008` — vérifie que le statut global d'audit est typé, calculé et affiché.
 - `AUDIT-009` — vérifie que le mode strict d'audit est câblé pour les sorties humaines et JSON.
 - `AUDIT-010` — vérifie que le script `audit:strict` est exposé pour les usages CI.
+- `AUDIT-011` — vérifie que le script `ci` enchaîne la validation générale et l'audit strict.
 
 ## Structure interne
 
@@ -302,8 +304,8 @@ Les listes de commandes publiques sont centralisées dans `src/audit/public-comm
 
 L'état attendu du moteur est :
 
-- 15 règles ;
-- 15 règles en pass ;
+- 16 règles ;
+- 16 règles en pass ;
 - 0 warning runtime ;
 - 0 fail ;
 - score 100 ;
@@ -326,3 +328,17 @@ Commandes supportées :
 Lorsque `summary.status` vaut `pass`, le code de sortie reste `0`.
 
 Lorsque `summary.status` vaut `warning` ou `fail`, le code de sortie devient non nul.
+
+
+---
+
+## Script CI
+
+Le script CI exécute la validation générale puis l'audit strict :
+
+- `pnpm run validate`
+- `pnpm run audit:strict`
+
+Commande dédiée :
+
+- `pnpm run ci`
