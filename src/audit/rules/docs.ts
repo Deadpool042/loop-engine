@@ -243,3 +243,49 @@ export const AUDIT_FINAL_REPORT_README_CHECKS_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_FINAL_REPORT_REGISTRY_CHECKS_RULE: AuditRule = {
+  id: "DOCS-005",
+  category: "docs",
+  severity: "warning",
+  title: "Final audit report documents registry checks",
+  description: "The final audit report should document audit registry integrity checks.",
+  check: () => {
+    const reportPath = "docs/audits/audit-engine-v1-final.md";
+
+    if (!existsSync(reportPath)) {
+      return fail(
+        AUDIT_FINAL_REPORT_REGISTRY_CHECKS_RULE,
+        "Final audit report is missing.",
+        [reportPath],
+        "Restore docs/audits/audit-engine-v1-final.md and document registry integrity checks.",
+      );
+    }
+
+    const content = readFileSync(reportPath, "utf8");
+    const expectedTokens = [
+      "`AUDIT-015`",
+      "`AUDIT-016`",
+      "unicité des identifiants",
+      "complétude du registre",
+      "`AUDIT_RULES`",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_FINAL_REPORT_REGISTRY_CHECKS_RULE,
+        "Final audit report does not document registry checks.",
+        missing,
+        "Document AUDIT-015, AUDIT-016, rule id uniqueness, and AUDIT_RULES registry completeness.",
+      );
+    }
+
+    return pass(
+      AUDIT_FINAL_REPORT_REGISTRY_CHECKS_RULE,
+      "Final audit report documents registry checks.",
+      expectedTokens,
+    );
+  },
+};
