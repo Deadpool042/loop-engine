@@ -1,7 +1,8 @@
 import { runAudit } from "../audit/runner.js";
+import type { AuditReport } from "../audit/types.js";
 import { terminal } from "../ui/terminal.js";
 
-export function printAuditReport(): void {
+export function printAuditReport(): AuditReport {
   const report = runAudit();
 
   terminal.header("Audit");
@@ -71,9 +72,13 @@ export function printAuditReport(): void {
       terminal.info(detail);
     }
   }
+
+  return report;
 }
 
 
-export function printAuditReportJson(): void {
-  console.log(JSON.stringify(runAudit()));
+export function printAuditReportJson(): AuditReport {
+  const report = runAudit();
+  console.log(JSON.stringify(report));
+  return report;
 }

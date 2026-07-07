@@ -93,10 +93,13 @@ if (command === "help" || command === "--help" || command === "-h") {
 } else if (command === "doctor") {
   printDoctor(loadConfig());
 } else if (command === "audit") {
-  if (process.argv.includes("--json")) {
-    printAuditReportJson();
-  } else {
-    printAuditReport();
+  const strict = process.argv.includes("--strict");
+  const report = process.argv.includes("--json")
+    ? printAuditReportJson()
+    : printAuditReport();
+
+  if (strict && report.summary.status !== "pass") {
+    process.exitCode = 1;
   }
 } else if (command === "handoff") {
   const project = resolveProjectOrExit("handoff");
