@@ -520,3 +520,78 @@ export const AUDIT_GITHUB_ACTIONS_CI_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RULE_ORDER_RULE: AuditRule = {
+  id: "AUDIT-013",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rules are ordered logically",
+  description: "Critical audit rules should stay in logical order for stable human and JSON reporting.",
+  check: () => {
+    const rulesPath = "src/audit/rules.ts";
+
+    if (!existsSync(rulesPath)) {
+      return fail(
+        AUDIT_RULE_ORDER_RULE,
+        "Audit rule registry is missing.",
+        [rulesPath],
+        "Restore src/audit/rules.ts so rule ordering can be verified.",
+      );
+    }
+
+    const content = readFileSync(rulesPath, "utf8");
+    const registryStart = content.indexOf("export const AUDIT_RULES");
+    const registryEnd = content.indexOf("];", registryStart);
+    const registry = content.slice(registryStart, registryEnd);
+
+    const expectedOrder = [
+      "AUDIT_GLOBAL_STATUS_RULE",
+      "AUDIT_STRICT_MODE_RULE",
+      "AUDIT_STRICT_SCRIPT_RULE",
+      "AUDIT_CI_SCRIPT_RULE",
+      "AUDIT_GITHUB_ACTIONS_CI_RULE",
+    ];
+
+    const positions = expectedOrder.map((token) => ({
+      token,
+      index: registry.indexOf(token),
+    }));
+
+    const missing = positions
+      .filter(({ index }) => index < 0)
+      .map(({ token }) => token);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RULE_ORDER_RULE,
+        "Audit rule ordering cannot be verified because rules are missing.",
+        missing,
+        "Keep the critical audit rules registered in src/audit/rules.ts.",
+      );
+    }
+
+    const outOfOrder = positions
+      .slice(1)
+      .filter(({ index }, offset) => {
+        const previous = positions[offset];
+
+        return previous !== undefined && index <= previous.index;
+      })
+      .map(({ token }) => token);
+
+    if (outOfOrder.length > 0) {
+      return fail(
+        AUDIT_RULE_ORDER_RULE,
+        "Critical audit rules are not ordered logically.",
+        outOfOrder,
+        "Order critical rules as global status, strict mode, strict script, CI script, then GitHub Actions CI.",
+      );
+    }
+
+    return pass(
+      AUDIT_RULE_ORDER_RULE,
+      "Critical audit rules are ordered logically.",
+      expectedOrder,
+    );
+  },
+};
