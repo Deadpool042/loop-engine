@@ -100,3 +100,67 @@ export const README_AUDIT_CI_DOCUMENTATION_RULE: AuditRule = {
     );
   },
 };
+
+export const README_SEE_ALSO_UNIQUE_RULE: AuditRule = {
+  id: "DOCS-003",
+  category: "docs",
+  severity: "warning",
+  title: "README see also links are unique",
+  description: "The README should not list duplicate documentation links in the See also section.",
+  check: () => {
+    const readmePath = "README.md";
+
+    if (!existsSync(readmePath)) {
+      return fail(
+        README_SEE_ALSO_UNIQUE_RULE,
+        "README is missing.",
+        [readmePath],
+        "Restore README.md so documentation links can be verified.",
+      );
+    }
+
+    const content = readFileSync(readmePath, "utf8");
+    const marker = "Voir aussi :";
+    const markerIndex = content.indexOf(marker);
+
+    if (markerIndex < 0) {
+      return fail(
+        README_SEE_ALSO_UNIQUE_RULE,
+        "README does not expose a See also section.",
+        [marker],
+        "Keep a Voir aussi section in README.md for documentation discoverability.",
+      );
+    }
+
+    const section = content.slice(markerIndex);
+    const links = section
+      .split("\\n")
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith("- `") && line.endsWith("`"));
+
+    const seen = new Set<string>();
+    const duplicates = links.filter((link) => {
+      if (seen.has(link)) {
+        return true;
+      }
+
+      seen.add(link);
+      return false;
+    });
+
+    if (duplicates.length > 0) {
+      return fail(
+        README_SEE_ALSO_UNIQUE_RULE,
+        "README See also section contains duplicate links.",
+        duplicates,
+        "Remove duplicate documentation links from README.md.",
+      );
+    }
+
+    return pass(
+      README_SEE_ALSO_UNIQUE_RULE,
+      "README See also links are unique.",
+      links,
+    );
+  },
+};
