@@ -9,6 +9,7 @@ export function runAudit(): AuditReport {
   const warning = findings.filter((finding) => finding.status === "warning").length;
   const fail = findings.filter((finding) => finding.status === "fail").length;
   const skipped = findings.filter((finding) => finding.status === "skipped").length;
+  const status = fail > 0 ? "fail" : warning > 0 ? "warning" : "pass";
   const score = total === 0 ? 100 : Math.round((pass / total) * 100);
   const byCategory = findings.reduce<Partial<Record<AuditReport["findings"][number]["category"], number>>>(
     (summary, finding) => {
@@ -36,6 +37,7 @@ export function runAudit(): AuditReport {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),
     summary: {
+      status,
       total,
       pass,
       warning,

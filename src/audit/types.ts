@@ -10,6 +10,7 @@ export type AuditCategory =
 
 export type AuditSeverity = "info" | "warning" | "error";
 export type AuditStatus = "pass" | "warning" | "fail" | "skipped";
+export type AuditSummaryStatus = "pass" | "warning" | "fail";
 export type AuditPriority = "low" | "medium" | "high";
 
 export type AuditRecommendation = Readonly<{
@@ -42,6 +43,7 @@ export type AuditReport = Readonly<{
   schemaVersion: 1;
   generatedAt: string;
   summary: {
+    status: AuditSummaryStatus;
     total: number;
     pass: number;
     warning: number;
