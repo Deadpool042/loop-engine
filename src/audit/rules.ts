@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
-import { fail, pass } from "./findings.js";
 import { AUDIT_PRIORITY_EXPOSURE_RULE, AUDIT_SCORE_EXPOSURE_RULE } from "./rules/audit.js";
 import { CLI_COMMAND_COVERAGE_RULE } from "./rules/cli.js";
 import { AUDIT_DOCUMENTATION_COVERAGE_RULE } from "./rules/docs.js";
