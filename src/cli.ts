@@ -22,7 +22,7 @@ import { printJsonError } from "./commands/json-error.js";
 function resolveProjectOrExit(commandName: string) {
   const config = loadConfig();
 
-  if (!process.argv[3]) {
+  if (!process.argv[3] || process.argv[3].startsWith("--")) {
     if (process.argv.includes("--json")) {
       printJsonError("missing_project", `Missing project argument for ${commandName}`);
     } else {

@@ -53,15 +53,9 @@ export function printNextProjectAction(project: ProjectConfig): void {
 
     terminal.section("Roadmap candidates");
 
-    const safeCount = snapshot.roadmap.candidates.filter(
-      (candidate) => candidate.kind === "safe",
-    ).length;
-    const warningCount = snapshot.roadmap.candidates.filter(
-      (candidate) => candidate.kind === "warning",
-    ).length;
-    const blockedCount = snapshot.roadmap.candidates.filter(
-      (candidate) => candidate.kind === "blocked",
-    ).length;
+    const safeCount = snapshot.roadmap.stats.safe;
+    const warningCount = snapshot.roadmap.stats.warning;
+    const blockedCount = snapshot.roadmap.stats.blocked;
 
     terminal.success(`safe: ${safeCount}`);
     terminal.warning(`warning: ${warningCount}`);
