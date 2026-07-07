@@ -64,6 +64,58 @@ export const JSON_SCHEMA_VERSION_RULE: AuditRule = {
   },
 };
 
+
+export const JSON_CHECK_COVERAGE_RULE: AuditRule = {
+  id: "JSON-005",
+  category: "json",
+  severity: "warning",
+  title: "Public JSON commands are covered by json-check",
+  description: "Every public command exposing --json should be listed in json-check.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_CHECK_COVERAGE_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedCommands = [
+      "audit",
+      "summary",
+      "context",
+      "next",
+      "prompt",
+      "review",
+      "handoff",
+      "rag-search",
+    ];
+
+    const missing = expectedCommands.filter(
+      (command) => !content.includes(`["${command}"`),
+    );
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_CHECK_COVERAGE_RULE,
+        "Some public JSON commands are missing from json-check.",
+        missing,
+      );
+    }
+
+    return pass(
+      JSON_CHECK_COVERAGE_RULE,
+      "All public JSON commands are covered by json-check.",
+      expectedCommands,
+    );
+  },
+};
+
+
 export const AUDIT_RULES: readonly AuditRule[] = [
   JSON_SCHEMA_VERSION_RULE,
+  JSON_CHECK_COVERAGE_RULE,
 ];
