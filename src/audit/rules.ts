@@ -1,27 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fail, pass } from "./findings.js";
+import { PUBLIC_COMMANDS, PUBLIC_JSON_COMMAND_FILES } from "./public-commands.js";
 import type { AuditRule } from "./types.js";
-
-const PUBLIC_COMMANDS = [
-  "audit",
-  "summary",
-  "context",
-  "next",
-  "prompt",
-  "review",
-  "handoff",
-  "rag-search",
-] as const;
-
-const PUBLIC_JSON_COMMAND_FILES = [
-  "src/commands/summary.ts",
-  "src/commands/context.ts",
-  "src/commands/next.ts",
-  "src/commands/prompt.ts",
-  "src/commands/review.ts",
-  "src/commands/handoff.ts",
-  "src/commands/rag-search.ts",
-] as const;
 
 export const JSON_SCHEMA_VERSION_RULE: AuditRule = {
   id: "JSON-001",
