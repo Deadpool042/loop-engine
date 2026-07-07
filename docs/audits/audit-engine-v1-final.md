@@ -262,7 +262,7 @@ Chaque finding contient :
 
 ## Règles actives
 
-Le moteur contient 17 règles exécutables :
+Le moteur contient 18 règles exécutables :
 
 - `JSON-001` — vérifie que les sorties JSON publiques exposent `schemaVersion` ;
 - `JSON-005` — vérifie que les commandes JSON publiques sont couvertes par `json-check` ;
@@ -281,11 +281,13 @@ Le moteur contient 17 règles exécutables :
 - `AUDIT-010` — vérifie que le script `audit:strict` est exposé pour les usages CI.
 - `AUDIT-011` — vérifie que le script `ci` enchaîne la validation générale et l'audit strict.
 - `AUDIT-012` — vérifie que le workflow GitHub Actions exécute le script `ci`.
+- `AUDIT-013` — vérifie que les règles critiques d'audit restent dans un ordre logique stable.
 - `AUDIT-008` — vérifie que le statut global d'audit est typé, calculé et affiché.
 - `AUDIT-009` — vérifie que le mode strict d'audit est câblé pour les sorties humaines et JSON.
 - `AUDIT-010` — vérifie que le script `audit:strict` est exposé pour les usages CI.
 - `AUDIT-011` — vérifie que le script `ci` enchaîne la validation générale et l'audit strict.
 - `AUDIT-012` — vérifie que le workflow GitHub Actions exécute le script `ci`.
+- `AUDIT-013` — vérifie que les règles critiques d'audit restent dans un ordre logique stable.
 
 ## Structure interne
 
@@ -306,8 +308,8 @@ Les listes de commandes publiques sont centralisées dans `src/audit/public-comm
 
 L'état attendu du moteur est :
 
-- 17 règles ;
-- 17 règles en pass ;
+- 18 règles ;
+- 18 règles en pass ;
 - 0 warning runtime ;
 - 0 fail ;
 - score 100 ;
