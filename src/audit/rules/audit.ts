@@ -251,3 +251,46 @@ export const AUDIT_PRIORITY_SUMMARY_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RECOMMENDATION_SUMMARY_RULE: AuditRule = {
+  id: "AUDIT-007",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit report exposes recommendation summary",
+  description: "The audit JSON report should expose a top-level recommendation summary for downstream reporting.",
+  check: () => {
+    const expectations = [
+      {
+        file: "src/audit/types.ts",
+        token: "recommendations: readonly AuditRecommendation[];",
+      },
+      {
+        file: "src/audit/runner.ts",
+        token: "const recommendations =",
+      },
+      {
+        file: "src/audit/runner.ts",
+        token: "recommendations,",
+      },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_SUMMARY_RULE,
+        "Audit recommendation summary is not fully exposed.",
+        missing,
+        "Ensure AuditReport exposes recommendations and runAudit derives them from findings with recommendations.",
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_SUMMARY_RULE,
+      "Audit recommendation summary is typed and computed.",
+      expectations.map(({ file }) => file),
+    );
+  },
+};
