@@ -235,6 +235,8 @@ Le rapport JSON contient :
 - `summary.skipped` ;
 - `summary.score` ;
 - `summary.byCategory` ;
+
+`summary.byCategory` regroupe les findings par catégorie et permet de vérifier la distribution des règles entre `json`, `cli`, `docs` et `architecture`.
 - `findings`.
 
 Chaque finding contient :
@@ -250,10 +252,11 @@ Chaque finding contient :
 
 ## Règles actives
 
-Le moteur contient 9 règles exécutables :
+Le moteur contient 10 règles exécutables :
 
 - `JSON-001` — vérifie que les sorties JSON publiques exposent `schemaVersion` ;
 - `JSON-005` — vérifie que les commandes JSON publiques sont couvertes par `json-check` ;
+- `JSON-006` — vérifie que le résumé JSON d'audit expose les champs stables attendus ;
 - `CLI-001` — vérifie que les commandes publiques sont accessibles depuis le routeur CLI ;
 - `DOCS-001` — vérifie que la documentation couvre les rapports humain et JSON ;
 - `AUDIT-001` — vérifie que le score d'audit est typé, calculé et affiché ;
@@ -281,8 +284,8 @@ Les listes de commandes publiques sont centralisées dans `src/audit/public-comm
 
 L'état attendu du moteur est :
 
-- 9 règles ;
-- 9 règles en pass ;
+- 10 règles ;
+- 10 règles en pass ;
 - 0 warning runtime ;
 - 0 fail ;
 - score 100 ;
