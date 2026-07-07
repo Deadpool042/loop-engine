@@ -341,3 +341,50 @@ export const AUDIT_GLOBAL_STATUS_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_STRICT_MODE_RULE: AuditRule = {
+  id: "AUDIT-009",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit command supports strict mode",
+  description: "The audit command should support strict mode for CI-oriented non-zero exits.",
+  check: () => {
+    const expectations = [
+      {
+        file: "src/cli.ts",
+        token: 'const strict = process.argv.includes("--strict");',
+      },
+      {
+        file: "src/cli.ts",
+        token: 'if (strict && report.summary.status !== "pass")',
+      },
+      {
+        file: "src/commands/audit.ts",
+        token: "export function printAuditReport(): AuditReport",
+      },
+      {
+        file: "src/commands/audit.ts",
+        token: "export function printAuditReportJson(): AuditReport",
+      },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_STRICT_MODE_RULE,
+        "Audit strict mode is not fully wired.",
+        missing,
+        "Ensure audit --strict derives process.exitCode from summary.status for both human and JSON output.",
+      );
+    }
+
+    return pass(
+      AUDIT_STRICT_MODE_RULE,
+      "Audit strict mode is wired for human and JSON output.",
+      expectations.map(({ file }) => file),
+    );
+  },
+};
