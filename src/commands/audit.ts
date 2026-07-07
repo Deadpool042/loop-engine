@@ -35,6 +35,12 @@ export function printAuditReport(): void {
     terminal.info(`${category}: ${count}`);
   }
 
+  terminal.section("Priorities");
+
+  for (const [priority, count] of Object.entries(report.summary.byPriority)) {
+    terminal.info(`${priority}: ${count}`);
+  }
+
   const recommendations = report.findings.filter(
     (finding) => finding.recommendation,
   );

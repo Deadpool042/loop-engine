@@ -43,6 +43,7 @@ export type AuditReport = Readonly<{
     skipped: number;
     score: number;
     byCategory: Partial<Record<AuditCategory, number>>;
+    byPriority: Partial<Record<AuditPriority, number>>;
   };
   findings: readonly AuditFinding[];
 }>;

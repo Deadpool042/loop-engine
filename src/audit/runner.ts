@@ -17,6 +17,13 @@ export function runAudit(): AuditReport {
     },
     {},
   );
+  const byPriority = findings.reduce<Partial<Record<AuditReport["findings"][number]["priority"], number>>>(
+    (summary, finding) => {
+      summary[finding.priority] = (summary[finding.priority] ?? 0) + 1;
+      return summary;
+    },
+    {},
+  );
 
   return {
     schemaVersion: 1,
@@ -29,6 +36,7 @@ export function runAudit(): AuditReport {
       skipped,
       score,
       byCategory,
+      byPriority,
     },
     findings,
   };
