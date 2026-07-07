@@ -431,3 +431,46 @@ export const AUDIT_STRICT_SCRIPT_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_CI_SCRIPT_RULE: AuditRule = {
+  id: "AUDIT-011",
+  category: "architecture",
+  severity: "warning",
+  title: "CI script runs validation and strict audit",
+  description: "The project should expose a CI script that runs validation and strict audit checks.",
+  check: () => {
+    const packagePath = "package.json";
+
+    if (!existsSync(packagePath)) {
+      return fail(
+        AUDIT_CI_SCRIPT_RULE,
+        "Package manifest is missing.",
+        [packagePath],
+        "Restore package.json so the CI script can be exposed.",
+      );
+    }
+
+    const content = readFileSync(packagePath, "utf8");
+    const expectedTokens = [
+      '"ci"',
+      '"pnpm run validate && pnpm run audit:strict"',
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_CI_SCRIPT_RULE,
+        "CI validation script is missing or incomplete.",
+        missing,
+        "Expose ci as pnpm run validate && pnpm run audit:strict.",
+      );
+    }
+
+    return pass(
+      AUDIT_CI_SCRIPT_RULE,
+      "CI validation script runs validate and strict audit.",
+      expectedTokens,
+    );
+  },
+};
