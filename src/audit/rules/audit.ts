@@ -208,3 +208,46 @@ export const AUDIT_RECOMMENDATION_REPORT_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_PRIORITY_SUMMARY_RULE: AuditRule = {
+  id: "AUDIT-006",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit summary exposes priority counts",
+  description: "The audit summary should expose finding counts grouped by priority.",
+  check: () => {
+    const expectations = [
+      {
+        file: "src/audit/types.ts",
+        token: "byPriority: Partial<Record<AuditPriority, number>>;",
+      },
+      {
+        file: "src/audit/runner.ts",
+        token: "const byPriority =",
+      },
+      {
+        file: "src/commands/audit.ts",
+        token: 'terminal.section("Priorities");',
+      },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PRIORITY_SUMMARY_RULE,
+        "Audit priority summary is not fully exposed.",
+        missing,
+        "Ensure byPriority is typed in AuditReport, computed in runAudit, and displayed by the human audit command.",
+      );
+    }
+
+    return pass(
+      AUDIT_PRIORITY_SUMMARY_RULE,
+      "Audit priority summary is typed, computed, and displayed.",
+      expectations.map(({ file }) => file),
+    );
+  },
+};
