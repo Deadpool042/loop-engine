@@ -269,7 +269,7 @@ Chaque finding contient :
 
 ## Règles exécutables
 
-Le moteur contient 24 règles exécutables :
+Le moteur contient 25 règles exécutables :
 
 - `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
 - `JSON-005` : couverture des commandes JSON publiques par `json-check`.
@@ -293,7 +293,8 @@ Le moteur contient 24 règles exécutables :
 - `AUDIT-012` : workflow GitHub Actions exécutant `pnpm run ci`.
 - `AUDIT-013` : ordre logique des règles critiques d'audit.
 - `AUDIT-014` : routage CLI du mode strict d'audit.
-- `AUDIT-015` : unicité des entrées du registre d'audit.
+- `AUDIT-015` : unicité des identifiants déclarés des règles d'audit.
+- `AUDIT-016` : complétude du registre `AUDIT_RULES`.
 
 ## Couverture README
 
@@ -314,8 +315,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 24 règles ;
-- 24 règles en pass ;
+- 25 règles ;
+- 25 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;
