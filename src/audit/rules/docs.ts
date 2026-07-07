@@ -16,6 +16,7 @@ export const AUDIT_DOCUMENTATION_COVERAGE_RULE: AuditRule = {
         AUDIT_DOCUMENTATION_COVERAGE_RULE,
         "Audit engine documentation is missing.",
         [docsPath],
+        "Create docs/audits/audit-engine-v1-final.md and document the audit command outputs.",
       );
     }
 
@@ -37,6 +38,7 @@ export const AUDIT_DOCUMENTATION_COVERAGE_RULE: AuditRule = {
         AUDIT_DOCUMENTATION_COVERAGE_RULE,
         "Audit engine documentation does not cover all expected report outputs.",
         missing,
+        "Document the human audit report and the audit --json report contract.",
       );
     }
 

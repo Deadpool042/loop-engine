@@ -33,6 +33,7 @@ export const AUDIT_SCORE_EXPOSURE_RULE: AuditRule = {
         AUDIT_SCORE_EXPOSURE_RULE,
         "Audit score is not fully exposed.",
         missing,
+        "Ensure the score is typed in AuditReport, computed in runAudit, and printed by the human audit command.",
       );
     }
 
@@ -71,6 +72,7 @@ export const AUDIT_PRIORITY_EXPOSURE_RULE: AuditRule = {
         AUDIT_PRIORITY_EXPOSURE_RULE,
         "Audit priority is not fully exposed.",
         missing,
+        "Ensure AuditFinding exposes priority and findings populate it through the finding helpers.",
       );
     }
 
@@ -113,6 +115,7 @@ export const AUDIT_RECOMMENDATION_SUPPORT_RULE: AuditRule = {
         AUDIT_RECOMMENDATION_SUPPORT_RULE,
         "Audit recommendations are not fully supported.",
         missing,
+        "Ensure AuditFinding exposes recommendation and failing findings can populate it through fail().",
       );
     }
 

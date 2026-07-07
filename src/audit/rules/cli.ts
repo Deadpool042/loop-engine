@@ -23,6 +23,7 @@ export const CLI_COMMAND_COVERAGE_RULE: AuditRule = {
         CLI_COMMAND_COVERAGE_RULE,
         "Some public CLI commands are missing from the router.",
         missing,
+        "Register the missing commands in src/cli.ts.",
       );
     }
 

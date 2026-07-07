@@ -25,6 +25,7 @@ export const JSON_SCHEMA_VERSION_RULE: AuditRule = {
         JSON_SCHEMA_VERSION_RULE,
         "Some public JSON commands do not expose schemaVersion.",
         missing,
+        "Add schemaVersion to every public command that supports --json.",
       );
     }
 
@@ -50,6 +51,7 @@ export const JSON_CHECK_COVERAGE_RULE: AuditRule = {
         JSON_CHECK_COVERAGE_RULE,
         "json-check command is missing.",
         [jsonCheckPath],
+        "Restore src/commands/json-check.ts or update the audit rule if the command was intentionally removed.",
       );
     }
 
@@ -65,6 +67,7 @@ export const JSON_CHECK_COVERAGE_RULE: AuditRule = {
         JSON_CHECK_COVERAGE_RULE,
         "Some public JSON commands are missing from json-check.",
         missing,
+        "Add the missing public JSON commands to src/commands/json-check.ts.",
       );
     }
 
