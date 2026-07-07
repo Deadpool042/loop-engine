@@ -474,3 +474,49 @@ export const AUDIT_CI_SCRIPT_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_GITHUB_ACTIONS_CI_RULE: AuditRule = {
+  id: "AUDIT-012",
+  category: "architecture",
+  severity: "warning",
+  title: "GitHub Actions runs CI script",
+  description: "The repository should expose a GitHub Actions workflow that runs the CI script.",
+  check: () => {
+    const workflowPath = ".github/workflows/ci.yml";
+
+    if (!existsSync(workflowPath)) {
+      return fail(
+        AUDIT_GITHUB_ACTIONS_CI_RULE,
+        "GitHub Actions CI workflow is missing.",
+        [workflowPath],
+        "Add .github/workflows/ci.yml and run pnpm run ci from the workflow.",
+      );
+    }
+
+    const content = readFileSync(workflowPath, "utf8");
+    const expectedTokens = [
+      "uses: actions/checkout@v4",
+      "uses: pnpm/action-setup@v4",
+      "uses: actions/setup-node@v4",
+      "run: pnpm install --frozen-lockfile",
+      "run: pnpm run ci",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_GITHUB_ACTIONS_CI_RULE,
+        "GitHub Actions CI workflow is incomplete.",
+        missing,
+        "Ensure the workflow installs dependencies and runs pnpm run ci.",
+      );
+    }
+
+    return pass(
+      AUDIT_GITHUB_ACTIONS_CI_RULE,
+      "GitHub Actions CI workflow runs pnpm run ci.",
+      expectedTokens,
+    );
+  },
+};
