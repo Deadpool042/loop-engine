@@ -205,3 +205,11 @@ Loop Engine possède aujourd'hui un socle suffisamment stable pour accueillir un
 Le meilleur investissement n'est plus un nouveau module fonctionnel.
 
 C'est l'automatisation des audits déjà réalisés manuellement.
+
+---
+
+# Couverture des sorties d'audit
+
+La commande `audit` doit produire un rapport humain lisible dans le terminal.
+
+La commande `audit --json` doit produire un rapport JSON stable, incluant `schemaVersion`, un résumé et la liste des findings.
