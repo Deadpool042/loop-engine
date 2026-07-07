@@ -226,8 +226,12 @@ Le rapport humain affiche également une section `Recommendations` lorsque des f
 
 Le rapport JSON contient :
 
+`summary.status` expose le statut global dérivé des findings : `pass`, `warning` ou `fail`.
+
 - `schemaVersion` ;
 - `generatedAt` ;
+- `summary.status` ;
+- `summary.status` ;
 - `summary.total` ;
 - `summary.pass` ;
 - `summary.warning` ;
@@ -258,7 +262,7 @@ Chaque finding contient :
 
 ## Règles actives
 
-Le moteur contient 12 règles exécutables :
+Le moteur contient 13 règles exécutables :
 
 - `JSON-001` — vérifie que les sorties JSON publiques exposent `schemaVersion` ;
 - `JSON-005` — vérifie que les commandes JSON publiques sont couvertes par `json-check` ;
@@ -272,6 +276,8 @@ Le moteur contient 12 règles exécutables :
 - `AUDIT-005` — vérifie que le rapport humain affiche les recommandations lorsqu'elles sont disponibles.
 - `AUDIT-006` — vérifie que le résumé par priorité est typé, calculé et affiché.
 - `AUDIT-007` — vérifie que le résumé top-level des recommandations est typé et calculé.
+- `AUDIT-008` — vérifie que le statut global d'audit est typé, calculé et affiché.
+- `AUDIT-008` — vérifie que le statut global d'audit est typé, calculé et affiché.
 
 ## Structure interne
 
@@ -292,8 +298,8 @@ Les listes de commandes publiques sont centralisées dans `src/audit/public-comm
 
 L'état attendu du moteur est :
 
-- 12 règles ;
-- 12 règles en pass ;
+- 13 règles ;
+- 13 règles en pass ;
 - 0 warning runtime ;
 - 0 fail ;
 - score 100 ;
