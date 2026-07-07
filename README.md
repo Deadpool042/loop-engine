@@ -119,7 +119,6 @@ Voir aussi :
 - `docs/integrations/n8n-read-only-checklist.md`
 - `docs/integrations/openclaw-read-only.md`
 - `docs/integrations/openclaw-read-only-checklist.md`
-- `docs/integrations/openclaw-read-only-checklist.md`
 - `docs/architecture/audit-engine.md`
 
 ## Audit et CI
