@@ -712,3 +712,88 @@ export const AUDIT_RULE_ID_UNIQUENESS_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RULE_REGISTRY_COMPLETENESS_RULE: AuditRule = {
+  id: "AUDIT-016",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule registry is complete",
+  description: "The audit rule registry should include every exported audit rule exactly once.",
+  check: () => {
+    const registryPath = "src/audit/rules.ts";
+    const ruleFiles = [
+      "src/audit/rules/json.ts",
+      "src/audit/rules/cli.ts",
+      "src/audit/rules/docs.ts",
+      "src/audit/rules/audit.ts",
+    ];
+
+    const missingFiles = [registryPath, ...ruleFiles].filter(
+      (file) => !existsSync(file),
+    );
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUDIT_RULE_REGISTRY_COMPLETENESS_RULE,
+        "Some audit registry files are missing.",
+        missingFiles,
+        "Restore missing audit registry files so registry completeness can be verified.",
+      );
+    }
+
+    const declaredRules = ruleFiles.flatMap((file) => {
+      const content = readFileSync(file, "utf8");
+
+      return Array.from(
+        content.matchAll(/export const ([A-Z0-9_]+_RULE): AuditRule/g),
+      )
+        .map((match) => match[1])
+        .filter((ruleName): ruleName is string => Boolean(ruleName));
+    });
+
+    const registryContent = readFileSync(registryPath, "utf8");
+    const registryStart = registryContent.indexOf("export const AUDIT_RULES");
+    const registryEnd = registryContent.indexOf("];", registryStart);
+
+    if (registryStart < 0 || registryEnd < 0) {
+      return fail(
+        AUDIT_RULE_REGISTRY_COMPLETENESS_RULE,
+        "Audit rule registry cannot be parsed.",
+        ["export const AUDIT_RULES"],
+        "Keep AUDIT_RULES declared as a static array in src/audit/rules.ts.",
+      );
+    }
+
+    const registry = registryContent.slice(registryStart, registryEnd);
+    const registeredRules = Array.from(
+      registry.matchAll(/\b([A-Z0-9_]+_RULE)\b/g),
+    )
+      .map((match) => match[1])
+      .filter((ruleName): ruleName is string => Boolean(ruleName));
+
+    const missingFromRegistry = declaredRules.filter(
+      (ruleName) => !registeredRules.includes(ruleName),
+    );
+    const orphanRegistryEntries = registeredRules.filter(
+      (ruleName) => !declaredRules.includes(ruleName),
+    );
+
+    if (missingFromRegistry.length > 0 || orphanRegistryEntries.length > 0) {
+      return fail(
+        AUDIT_RULE_REGISTRY_COMPLETENESS_RULE,
+        "Audit rule registry is not complete.",
+        [
+          ...missingFromRegistry.map((ruleName) => `missing: ${ruleName}`),
+          ...orphanRegistryEntries.map((ruleName) => `orphan: ${ruleName}`),
+        ],
+        "Ensure every exported audit rule appears exactly once in AUDIT_RULES.",
+      );
+    }
+
+    return pass(
+      AUDIT_RULE_REGISTRY_COMPLETENESS_RULE,
+      "Audit rule registry includes every exported audit rule.",
+      registeredRules,
+    );
+  },
+};
