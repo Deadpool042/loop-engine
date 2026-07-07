@@ -164,3 +164,52 @@ export const README_SEE_ALSO_UNIQUE_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_FINAL_REPORT_README_CHECKS_RULE: AuditRule = {
+  id: "DOCS-004",
+  category: "docs",
+  severity: "warning",
+  title: "Final audit report documents README checks",
+  description: "The final audit report should mention the README audit rules and current rule count.",
+  check: () => {
+    const reportPath = "docs/audits/audit-engine-v1-final.md";
+
+    if (!existsSync(reportPath)) {
+      return fail(
+        AUDIT_FINAL_REPORT_README_CHECKS_RULE,
+        "Final audit report is missing.",
+        [reportPath],
+        "Restore docs/audits/audit-engine-v1-final.md and document the current audit rules.",
+      );
+    }
+
+    const content = readFileSync(reportPath, "utf8");
+    const expectedTokens = [
+      "20 règles",
+      "`DOCS-002`",
+      "`DOCS-003`",
+      "Couverture README",
+      "pnpm loop audit",
+      "pnpm run ci",
+      "Voir aussi",
+      "README utilisateur aligné",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_FINAL_REPORT_README_CHECKS_RULE,
+        "Final audit report does not document all README audit checks.",
+        missing,
+        "Document DOCS-002, DOCS-003, the README audit commands, and the current rule count in the final audit report.",
+      );
+    }
+
+    return pass(
+      AUDIT_FINAL_REPORT_README_CHECKS_RULE,
+      "Final audit report documents README checks.",
+      expectedTokens,
+    );
+  },
+};
