@@ -1,5 +1,13 @@
 import type { AuditFinding, AuditPriority, AuditRule } from "./types.js";
 
+function normalizeDetails(details?: readonly string[]): readonly string[] | undefined {
+  if (!details) {
+    return undefined;
+  }
+
+  return [...new Set(details)];
+}
+
 export function getPriority(rule: AuditRule, status: AuditFinding["status"]): AuditPriority {
   if (status === "fail" && rule.severity === "error") {
     return "high";
@@ -17,6 +25,8 @@ export function pass(
   message: string,
   details?: readonly string[],
 ): AuditFinding {
+  const normalizedDetails = normalizeDetails(details);
+
   return {
     ruleId: rule.id,
     category: rule.category,
@@ -24,7 +34,7 @@ export function pass(
     status: "pass",
     priority: getPriority(rule, "pass"),
     message,
-    ...(details ? { details } : {}),
+    ...(normalizedDetails ? { details: normalizedDetails } : {}),
   };
 }
 
@@ -34,6 +44,8 @@ export function fail(
   details?: readonly string[],
   recommendation?: string,
 ): AuditFinding {
+  const normalizedDetails = normalizeDetails(details);
+
   return {
     ruleId: rule.id,
     category: rule.category,
@@ -42,6 +54,6 @@ export function fail(
     priority: getPriority(rule, "fail"),
     message,
     ...(recommendation ? { recommendation } : {}),
-    ...(details ? { details } : {}),
+    ...(normalizedDetails ? { details: normalizedDetails } : {}),
   };
 }
