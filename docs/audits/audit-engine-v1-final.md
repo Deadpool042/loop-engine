@@ -262,7 +262,7 @@ Chaque finding contient :
 
 ## Règles actives
 
-Le moteur contient 14 règles exécutables :
+Le moteur contient 15 règles exécutables :
 
 - `JSON-001` — vérifie que les sorties JSON publiques exposent `schemaVersion` ;
 - `JSON-005` — vérifie que les commandes JSON publiques sont couvertes par `json-check` ;
@@ -278,8 +278,10 @@ Le moteur contient 14 règles exécutables :
 - `AUDIT-007` — vérifie que le résumé top-level des recommandations est typé et calculé.
 - `AUDIT-008` — vérifie que le statut global d'audit est typé, calculé et affiché.
 - `AUDIT-009` — vérifie que le mode strict d'audit est câblé pour les sorties humaines et JSON.
+- `AUDIT-010` — vérifie que le script `audit:strict` est exposé pour les usages CI.
 - `AUDIT-008` — vérifie que le statut global d'audit est typé, calculé et affiché.
 - `AUDIT-009` — vérifie que le mode strict d'audit est câblé pour les sorties humaines et JSON.
+- `AUDIT-010` — vérifie que le script `audit:strict` est exposé pour les usages CI.
 
 ## Structure interne
 
@@ -300,8 +302,8 @@ Les listes de commandes publiques sont centralisées dans `src/audit/public-comm
 
 L'état attendu du moteur est :
 
-- 14 règles ;
-- 14 règles en pass ;
+- 15 règles ;
+- 15 règles en pass ;
 - 0 warning runtime ;
 - 0 fail ;
 - score 100 ;
@@ -319,6 +321,7 @@ Commandes supportées :
 
 - `audit --strict`
 - `audit --json --strict`
+- `pnpm run audit:strict`
 
 Lorsque `summary.status` vaut `pass`, le code de sortie reste `0`.
 
