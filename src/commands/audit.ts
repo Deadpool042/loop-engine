@@ -8,6 +8,7 @@ export function printAuditReport(): void {
 
   terminal.section("Summary");
   terminal.info(`Total: ${report.summary.total}`);
+  terminal.info(`Score: ${report.summary.score}`);
   terminal.success(`Pass: ${report.summary.pass}`);
 
   if (report.summary.warning > 0) {

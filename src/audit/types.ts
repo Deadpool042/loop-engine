@@ -38,6 +38,7 @@ export type AuditReport = Readonly<{
     warning: number;
     fail: number;
     skipped: number;
+    score: number;
   };
   findings: readonly AuditFinding[];
 }>;
