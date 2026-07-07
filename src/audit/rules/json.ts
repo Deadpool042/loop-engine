@@ -132,3 +132,49 @@ export const AUDIT_JSON_SUMMARY_CONTRACT_RULE: AuditRule = {
     );
   },
 };
+
+export const JSON_CHECK_PARSE_ASSERTION_RULE: AuditRule = {
+  id: "JSON-007",
+  category: "json",
+  severity: "warning",
+  title: "json-check parses public JSON outputs",
+  description: "json-check should assert that public JSON command outputs are valid JSON.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_CHECK_PARSE_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so public JSON output parsing can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "JSON.parse(output)",
+      "validatePayload(command, json)",
+      "assertField(json, \"schemaVersion\")",
+      "execFileSync",
+      "process.exitCode = 1",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_CHECK_PARSE_ASSERTION_RULE,
+        "json-check does not clearly assert JSON parsability for public outputs.",
+        missing,
+        "Ensure json-check parses every public JSON command output and fails on invalid payloads.",
+      );
+    }
+
+    return pass(
+      JSON_CHECK_PARSE_ASSERTION_RULE,
+      "json-check asserts public JSON output parsability.",
+      expectedTokens,
+    );
+  },
+};
