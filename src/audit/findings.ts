@@ -32,6 +32,7 @@ export function fail(
   rule: AuditRule,
   message: string,
   details?: readonly string[],
+  recommendation?: string,
 ): AuditFinding {
   return {
     ruleId: rule.id,
@@ -40,6 +41,7 @@ export function fail(
     status: "fail",
     priority: getPriority(rule, "fail"),
     message,
+    ...(recommendation ? { recommendation } : {}),
     ...(details ? { details } : {}),
   };
 }

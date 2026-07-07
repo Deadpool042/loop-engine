@@ -19,6 +19,7 @@ export type AuditFinding = Readonly<{
   status: AuditStatus;
   priority: AuditPriority;
   message: string;
+  recommendation?: string;
   details?: readonly string[];
 }>;
 
