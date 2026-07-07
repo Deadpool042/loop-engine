@@ -184,8 +184,38 @@ export const AUDIT_FINAL_REPORT_README_CHECKS_RULE: AuditRule = {
     }
 
     const content = readFileSync(reportPath, "utf8");
+    const registryPath = "src/audit/rules.ts";
+
+    if (!existsSync(registryPath)) {
+      return fail(
+        AUDIT_FINAL_REPORT_README_CHECKS_RULE,
+        "Audit rule registry is missing.",
+        [registryPath],
+        "Restore src/audit/rules.ts so the documented rule count can be verified.",
+      );
+    }
+
+    const registryContent = readFileSync(registryPath, "utf8");
+    const registryStart = registryContent.indexOf("export const AUDIT_RULES");
+    const registryEnd = registryContent.indexOf("];", registryStart);
+
+    if (registryStart < 0 || registryEnd < 0) {
+      return fail(
+        AUDIT_FINAL_REPORT_README_CHECKS_RULE,
+        "Audit rule registry cannot be parsed.",
+        ["export const AUDIT_RULES"],
+        "Keep AUDIT_RULES declared as a static array in src/audit/rules.ts.",
+      );
+    }
+
+    const registry = registryContent.slice(registryStart, registryEnd);
+    const documentedRuleCount = Array.from(
+      registry.matchAll(/\b[A-Z0-9_]+_RULE\b/g),
+    ).length;
+    const expectedRuleCount = `${documentedRuleCount} règles`;
+
     const expectedTokens = [
-      "25 règles",
+      expectedRuleCount,
       "`DOCS-002`",
       "`DOCS-003`",
       "Couverture README",
