@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-07 — V2.7 Audit Engine design
+
+### Ajouté
+
+- Audits Audit Engine V1.
+- Règles candidates `docs/architecture/audit-engine-rules.md`.
+- Rapport final `docs/audits/audit-engine-v1-final.md`.
+- Spécification `docs/architecture/audit-engine.md`.
+
+### Confirmé
+
+- L'Audit Engine restera local, déterministe et read-only.
+- Aucun appel IA automatique.
+- Aucune correction automatique.
+- Les règles V1 produiront d'abord des rapports, sans bloquer les commits.
+
+---
+
 ## 2026-07-06 — V2.6 CLI consolidation
 
 ### Ajouté

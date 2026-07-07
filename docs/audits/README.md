@@ -15,6 +15,7 @@ Ils ne remplacent pas les documents d'architecture actifs.
 - `audit-engine-json-contracts-v1.md` — contrats JSON publics.
 - `audit-engine-tests-v1.md` — couverture de tests.
 - `audit-engine-docs-v1.md` — documentation et risques d'obsolescence.
+- `audit-engine-v1-final.md` — rapport final Audit Engine V1.
 
 ## Audits RAG / Memory
 
