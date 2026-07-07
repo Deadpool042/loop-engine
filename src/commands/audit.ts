@@ -29,6 +29,12 @@ export function printAuditReport(): void {
     terminal.success("Skipped: 0");
   }
 
+  terminal.section("Categories");
+
+  for (const [category, count] of Object.entries(report.summary.byCategory)) {
+    terminal.info(`${category}: ${count}`);
+  }
+
   terminal.section("Findings");
 
   for (const finding of report.findings) {
