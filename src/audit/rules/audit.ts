@@ -169,3 +169,42 @@ export const AUDIT_CATEGORY_SUMMARY_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RECOMMENDATION_REPORT_RULE: AuditRule = {
+  id: "AUDIT-005",
+  category: "architecture",
+  severity: "warning",
+  title: "Human audit report prints recommendations",
+  description: "The human audit report should expose actionable recommendations when findings provide them.",
+  check: () => {
+    const expectations = [
+      {
+        file: "src/commands/audit.ts",
+        token: 'terminal.section("Recommendations");',
+      },
+      {
+        file: "src/commands/audit.ts",
+        token: "finding.recommendation",
+      },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_REPORT_RULE,
+        "Human audit report does not fully expose recommendations.",
+        missing,
+        "Ensure printAuditReport renders a Recommendations section for findings with recommendations.",
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_REPORT_RULE,
+      "Human audit report prints finding recommendations.",
+      expectations.map(({ file }) => file),
+    );
+  },
+};
