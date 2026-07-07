@@ -2,6 +2,7 @@ export type AuditCategory =
   | "architecture"
   | "duplication"
   | "json"
+  | "cli"
   | "tests"
   | "docs"
   | "rag"

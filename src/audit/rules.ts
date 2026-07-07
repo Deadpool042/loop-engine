@@ -118,7 +118,7 @@ export const JSON_CHECK_COVERAGE_RULE: AuditRule = {
 
 const CLI_COMMAND_COVERAGE_RULE: AuditRule = {
   id: "CLI-001",
-  category: "json",
+  category: "cli",
   severity: "error",
   title: "Public CLI commands are covered by the router",
   description: "Every public command should be reachable from the CLI router.",
