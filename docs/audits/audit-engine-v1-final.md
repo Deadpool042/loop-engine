@@ -240,7 +240,10 @@ Le rapport JSON contient :
 `summary.byCategory` regroupe les findings par catégorie et permet de vérifier la distribution des règles entre `json`, `cli`, `docs` et `architecture`.
 
 `summary.byPriority` regroupe les findings par priorité et permet de vérifier la distribution opérationnelle entre `low`, `medium` et `high`.
-- `findings`.
+
+Le champ top-level `recommendations` expose les recommandations actionnables dérivées des findings en échec.
+- `findings` ;
+- `recommendations`.
 
 Chaque finding contient :
 
@@ -255,11 +258,11 @@ Chaque finding contient :
 
 ## Règles actives
 
-Le moteur contient 11 règles exécutables :
+Le moteur contient 12 règles exécutables :
 
 - `JSON-001` — vérifie que les sorties JSON publiques exposent `schemaVersion` ;
 - `JSON-005` — vérifie que les commandes JSON publiques sont couvertes par `json-check` ;
-- `JSON-006` — vérifie que le résumé JSON d'audit expose les champs stables attendus ;
+- `JSON-006` — vérifie que le rapport JSON d'audit expose les champs stables attendus ;
 - `CLI-001` — vérifie que les commandes publiques sont accessibles depuis le routeur CLI ;
 - `DOCS-001` — vérifie que la documentation couvre les rapports humain et JSON ;
 - `AUDIT-001` — vérifie que le score d'audit est typé, calculé et affiché ;
@@ -268,6 +271,7 @@ Le moteur contient 11 règles exécutables :
 - `AUDIT-004` — vérifie que le résumé par catégorie est typé, calculé et affiché.
 - `AUDIT-005` — vérifie que le rapport humain affiche les recommandations lorsqu'elles sont disponibles.
 - `AUDIT-006` — vérifie que le résumé par priorité est typé, calculé et affiché.
+- `AUDIT-007` — vérifie que le résumé top-level des recommandations est typé et calculé.
 
 ## Structure interne
 
@@ -288,8 +292,8 @@ Les listes de commandes publiques sont centralisées dans `src/audit/public-comm
 
 L'état attendu du moteur est :
 
-- 11 règles ;
-- 11 règles en pass ;
+- 12 règles ;
+- 12 règles en pass ;
 - 0 warning runtime ;
 - 0 fail ;
 - score 100 ;
