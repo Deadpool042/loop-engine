@@ -49,3 +49,54 @@ export const AUDIT_DOCUMENTATION_COVERAGE_RULE: AuditRule = {
     );
   },
 };
+
+export const README_AUDIT_CI_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-002",
+  category: "docs",
+  severity: "warning",
+  title: "README documents audit and CI commands",
+  description: "The README should document the public audit and CI commands.",
+  check: () => {
+    const readmePath = "README.md";
+
+    if (!existsSync(readmePath)) {
+      return fail(
+        README_AUDIT_CI_DOCUMENTATION_RULE,
+        "README is missing.",
+        [readmePath],
+        "Restore README.md and document audit and CI commands.",
+      );
+    }
+
+    const content = readFileSync(readmePath, "utf8");
+    const expectedTokens = [
+      "## Audit et CI",
+      "pnpm loop audit",
+      "pnpm loop audit --json",
+      "pnpm loop audit --strict",
+      "pnpm loop audit --json --strict",
+      "pnpm run audit:strict",
+      "pnpm run ci",
+      "summary.status",
+      "summary.score",
+      "recommendations",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        README_AUDIT_CI_DOCUMENTATION_RULE,
+        "README audit and CI documentation is incomplete.",
+        missing,
+        "Document the audit command, strict audit mode, CI script, and JSON report fields in README.md.",
+      );
+    }
+
+    return pass(
+      README_AUDIT_CI_DOCUMENTATION_RULE,
+      "README documents audit and CI commands.",
+      expectedTokens,
+    );
+  },
+};
