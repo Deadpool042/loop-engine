@@ -660,59 +660,55 @@ export const AUDIT_RULE_ID_UNIQUENESS_RULE: AuditRule = {
   title: "Audit rule ids are unique",
   description: "The audit registry should not expose duplicate rule ids.",
   check: () => {
-    const registryPath = "src/audit/rules.ts";
+    const ruleFiles = [
+      "src/audit/rules/json.ts",
+      "src/audit/rules/cli.ts",
+      "src/audit/rules/docs.ts",
+      "src/audit/rules/audit.ts",
+    ];
 
-    if (!existsSync(registryPath)) {
+    const missingFiles = ruleFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
       return fail(
         AUDIT_RULE_ID_UNIQUENESS_RULE,
-        "Audit rule registry is missing.",
-        [registryPath],
-        "Restore src/audit/rules.ts so audit rule id uniqueness can be verified.",
+        "Some audit rule files are missing.",
+        missingFiles,
+        "Restore missing audit rule files so rule id uniqueness can be verified.",
       );
     }
 
-    const content = readFileSync(registryPath, "utf8");
-    const registryStart = content.indexOf("export const AUDIT_RULES");
-    const registryEnd = content.indexOf("];", registryStart);
+    const ruleIds = ruleFiles.flatMap((file) => {
+      const content = readFileSync(file, "utf8");
 
-    if (registryStart < 0 || registryEnd < 0) {
-      return fail(
-        AUDIT_RULE_ID_UNIQUENESS_RULE,
-        "Audit rule registry cannot be parsed.",
-        ["export const AUDIT_RULES"],
-        "Keep AUDIT_RULES declared as a static array in src/audit/rules.ts.",
-      );
-    }
-
-    const registry = content.slice(registryStart, registryEnd);
-    const registeredRules = Array.from(
-      registry.matchAll(/\\b[A-Z0-9_]+_RULE\\b/g),
-      (match) => match[0],
-    );
+      return Array.from(content.matchAll(/\bid:\s*"([^"]+)"/g))
+        .map((match) => match[1])
+        .filter((ruleId): ruleId is string => Boolean(ruleId));
+    });
 
     const seen = new Set<string>();
-    const duplicateNames = registeredRules.filter((ruleName) => {
-      if (seen.has(ruleName)) {
+    const duplicateIds = ruleIds.filter((ruleId) => {
+      if (seen.has(ruleId)) {
         return true;
       }
 
-      seen.add(ruleName);
+      seen.add(ruleId);
       return false;
     });
 
-    if (duplicateNames.length > 0) {
+    if (duplicateIds.length > 0) {
       return fail(
         AUDIT_RULE_ID_UNIQUENESS_RULE,
-        "Audit registry contains duplicate rule entries.",
-        duplicateNames,
-        "Remove duplicate rule entries from AUDIT_RULES.",
+        "Audit rule ids are duplicated.",
+        duplicateIds,
+        "Ensure every audit rule declares a unique id.",
       );
     }
 
     return pass(
       AUDIT_RULE_ID_UNIQUENESS_RULE,
-      "Audit registry rule entries are unique.",
-      registeredRules,
+      "Audit rule ids are unique.",
+      ruleIds,
     );
   },
 };
