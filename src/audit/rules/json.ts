@@ -78,3 +78,54 @@ export const JSON_CHECK_COVERAGE_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_JSON_SUMMARY_CONTRACT_RULE: AuditRule = {
+  id: "JSON-006",
+  category: "json",
+  severity: "warning",
+  title: "Audit JSON report exposes stable summary fields",
+  description: "The audit JSON report should expose the stable summary fields used by downstream tools.",
+  check: () => {
+    const typesPath = "src/audit/types.ts";
+
+    if (!existsSync(typesPath)) {
+      return fail(
+        AUDIT_JSON_SUMMARY_CONTRACT_RULE,
+        "Audit report type definition is missing.",
+        [typesPath],
+        "Restore src/audit/types.ts or update the audit rule if the report model moved.",
+      );
+    }
+
+    const content = readFileSync(typesPath, "utf8");
+
+    const expectedTokens = [
+      "total: number;",
+      "pass: number;",
+      "warning: number;",
+      "fail: number;",
+      "skipped: number;",
+      "score: number;",
+      "byCategory: Partial<Record<AuditCategory, number>>;",
+    ];
+
+    const missing = expectedTokens.filter(
+      (token) => !content.includes(token),
+    );
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_JSON_SUMMARY_CONTRACT_RULE,
+        "Audit JSON summary contract is incomplete.",
+        missing,
+        "Ensure AuditReport.summary exposes all stable summary fields.",
+      );
+    }
+
+    return pass(
+      AUDIT_JSON_SUMMARY_CONTRACT_RULE,
+      "Audit JSON summary contract exposes all stable fields.",
+      expectedTokens,
+    );
+  },
+};

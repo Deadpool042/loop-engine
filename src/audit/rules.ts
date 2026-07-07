@@ -7,13 +7,18 @@ import {
 } from "./rules/audit.js";
 import { CLI_COMMAND_COVERAGE_RULE } from "./rules/cli.js";
 import { AUDIT_DOCUMENTATION_COVERAGE_RULE } from "./rules/docs.js";
-import { JSON_CHECK_COVERAGE_RULE, JSON_SCHEMA_VERSION_RULE } from "./rules/json.js";
+import {
+  AUDIT_JSON_SUMMARY_CONTRACT_RULE,
+  JSON_CHECK_COVERAGE_RULE,
+  JSON_SCHEMA_VERSION_RULE,
+} from "./rules/json.js";
 import type { AuditRule } from "./types.js";
 
 
 export const AUDIT_RULES: readonly AuditRule[] = [
   JSON_SCHEMA_VERSION_RULE,
   JSON_CHECK_COVERAGE_RULE,
+  AUDIT_JSON_SUMMARY_CONTRACT_RULE,
   CLI_COMMAND_COVERAGE_RULE,
   AUDIT_DOCUMENTATION_COVERAGE_RULE,
   AUDIT_SCORE_EXPOSURE_RULE,
