@@ -220,17 +220,22 @@ La commande `audit --json` doit produire un rapport JSON stable, incluant `schem
 
 Le moteur d'audit expose désormais un rapport humain et un rapport JSON stable.
 
-Le rapport humain affiche également une section `Recommendations` lorsque des findings exposent une recommandation corrective.
+Le rapport humain affiche :
+
+- un statut global ;
+- un score ;
+- les compteurs par statut ;
+- une distribution par catégorie ;
+- une distribution par priorité ;
+- une section `Recommendations` lorsque des findings exposent une recommandation corrective ;
+- la liste détaillée des findings.
 
 ## Rapport JSON
 
 Le rapport JSON contient :
 
-`summary.status` expose le statut global dérivé des findings : `pass`, `warning` ou `fail`.
-
 - `schemaVersion` ;
 - `generatedAt` ;
-- `summary.status` ;
 - `summary.status` ;
 - `summary.total` ;
 - `summary.pass` ;
@@ -240,14 +245,16 @@ Le rapport JSON contient :
 - `summary.score` ;
 - `summary.byCategory` ;
 - `summary.byPriority` ;
+- `findings` ;
+- `recommendations`.
+
+`summary.status` expose le statut global dérivé des findings : `pass`, `warning` ou `fail`.
 
 `summary.byCategory` regroupe les findings par catégorie et permet de vérifier la distribution des règles entre `json`, `cli`, `docs` et `architecture`.
 
 `summary.byPriority` regroupe les findings par priorité et permet de vérifier la distribution opérationnelle entre `low`, `medium` et `high`.
 
 Le champ top-level `recommendations` expose les recommandations actionnables dérivées des findings en échec.
-- `findings` ;
-- `recommendations`.
 
 Chaque finding contient :
 
@@ -258,106 +265,69 @@ Chaque finding contient :
 - `priority` ;
 - `message` ;
 - `recommendation`, lorsque le finding échoue et qu'une action corrective est disponible ;
-- `details`, lorsque la règle expose des éléments vérifiés ou manquants.
+- `details`, lorsque la règle expose des éléments vérifiés.
 
-## Règles actives
+## Règles exécutables
 
-Le moteur contient 18 règles exécutables :
+Le moteur contient 20 règles exécutables :
 
-- `JSON-001` — vérifie que les sorties JSON publiques exposent `schemaVersion` ;
-- `JSON-005` — vérifie que les commandes JSON publiques sont couvertes par `json-check` ;
-- `JSON-006` — vérifie que le rapport JSON d'audit expose les champs stables attendus ;
-- `CLI-001` — vérifie que les commandes publiques sont accessibles depuis le routeur CLI ;
-- `DOCS-001` — vérifie que la documentation couvre les rapports humain et JSON ;
-- `AUDIT-001` — vérifie que le score d'audit est typé, calculé et affiché ;
-- `AUDIT-002` — vérifie que la priorité des findings est typée et renseignée ;
-- `AUDIT-003` — vérifie que les recommandations sont supportées par les findings ;
-- `AUDIT-004` — vérifie que le résumé par catégorie est typé, calculé et affiché.
-- `AUDIT-005` — vérifie que le rapport humain affiche les recommandations lorsqu'elles sont disponibles.
-- `AUDIT-006` — vérifie que le résumé par priorité est typé, calculé et affiché.
-- `AUDIT-007` — vérifie que le résumé top-level des recommandations est typé et calculé.
-- `AUDIT-008` — vérifie que le statut global d'audit est typé, calculé et affiché.
-- `AUDIT-009` — vérifie que le mode strict d'audit est câblé pour les sorties humaines et JSON.
-- `AUDIT-010` — vérifie que le script `audit:strict` est exposé pour les usages CI.
-- `AUDIT-011` — vérifie que le script `ci` enchaîne la validation générale et l'audit strict.
-- `AUDIT-012` — vérifie que le workflow GitHub Actions exécute le script `ci`.
-- `AUDIT-013` — vérifie que les règles critiques d'audit restent dans un ordre logique stable.
-- `AUDIT-008` — vérifie que le statut global d'audit est typé, calculé et affiché.
-- `AUDIT-009` — vérifie que le mode strict d'audit est câblé pour les sorties humaines et JSON.
-- `AUDIT-010` — vérifie que le script `audit:strict` est exposé pour les usages CI.
-- `AUDIT-011` — vérifie que le script `ci` enchaîne la validation générale et l'audit strict.
-- `AUDIT-012` — vérifie que le workflow GitHub Actions exécute le script `ci`.
-- `AUDIT-013` — vérifie que les règles critiques d'audit restent dans un ordre logique stable.
+- `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
+- `JSON-005` : couverture des commandes JSON publiques par `json-check`.
+- `JSON-006` : contrat stable du rapport JSON d'audit.
+- `CLI-001` : couverture des commandes publiques par le routeur CLI.
+- `DOCS-001` : couverture documentaire du rapport humain et JSON.
+- `DOCS-002` : couverture README des commandes audit et CI.
+- `DOCS-003` : unicité des liens de la section `Voir aussi` du README.
+- `AUDIT-001` : score typé, calculé et affiché.
+- `AUDIT-002` : priorité typée et renseignée.
+- `AUDIT-003` : recommandations typées et supportées par les findings.
+- `AUDIT-004` : résumé par catégorie typé, calculé et affiché.
+- `AUDIT-005` : recommandations affichées dans le rapport humain.
+- `AUDIT-006` : résumé par priorité typé, calculé et affiché.
+- `AUDIT-007` : résumé des recommandations typé et calculé.
+- `AUDIT-008` : statut global typé, calculé et affiché.
+- `AUDIT-009` : mode strict câblé pour les sorties humaine et JSON.
+- `AUDIT-010` : script `audit:strict` disponible.
+- `AUDIT-011` : script `ci` exécutant `validate` puis `audit:strict`.
+- `AUDIT-012` : workflow GitHub Actions exécutant `pnpm run ci`.
+- `AUDIT-013` : ordre logique des règles critiques d'audit.
 
-## Structure interne
+## Couverture README
 
-Les règles sont découpées par domaine :
+Le README expose désormais les commandes publiques du moteur d'audit :
 
-- `src/audit/rules/json.ts` ;
-- `src/audit/rules/cli.ts` ;
-- `src/audit/rules/docs.ts` ;
-- `src/audit/rules/audit.ts`.
+- `pnpm loop audit` ;
+- `pnpm loop audit --json` ;
+- `pnpm loop audit --strict` ;
+- `pnpm loop audit --json --strict` ;
+- `pnpm run audit:strict` ;
+- `pnpm run ci`.
 
-Le registre principal `src/audit/rules.ts` agrège les règles actives.
+Cette couverture est vérifiée par `DOCS-002`.
 
-Les helpers de findings sont centralisés dans `src/audit/findings.ts`.
+La section `Voir aussi` est également vérifiée pour éviter les liens documentaires dupliqués. Cette règle est portée par `DOCS-003`.
 
-Les listes de commandes publiques sont centralisées dans `src/audit/public-commands.ts`.
+## Résultat final
 
-## Critère de stabilité
+État validé :
 
-L'état attendu du moteur est :
-
-- 18 règles ;
-- 18 règles en pass ;
-- 0 warning runtime ;
+- 20 règles ;
+- 20 règles en pass ;
+- 0 warning ;
 - 0 fail ;
 - score 100 ;
-- une distribution par catégorie incluant `json`, `cli`, `docs` et `architecture`.
+- rapport JSON stable ;
+- mode strict compatible CI ;
+- workflow GitHub Actions actif ;
+- README utilisateur aligné.
 
+## Conclusion V3
 
+Loop Engine possède désormais un moteur d'audit opérationnel.
 
----
+Le moteur ne modifie pas les projets audités.
 
-## Mode strict
+Il produit un rapport humain, un rapport JSON, un score, des priorités, des recommandations et des contrôles auto-référentiels.
 
-Le mode strict permet d'utiliser l'audit dans un contexte CI.
+Le prochain investissement utile n'est plus la création du moteur, mais l'élargissement progressif de ses règles.
 
-Commandes supportées :
-
-- `audit --strict`
-- `audit --json --strict`
-- `pnpm run audit:strict`
-
-Lorsque `summary.status` vaut `pass`, le code de sortie reste `0`.
-
-Lorsque `summary.status` vaut `warning` ou `fail`, le code de sortie devient non nul.
-
-
----
-
-## Script CI
-
-Le script CI exécute la validation générale puis l'audit strict :
-
-- `pnpm run validate`
-- `pnpm run audit:strict`
-
-Commande dédiée :
-
-- `pnpm run ci`
-
-
----
-
-## GitHub Actions
-
-Le workflow `.github/workflows/ci.yml` exécute le script CI du projet sur `push` et `pull_request`.
-
-Étapes principales :
-
-- checkout du dépôt ;
-- installation de pnpm ;
-- installation de Node.js ;
-- installation des dépendances avec `pnpm install --frozen-lockfile` ;
-- exécution de `pnpm run ci`.
