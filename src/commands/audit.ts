@@ -35,6 +35,18 @@ export function printAuditReport(): void {
     terminal.info(`${category}: ${count}`);
   }
 
+  const recommendations = report.findings.filter(
+    (finding) => finding.recommendation,
+  );
+
+  if (recommendations.length > 0) {
+    terminal.section("Recommendations");
+
+    for (const finding of recommendations) {
+      terminal.info(`${finding.ruleId}: ${finding.recommendation}`);
+    }
+  }
+
   terminal.section("Findings");
 
   for (const finding of report.findings) {
