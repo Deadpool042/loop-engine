@@ -46,3 +46,8 @@ export function printAuditReport(): void {
     }
   }
 }
+
+
+export function printAuditReportJson(): void {
+  console.log(JSON.stringify(runAudit()));
+}

@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 
 const COMMANDS = [
+  ["audit", "--json"],
   ["summary", "--json"],
   ["context", "loop-engine", "--json"],
   ["next", "loop-engine", "--json"],
@@ -32,7 +33,10 @@ function validatePayload(command: readonly string[], json: unknown): void {
 
   const commandName = command[0];
 
-  if (commandName === "summary") {
+  if (commandName === "audit") {
+    assertField(json, "summary");
+    assertField(json, "findings");
+  } else if (commandName === "summary") {
     assertField(json, "projects");
   } else if (commandName === "context") {
     assertField(json, "project");
