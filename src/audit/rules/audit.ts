@@ -294,3 +294,50 @@ export const AUDIT_RECOMMENDATION_SUMMARY_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_GLOBAL_STATUS_RULE: AuditRule = {
+  id: "AUDIT-008",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit summary exposes global status",
+  description: "The audit summary should expose a global status for downstream reporting and CI usage.",
+  check: () => {
+    const expectations = [
+      {
+        file: "src/audit/types.ts",
+        token: 'export type AuditSummaryStatus = "pass" | "warning" | "fail";',
+      },
+      {
+        file: "src/audit/types.ts",
+        token: "status: AuditSummaryStatus;",
+      },
+      {
+        file: "src/audit/runner.ts",
+        token: "const status =",
+      },
+      {
+        file: "src/commands/audit.ts",
+        token: "Status:",
+      },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_GLOBAL_STATUS_RULE,
+        "Audit global status is not fully exposed.",
+        missing,
+        "Ensure summary.status is typed, computed in runAudit, and displayed by the human audit command.",
+      );
+    }
+
+    return pass(
+      AUDIT_GLOBAL_STATUS_RULE,
+      "Audit global status is typed, computed, and displayed.",
+      expectations.map(({ file }) => file),
+    );
+  },
+};
