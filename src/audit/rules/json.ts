@@ -107,6 +107,7 @@ export const AUDIT_JSON_SUMMARY_CONTRACT_RULE: AuditRule = {
       "skipped: number;",
       "score: number;",
       "byCategory: Partial<Record<AuditCategory, number>>;",
+      "byPriority: Partial<Record<AuditPriority, number>>;",
     ];
 
     const missing = expectedTokens.filter(
