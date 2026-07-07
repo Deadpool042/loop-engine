@@ -126,3 +126,46 @@ export const AUDIT_RECOMMENDATION_SUPPORT_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_CATEGORY_SUMMARY_RULE: AuditRule = {
+  id: "AUDIT-004",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit summary exposes category counts",
+  description: "The audit summary should expose finding counts grouped by category.",
+  check: () => {
+    const expectations = [
+      {
+        file: "src/audit/types.ts",
+        token: "byCategory: Partial<Record<AuditCategory, number>>;",
+      },
+      {
+        file: "src/audit/runner.ts",
+        token: "const byCategory =",
+      },
+      {
+        file: "src/commands/audit.ts",
+        token: 'terminal.section("Categories");',
+      },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_CATEGORY_SUMMARY_RULE,
+        "Audit category summary is not fully exposed.",
+        missing,
+        "Ensure byCategory is typed in AuditReport, computed in runAudit, and displayed by the human audit command.",
+      );
+    }
+
+    return pass(
+      AUDIT_CATEGORY_SUMMARY_RULE,
+      "Audit category summary is typed, computed, and displayed.",
+      expectations.map(({ file }) => file),
+    );
+  },
+};
