@@ -12,6 +12,7 @@ import { printNextProjectAction, printNextProjectActionJson } from "./commands/n
 import { printProjectPrompt, printProjectPromptJson } from "./commands/prompt.js";
 import { printStatus } from "./commands/status.js";
 import { printDoctor } from "./commands/doctor.js";
+import { printAuditReport } from "./commands/audit.js";
 import { loadConfig } from "./core/config.js";
 import { findProject, getRequiredProjectName } from "./core/project.js";
 import { terminal } from "./ui/terminal.js";
@@ -91,6 +92,8 @@ if (command === "help" || command === "--help" || command === "-h") {
   });
 } else if (command === "doctor") {
   printDoctor(loadConfig());
+} else if (command === "audit") {
+  printAuditReport();
 } else if (command === "handoff") {
   const project = resolveProjectOrExit("handoff");
 
