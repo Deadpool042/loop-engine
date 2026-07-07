@@ -1,6 +1,27 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { AuditFinding, AuditRule } from "./types.js";
 
+const PUBLIC_COMMANDS = [
+  "audit",
+  "summary",
+  "context",
+  "next",
+  "prompt",
+  "review",
+  "handoff",
+  "rag-search",
+] as const;
+
+const PUBLIC_JSON_COMMAND_FILES = [
+  "src/commands/summary.ts",
+  "src/commands/context.ts",
+  "src/commands/next.ts",
+  "src/commands/prompt.ts",
+  "src/commands/review.ts",
+  "src/commands/handoff.ts",
+  "src/commands/rag-search.ts",
+] as const;
+
 function pass(rule: AuditRule, message: string, details?: readonly string[]): AuditFinding {
   return {
     ruleId: rule.id,
@@ -30,15 +51,7 @@ export const JSON_SCHEMA_VERSION_RULE: AuditRule = {
   title: "Public JSON outputs expose schemaVersion",
   description: "Every documented public JSON command should expose schemaVersion.",
   check: () => {
-    const files = [
-      "src/commands/summary.ts",
-      "src/commands/context.ts",
-      "src/commands/next.ts",
-      "src/commands/prompt.ts",
-      "src/commands/review.ts",
-      "src/commands/handoff.ts",
-      "src/commands/rag-search.ts",
-    ];
+    const files = PUBLIC_JSON_COMMAND_FILES;
 
     const missing = files.filter((file) => {
       if (!existsSync(file)) {
@@ -83,16 +96,7 @@ export const JSON_CHECK_COVERAGE_RULE: AuditRule = {
     }
 
     const content = readFileSync(jsonCheckPath, "utf8");
-    const expectedCommands = [
-      "audit",
-      "summary",
-      "context",
-      "next",
-      "prompt",
-      "review",
-      "handoff",
-      "rag-search",
-    ];
+    const expectedCommands = PUBLIC_COMMANDS;
 
     const missing = expectedCommands.filter(
       (command) => !content.includes(`["${command}"`),
@@ -125,16 +129,7 @@ const CLI_COMMAND_COVERAGE_RULE: AuditRule = {
   check: () => {
     const content = readFileSync("src/cli.ts", "utf8");
 
-    const expectedCommands = [
-      "audit",
-      "summary",
-      "context",
-      "next",
-      "prompt",
-      "review",
-      "handoff",
-      "rag-search",
-    ];
+    const expectedCommands = PUBLIC_COMMANDS;
 
     const missing = expectedCommands.filter(
       (command) => !content.includes(`"${command}"`) && !content.includes(`'${command}'`),
