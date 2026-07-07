@@ -595,3 +595,60 @@ export const AUDIT_RULE_ORDER_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_CLI_STRICT_ROUTING_RULE: AuditRule = {
+  id: "AUDIT-014",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit strict mode is routed by the CLI",
+  description: "The CLI audit branch should parse --strict and set a non-zero exit code when the audit status is not pass.",
+  check: () => {
+    const cliPath = "src/cli.ts";
+
+    if (!existsSync(cliPath)) {
+      return fail(
+        AUDIT_CLI_STRICT_ROUTING_RULE,
+        "CLI router is missing.",
+        [cliPath],
+        "Restore src/cli.ts so audit strict routing can be verified.",
+      );
+    }
+
+    const content = readFileSync(cliPath, "utf8");
+    const auditBranchIndex = content.indexOf('command === "audit"');
+
+    if (auditBranchIndex < 0) {
+      return fail(
+        AUDIT_CLI_STRICT_ROUTING_RULE,
+        "CLI router does not expose the audit command branch.",
+        ['command === "audit"'],
+        "Route the audit command from src/cli.ts.",
+      );
+    }
+
+    const auditBranch = content.slice(auditBranchIndex);
+    const expectedTokens = [
+      'process.argv.includes("--strict")',
+      "report.summary.status",
+      '"pass"',
+      "process.exitCode = 1",
+    ];
+
+    const missing = expectedTokens.filter((token) => !auditBranch.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_CLI_STRICT_ROUTING_RULE,
+        "CLI audit branch does not fully route strict mode.",
+        missing,
+        "Parse --strict in the audit branch and set process.exitCode = 1 when report.summary.status is not pass.",
+      );
+    }
+
+    return pass(
+      AUDIT_CLI_STRICT_ROUTING_RULE,
+      "CLI audit branch routes strict mode.",
+      expectedTokens,
+    );
+  },
+};
