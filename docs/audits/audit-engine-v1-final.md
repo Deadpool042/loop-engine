@@ -269,12 +269,13 @@ Chaque finding contient :
 
 ## Règles exécutables
 
-Le moteur contient 26 règles exécutables :
+Le moteur contient 27 règles exécutables :
 
 - `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
 - `JSON-005` : couverture des commandes JSON publiques par `json-check`.
 - `JSON-006` : contrat stable du rapport JSON d'audit.
 - `JSON-007` : parsing effectif des sorties JSON publiques par `json-check`.
+- `JSON-008` : validation de l'objet racine JSON et de `schemaVersion: 1`.
 - `CLI-001` : couverture des commandes publiques par le routeur CLI.
 - `DOCS-001` : couverture documentaire du rapport humain et JSON.
 - `DOCS-002` : couverture README des commandes audit et CI.
@@ -315,8 +316,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 26 règles ;
-- 26 règles en pass ;
+- 27 règles ;
+- 27 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;

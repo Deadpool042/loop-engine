@@ -178,3 +178,48 @@ export const JSON_CHECK_PARSE_ASSERTION_RULE: AuditRule = {
     );
   },
 };
+
+export const JSON_ROOT_SCHEMA_VERSION_ASSERTION_RULE: AuditRule = {
+  id: "JSON-008",
+  category: "json",
+  severity: "warning",
+  title: "Public JSON outputs assert root schemaVersion",
+  description: "json-check should verify that public JSON outputs are root objects with schemaVersion 1.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_ROOT_SCHEMA_VERSION_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so root JSON schemaVersion assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "assertRecord(json)",
+      "assertField(json, \"schemaVersion\")",
+      "json.schemaVersion !== 1",
+      "schemaVersion != 1",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_ROOT_SCHEMA_VERSION_ASSERTION_RULE,
+        "json-check does not assert the root JSON schemaVersion contract.",
+        missing,
+        "Ensure json-check validates that every public JSON output is an object with schemaVersion 1.",
+      );
+    }
+
+    return pass(
+      JSON_ROOT_SCHEMA_VERSION_ASSERTION_RULE,
+      "json-check asserts the root JSON schemaVersion contract.",
+      expectedTokens,
+    );
+  },
+};
