@@ -388,3 +388,46 @@ export const AUDIT_STRICT_MODE_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_STRICT_SCRIPT_RULE: AuditRule = {
+  id: "AUDIT-010",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit strict script is available",
+  description: "The project should expose a package script for strict audit usage in CI.",
+  check: () => {
+    const packagePath = "package.json";
+
+    if (!existsSync(packagePath)) {
+      return fail(
+        AUDIT_STRICT_SCRIPT_RULE,
+        "Package manifest is missing.",
+        [packagePath],
+        "Restore package.json so the strict audit script can be exposed.",
+      );
+    }
+
+    const content = readFileSync(packagePath, "utf8");
+    const expectedTokens = [
+      '"audit:strict"',
+      '"tsx src/cli.ts audit --json --strict"',
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_STRICT_SCRIPT_RULE,
+        "Strict audit script is missing or incomplete.",
+        missing,
+        "Expose audit:strict as tsx src/cli.ts audit --json --strict.",
+      );
+    }
+
+    return pass(
+      AUDIT_STRICT_SCRIPT_RULE,
+      "Strict audit script is available.",
+      expectedTokens,
+    );
+  },
+};
