@@ -10,12 +10,14 @@ export type AuditCategory =
 
 export type AuditSeverity = "info" | "warning" | "error";
 export type AuditStatus = "pass" | "warning" | "fail" | "skipped";
+export type AuditPriority = "low" | "medium" | "high";
 
 export type AuditFinding = Readonly<{
   ruleId: string;
   category: AuditCategory;
   severity: AuditSeverity;
   status: AuditStatus;
+  priority: AuditPriority;
   message: string;
   details?: readonly string[];
 }>;

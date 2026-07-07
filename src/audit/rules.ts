@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import type { AuditFinding, AuditRule } from "./types.js";
+import type { AuditFinding, AuditPriority, AuditRule } from "./types.js";
 
 const PUBLIC_COMMANDS = [
   "audit",
@@ -22,12 +22,25 @@ const PUBLIC_JSON_COMMAND_FILES = [
   "src/commands/rag-search.ts",
 ] as const;
 
+function getPriority(rule: AuditRule, status: AuditFinding["status"]): AuditPriority {
+  if (status === "fail" && rule.severity === "error") {
+    return "high";
+  }
+
+  if (status === "fail" || status === "warning") {
+    return "medium";
+  }
+
+  return "low";
+}
+
 function pass(rule: AuditRule, message: string, details?: readonly string[]): AuditFinding {
   return {
     ruleId: rule.id,
     category: rule.category,
     severity: rule.severity,
     status: "pass",
+    priority: getPriority(rule, "pass"),
     message,
     ...(details ? { details } : {}),
   };
@@ -39,6 +52,7 @@ function fail(rule: AuditRule, message: string, details?: readonly string[]): Au
     category: rule.category,
     severity: rule.severity,
     status: "fail",
+    priority: getPriority(rule, "fail"),
     message,
     ...(details ? { details } : {}),
   };
