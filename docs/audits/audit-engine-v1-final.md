@@ -213,3 +213,75 @@ C'est l'automatisation des audits déjà réalisés manuellement.
 La commande `audit` doit produire un rapport humain lisible dans le terminal.
 
 La commande `audit --json` doit produire un rapport JSON stable, incluant `schemaVersion`, un résumé et la liste des findings.
+
+---
+
+# État du moteur après consolidation V3 minimale
+
+Le moteur d'audit expose désormais un rapport humain et un rapport JSON stable.
+
+## Rapport JSON
+
+Le rapport JSON contient :
+
+- `schemaVersion` ;
+- `generatedAt` ;
+- `summary.total` ;
+- `summary.pass` ;
+- `summary.warning` ;
+- `summary.fail` ;
+- `summary.skipped` ;
+- `summary.score` ;
+- `summary.byCategory` ;
+- `findings`.
+
+Chaque finding contient :
+
+- `ruleId` ;
+- `category` ;
+- `severity` ;
+- `status` ;
+- `priority` ;
+- `message` ;
+- `recommendation`, lorsque le finding échoue et qu'une action corrective est disponible ;
+- `details`, lorsque la règle expose des éléments vérifiés ou manquants.
+
+## Règles actives
+
+Le moteur contient 8 règles exécutables :
+
+- `JSON-001` — vérifie que les sorties JSON publiques exposent `schemaVersion` ;
+- `JSON-005` — vérifie que les commandes JSON publiques sont couvertes par `json-check` ;
+- `CLI-001` — vérifie que les commandes publiques sont accessibles depuis le routeur CLI ;
+- `DOCS-001` — vérifie que la documentation couvre les rapports humain et JSON ;
+- `AUDIT-001` — vérifie que le score d'audit est typé, calculé et affiché ;
+- `AUDIT-002` — vérifie que la priorité des findings est typée et renseignée ;
+- `AUDIT-003` — vérifie que les recommandations sont supportées par les findings ;
+- `AUDIT-004` — vérifie que le résumé par catégorie est typé, calculé et affiché.
+
+## Structure interne
+
+Les règles sont découpées par domaine :
+
+- `src/audit/rules/json.ts` ;
+- `src/audit/rules/cli.ts` ;
+- `src/audit/rules/docs.ts` ;
+- `src/audit/rules/audit.ts`.
+
+Le registre principal `src/audit/rules.ts` agrège les règles actives.
+
+Les helpers de findings sont centralisés dans `src/audit/findings.ts`.
+
+Les listes de commandes publiques sont centralisées dans `src/audit/public-commands.ts`.
+
+## Critère de stabilité
+
+L'état attendu du moteur est :
+
+- 8 règles ;
+- 8 règles en pass ;
+- 0 warning runtime ;
+- 0 fail ;
+- score 100 ;
+- une distribution par catégorie incluant `json`, `cli`, `docs` et `architecture`.
+
