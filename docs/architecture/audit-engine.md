@@ -153,3 +153,20 @@ Toute évolution de l'Audit Engine doit passer :
 
 - `pnpm run validate`
 - `pnpm exec tsx src/cli.ts json-check`
+
+
+## Commande V1
+
+La commande disponible est :
+
+- `pnpm exec tsx src/cli.ts audit`
+- `pnpm exec tsx src/cli.ts audit --json`
+
+V1 exécute les règles locales définies dans `src/audit/rules.ts`.
+
+La première règle active est :
+
+- `JSON-001`
+
+La sortie JSON de `audit` est incluse dans `json-check`.
+

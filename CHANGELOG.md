@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-07 — V2.8 Audit Engine V1
+
+### Ajouté
+
+- Types internes Audit Engine.
+- Runner `runAudit`.
+- Règle `JSON-001`.
+- Commande `audit`.
+- Sortie `audit --json`.
+- Inclusion de `audit --json` dans `json-check`.
+- Tests de la commande `audit`.
+
+### Confirmé
+
+- L'Audit Engine reste local, déterministe et read-only.
+- Aucune correction automatique.
+- Aucun appel IA automatique.
+- Les règles V1 produisent un rapport, sans bloquer les commits.
+
+---
+
 ## 2026-07-07 — V2.7 Audit Engine design
 
 ### Ajouté
