@@ -202,9 +202,52 @@ const AUDIT_DOCUMENTATION_COVERAGE_RULE: AuditRule = {
   },
 };
 
+const AUDIT_SCORE_EXPOSURE_RULE: AuditRule = {
+  id: "AUDIT-001",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit score is exposed in model, runner, and human report",
+  description: "The audit score should be typed, computed, and displayed in the human audit report.",
+  check: () => {
+    const expectations = [
+      {
+        file: "src/audit/types.ts",
+        token: "score: number;",
+      },
+      {
+        file: "src/audit/runner.ts",
+        token: "const score =",
+      },
+      {
+        file: "src/commands/audit.ts",
+        token: "Score:",
+      },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_SCORE_EXPOSURE_RULE,
+        "Audit score is not fully exposed.",
+        missing,
+      );
+    }
+
+    return pass(
+      AUDIT_SCORE_EXPOSURE_RULE,
+      "Audit score is typed, computed, and displayed.",
+      expectations.map(({ file }) => file),
+    );
+  },
+};
+
 export const AUDIT_RULES: readonly AuditRule[] = [
   JSON_SCHEMA_VERSION_RULE,
   JSON_CHECK_COVERAGE_RULE,
   CLI_COMMAND_COVERAGE_RULE,
   AUDIT_DOCUMENTATION_COVERAGE_RULE,
+  AUDIT_SCORE_EXPOSURE_RULE,
 ];
