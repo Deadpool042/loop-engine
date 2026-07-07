@@ -100,6 +100,7 @@ export const AUDIT_JSON_SUMMARY_CONTRACT_RULE: AuditRule = {
     const content = readFileSync(typesPath, "utf8");
 
     const expectedTokens = [
+      "status: AuditSummaryStatus;",
       "total: number;",
       "pass: number;",
       "warning: number;",
