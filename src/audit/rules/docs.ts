@@ -185,7 +185,7 @@ export const AUDIT_FINAL_REPORT_README_CHECKS_RULE: AuditRule = {
 
     const content = readFileSync(reportPath, "utf8");
     const expectedTokens = [
-      "20 règles",
+      "22 règles",
       "`DOCS-002`",
       "`DOCS-003`",
       "Couverture README",
