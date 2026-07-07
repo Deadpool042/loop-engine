@@ -121,3 +121,28 @@ Voir aussi :
 - `docs/integrations/openclaw-read-only-checklist.md`
 - `docs/integrations/openclaw-read-only-checklist.md`
 - `docs/architecture/audit-engine.md`
+
+## Audit et CI
+
+Loop Engine expose un moteur d'audit intégré.
+
+Commandes principales :
+
+- `pnpm loop audit`
+- `pnpm loop audit --json`
+- `pnpm loop audit --strict`
+- `pnpm loop audit --json --strict`
+- `pnpm run audit:strict`
+- `pnpm run ci`
+
+Le rapport JSON expose notamment :
+
+- `schemaVersion` ;
+- `summary.status` ;
+- `summary.score` ;
+- `summary.byCategory` ;
+- `summary.byPriority` ;
+- `findings` ;
+- `recommendations`.
+
+Le script `pnpm run ci` exécute la validation générale puis l'audit strict. Il est utilisé par le workflow GitHub Actions du dépôt.
