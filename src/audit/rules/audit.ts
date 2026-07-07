@@ -652,3 +652,67 @@ export const AUDIT_CLI_STRICT_ROUTING_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RULE_ID_UNIQUENESS_RULE: AuditRule = {
+  id: "AUDIT-015",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule ids are unique",
+  description: "The audit registry should not expose duplicate rule ids.",
+  check: () => {
+    const registryPath = "src/audit/rules.ts";
+
+    if (!existsSync(registryPath)) {
+      return fail(
+        AUDIT_RULE_ID_UNIQUENESS_RULE,
+        "Audit rule registry is missing.",
+        [registryPath],
+        "Restore src/audit/rules.ts so audit rule id uniqueness can be verified.",
+      );
+    }
+
+    const content = readFileSync(registryPath, "utf8");
+    const registryStart = content.indexOf("export const AUDIT_RULES");
+    const registryEnd = content.indexOf("];", registryStart);
+
+    if (registryStart < 0 || registryEnd < 0) {
+      return fail(
+        AUDIT_RULE_ID_UNIQUENESS_RULE,
+        "Audit rule registry cannot be parsed.",
+        ["export const AUDIT_RULES"],
+        "Keep AUDIT_RULES declared as a static array in src/audit/rules.ts.",
+      );
+    }
+
+    const registry = content.slice(registryStart, registryEnd);
+    const registeredRules = Array.from(
+      registry.matchAll(/\\b[A-Z0-9_]+_RULE\\b/g),
+      (match) => match[0],
+    );
+
+    const seen = new Set<string>();
+    const duplicateNames = registeredRules.filter((ruleName) => {
+      if (seen.has(ruleName)) {
+        return true;
+      }
+
+      seen.add(ruleName);
+      return false;
+    });
+
+    if (duplicateNames.length > 0) {
+      return fail(
+        AUDIT_RULE_ID_UNIQUENESS_RULE,
+        "Audit registry contains duplicate rule entries.",
+        duplicateNames,
+        "Remove duplicate rule entries from AUDIT_RULES.",
+      );
+    }
+
+    return pass(
+      AUDIT_RULE_ID_UNIQUENESS_RULE,
+      "Audit registry rule entries are unique.",
+      registeredRules,
+    );
+  },
+};
