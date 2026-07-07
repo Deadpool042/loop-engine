@@ -220,6 +220,8 @@ La commande `audit --json` doit produire un rapport JSON stable, incluant `schem
 
 Le moteur d'audit expose désormais un rapport humain et un rapport JSON stable.
 
+Le rapport humain affiche également une section `Recommendations` lorsque des findings exposent une recommandation corrective.
+
 ## Rapport JSON
 
 Le rapport JSON contient :
@@ -248,7 +250,7 @@ Chaque finding contient :
 
 ## Règles actives
 
-Le moteur contient 8 règles exécutables :
+Le moteur contient 9 règles exécutables :
 
 - `JSON-001` — vérifie que les sorties JSON publiques exposent `schemaVersion` ;
 - `JSON-005` — vérifie que les commandes JSON publiques sont couvertes par `json-check` ;
@@ -258,6 +260,7 @@ Le moteur contient 8 règles exécutables :
 - `AUDIT-002` — vérifie que la priorité des findings est typée et renseignée ;
 - `AUDIT-003` — vérifie que les recommandations sont supportées par les findings ;
 - `AUDIT-004` — vérifie que le résumé par catégorie est typé, calculé et affiché.
+- `AUDIT-005` — vérifie que le rapport humain affiche les recommandations lorsqu'elles sont disponibles.
 
 ## Structure interne
 
@@ -278,8 +281,8 @@ Les listes de commandes publiques sont centralisées dans `src/audit/public-comm
 
 L'état attendu du moteur est :
 
-- 8 règles ;
-- 8 règles en pass ;
+- 9 règles ;
+- 9 règles en pass ;
 - 0 warning runtime ;
 - 0 fail ;
 - score 100 ;
