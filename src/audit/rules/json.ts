@@ -83,8 +83,8 @@ export const AUDIT_JSON_SUMMARY_CONTRACT_RULE: AuditRule = {
   id: "JSON-006",
   category: "json",
   severity: "warning",
-  title: "Audit JSON report exposes stable summary fields",
-  description: "The audit JSON report should expose the stable summary fields used by downstream tools.",
+  title: "Audit JSON report exposes stable fields",
+  description: "The audit JSON report should expose the stable fields used by downstream tools.",
   check: () => {
     const typesPath = "src/audit/types.ts";
 
@@ -108,6 +108,7 @@ export const AUDIT_JSON_SUMMARY_CONTRACT_RULE: AuditRule = {
       "score: number;",
       "byCategory: Partial<Record<AuditCategory, number>>;",
       "byPriority: Partial<Record<AuditPriority, number>>;",
+      "recommendations: readonly AuditRecommendation[];",
     ];
 
     const missing = expectedTokens.filter(
@@ -117,15 +118,15 @@ export const AUDIT_JSON_SUMMARY_CONTRACT_RULE: AuditRule = {
     if (missing.length > 0) {
       return fail(
         AUDIT_JSON_SUMMARY_CONTRACT_RULE,
-        "Audit JSON summary contract is incomplete.",
+        "Audit JSON report contract is incomplete.",
         missing,
-        "Ensure AuditReport.summary exposes all stable summary fields.",
+        "Ensure AuditReport exposes all stable report fields.",
       );
     }
 
     return pass(
       AUDIT_JSON_SUMMARY_CONTRACT_RULE,
-      "Audit JSON summary contract exposes all stable fields.",
+      "Audit JSON report contract exposes all stable fields.",
       expectedTokens,
     );
   },
