@@ -81,3 +81,45 @@ export const AUDIT_PRIORITY_EXPOSURE_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RECOMMENDATION_SUPPORT_RULE: AuditRule = {
+  id: "AUDIT-003",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit findings support recommendations",
+  description: "Audit findings should support structured recommendations for downstream reporting.",
+  check: () => {
+    const expectations = [
+      {
+        file: "src/audit/types.ts",
+        token: "recommendation?: string;",
+      },
+      {
+        file: "src/audit/findings.ts",
+        token: "recommendation?: string",
+      },
+      {
+        file: "src/audit/findings.ts",
+        token: "...(recommendation ? { recommendation } : {})",
+      },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_SUPPORT_RULE,
+        "Audit recommendations are not fully supported.",
+        missing,
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_SUPPORT_RULE,
+      "Audit recommendations are typed and supported by findings.",
+      expectations.map(({ file }) => file),
+    );
+  },
+};
