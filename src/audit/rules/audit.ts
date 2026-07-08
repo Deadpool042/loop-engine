@@ -1032,3 +1032,49 @@ export const AUDIT_RULE_PRIORITY_VALIDITY_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_FINDING_STATUS_VALIDITY_RULE: AuditRule = {
+  id: "AUDIT-021",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit finding statuses are valid",
+  description: "Every audit finding helper should use one of the supported audit statuses.",
+  check: () => {
+    const findingFile = "src/audit/findings.ts";
+    const validStatuses = ["pass", "fail", "skipped"];
+
+    if (!existsSync(findingFile)) {
+      return fail(
+        AUDIT_FINDING_STATUS_VALIDITY_RULE,
+        "Audit finding helpers are missing.",
+        [findingFile],
+        "Restore src/audit/findings.ts so audit finding statuses can be verified.",
+      );
+    }
+
+    const content = readFileSync(findingFile, "utf8");
+    const statusMatches = Array.from(
+      content.matchAll(/status:\s*"([^"]+)"/g),
+    );
+
+    const invalidStatuses = statusMatches
+      .map((match) => match[1])
+      .filter((status): status is string => Boolean(status))
+      .filter((status) => !validStatuses.includes(status));
+
+    if (invalidStatuses.length > 0) {
+      return fail(
+        AUDIT_FINDING_STATUS_VALIDITY_RULE,
+        "Some audit finding statuses are invalid.",
+        invalidStatuses,
+        "Use only supported audit statuses: pass, fail, skipped.",
+      );
+    }
+
+    return pass(
+      AUDIT_FINDING_STATUS_VALIDITY_RULE,
+      "Audit finding statuses are valid.",
+      validStatuses,
+    );
+  },
+};
