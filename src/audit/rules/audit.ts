@@ -1166,3 +1166,76 @@ export const AUDIT_FINDING_DIAGNOSTIC_FIELDS_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RULE_ID_PREFIX_RULE: AuditRule = {
+  id: "AUDIT-024",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule ids match their categories",
+  description: "Every audit rule id should use the prefix associated with its declared category.",
+  check: () => {
+    const ruleFiles = [
+      "src/audit/rules/json.ts",
+      "src/audit/rules/cli.ts",
+      "src/audit/rules/docs.ts",
+      "src/audit/rules/audit.ts",
+    ];
+    const expectedPrefixes: Record<string, string> = {
+      json: "JSON-",
+      cli: "CLI-",
+      docs: "DOCS-",
+      architecture: "AUDIT-",
+    };
+
+    const missingFiles = ruleFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUDIT_RULE_ID_PREFIX_RULE,
+        "Some audit rule files are missing.",
+        missingFiles,
+        "Restore missing audit rule files so rule id prefixes can be verified.",
+      );
+    }
+
+    const invalidPrefixes = ruleFiles.flatMap((file) => {
+      const content = readFileSync(file, "utf8");
+      const exports = Array.from(
+        content.matchAll(/export const ([A-Z0-9_]+_RULE): AuditRule/g),
+      );
+
+      return exports
+        .map((match, index) => {
+          const ruleName = match[1];
+          const start = match.index ?? 0;
+          const nextStart = exports[index + 1]?.index ?? content.length;
+          const ruleSource = content.slice(start, nextStart);
+          const id = ruleSource.match(/\bid:\s*"([^"]+)"/)?.[1];
+          const category = ruleSource.match(/\bcategory:\s*"([^"]+)"/)?.[1];
+          const expectedPrefix = category ? expectedPrefixes[category] : undefined;
+
+          if (!ruleName || !id || !category || !expectedPrefix || id.startsWith(expectedPrefix)) {
+            return "";
+          }
+
+          return `${ruleName}: ${id} should use prefix ${expectedPrefix} for category ${category}`;
+        })
+        .filter((detail): detail is string => Boolean(detail));
+    });
+
+    if (invalidPrefixes.length > 0) {
+      return fail(
+        AUDIT_RULE_ID_PREFIX_RULE,
+        "Some audit rule ids do not match their categories.",
+        invalidPrefixes,
+        "Use the expected rule id prefixes: JSON-, CLI-, DOCS-, AUDIT-.",
+      );
+    }
+
+    return pass(
+      AUDIT_RULE_ID_PREFIX_RULE,
+      "Audit rule ids match their categories.",
+      Object.entries(expectedPrefixes).map(([category, prefix]) => `${category}: ${prefix}`),
+    );
+  },
+};
