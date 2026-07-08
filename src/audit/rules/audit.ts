@@ -863,3 +863,65 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RULE_CATEGORY_VALIDITY_RULE: AuditRule = {
+  id: "AUDIT-018",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule categories are valid",
+  description: "Every audit rule should use one of the supported audit categories.",
+  check: () => {
+    const ruleFiles = [
+      "src/audit/rules/json.ts",
+      "src/audit/rules/cli.ts",
+      "src/audit/rules/docs.ts",
+      "src/audit/rules/audit.ts",
+    ];
+    const validCategories = ["json", "cli", "docs", "architecture"];
+
+    const missingFiles = ruleFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUDIT_RULE_CATEGORY_VALIDITY_RULE,
+        "Some audit rule files are missing.",
+        missingFiles,
+        "Restore missing audit rule files so rule categories can be verified.",
+      );
+    }
+
+    const invalidCategories = ruleFiles.flatMap((file) => {
+      const content = readFileSync(file, "utf8");
+
+      return Array.from(
+        content.matchAll(
+          /export const ([A-Z0-9_]+_RULE): AuditRule[\s\S]*?category:\s*"([^"]+)"/g,
+        ),
+      )
+        .map((match) => {
+          const ruleName = match[1];
+          const category = match[2];
+
+          return ruleName && category && !validCategories.includes(category)
+            ? `${ruleName}: invalid category ${category}`
+            : "";
+        })
+        .filter((detail): detail is string => Boolean(detail));
+    });
+
+    if (invalidCategories.length > 0) {
+      return fail(
+        AUDIT_RULE_CATEGORY_VALIDITY_RULE,
+        "Some audit rule categories are invalid.",
+        invalidCategories,
+        "Use only supported audit categories: json, cli, docs, architecture.",
+      );
+    }
+
+    return pass(
+      AUDIT_RULE_CATEGORY_VALIDITY_RULE,
+      "Audit rule categories are valid.",
+      validCategories,
+    );
+  },
+};

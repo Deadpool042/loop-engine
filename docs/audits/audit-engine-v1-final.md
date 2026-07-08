@@ -269,7 +269,7 @@ Chaque finding contient :
 
 ## Règles exécutables
 
-Le moteur contient 28 règles exécutables :
+Le moteur contient 29 règles exécutables :
 
 - `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
 - `JSON-005` : couverture des commandes JSON publiques par `json-check`.
@@ -297,6 +297,7 @@ Le moteur contient 28 règles exécutables :
 - `AUDIT-015` : unicité des identifiants déclarés des règles d'audit.
 - `AUDIT-016` : complétude du registre `AUDIT_RULES`.
 - `AUDIT-017` : complétude des métadonnées `title` et `description` des règles d'audit.
+- `AUDIT-018` : validité des catégories déclarées par les règles d'audit.
 
 ## Couverture README
 
@@ -317,8 +318,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 28 règles ;
-- 28 règles en pass ;
+- 29 règles ;
+- 29 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;
