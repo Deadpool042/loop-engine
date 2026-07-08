@@ -987,3 +987,48 @@ export const AUDIT_RULE_SEVERITY_VALIDITY_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RULE_PRIORITY_VALIDITY_RULE: AuditRule = {
+  id: "AUDIT-020",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule priorities are valid",
+  description: "Every audit finding helper should use one of the supported audit priorities.",
+  check: () => {
+    const findingFile = "src/audit/findings.ts";
+    const validPriorities = ["low", "medium", "high"];
+
+    if (!existsSync(findingFile)) {
+      return fail(
+        AUDIT_RULE_PRIORITY_VALIDITY_RULE,
+        "Audit finding helpers are missing.",
+        [findingFile],
+        "Restore src/audit/findings.ts so audit priorities can be verified.",
+      );
+    }
+
+    const content = readFileSync(findingFile, "utf8");
+    const priorityMatches = Array.from(
+      content.matchAll(/priority:\s*"([^"]+)"/g),
+    );
+    const invalidPriorities = priorityMatches
+      .map((match) => match[1])
+      .filter((priority): priority is string => Boolean(priority))
+      .filter((priority) => !validPriorities.includes(priority));
+
+    if (invalidPriorities.length > 0) {
+      return fail(
+        AUDIT_RULE_PRIORITY_VALIDITY_RULE,
+        "Some audit priorities are invalid.",
+        invalidPriorities,
+        "Use only supported audit priorities: low, medium, high.",
+      );
+    }
+
+    return pass(
+      AUDIT_RULE_PRIORITY_VALIDITY_RULE,
+      "Audit priorities are valid.",
+      validPriorities,
+    );
+  },
+};
