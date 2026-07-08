@@ -1078,3 +1078,46 @@ export const AUDIT_FINDING_STATUS_VALIDITY_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_FINDING_IDENTITY_FIELDS_RULE: AuditRule = {
+  id: "AUDIT-022",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit finding identity fields are preserved",
+  description: "Audit finding helpers should preserve rule id, category, and severity.",
+  check: () => {
+    const findingFile = "src/audit/findings.ts";
+    const expectedTokens = [
+      "ruleId: rule.id",
+      "category: rule.category",
+      "severity: rule.severity",
+    ];
+
+    if (!existsSync(findingFile)) {
+      return fail(
+        AUDIT_FINDING_IDENTITY_FIELDS_RULE,
+        "Audit finding helpers are missing.",
+        [findingFile],
+        "Restore src/audit/findings.ts so audit finding identity fields can be verified.",
+      );
+    }
+
+    const content = readFileSync(findingFile, "utf8");
+    const missingTokens = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missingTokens.length > 0) {
+      return fail(
+        AUDIT_FINDING_IDENTITY_FIELDS_RULE,
+        "Audit finding helpers do not preserve all rule identity fields.",
+        missingTokens,
+        "Ensure audit finding helpers set ruleId, category, and severity from the source rule.",
+      );
+    }
+
+    return pass(
+      AUDIT_FINDING_IDENTITY_FIELDS_RULE,
+      "Audit finding identity fields are preserved.",
+      expectedTokens,
+    );
+  },
+};
