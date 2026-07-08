@@ -1390,3 +1390,60 @@ export const AUDIT_RULE_DESCRIPTION_UNIQUENESS_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RULE_EXPORT_NAME_CONVENTION_RULE: AuditRule = {
+  id: "AUDIT-027",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule export names follow convention",
+  description: "Every exported audit rule should use an uppercase _RULE export name for registry consistency.",
+  check: () => {
+    const ruleFiles = [
+      "src/audit/rules/json.ts",
+      "src/audit/rules/cli.ts",
+      "src/audit/rules/docs.ts",
+      "src/audit/rules/audit.ts",
+    ];
+    const exportNamePattern = /^[A-Z0-9_]+_RULE$/;
+
+    const missingFiles = ruleFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUDIT_RULE_EXPORT_NAME_CONVENTION_RULE,
+        "Some audit rule files are missing.",
+        missingFiles,
+        "Restore missing audit rule files so export name conventions can be verified.",
+      );
+    }
+
+    const exportNames = ruleFiles.flatMap((file) => {
+      const content = readFileSync(file, "utf8");
+
+      return Array.from(
+        content.matchAll(/export const ([A-Za-z0-9_]+): AuditRule/g),
+      )
+        .map((match) => match[1])
+        .filter((ruleName): ruleName is string => Boolean(ruleName));
+    });
+
+    const invalidExportNames = exportNames.filter(
+      (ruleName) => !exportNamePattern.test(ruleName),
+    );
+
+    if (invalidExportNames.length > 0) {
+      return fail(
+        AUDIT_RULE_EXPORT_NAME_CONVENTION_RULE,
+        "Some audit rule export names do not follow convention.",
+        invalidExportNames,
+        "Use UPPER_SNAKE_CASE names ending with _RULE for every exported audit rule.",
+      );
+    }
+
+    return pass(
+      AUDIT_RULE_EXPORT_NAME_CONVENTION_RULE,
+      "Audit rule export names follow convention.",
+      exportNames,
+    );
+  },
+};
