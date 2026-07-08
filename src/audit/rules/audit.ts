@@ -1121,3 +1121,48 @@ export const AUDIT_FINDING_IDENTITY_FIELDS_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_FINDING_DIAGNOSTIC_FIELDS_RULE: AuditRule = {
+  id: "AUDIT-023",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit finding diagnostic fields are preserved",
+  description: "Audit finding helpers should preserve diagnostic message, details, and recommendations.",
+  check: () => {
+    const findingFile = "src/audit/findings.ts";
+    const expectedTokens = [
+      "message",
+      "details",
+      "recommendation",
+    ];
+
+    if (!existsSync(findingFile)) {
+      return fail(
+        AUDIT_FINDING_DIAGNOSTIC_FIELDS_RULE,
+        "Audit finding helpers are missing.",
+        [findingFile],
+        "Restore src/audit/findings.ts so audit finding diagnostic fields can be verified.",
+      );
+    }
+
+    const content = readFileSync(findingFile, "utf8");
+    const missingTokens = expectedTokens.filter(
+      (token) => !new RegExp(`\\b${token}\\b`).test(content),
+    );
+
+    if (missingTokens.length > 0) {
+      return fail(
+        AUDIT_FINDING_DIAGNOSTIC_FIELDS_RULE,
+        "Audit finding helpers do not preserve all diagnostic fields.",
+        missingTokens,
+        "Ensure audit finding helpers expose message, details, and recommendation fields.",
+      );
+    }
+
+    return pass(
+      AUDIT_FINDING_DIAGNOSTIC_FIELDS_RULE,
+      "Audit finding diagnostic fields are preserved.",
+      expectedTokens,
+    );
+  },
+};
