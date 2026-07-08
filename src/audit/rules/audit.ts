@@ -925,3 +925,65 @@ export const AUDIT_RULE_CATEGORY_VALIDITY_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RULE_SEVERITY_VALIDITY_RULE: AuditRule = {
+  id: "AUDIT-019",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule severities are valid",
+  description: "Every audit rule should use one of the supported audit severities.",
+  check: () => {
+    const ruleFiles = [
+      "src/audit/rules/json.ts",
+      "src/audit/rules/cli.ts",
+      "src/audit/rules/docs.ts",
+      "src/audit/rules/audit.ts",
+    ];
+    const validSeverities = ["error", "warning"];
+
+    const missingFiles = ruleFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUDIT_RULE_SEVERITY_VALIDITY_RULE,
+        "Some audit rule files are missing.",
+        missingFiles,
+        "Restore missing audit rule files so rule severities can be verified.",
+      );
+    }
+
+    const invalidSeverities = ruleFiles.flatMap((file) => {
+      const content = readFileSync(file, "utf8");
+
+      return Array.from(
+        content.matchAll(
+          /export const ([A-Z0-9_]+_RULE): AuditRule[\s\S]*?severity:\s*"([^"]+)"/g,
+        ),
+      )
+        .map((match) => {
+          const ruleName = match[1];
+          const severity = match[2];
+
+          return ruleName && severity && !validSeverities.includes(severity)
+            ? `${ruleName}: invalid severity ${severity}`
+            : "";
+        })
+        .filter((detail): detail is string => Boolean(detail));
+    });
+
+    if (invalidSeverities.length > 0) {
+      return fail(
+        AUDIT_RULE_SEVERITY_VALIDITY_RULE,
+        "Some audit rule severities are invalid.",
+        invalidSeverities,
+        "Use only supported audit severities: error, warning.",
+      );
+    }
+
+    return pass(
+      AUDIT_RULE_SEVERITY_VALIDITY_RULE,
+      "Audit rule severities are valid.",
+      validSeverities,
+    );
+  },
+};
