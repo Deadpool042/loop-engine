@@ -128,6 +128,14 @@ function validatePayload(command: readonly string[], json: unknown): void {
       assertField(recommendation, "ruleId");
       assertField(recommendation, "priority");
       assertField(recommendation, "message");
+      assertString(recommendation.ruleId, "recommendation.ruleId");
+      assertString(recommendation.message, "recommendation.message");
+
+      const recommendationPriority = recommendation.priority;
+      assertString(recommendationPriority, "recommendation.priority");
+      if (!["low", "medium", "high"].includes(recommendationPriority)) {
+        throw new Error("recommendation.priority must be low, medium, or high");
+      }
     }
   } else if (commandName === "summary") {
     assertField(json, "projects");

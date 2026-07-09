@@ -653,6 +653,53 @@ export const JSON_AUDIT_FINDING_VALUE_ASSERTION_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_RECOMMENDATION_VALUE_ASSERTION_RULE: AuditRule = {
+  id: "JSON-018",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit recommendation value types",
+  description: "json-check should assert the stable audit recommendation value types.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_VALUE_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so audit recommendation value assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "assertString(recommendation.ruleId, \"recommendation.ruleId\")",
+      "assertString(recommendation.message, \"recommendation.message\")",
+      "const recommendationPriority = recommendation.priority",
+      "assertString(recommendationPriority, \"recommendation.priority\")",
+      "recommendation.priority must be low, medium, or high",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_VALUE_ASSERTION_RULE,
+        "json-check does not assert all stable audit recommendation value types.",
+        missing,
+        "Ensure json-check validates audit recommendation ruleId, message, and priority values.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_RECOMMENDATION_VALUE_ASSERTION_RULE,
+      "json-check asserts audit recommendation value types.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 
