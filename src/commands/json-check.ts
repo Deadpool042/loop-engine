@@ -29,6 +29,12 @@ function assertArray(value: unknown): asserts value is readonly unknown[] {
   }
 }
 
+function assertString(value: unknown, field: string): asserts value is string {
+  if (typeof value !== "string") {
+    throw new Error(`${field} must be string`);
+  }
+}
+
 function validatePayload(command: readonly string[], json: unknown): void {
   assertRecord(json);
   assertField(json, "schemaVersion");
@@ -41,6 +47,10 @@ function validatePayload(command: readonly string[], json: unknown): void {
 
   if (commandName === "audit") {
     assertField(json, "generatedAt");
+    assertString(json.generatedAt, "generatedAt");
+    if (Number.isNaN(Date.parse(json.generatedAt))) {
+      throw new Error("generatedAt must be parseable date");
+    }
     assertField(json, "summary");
     const summary = json.summary;
     assertRecord(summary);

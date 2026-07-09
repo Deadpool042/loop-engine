@@ -502,6 +502,52 @@ export const JSON_AUDIT_RECOMMENDATION_FIELD_ASSERTION_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_GENERATED_AT_ASSERTION_RULE: AuditRule = {
+  id: "JSON-015",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit generatedAt timestamp value",
+  description: "json-check should assert that audit generatedAt is a parseable timestamp string.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_GENERATED_AT_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so audit generatedAt assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "function assertString",
+      "assertString(json.generatedAt, \"generatedAt\")",
+      "Date.parse(json.generatedAt)",
+      "generatedAt must be parseable date",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_GENERATED_AT_ASSERTION_RULE,
+        "json-check does not assert audit generatedAt timestamp value.",
+        missing,
+        "Ensure json-check validates that audit generatedAt is a parseable timestamp string.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_GENERATED_AT_ASSERTION_RULE,
+      "json-check asserts audit generatedAt timestamp value.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 
