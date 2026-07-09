@@ -90,6 +90,22 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertNumber(summary.fail, "summary.fail");
     assertNumber(summary.skipped, "summary.skipped");
     assertNumber(summary.score, "summary.score");
+
+    const byCategory = summary.byCategory;
+    assertRecord(byCategory);
+    for (const category of AUDIT_CATEGORIES) {
+      if (category in byCategory) {
+        assertNumber(byCategory[category], `summary.byCategory.${category}`);
+      }
+    }
+
+    const byPriority = summary.byPriority;
+    assertRecord(byPriority);
+    for (const priority of AUDIT_PRIORITIES) {
+      if (priority in byPriority) {
+        assertNumber(byPriority[priority], `summary.byPriority.${priority}`);
+      }
+    }
     assertField(json, "findings");
     const findings = json.findings;
     assertArray(findings);

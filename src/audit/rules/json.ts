@@ -801,6 +801,56 @@ export const JSON_CHECK_ENUM_VALUE_CONSTANTS_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_SUMMARY_GROUPED_COUNT_ASSERTION_RULE: AuditRule = {
+  id: "JSON-021",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit summary grouped count values",
+  description: "json-check should assert audit summary grouped count object values.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_SUMMARY_GROUPED_COUNT_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so grouped summary count assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const byCategory = summary.byCategory",
+      "assertRecord(byCategory)",
+      "for (const category of AUDIT_CATEGORIES)",
+      "assertNumber(byCategory[category], `summary.byCategory.${category}`)",
+      "const byPriority = summary.byPriority",
+      "assertRecord(byPriority)",
+      "for (const priority of AUDIT_PRIORITIES)",
+      "assertNumber(byPriority[priority], `summary.byPriority.${priority}`)",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_SUMMARY_GROUPED_COUNT_ASSERTION_RULE,
+        "json-check does not assert audit summary grouped count values.",
+        missing,
+        "Ensure json-check validates byCategory and byPriority as objects with numeric values.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_SUMMARY_GROUPED_COUNT_ASSERTION_RULE,
+      "json-check asserts audit summary grouped count values.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 
