@@ -1447,3 +1447,66 @@ export const AUDIT_RULE_EXPORT_NAME_CONVENTION_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RULE_EXPORT_NAME_UNIQUENESS_RULE: AuditRule = {
+  id: "AUDIT-028",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule export names are unique",
+  description: "Every exported audit rule should use a unique export name across rule files.",
+  check: () => {
+    const ruleFiles = [
+      "src/audit/rules/json.ts",
+      "src/audit/rules/cli.ts",
+      "src/audit/rules/docs.ts",
+      "src/audit/rules/audit.ts",
+    ];
+
+    const missingFiles = ruleFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUDIT_RULE_EXPORT_NAME_UNIQUENESS_RULE,
+        "Some audit rule files are missing.",
+        missingFiles,
+        "Restore missing audit rule files so export name uniqueness can be verified.",
+      );
+    }
+
+    const exportEntries = ruleFiles.flatMap((file) => {
+      const content = readFileSync(file, "utf8");
+
+      return Array.from(
+        content.matchAll(/export const ([A-Za-z0-9_]+): AuditRule/g),
+      )
+        .map((match) => match[1])
+        .filter((ruleName): ruleName is string => Boolean(ruleName))
+        .map((ruleName) => ({ file, ruleName }));
+    });
+
+    const exportsByName = new Map<string, string[]>();
+
+    for (const { file, ruleName } of exportEntries) {
+      exportsByName.set(ruleName, [...(exportsByName.get(ruleName) ?? []), file]);
+    }
+
+    const duplicateExports = Array.from(exportsByName.entries())
+      .filter(([, files]) => files.length > 1)
+      .map(([ruleName, files]) => `${ruleName}: ${files.join(", ")}`);
+
+    if (duplicateExports.length > 0) {
+      return fail(
+        AUDIT_RULE_EXPORT_NAME_UNIQUENESS_RULE,
+        "Some audit rule export names are duplicated.",
+        duplicateExports,
+        "Use a unique export name for every audit rule.",
+      );
+    }
+
+    return pass(
+      AUDIT_RULE_EXPORT_NAME_UNIQUENESS_RULE,
+      "Audit rule export names are unique.",
+      exportEntries.map(({ ruleName }) => ruleName),
+    );
+  },
+};
