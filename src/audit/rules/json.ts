@@ -263,3 +263,47 @@ export const JSON_GENERATED_AT_CONTRACT_RULE: AuditRule = {
   },
 };
 
+export const JSON_RECOMMENDATIONS_CONTRACT_RULE: AuditRule = {
+  id: "JSON-010",
+  category: "json",
+  severity: "warning",
+  title: "Audit JSON report exposes recommendations array",
+  description: "The audit JSON report should expose top-level recommendations for downstream reporting.",
+  check: () => {
+    const expectations = [
+      {
+        file: "src/audit/types.ts",
+        token: "recommendations: readonly AuditRecommendation[];",
+      },
+      {
+        file: "src/audit/runner.ts",
+        token: "const recommendations = findings",
+      },
+      {
+        file: "src/audit/runner.ts",
+        token: "recommendations,",
+      },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_RECOMMENDATIONS_CONTRACT_RULE,
+        "Audit JSON report recommendations contract is incomplete.",
+        missing,
+        "Ensure AuditReport exposes recommendations and runAudit computes and returns them.",
+      );
+    }
+
+    return pass(
+      JSON_RECOMMENDATIONS_CONTRACT_RULE,
+      "Audit JSON report exposes recommendations array.",
+      expectations.map(({ file }) => file),
+    );
+  },
+};
+
+
