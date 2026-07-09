@@ -145,6 +145,25 @@ function validatePayload(command: readonly string[], json: unknown): void {
         throw new Error(`summary.byCategory.${category} must match finding category count`);
       }
     }
+
+    const priorityCounts: Record<string, number> = {};
+    for (const finding of findings) {
+      assertRecord(finding);
+      const priority = finding.priority;
+      assertString(priority, "finding.priority");
+      assertOneOf(priority, "finding.priority", AUDIT_PRIORITIES);
+      priorityCounts[priority] = (priorityCounts[priority] ?? 0) + 1;
+    }
+
+    for (const priority of AUDIT_PRIORITIES) {
+      const actualPriorityCount = priority in byPriority ? byPriority[priority] : 0;
+      assertNumber(actualPriorityCount, `summary.byPriority.${priority}`);
+      const expectedPriorityCount = priorityCounts[priority] ?? 0;
+
+      if (actualPriorityCount !== expectedPriorityCount) {
+        throw new Error(`summary.byPriority.${priority} must match finding priority count`);
+      }
+    }
     if (findings.length > 0) {
       const finding = findings[0];
       assertRecord(finding);

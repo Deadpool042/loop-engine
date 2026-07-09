@@ -1033,6 +1033,56 @@ export const JSON_AUDIT_SUMMARY_CATEGORY_COUNT_CONSISTENCY_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_SUMMARY_PRIORITY_COUNT_CONSISTENCY_RULE: AuditRule = {
+  id: "JSON-026",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit summary priority count consistency",
+  description: "json-check should assert audit summary priority counts against finding priorities.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_SUMMARY_PRIORITY_COUNT_CONSISTENCY_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so priority count consistency assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const priorityCounts: Record<string, number> = {}",
+      "for (const finding of findings)",
+      "const priority = finding.priority",
+      "assertOneOf(priority, \"finding.priority\", AUDIT_PRIORITIES)",
+      "priorityCounts[priority] = (priorityCounts[priority] ?? 0) + 1",
+      "const actualPriorityCount = priority in byPriority ? byPriority[priority] : 0",
+      "const expectedPriorityCount = priorityCounts[priority] ?? 0",
+      "summary.byPriority.${priority} must match finding priority count",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_SUMMARY_PRIORITY_COUNT_CONSISTENCY_RULE,
+        "json-check does not assert audit summary priority count consistency.",
+        missing,
+        "Ensure json-check validates summary.byPriority against finding priorities.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_SUMMARY_PRIORITY_COUNT_CONSISTENCY_RULE,
+      "json-check asserts audit summary priority count consistency.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 
