@@ -34,8 +34,10 @@ function validatePayload(command: readonly string[], json: unknown): void {
   const commandName = command[0];
 
   if (commandName === "audit") {
+    assertField(json, "generatedAt");
     assertField(json, "summary");
     assertField(json, "findings");
+    assertField(json, "recommendations");
   } else if (commandName === "summary") {
     assertField(json, "projects");
   } else if (commandName === "context") {

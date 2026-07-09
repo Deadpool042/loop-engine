@@ -306,4 +306,51 @@ export const JSON_RECOMMENDATIONS_CONTRACT_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_REPORT_FIELD_ASSERTION_RULE: AuditRule = {
+  id: "JSON-011",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit report stable fields",
+  description: "json-check should assert the stable top-level audit JSON report fields.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_REPORT_FIELD_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so audit JSON report field assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "commandName === \"audit\"",
+      "assertField(json, \"generatedAt\")",
+      "assertField(json, \"summary\")",
+      "assertField(json, \"findings\")",
+      "assertField(json, \"recommendations\")",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_REPORT_FIELD_ASSERTION_RULE,
+        "json-check does not assert all stable audit report fields.",
+        missing,
+        "Ensure json-check validates generatedAt, summary, findings, and recommendations for audit --json.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_REPORT_FIELD_ASSERTION_RULE,
+      "json-check asserts audit report stable fields.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
