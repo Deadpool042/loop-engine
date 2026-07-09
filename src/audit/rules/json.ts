@@ -352,5 +352,58 @@ export const JSON_AUDIT_REPORT_FIELD_ASSERTION_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_SUMMARY_FIELD_ASSERTION_RULE: AuditRule = {
+  id: "JSON-012",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit summary stable fields",
+  description: "json-check should assert the stable audit summary fields.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_SUMMARY_FIELD_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so audit summary field assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const summary = json.summary",
+      "assertRecord(summary)",
+      "assertField(summary, \"status\")",
+      "assertField(summary, \"total\")",
+      "assertField(summary, \"pass\")",
+      "assertField(summary, \"warning\")",
+      "assertField(summary, \"fail\")",
+      "assertField(summary, \"skipped\")",
+      "assertField(summary, \"score\")",
+      "assertField(summary, \"byCategory\")",
+      "assertField(summary, \"byPriority\")",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_SUMMARY_FIELD_ASSERTION_RULE,
+        "json-check does not assert all stable audit summary fields.",
+        missing,
+        "Ensure json-check validates the audit summary status, counts, score, category counts, and priority counts.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_SUMMARY_FIELD_ASSERTION_RULE,
+      "json-check asserts audit summary stable fields.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
