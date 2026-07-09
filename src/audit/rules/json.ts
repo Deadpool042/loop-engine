@@ -223,3 +223,43 @@ export const JSON_ROOT_SCHEMA_VERSION_ASSERTION_RULE: AuditRule = {
     );
   },
 };
+
+export const JSON_GENERATED_AT_CONTRACT_RULE: AuditRule = {
+  id: "JSON-009",
+  category: "json",
+  severity: "warning",
+  title: "Audit JSON report exposes generatedAt timestamp",
+  description: "The audit JSON report should expose a generatedAt ISO timestamp for downstream traceability.",
+  check: () => {
+    const expectations = [
+      {
+        file: "src/audit/types.ts",
+        token: "generatedAt: string;",
+      },
+      {
+        file: "src/audit/runner.ts",
+        token: "generatedAt: new Date().toISOString()",
+      },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_GENERATED_AT_CONTRACT_RULE,
+        "Audit JSON report generatedAt timestamp contract is incomplete.",
+        missing,
+        "Ensure AuditReport exposes generatedAt and runAudit populates it with an ISO timestamp.",
+      );
+    }
+
+    return pass(
+      JSON_GENERATED_AT_CONTRACT_RULE,
+      "Audit JSON report exposes generatedAt timestamp.",
+      expectations.map(({ file }) => file),
+    );
+  },
+};
+
