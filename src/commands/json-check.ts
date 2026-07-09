@@ -23,6 +23,12 @@ function assertField(json: Record<string, unknown>, field: string): void {
   }
 }
 
+function assertArray(value: unknown): asserts value is readonly unknown[] {
+  if (!Array.isArray(value)) {
+    throw new Error("expected JSON array");
+  }
+}
+
 function validatePayload(command: readonly string[], json: unknown): void {
   assertRecord(json);
   assertField(json, "schemaVersion");
@@ -48,6 +54,18 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(summary, "byCategory");
     assertField(summary, "byPriority");
     assertField(json, "findings");
+    const findings = json.findings;
+    assertArray(findings);
+    if (findings.length > 0) {
+      const finding = findings[0];
+      assertRecord(finding);
+      assertField(finding, "ruleId");
+      assertField(finding, "category");
+      assertField(finding, "severity");
+      assertField(finding, "status");
+      assertField(finding, "priority");
+      assertField(finding, "message");
+    }
     assertField(json, "recommendations");
   } else if (commandName === "summary") {
     assertField(json, "projects");

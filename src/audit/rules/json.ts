@@ -404,6 +404,58 @@ export const JSON_AUDIT_SUMMARY_FIELD_ASSERTION_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_FINDING_FIELD_ASSERTION_RULE: AuditRule = {
+  id: "JSON-013",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit finding stable fields",
+  description: "json-check should assert the stable audit finding fields.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_FINDING_FIELD_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so audit finding field assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "function assertArray",
+      "const findings = json.findings",
+      "assertArray(findings)",
+      "const finding = findings[0]",
+      "assertField(finding, \"ruleId\")",
+      "assertField(finding, \"category\")",
+      "assertField(finding, \"severity\")",
+      "assertField(finding, \"status\")",
+      "assertField(finding, \"priority\")",
+      "assertField(finding, \"message\")",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_FINDING_FIELD_ASSERTION_RULE,
+        "json-check does not assert all stable audit finding fields.",
+        missing,
+        "Ensure json-check validates the audit finding identity, classification, status, priority, and message fields.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_FINDING_FIELD_ASSERTION_RULE,
+      "json-check asserts audit finding stable fields.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 
