@@ -455,6 +455,54 @@ export const JSON_AUDIT_FINDING_FIELD_ASSERTION_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_RECOMMENDATION_FIELD_ASSERTION_RULE: AuditRule = {
+  id: "JSON-014",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit recommendation stable fields",
+  description: "json-check should assert the stable audit recommendation fields.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_FIELD_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so audit recommendation field assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const recommendations = json.recommendations",
+      "assertArray(recommendations)",
+      "const recommendation = recommendations[0]",
+      "assertField(recommendation, \"ruleId\")",
+      "assertField(recommendation, \"priority\")",
+      "assertField(recommendation, \"message\")",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_FIELD_ASSERTION_RULE,
+        "json-check does not assert all stable audit recommendation fields.",
+        missing,
+        "Ensure json-check validates the audit recommendation rule id, priority, and message fields.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_RECOMMENDATION_FIELD_ASSERTION_RULE,
+      "json-check asserts audit recommendation stable fields.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 

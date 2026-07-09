@@ -67,6 +67,15 @@ function validatePayload(command: readonly string[], json: unknown): void {
       assertField(finding, "message");
     }
     assertField(json, "recommendations");
+    const recommendations = json.recommendations;
+    assertArray(recommendations);
+    if (recommendations.length > 0) {
+      const recommendation = recommendations[0];
+      assertRecord(recommendation);
+      assertField(recommendation, "ruleId");
+      assertField(recommendation, "priority");
+      assertField(recommendation, "message");
+    }
   } else if (commandName === "summary") {
     assertField(json, "projects");
   } else if (commandName === "context") {
