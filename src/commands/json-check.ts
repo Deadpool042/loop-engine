@@ -35,6 +35,12 @@ function assertString(value: unknown, field: string): asserts value is string {
   }
 }
 
+function assertNumber(value: unknown, field: string): asserts value is number {
+  if (typeof value !== "number") {
+    throw new Error(`${field} must be number`);
+  }
+}
+
 function validatePayload(command: readonly string[], json: unknown): void {
   assertRecord(json);
   assertField(json, "schemaVersion");
@@ -63,6 +69,17 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(summary, "score");
     assertField(summary, "byCategory");
     assertField(summary, "byPriority");
+    const summaryStatus = summary.status;
+    assertString(summaryStatus, "summary.status");
+    if (!["pass", "warning", "fail"].includes(summaryStatus)) {
+      throw new Error("summary.status must be pass, warning, or fail");
+    }
+    assertNumber(summary.total, "summary.total");
+    assertNumber(summary.pass, "summary.pass");
+    assertNumber(summary.warning, "summary.warning");
+    assertNumber(summary.fail, "summary.fail");
+    assertNumber(summary.skipped, "summary.skipped");
+    assertNumber(summary.score, "summary.score");
     assertField(json, "findings");
     const findings = json.findings;
     assertArray(findings);
