@@ -940,6 +940,51 @@ export const JSON_AUDIT_SUMMARY_SCORE_CONSISTENCY_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_SUMMARY_STATUS_CONSISTENCY_RULE: AuditRule = {
+  id: "JSON-024",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit summary status consistency",
+  description: "json-check should assert audit summary status consistency against finding counts.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_SUMMARY_STATUS_CONSISTENCY_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so summary status consistency assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const expectedStatus = summary.fail > 0 ? \"fail\" : summary.warning > 0 ? \"warning\" : \"pass\"",
+      "summaryStatus !== expectedStatus",
+      "summary.status must match finding counts",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_SUMMARY_STATUS_CONSISTENCY_RULE,
+        "json-check does not assert audit summary status consistency.",
+        missing,
+        "Ensure json-check validates summary.status against fail and warning counts.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_SUMMARY_STATUS_CONSISTENCY_RULE,
+      "json-check asserts audit summary status consistency.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 

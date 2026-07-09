@@ -121,6 +121,11 @@ function validatePayload(command: readonly string[], json: unknown): void {
     if (summary.score !== expectedScore) {
       throw new Error("summary.score must match pass ratio");
     }
+
+    const expectedStatus = summary.fail > 0 ? "fail" : summary.warning > 0 ? "warning" : "pass";
+    if (summaryStatus !== expectedStatus) {
+      throw new Error("summary.status must match finding counts");
+    }
     if (findings.length > 0) {
       const finding = findings[0];
       assertRecord(finding);
