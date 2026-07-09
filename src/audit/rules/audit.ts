@@ -1510,3 +1510,53 @@ export const AUDIT_RULE_EXPORT_NAME_UNIQUENESS_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_RULE_ID_SEQUENCE_RULE: AuditRule = {
+  id: "AUDIT-029",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule ids are contiguous within the AUDIT prefix",
+  description: "AUDIT-prefixed rule ids should form a contiguous sequence without gaps.",
+  check: () => {
+    const ruleFile = "src/audit/rules/audit.ts";
+
+    if (!existsSync(ruleFile)) {
+      return fail(
+        AUDIT_RULE_ID_SEQUENCE_RULE,
+        "Audit rule file is missing.",
+        [ruleFile],
+        "Restore src/audit/rules/audit.ts so AUDIT rule id sequencing can be verified.",
+      );
+    }
+
+    const content = readFileSync(ruleFile, "utf8");
+    const auditIds = Array.from(content.matchAll(/\bid:\s*"AUDIT-(\d{3})"/g))
+      .map((match) => Number(match[1]))
+      .filter((id) => Number.isInteger(id))
+      .sort((left, right) => left - right);
+
+    const expectedIds = Array.from(
+      { length: Math.max(...auditIds) },
+      (_, index) => index + 1,
+    );
+
+    const missingIds = expectedIds
+      .filter((id) => !auditIds.includes(id))
+      .map((id) => `AUDIT-${String(id).padStart(3, "0")}`);
+
+    if (missingIds.length > 0) {
+      return fail(
+        AUDIT_RULE_ID_SEQUENCE_RULE,
+        "AUDIT rule ids are not contiguous.",
+        missingIds,
+        "Keep AUDIT-prefixed rule ids contiguous when adding, removing, or renumbering audit architecture rules.",
+      );
+    }
+
+    return pass(
+      AUDIT_RULE_ID_SEQUENCE_RULE,
+      "AUDIT rule ids are contiguous within the AUDIT prefix.",
+      auditIds.map((id) => `AUDIT-${String(id).padStart(3, "0")}`),
+    );
+  },
+};
