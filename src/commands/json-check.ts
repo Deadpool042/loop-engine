@@ -47,6 +47,12 @@ function assertOneOf(value: string, field: string, values: readonly string[]): v
   }
 }
 
+const AUDIT_SUMMARY_STATUSES = ["pass", "warning", "fail"] as const;
+const AUDIT_CATEGORIES = ["json", "cli", "docs", "architecture"] as const;
+const AUDIT_SEVERITIES = ["error", "warning"] as const;
+const AUDIT_FINDING_STATUSES = ["pass", "fail", "skipped"] as const;
+const AUDIT_PRIORITIES = ["low", "medium", "high"] as const;
+
 function validatePayload(command: readonly string[], json: unknown): void {
   assertRecord(json);
   assertField(json, "schemaVersion");
@@ -77,7 +83,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(summary, "byPriority");
     const summaryStatus = summary.status;
     assertString(summaryStatus, "summary.status");
-    assertOneOf(summaryStatus, "summary.status", ["pass", "warning", "fail"]);
+    assertOneOf(summaryStatus, "summary.status", AUDIT_SUMMARY_STATUSES);
     assertNumber(summary.total, "summary.total");
     assertNumber(summary.pass, "summary.pass");
     assertNumber(summary.warning, "summary.warning");
@@ -101,19 +107,19 @@ function validatePayload(command: readonly string[], json: unknown): void {
 
       const findingCategory = finding.category;
       assertString(findingCategory, "finding.category");
-      assertOneOf(findingCategory, "finding.category", ["json", "cli", "docs", "architecture"]);
+      assertOneOf(findingCategory, "finding.category", AUDIT_CATEGORIES);
 
       const findingSeverity = finding.severity;
       assertString(findingSeverity, "finding.severity");
-      assertOneOf(findingSeverity, "finding.severity", ["error", "warning"]);
+      assertOneOf(findingSeverity, "finding.severity", AUDIT_SEVERITIES);
 
       const findingStatus = finding.status;
       assertString(findingStatus, "finding.status");
-      assertOneOf(findingStatus, "finding.status", ["pass", "fail", "skipped"]);
+      assertOneOf(findingStatus, "finding.status", AUDIT_FINDING_STATUSES);
 
       const findingPriority = finding.priority;
       assertString(findingPriority, "finding.priority");
-      assertOneOf(findingPriority, "finding.priority", ["low", "medium", "high"]);
+      assertOneOf(findingPriority, "finding.priority", AUDIT_PRIORITIES);
     }
     assertField(json, "recommendations");
     const recommendations = json.recommendations;
@@ -129,7 +135,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
 
       const recommendationPriority = recommendation.priority;
       assertString(recommendationPriority, "recommendation.priority");
-      assertOneOf(recommendationPriority, "recommendation.priority", ["low", "medium", "high"]);
+      assertOneOf(recommendationPriority, "recommendation.priority", AUDIT_PRIORITIES);
     }
   } else if (commandName === "summary") {
     assertField(json, "projects");

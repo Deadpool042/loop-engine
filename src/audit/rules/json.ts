@@ -570,7 +570,7 @@ export const JSON_AUDIT_SUMMARY_VALUE_ASSERTION_RULE: AuditRule = {
       "function assertNumber",
       "const summaryStatus = summary.status",
       "assertString(summaryStatus, \"summary.status\")",
-      "assertOneOf(summaryStatus, \"summary.status\", [\"pass\", \"warning\", \"fail\"])",
+      "assertOneOf(summaryStatus, \"summary.status\", AUDIT_SUMMARY_STATUSES)",
       "assertNumber(summary.total, \"summary.total\")",
       "assertNumber(summary.pass, \"summary.pass\")",
       "assertNumber(summary.warning, \"summary.warning\")",
@@ -622,16 +622,16 @@ export const JSON_AUDIT_FINDING_VALUE_ASSERTION_RULE: AuditRule = {
       "assertString(finding.message, \"finding.message\")",
       "const findingCategory = finding.category",
       "assertString(findingCategory, \"finding.category\")",
-      "assertOneOf(findingCategory, \"finding.category\", [\"json\", \"cli\", \"docs\", \"architecture\"])",
+      "assertOneOf(findingCategory, \"finding.category\", AUDIT_CATEGORIES)",
       "const findingSeverity = finding.severity",
       "assertString(findingSeverity, \"finding.severity\")",
-      "assertOneOf(findingSeverity, \"finding.severity\", [\"error\", \"warning\"])",
+      "assertOneOf(findingSeverity, \"finding.severity\", AUDIT_SEVERITIES)",
       "const findingStatus = finding.status",
       "assertString(findingStatus, \"finding.status\")",
-      "assertOneOf(findingStatus, \"finding.status\", [\"pass\", \"fail\", \"skipped\"])",
+      "assertOneOf(findingStatus, \"finding.status\", AUDIT_FINDING_STATUSES)",
       "const findingPriority = finding.priority",
       "assertString(findingPriority, \"finding.priority\")",
-      "assertOneOf(findingPriority, \"finding.priority\", [\"low\", \"medium\", \"high\"])",
+      "assertOneOf(findingPriority, \"finding.priority\", AUDIT_PRIORITIES)",
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
@@ -677,7 +677,7 @@ export const JSON_AUDIT_RECOMMENDATION_VALUE_ASSERTION_RULE: AuditRule = {
       "assertString(recommendation.message, \"recommendation.message\")",
       "const recommendationPriority = recommendation.priority",
       "assertString(recommendationPriority, \"recommendation.priority\")",
-      "assertOneOf(recommendationPriority, \"recommendation.priority\", [\"low\", \"medium\", \"high\"])",
+      "assertOneOf(recommendationPriority, \"recommendation.priority\", AUDIT_PRIORITIES)",
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
@@ -722,12 +722,12 @@ export const JSON_CHECK_ENUM_ASSERTION_HELPER_RULE: AuditRule = {
       "function assertOneOf",
       "values.includes(value)",
       "values.join(\", \")",
-      "assertOneOf(summaryStatus, \"summary.status\", [\"pass\", \"warning\", \"fail\"])",
-      "assertOneOf(findingCategory, \"finding.category\", [\"json\", \"cli\", \"docs\", \"architecture\"])",
-      "assertOneOf(findingSeverity, \"finding.severity\", [\"error\", \"warning\"])",
-      "assertOneOf(findingStatus, \"finding.status\", [\"pass\", \"fail\", \"skipped\"])",
-      "assertOneOf(findingPriority, \"finding.priority\", [\"low\", \"medium\", \"high\"])",
-      "assertOneOf(recommendationPriority, \"recommendation.priority\", [\"low\", \"medium\", \"high\"])",
+      "assertOneOf(summaryStatus, \"summary.status\", AUDIT_SUMMARY_STATUSES)",
+      "assertOneOf(findingCategory, \"finding.category\", AUDIT_CATEGORIES)",
+      "assertOneOf(findingSeverity, \"finding.severity\", AUDIT_SEVERITIES)",
+      "assertOneOf(findingStatus, \"finding.status\", AUDIT_FINDING_STATUSES)",
+      "assertOneOf(findingPriority, \"finding.priority\", AUDIT_PRIORITIES)",
+      "assertOneOf(recommendationPriority, \"recommendation.priority\", AUDIT_PRIORITIES)",
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
@@ -748,6 +748,59 @@ export const JSON_CHECK_ENUM_ASSERTION_HELPER_RULE: AuditRule = {
     );
   },
 };
+
+export const JSON_CHECK_ENUM_VALUE_CONSTANTS_RULE: AuditRule = {
+  id: "JSON-020",
+  category: "json",
+  severity: "warning",
+  title: "json-check uses shared enum value constants",
+  description: "json-check should use shared constants for stable enum-like JSON values.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_CHECK_ENUM_VALUE_CONSTANTS_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so enum value constants can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const AUDIT_SUMMARY_STATUSES = [\"pass\", \"warning\", \"fail\"] as const",
+      "const AUDIT_CATEGORIES = [\"json\", \"cli\", \"docs\", \"architecture\"] as const",
+      "const AUDIT_SEVERITIES = [\"error\", \"warning\"] as const",
+      "const AUDIT_FINDING_STATUSES = [\"pass\", \"fail\", \"skipped\"] as const",
+      "const AUDIT_PRIORITIES = [\"low\", \"medium\", \"high\"] as const",
+      "assertOneOf(summaryStatus, \"summary.status\", AUDIT_SUMMARY_STATUSES)",
+      "assertOneOf(findingCategory, \"finding.category\", AUDIT_CATEGORIES)",
+      "assertOneOf(findingSeverity, \"finding.severity\", AUDIT_SEVERITIES)",
+      "assertOneOf(findingStatus, \"finding.status\", AUDIT_FINDING_STATUSES)",
+      "assertOneOf(findingPriority, \"finding.priority\", AUDIT_PRIORITIES)",
+      "assertOneOf(recommendationPriority, \"recommendation.priority\", AUDIT_PRIORITIES)",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_CHECK_ENUM_VALUE_CONSTANTS_RULE,
+        "json-check does not use shared constants for stable enum-like values.",
+        missing,
+        "Define shared enum value constants and pass them to assertOneOf.",
+      );
+    }
+
+    return pass(
+      JSON_CHECK_ENUM_VALUE_CONSTANTS_RULE,
+      "json-check uses shared enum value constants.",
+      expectedTokens,
+    );
+  },
+};
+
 
 
 
