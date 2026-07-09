@@ -116,6 +116,11 @@ function validatePayload(command: readonly string[], json: unknown): void {
     if (summary.total !== summaryCountTotal) {
       throw new Error("summary.total must match summary count total");
     }
+
+    const expectedScore = summary.total === 0 ? 100 : Math.round((summary.pass / summary.total) * 100);
+    if (summary.score !== expectedScore) {
+      throw new Error("summary.score must match pass ratio");
+    }
     if (findings.length > 0) {
       const finding = findings[0];
       assertRecord(finding);
