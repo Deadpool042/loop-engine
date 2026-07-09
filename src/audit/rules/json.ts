@@ -570,7 +570,7 @@ export const JSON_AUDIT_SUMMARY_VALUE_ASSERTION_RULE: AuditRule = {
       "function assertNumber",
       "const summaryStatus = summary.status",
       "assertString(summaryStatus, \"summary.status\")",
-      "summary.status must be pass, warning, or fail",
+      "assertOneOf(summaryStatus, \"summary.status\", [\"pass\", \"warning\", \"fail\"])",
       "assertNumber(summary.total, \"summary.total\")",
       "assertNumber(summary.pass, \"summary.pass\")",
       "assertNumber(summary.warning, \"summary.warning\")",
@@ -622,16 +622,16 @@ export const JSON_AUDIT_FINDING_VALUE_ASSERTION_RULE: AuditRule = {
       "assertString(finding.message, \"finding.message\")",
       "const findingCategory = finding.category",
       "assertString(findingCategory, \"finding.category\")",
-      "finding.category must be json, cli, docs, or architecture",
+      "assertOneOf(findingCategory, \"finding.category\", [\"json\", \"cli\", \"docs\", \"architecture\"])",
       "const findingSeverity = finding.severity",
       "assertString(findingSeverity, \"finding.severity\")",
-      "finding.severity must be error or warning",
+      "assertOneOf(findingSeverity, \"finding.severity\", [\"error\", \"warning\"])",
       "const findingStatus = finding.status",
       "assertString(findingStatus, \"finding.status\")",
-      "finding.status must be pass, fail, or skipped",
+      "assertOneOf(findingStatus, \"finding.status\", [\"pass\", \"fail\", \"skipped\"])",
       "const findingPriority = finding.priority",
       "assertString(findingPriority, \"finding.priority\")",
-      "finding.priority must be low, medium, or high",
+      "assertOneOf(findingPriority, \"finding.priority\", [\"low\", \"medium\", \"high\"])",
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
@@ -677,7 +677,7 @@ export const JSON_AUDIT_RECOMMENDATION_VALUE_ASSERTION_RULE: AuditRule = {
       "assertString(recommendation.message, \"recommendation.message\")",
       "const recommendationPriority = recommendation.priority",
       "assertString(recommendationPriority, \"recommendation.priority\")",
-      "recommendation.priority must be low, medium, or high",
+      "assertOneOf(recommendationPriority, \"recommendation.priority\", [\"low\", \"medium\", \"high\"])",
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
@@ -698,6 +698,57 @@ export const JSON_AUDIT_RECOMMENDATION_VALUE_ASSERTION_RULE: AuditRule = {
     );
   },
 };
+
+export const JSON_CHECK_ENUM_ASSERTION_HELPER_RULE: AuditRule = {
+  id: "JSON-019",
+  category: "json",
+  severity: "warning",
+  title: "json-check uses enum assertion helper",
+  description: "json-check should use a shared enum assertion helper for stable enum-like JSON values.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_CHECK_ENUM_ASSERTION_HELPER_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so enum assertion helper usage can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "function assertOneOf",
+      "values.includes(value)",
+      "values.join(\", \")",
+      "assertOneOf(summaryStatus, \"summary.status\", [\"pass\", \"warning\", \"fail\"])",
+      "assertOneOf(findingCategory, \"finding.category\", [\"json\", \"cli\", \"docs\", \"architecture\"])",
+      "assertOneOf(findingSeverity, \"finding.severity\", [\"error\", \"warning\"])",
+      "assertOneOf(findingStatus, \"finding.status\", [\"pass\", \"fail\", \"skipped\"])",
+      "assertOneOf(findingPriority, \"finding.priority\", [\"low\", \"medium\", \"high\"])",
+      "assertOneOf(recommendationPriority, \"recommendation.priority\", [\"low\", \"medium\", \"high\"])",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_CHECK_ENUM_ASSERTION_HELPER_RULE,
+        "json-check does not use a shared enum assertion helper for stable enum-like values.",
+        missing,
+        "Use assertOneOf for audit summary, finding, and recommendation enum-like values.",
+      );
+    }
+
+    return pass(
+      JSON_CHECK_ENUM_ASSERTION_HELPER_RULE,
+      "json-check uses enum assertion helper.",
+      expectedTokens,
+    );
+  },
+};
+
 
 
 

@@ -41,6 +41,12 @@ function assertNumber(value: unknown, field: string): asserts value is number {
   }
 }
 
+function assertOneOf(value: string, field: string, values: readonly string[]): void {
+  if (!values.includes(value)) {
+    throw new Error(`${field} must be one of: ${values.join(", ")}`);
+  }
+}
+
 function validatePayload(command: readonly string[], json: unknown): void {
   assertRecord(json);
   assertField(json, "schemaVersion");
@@ -71,9 +77,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(summary, "byPriority");
     const summaryStatus = summary.status;
     assertString(summaryStatus, "summary.status");
-    if (!["pass", "warning", "fail"].includes(summaryStatus)) {
-      throw new Error("summary.status must be pass, warning, or fail");
-    }
+    assertOneOf(summaryStatus, "summary.status", ["pass", "warning", "fail"]);
     assertNumber(summary.total, "summary.total");
     assertNumber(summary.pass, "summary.pass");
     assertNumber(summary.warning, "summary.warning");
@@ -97,27 +101,19 @@ function validatePayload(command: readonly string[], json: unknown): void {
 
       const findingCategory = finding.category;
       assertString(findingCategory, "finding.category");
-      if (!["json", "cli", "docs", "architecture"].includes(findingCategory)) {
-        throw new Error("finding.category must be json, cli, docs, or architecture");
-      }
+      assertOneOf(findingCategory, "finding.category", ["json", "cli", "docs", "architecture"]);
 
       const findingSeverity = finding.severity;
       assertString(findingSeverity, "finding.severity");
-      if (!["error", "warning"].includes(findingSeverity)) {
-        throw new Error("finding.severity must be error or warning");
-      }
+      assertOneOf(findingSeverity, "finding.severity", ["error", "warning"]);
 
       const findingStatus = finding.status;
       assertString(findingStatus, "finding.status");
-      if (!["pass", "fail", "skipped"].includes(findingStatus)) {
-        throw new Error("finding.status must be pass, fail, or skipped");
-      }
+      assertOneOf(findingStatus, "finding.status", ["pass", "fail", "skipped"]);
 
       const findingPriority = finding.priority;
       assertString(findingPriority, "finding.priority");
-      if (!["low", "medium", "high"].includes(findingPriority)) {
-        throw new Error("finding.priority must be low, medium, or high");
-      }
+      assertOneOf(findingPriority, "finding.priority", ["low", "medium", "high"]);
     }
     assertField(json, "recommendations");
     const recommendations = json.recommendations;
@@ -133,9 +129,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
 
       const recommendationPriority = recommendation.priority;
       assertString(recommendationPriority, "recommendation.priority");
-      if (!["low", "medium", "high"].includes(recommendationPriority)) {
-        throw new Error("recommendation.priority must be low, medium, or high");
-      }
+      assertOneOf(recommendationPriority, "recommendation.priority", ["low", "medium", "high"]);
     }
   } else if (commandName === "summary") {
     assertField(json, "projects");
