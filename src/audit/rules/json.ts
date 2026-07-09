@@ -598,6 +598,62 @@ export const JSON_AUDIT_SUMMARY_VALUE_ASSERTION_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_FINDING_VALUE_ASSERTION_RULE: AuditRule = {
+  id: "JSON-017",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit finding value types",
+  description: "json-check should assert the stable audit finding value types.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_FINDING_VALUE_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so audit finding value assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "assertString(finding.ruleId, \"finding.ruleId\")",
+      "assertString(finding.message, \"finding.message\")",
+      "const findingCategory = finding.category",
+      "assertString(findingCategory, \"finding.category\")",
+      "finding.category must be json, cli, docs, or architecture",
+      "const findingSeverity = finding.severity",
+      "assertString(findingSeverity, \"finding.severity\")",
+      "finding.severity must be error or warning",
+      "const findingStatus = finding.status",
+      "assertString(findingStatus, \"finding.status\")",
+      "finding.status must be pass, fail, or skipped",
+      "const findingPriority = finding.priority",
+      "assertString(findingPriority, \"finding.priority\")",
+      "finding.priority must be low, medium, or high",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_FINDING_VALUE_ASSERTION_RULE,
+        "json-check does not assert all stable audit finding value types.",
+        missing,
+        "Ensure json-check validates audit finding category, severity, status, priority, ruleId, and message values.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_FINDING_VALUE_ASSERTION_RULE,
+      "json-check asserts audit finding value types.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 

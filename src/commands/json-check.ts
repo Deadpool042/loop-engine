@@ -92,6 +92,32 @@ function validatePayload(command: readonly string[], json: unknown): void {
       assertField(finding, "status");
       assertField(finding, "priority");
       assertField(finding, "message");
+      assertString(finding.ruleId, "finding.ruleId");
+      assertString(finding.message, "finding.message");
+
+      const findingCategory = finding.category;
+      assertString(findingCategory, "finding.category");
+      if (!["json", "cli", "docs", "architecture"].includes(findingCategory)) {
+        throw new Error("finding.category must be json, cli, docs, or architecture");
+      }
+
+      const findingSeverity = finding.severity;
+      assertString(findingSeverity, "finding.severity");
+      if (!["error", "warning"].includes(findingSeverity)) {
+        throw new Error("finding.severity must be error or warning");
+      }
+
+      const findingStatus = finding.status;
+      assertString(findingStatus, "finding.status");
+      if (!["pass", "fail", "skipped"].includes(findingStatus)) {
+        throw new Error("finding.status must be pass, fail, or skipped");
+      }
+
+      const findingPriority = finding.priority;
+      assertString(findingPriority, "finding.priority");
+      if (!["low", "medium", "high"].includes(findingPriority)) {
+        throw new Error("finding.priority must be low, medium, or high");
+      }
     }
     assertField(json, "recommendations");
     const recommendations = json.recommendations;
