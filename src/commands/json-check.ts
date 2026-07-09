@@ -126,6 +126,25 @@ function validatePayload(command: readonly string[], json: unknown): void {
     if (summaryStatus !== expectedStatus) {
       throw new Error("summary.status must match finding counts");
     }
+
+    const categoryCounts: Record<string, number> = {};
+    for (const finding of findings) {
+      assertRecord(finding);
+      const category = finding.category;
+      assertString(category, "finding.category");
+      assertOneOf(category, "finding.category", AUDIT_CATEGORIES);
+      categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
+    }
+
+    for (const category of AUDIT_CATEGORIES) {
+      const actualCategoryCount = category in byCategory ? byCategory[category] : 0;
+      assertNumber(actualCategoryCount, `summary.byCategory.${category}`);
+      const expectedCategoryCount = categoryCounts[category] ?? 0;
+
+      if (actualCategoryCount !== expectedCategoryCount) {
+        throw new Error(`summary.byCategory.${category} must match finding category count`);
+      }
+    }
     if (findings.length > 0) {
       const finding = findings[0];
       assertRecord(finding);

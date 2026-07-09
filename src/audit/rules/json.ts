@@ -984,6 +984,56 @@ export const JSON_AUDIT_SUMMARY_STATUS_CONSISTENCY_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_SUMMARY_CATEGORY_COUNT_CONSISTENCY_RULE: AuditRule = {
+  id: "JSON-025",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit summary category count consistency",
+  description: "json-check should assert audit summary category counts against finding categories.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_SUMMARY_CATEGORY_COUNT_CONSISTENCY_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so category count consistency assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const categoryCounts: Record<string, number> = {}",
+      "for (const finding of findings)",
+      "const category = finding.category",
+      "assertOneOf(category, \"finding.category\", AUDIT_CATEGORIES)",
+      "categoryCounts[category] = (categoryCounts[category] ?? 0) + 1",
+      "const actualCategoryCount = category in byCategory ? byCategory[category] : 0",
+      "const expectedCategoryCount = categoryCounts[category] ?? 0",
+      "summary.byCategory.${category} must match finding category count",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_SUMMARY_CATEGORY_COUNT_CONSISTENCY_RULE,
+        "json-check does not assert audit summary category count consistency.",
+        missing,
+        "Ensure json-check validates summary.byCategory against finding categories.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_SUMMARY_CATEGORY_COUNT_CONSISTENCY_RULE,
+      "json-check asserts audit summary category count consistency.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 
