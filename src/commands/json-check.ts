@@ -109,6 +109,13 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(json, "findings");
     const findings = json.findings;
     assertArray(findings);
+    const summaryCountTotal = summary.pass + summary.warning + summary.fail + summary.skipped;
+    if (summary.total !== findings.length) {
+      throw new Error("summary.total must match findings length");
+    }
+    if (summary.total !== summaryCountTotal) {
+      throw new Error("summary.total must match summary count total");
+    }
     if (findings.length > 0) {
       const finding = findings[0];
       assertRecord(finding);

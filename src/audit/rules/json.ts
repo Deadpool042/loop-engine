@@ -850,6 +850,53 @@ export const JSON_AUDIT_SUMMARY_GROUPED_COUNT_ASSERTION_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_SUMMARY_TOTAL_CONSISTENCY_RULE: AuditRule = {
+  id: "JSON-022",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit summary total consistency",
+  description: "json-check should assert audit summary total consistency against findings and status counts.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_SUMMARY_TOTAL_CONSISTENCY_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so summary total consistency assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const summaryCountTotal = summary.pass + summary.warning + summary.fail + summary.skipped",
+      "summary.total !== findings.length",
+      "summary.total must match findings length",
+      "summary.total !== summaryCountTotal",
+      "summary.total must match summary count total",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_SUMMARY_TOTAL_CONSISTENCY_RULE,
+        "json-check does not assert audit summary total consistency.",
+        missing,
+        "Ensure json-check validates summary.total against findings length and status count totals.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_SUMMARY_TOTAL_CONSISTENCY_RULE,
+      "json-check asserts audit summary total consistency.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 
