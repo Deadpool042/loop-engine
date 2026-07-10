@@ -1706,3 +1706,49 @@ export const AUDIT_PROFILE_HELPERS_EXPOSURE_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_PROFILE_RULE_SELECTION_EXPOSURE_RULE: AuditRule = {
+  id: "AUDIT-033",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rules are selectable by profile",
+  description: "The audit engine should expose a pure helper for selecting audit rules by audit profile.",
+  check: () => {
+    const profilesPath = "src/audit/profiles.ts";
+
+    if (!existsSync(profilesPath)) {
+      return fail(
+        AUDIT_PROFILE_RULE_SELECTION_EXPOSURE_RULE,
+        "Audit profile selection file is missing.",
+        [profilesPath],
+        "Create src/audit/profiles.ts with selectAuditRulesForProfile.",
+      );
+    }
+
+    const content = readFileSync(profilesPath, "utf8");
+    const expectedTokens = [
+      "export function selectAuditRulesForProfile",
+      "profile: AuditProfile",
+      "rules: readonly AuditRule[]",
+      "getAuditProfileDefinition(profile)",
+      "definition.categories.includes(rule.category)",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PROFILE_RULE_SELECTION_EXPOSURE_RULE,
+        "Audit profile rule selection helper is incomplete.",
+        missing,
+        "Expose selectAuditRulesForProfile in src/audit/profiles.ts.",
+      );
+    }
+
+    return pass(
+      AUDIT_PROFILE_RULE_SELECTION_EXPOSURE_RULE,
+      "Audit rules are selectable by profile.",
+      expectedTokens,
+    );
+  },
+};
+

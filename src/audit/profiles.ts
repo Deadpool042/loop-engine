@@ -1,4 +1,4 @@
-import type { AuditCategory, AuditProfile } from "./types.js";
+import type { AuditCategory, AuditProfile, AuditRule } from "./types.js";
 
 export type AuditProfileDefinition = {
   readonly profile: AuditProfile;
@@ -39,3 +39,12 @@ export function isAuditProfile(value: string): value is AuditProfile {
 export function getAuditProfileDefinition(profile: AuditProfile): AuditProfileDefinition {
   return AUDIT_PROFILE_DEFINITIONS[profile];
 }
+
+export function selectAuditRulesForProfile(
+  profile: AuditProfile,
+  rules: readonly AuditRule[],
+): readonly AuditRule[] {
+  const definition = getAuditProfileDefinition(profile);
+  return rules.filter((rule) => definition.categories.includes(rule.category));
+}
+
