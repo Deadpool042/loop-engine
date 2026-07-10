@@ -2152,3 +2152,53 @@ export const AUDIT_RECOMMENDATION_BUILDER_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_RECOMMENDATION_BUILDER_TEST_RULE: AuditRule = {
+  id: "AUDIT-042",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit recommendation builder is covered by tests",
+  description: "The dedicated audit recommendation builder should be covered by unit tests.",
+  check: () => {
+    const testPath = "tests/recommendations.test.ts";
+
+    if (!existsSync(testPath)) {
+      return fail(
+        AUDIT_RECOMMENDATION_BUILDER_TEST_RULE,
+        "Audit recommendation builder test is missing.",
+        [testPath],
+        "Add tests/recommendations.test.ts to cover buildAuditRecommendations.",
+      );
+    }
+
+    const testContent = readFileSync(testPath, "utf8");
+
+    const expectedTokens = [
+      "buildAuditRecommendations",
+      "extracts actionable finding recommendations",
+      "returns an empty list when no findings are actionable",
+      "assert.deepEqual",
+      "recommendation: \"Fix the failing audit rule.\"",
+      "priority: \"medium\"",
+      "message: \"Fix the failing audit rule.\"",
+      "[]",
+    ];
+
+    const missing = expectedTokens.filter((token) => !testContent.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_BUILDER_TEST_RULE,
+        "Audit recommendation builder test coverage is incomplete.",
+        missing,
+        "Cover recommendation extraction and empty recommendation output.",
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_BUILDER_TEST_RULE,
+      "Audit recommendation builder is covered by tests.",
+      expectedTokens,
+    );
+  },
+};
+

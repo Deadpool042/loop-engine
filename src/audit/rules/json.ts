@@ -270,24 +270,19 @@ export const JSON_RECOMMENDATIONS_CONTRACT_RULE: AuditRule = {
   title: "Audit JSON report exposes recommendations array",
   description: "The audit JSON report should expose top-level recommendations for downstream reporting.",
   check: () => {
-    const expectations = [
-      {
-        file: "src/audit/types.ts",
-        token: "recommendations: readonly AuditRecommendation[];",
-      },
-      {
-        file: "src/audit/runner.ts",
-        token: "const recommendations = findings",
-      },
-      {
-        file: "src/audit/runner.ts",
-        token: "recommendations,",
-      },
+    const typesContent = readFileSync("src/audit/types.ts", "utf8");
+    const runnerContent = readFileSync("src/audit/runner.ts", "utf8");
+    const recommendationContent = readFileSync("src/audit/recommendations.ts", "utf8");
+
+    const expectedTokens = [
+      "recommendations: readonly AuditRecommendation[];",
+      "export function buildAuditRecommendations",
+      "const recommendations = buildAuditRecommendations(findings)",
+      "recommendations,",
     ];
 
-    const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
-      .map(({ file, token }) => `${file} -> ${token}`);
+    const haystack = `${typesContent}\n${runnerContent}\n${recommendationContent}`;
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
 
     if (missing.length > 0) {
       return fail(
@@ -301,7 +296,7 @@ export const JSON_RECOMMENDATIONS_CONTRACT_RULE: AuditRule = {
     return pass(
       JSON_RECOMMENDATIONS_CONTRACT_RULE,
       "Audit JSON report exposes recommendations array.",
-      expectations.map(({ file }) => file),
+      expectedTokens,
     );
   },
 };

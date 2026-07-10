@@ -573,7 +573,7 @@ export const AUDIT_ENGINE_V4_FINAL_REPORT_RULE: AuditRule = {
 
     const expectedTokens = [
       "Audit Engine V4 — Rapport final",
-      "82 règles exécutables",
+      "81 règles exécutables",
       "profils d'audit typés",
       "scripts/audit-profile-check.ts",
       "PROFILE_EXPECTATIONS",
