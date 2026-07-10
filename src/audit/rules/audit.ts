@@ -1661,3 +1661,48 @@ export const AUDIT_PROFILE_DEFINITION_EXPOSURE_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_PROFILE_HELPERS_EXPOSURE_RULE: AuditRule = {
+  id: "AUDIT-032",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit profile helpers are exposed",
+  description: "The audit engine should expose helpers for validating and resolving audit profiles.",
+  check: () => {
+    const profilesPath = "src/audit/profiles.ts";
+
+    if (!existsSync(profilesPath)) {
+      return fail(
+        AUDIT_PROFILE_HELPERS_EXPOSURE_RULE,
+        "Audit profile helpers file is missing.",
+        [profilesPath],
+        "Create src/audit/profiles.ts with profile helper functions.",
+      );
+    }
+
+    const content = readFileSync(profilesPath, "utf8");
+    const expectedTokens = [
+      "export function isAuditProfile",
+      "value is AuditProfile",
+      "export function getAuditProfileDefinition",
+      "AUDIT_PROFILE_DEFINITIONS[profile]",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PROFILE_HELPERS_EXPOSURE_RULE,
+        "Audit profile helpers are incomplete.",
+        missing,
+        "Expose isAuditProfile and getAuditProfileDefinition in src/audit/profiles.ts.",
+      );
+    }
+
+    return pass(
+      AUDIT_PROFILE_HELPERS_EXPOSURE_RULE,
+      "Audit profile helpers are exposed.",
+      expectedTokens,
+    );
+  },
+};
+

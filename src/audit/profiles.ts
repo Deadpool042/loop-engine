@@ -31,3 +31,11 @@ export const AUDIT_PROFILE_DEFINITIONS: Record<AuditProfile, AuditProfileDefinit
     categories: ["architecture"],
   },
 };
+
+export function isAuditProfile(value: string): value is AuditProfile {
+  return value in AUDIT_PROFILE_DEFINITIONS;
+}
+
+export function getAuditProfileDefinition(profile: AuditProfile): AuditProfileDefinition {
+  return AUDIT_PROFILE_DEFINITIONS[profile];
+}
