@@ -74,6 +74,23 @@ function assertProfile(expectation: ProfileExpectation): void {
 }
 
 
+
+function assertMissingProfileValueFails(): void {
+  const result = spawnSync(
+    "pnpm",
+    ["exec", "tsx", "src/cli.ts", "audit", "--json", "--profile"],
+    { encoding: "utf8" },
+  );
+
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+
+  assert(result.status !== 0, "missing profile value should exit with a non-zero status");
+  assert(
+    output.includes("Invalid audit profile: <missing>"),
+    "missing profile value should print Invalid audit profile: <missing>",
+  );
+}
+
 function assertInvalidProfileFails(): void {
   const result = spawnSync(
     "pnpm",
@@ -95,5 +112,6 @@ for (const expectation of PROFILE_EXPECTATIONS) {
 }
 
 assertInvalidProfileFails();
+assertMissingProfileValueFails();
 
 console.log("audit profile checks passed");

@@ -2001,3 +2001,49 @@ export const AUDIT_INVALID_PROFILE_CHECK_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_MISSING_PROFILE_VALUE_CHECK_RULE: AuditRule = {
+  id: "AUDIT-039",
+  category: "architecture",
+  severity: "warning",
+  title: "Missing audit profile values are checked by CI",
+  description: "The audit profile CI check should verify that --profile without a value fails explicitly.",
+  check: () => {
+    const scriptPath = "scripts/audit-profile-check.ts";
+
+    if (!existsSync(scriptPath)) {
+      return fail(
+        AUDIT_MISSING_PROFILE_VALUE_CHECK_RULE,
+        "Audit profile check script is missing.",
+        [scriptPath],
+        "Create scripts/audit-profile-check.ts and verify missing profile value handling.",
+      );
+    }
+
+    const scriptContent = readFileSync(scriptPath, "utf8");
+
+    const expectedTokens = [
+      "assertMissingProfileValueFails",
+      "\"--profile\"",
+      "Invalid audit profile: <missing>",
+      "result.status !== 0",
+    ];
+
+    const missing = expectedTokens.filter((token) => !scriptContent.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_MISSING_PROFILE_VALUE_CHECK_RULE,
+        "Missing audit profile value handling is not checked by CI.",
+        missing,
+        "Check that --profile without a value exits non-zero and prints Invalid audit profile: <missing>.",
+      );
+    }
+
+    return pass(
+      AUDIT_MISSING_PROFILE_VALUE_CHECK_RULE,
+      "Missing audit profile values are checked by CI.",
+      expectedTokens,
+    );
+  },
+};
+
