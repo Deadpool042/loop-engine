@@ -2391,6 +2391,10 @@ export const AUDIT_SUMMARY_CONTRACT_FORMAT_RULE: AuditRule = {
       "    byCategory: Partial<Record<AuditCategory, number>>;",
       "    byPriority: Partial<Record<AuditPriority, number>>;",
       "    recommendationsByPriority: Partial<Record<AuditPriority, number>>;",
+      "    recommendations: {",
+      "      total: number;",
+      "      byPriority: Partial<Record<AuditPriority, number>>;",
+      "    };",
     ].join("\n");
 
     if (!content.includes(expectedBlock)) {
@@ -2406,6 +2410,65 @@ export const AUDIT_SUMMARY_CONTRACT_FORMAT_RULE: AuditRule = {
       AUDIT_SUMMARY_CONTRACT_FORMAT_RULE,
       "Audit summary contract fields are consistently formatted.",
       [expectedBlock],
+    );
+  },
+};
+
+export const AUDIT_RECOMMENDATION_TOTAL_SUMMARY_RULE: AuditRule = {
+  id: "AUDIT-047",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit summary exposes recommendation totals",
+  description: "Audit JSON summary should expose the total number of actionable recommendations.",
+  check: () => {
+    const typePath = "src/audit/types.ts";
+    const runnerPath = "src/audit/runner.ts";
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(typePath) || !existsSync(runnerPath) || !existsSync(jsonCheckPath)) {
+      return fail(
+        AUDIT_RECOMMENDATION_TOTAL_SUMMARY_RULE,
+        "Audit recommendation total summary implementation is missing.",
+        [typePath, runnerPath, jsonCheckPath],
+        "Expose summary.recommendations.total and validate it against the recommendations array.",
+      );
+    }
+
+    const haystack = [
+      readFileSync(typePath, "utf8"),
+      readFileSync(runnerPath, "utf8"),
+      readFileSync(jsonCheckPath, "utf8"),
+    ].join("\n");
+
+    const expectedTokens = [
+      "recommendations: {",
+      "total: number;",
+      "byPriority: Partial<Record<AuditPriority, number>>;",
+      "const recommendationsSummary = {",
+      "total: recommendations.length",
+      "recommendations: recommendationsSummary,",
+      "const summaryRecommendations = summary.recommendations",
+      "assertField(summaryRecommendations, \"total\")",
+      "assertNumber(summaryRecommendations.total, \"summary.recommendations.total\")",
+      "summary.recommendations.total must match recommendations length",
+      "summary.recommendations.byPriority.${priority} must match recommendation priority count",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_TOTAL_SUMMARY_RULE,
+        "Audit recommendation total summary is incomplete.",
+        missing,
+        "Expose and validate summary.recommendations.total.",
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_TOTAL_SUMMARY_RULE,
+      "Audit summary exposes recommendation totals.",
+      expectedTokens,
     );
   },
 };

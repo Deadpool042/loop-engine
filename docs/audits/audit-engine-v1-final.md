@@ -269,7 +269,7 @@ Chaque finding contient :
 
 ## Règles exécutables
 
-Le moteur contient 87 règles exécutables :
+Le moteur contient 88 règles exécutables :
 
 - `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
 - `JSON-005` : couverture des commandes JSON publiques par `json-check`.
@@ -328,8 +328,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 87 règles ;
-- 87 règles en pass ;
+- 88 règles ;
+- 88 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;

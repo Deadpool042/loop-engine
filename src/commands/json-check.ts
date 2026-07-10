@@ -82,6 +82,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(summary, "byCategory");
     assertField(summary, "byPriority");
     assertField(summary, "recommendationsByPriority");
+    assertField(summary, "recommendations");
     const summaryStatus = summary.status;
     assertString(summaryStatus, "summary.status");
     assertOneOf(summaryStatus, "summary.status", AUDIT_SUMMARY_STATUSES);
@@ -113,6 +114,20 @@ function validatePayload(command: readonly string[], json: unknown): void {
     for (const priority of AUDIT_PRIORITIES) {
       if (priority in recommendationsByPriority) {
         assertNumber(recommendationsByPriority[priority], `summary.recommendationsByPriority.${priority}`);
+      }
+    }
+
+    const summaryRecommendations = summary.recommendations;
+    assertRecord(summaryRecommendations);
+    assertField(summaryRecommendations, "total");
+    assertField(summaryRecommendations, "byPriority");
+    assertNumber(summaryRecommendations.total, "summary.recommendations.total");
+
+    const summaryRecommendationsByPriority = summaryRecommendations.byPriority;
+    assertRecord(summaryRecommendationsByPriority);
+    for (const priority of AUDIT_PRIORITIES) {
+      if (priority in summaryRecommendationsByPriority) {
+        assertNumber(summaryRecommendationsByPriority[priority], `summary.recommendations.byPriority.${priority}`);
       }
     }
     assertField(json, "findings");
@@ -267,6 +282,10 @@ function validatePayload(command: readonly string[], json: unknown): void {
       assertOneOf(recommendationPriority, "recommendation.priority", AUDIT_PRIORITIES);
     }
 
+    if (summaryRecommendations.total !== recommendations.length) {
+      throw new Error("summary.recommendations.total must match recommendations length");
+    }
+
     const recommendationPriorityCounts: Record<string, number> = {};
     for (const recommendationValue of recommendations) {
       assertRecord(recommendationValue);
@@ -280,10 +299,19 @@ function validatePayload(command: readonly string[], json: unknown): void {
       const actualRecommendationPriorityCount =
         priority in recommendationsByPriority ? recommendationsByPriority[priority] : 0;
       assertNumber(actualRecommendationPriorityCount, `summary.recommendationsByPriority.${priority}`);
+
+      const actualSummaryRecommendationPriorityCount =
+        priority in summaryRecommendationsByPriority ? summaryRecommendationsByPriority[priority] : 0;
+      assertNumber(actualSummaryRecommendationPriorityCount, `summary.recommendations.byPriority.${priority}`);
+
       const expectedRecommendationPriorityCount = recommendationPriorityCounts[priority] ?? 0;
 
       if (actualRecommendationPriorityCount !== expectedRecommendationPriorityCount) {
         throw new Error(`summary.recommendationsByPriority.${priority} must match recommendation priority count`);
+      }
+
+      if (actualSummaryRecommendationPriorityCount !== expectedRecommendationPriorityCount) {
+        throw new Error(`summary.recommendations.byPriority.${priority} must match recommendation priority count`);
       }
     }
   } else if (commandName === "summary") {

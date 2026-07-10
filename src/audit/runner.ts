@@ -36,6 +36,10 @@ export function runAudit(options: AuditRunOptions = {}): AuditReport {
   );
   const recommendations = buildAuditRecommendations(findings);
   const recommendationsByPriority = countAuditRecommendationsByPriority(recommendations);
+  const recommendationsSummary = {
+    total: recommendations.length,
+    byPriority: recommendationsByPriority,
+  };
 
   return {
     schemaVersion: 1,
@@ -51,6 +55,7 @@ export function runAudit(options: AuditRunOptions = {}): AuditReport {
       byCategory,
       byPriority,
       recommendationsByPriority,
+      recommendations: recommendationsSummary,
     },
     findings,
     recommendations,

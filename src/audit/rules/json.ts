@@ -110,6 +110,9 @@ export const AUDIT_JSON_SUMMARY_CONTRACT_RULE: AuditRule = {
       "byCategory: Partial<Record<AuditCategory, number>>;",
       "byPriority: Partial<Record<AuditPriority, number>>;",
       "recommendationsByPriority: Partial<Record<AuditPriority, number>>;",
+      "recommendations: {",
+      "total: number;",
+      "byPriority: Partial<Record<AuditPriority, number>>;",
       "recommendations: readonly AuditRecommendation[];",
     ];
 
@@ -380,6 +383,7 @@ export const JSON_AUDIT_SUMMARY_FIELD_ASSERTION_RULE: AuditRule = {
       "assertField(summary, \"byCategory\")",
       "assertField(summary, \"byPriority\")",
       "assertField(summary, \"recommendationsByPriority\")",
+      "assertField(summary, \"recommendations\")",
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
@@ -824,6 +828,9 @@ export const JSON_AUDIT_SUMMARY_GROUPED_COUNT_ASSERTION_RULE: AuditRule = {
       "assertNumber(byCategory[category], `summary.byCategory.${category}`)",
       "const byPriority = summary.byPriority",
       "const recommendationsByPriority = summary.recommendationsByPriority",
+      "const summaryRecommendations = summary.recommendations",
+      "assertField(summaryRecommendations, \"total\")",
+      "assertNumber(summaryRecommendations.total, \"summary.recommendations.total\")",
       "assertRecord(byPriority)",
       "for (const priority of AUDIT_PRIORITIES)",
       "assertNumber(byPriority[priority], `summary.byPriority.${priority}`)",
