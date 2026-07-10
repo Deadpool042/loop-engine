@@ -30,6 +30,7 @@ export function printAuditReport(): AuditReport {
   terminal.info(`Status: ${report.summary.status}`);
   terminal.info(`Total: ${report.summary.total}`);
   terminal.info(`Score: ${report.summary.score}`);
+  terminal.info(`Recommendations: ${report.summary.recommendations.total}`);
   terminal.success(`Pass: ${report.summary.pass}`);
 
   if (report.summary.warning > 0) {
