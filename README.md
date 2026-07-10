@@ -145,3 +145,7 @@ Le rapport JSON expose notamment :
 - `recommendations`.
 
 Le script `pnpm run ci` exécute la validation générale puis l'audit strict. Il est utilisé par le workflow GitHub Actions du dépôt.
+
+## Voir aussi
+
+- [Audit Engine V3 — Rapport final](docs/audits/audit-engine-v3-final.md)
