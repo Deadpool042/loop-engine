@@ -148,6 +148,8 @@ Le script `pnpm run ci` exécute la validation générale puis l'audit strict. I
 
 ## Voir aussi
 
+- [Audit Engine V4 — Rapport final](docs/audits/audit-engine-v4-final.md)
+
 - [Audit Engine V3 — Rapport final](docs/audits/audit-engine-v3-final.md)
 
 

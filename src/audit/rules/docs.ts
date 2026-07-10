@@ -548,3 +548,59 @@ export const AUDIT_PROFILE_CHECK_STRUCTURE_DOCUMENTATION_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_ENGINE_V4_FINAL_REPORT_RULE: AuditRule = {
+  id: "DOCS-011",
+  category: "docs",
+  severity: "warning",
+  title: "Audit Engine V4 final report is documented",
+  description: "The repository should document the final Audit Engine V4 report and link it from the README.",
+  check: () => {
+    const reportPath = "docs/audits/audit-engine-v4-final.md";
+    const readmePath = "README.md";
+
+    if (!existsSync(reportPath) || !existsSync(readmePath)) {
+      return fail(
+        AUDIT_ENGINE_V4_FINAL_REPORT_RULE,
+        "Audit Engine V4 final report or README link target is missing.",
+        [reportPath, readmePath],
+        "Create docs/audits/audit-engine-v4-final.md and link it from README.md.",
+      );
+    }
+
+    const reportContent = readFileSync(reportPath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+    const haystack = `${reportContent}\n${readmeContent}`;
+
+    const expectedTokens = [
+      "Audit Engine V4 — Rapport final",
+      "81 règles exécutables",
+      "profils d'audit typés",
+      "scripts/audit-profile-check.ts",
+      "PROFILE_EXPECTATIONS",
+      "FAILURE_EXPECTATIONS",
+      "AUDIT-030",
+      "AUDIT-040",
+      "DOCS-006",
+      "DOCS-011",
+      "docs/audits/audit-engine-v4-final.md",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_ENGINE_V4_FINAL_REPORT_RULE,
+        "Audit Engine V4 final report documentation is incomplete.",
+        missing,
+        "Document the V4 final report, rule range, profile checks, and README link.",
+      );
+    }
+
+    return pass(
+      AUDIT_ENGINE_V4_FINAL_REPORT_RULE,
+      "Audit Engine V4 final report is documented.",
+      expectedTokens,
+    );
+  },
+};
+
