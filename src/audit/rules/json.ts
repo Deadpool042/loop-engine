@@ -1368,6 +1368,66 @@ export const JSON_AUDIT_RECOMMENDATION_ACTIONABLE_REFERENCE_ASSERTION_RULE: Audi
   },
 };
 
+export const JSON_AUDIT_NESTED_RECOMMENDATION_SUMMARY_CONTRACT_RULE: AuditRule = {
+  id: "JSON-033",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts nested recommendation summary contract",
+  description: "json-check should assert the nested recommendation summary contract and its synchronization with the legacy flat field.",
+  check: () => {
+    const typesPath = "src/audit/types.ts";
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(typesPath) || !existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_NESTED_RECOMMENDATION_SUMMARY_CONTRACT_RULE,
+        "Nested recommendation summary contract files are missing.",
+        [typesPath, jsonCheckPath],
+        "Restore src/audit/types.ts and src/commands/json-check.ts so the nested recommendation summary contract can be verified.",
+      );
+    }
+
+    const content = [
+      readFileSync(typesPath, "utf8"),
+      readFileSync(jsonCheckPath, "utf8"),
+    ].join("\n");
+
+    const expectedTokens = [
+      "recommendations: {",
+      "total: number;",
+      "byPriority: Partial<Record<AuditPriority, number>>;",
+      "const summaryRecommendations = summary.recommendations",
+      "assertField(summaryRecommendations, \"total\")",
+      "assertNumber(summaryRecommendations.total, \"summary.recommendations.total\")",
+      "assertField(summaryRecommendations, \"byPriority\")",
+      "const summaryRecommendationsByPriority = summaryRecommendations.byPriority",
+      "assertRecord(summaryRecommendationsByPriority)",
+      "summary.recommendations.byPriority.${priority} must match recommendation priority count",
+      "summary.recommendationsByPriority.${priority} must match recommendation priority count",
+      "priority in summaryRecommendationsByPriority ? summaryRecommendationsByPriority[priority] : 0",
+      "priority in recommendationsByPriority ? recommendationsByPriority[priority] : 0",
+      "summary.recommendations.byPriority.${priority}",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_NESTED_RECOMMENDATION_SUMMARY_CONTRACT_RULE,
+        "Nested recommendation summary contract is incomplete.",
+        missing,
+        "Ensure json-check asserts summary.recommendations.total, summary.recommendations.byPriority, and the legacy/canonical synchronization.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_NESTED_RECOMMENDATION_SUMMARY_CONTRACT_RULE,
+      "json-check asserts the nested recommendation summary contract.",
+      expectedTokens,
+    );
+  },
+};
+
 
 
 
