@@ -194,3 +194,12 @@ Les profils disponibles sont :
 - `architecture`
 
 Chaque profil sélectionne un sous-ensemble de règles selon leurs catégories. Le rapport conserve le même contrat de sortie, y compris en JSON.
+
+
+## Contrôle CI des profils
+
+Le script `pnpm run audit:profiles` exécute `scripts/audit-profile-check.ts`.
+
+Il vérifie explicitement que les profils `json`, `docs` et `architecture` ne retournent que les catégories attendues.
+
+Ce contrôle complète `audit --json --strict` dans `pnpm run ci`.

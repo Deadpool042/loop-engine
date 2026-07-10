@@ -174,3 +174,12 @@ Profils disponibles :
 - `architecture`
 
 Les profils filtrent les règles exécutées par catégorie, sans modifier le format du rapport.
+
+
+### Contrôle CI des profils d'audit
+
+Le script `pnpm run audit:profiles` exécute `scripts/audit-profile-check.ts`.
+
+Il vérifie que les profils `json`, `docs` et `architecture` filtrent bien les règles par catégorie.
+
+Ce contrôle est inclus dans `pnpm run ci`.

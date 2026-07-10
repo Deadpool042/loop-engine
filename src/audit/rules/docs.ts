@@ -397,3 +397,52 @@ export const ARCHITECTURE_AUDIT_PROFILE_DOCUMENTATION_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_PROFILE_CI_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-008",
+  category: "docs",
+  severity: "warning",
+  title: "Docs document audit profile CI checks",
+  description: "The README and architecture docs should document the audit profile CI check script.",
+  check: () => {
+    const readmePath = "README.md";
+    const architecturePath = "docs/architecture/audit-engine.md";
+
+    if (!existsSync(readmePath) || !existsSync(architecturePath)) {
+      return fail(
+        AUDIT_PROFILE_CI_DOCUMENTATION_RULE,
+        "Audit profile CI documentation files are missing.",
+        [readmePath, architecturePath],
+        "Document pnpm run audit:profiles in README.md and docs/architecture/audit-engine.md.",
+      );
+    }
+
+    const readmeContent = readFileSync(readmePath, "utf8");
+    const architectureContent = readFileSync(architecturePath, "utf8");
+    const haystack = `${readmeContent}\n${architectureContent}`;
+
+    const expectedTokens = [
+      "pnpm run audit:profiles",
+      "scripts/audit-profile-check.ts",
+      "profils `json`, `docs` et `architecture`",
+      "pnpm run ci",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PROFILE_CI_DOCUMENTATION_RULE,
+        "Audit profile CI documentation is incomplete.",
+        missing,
+        "Document the audit profile CI check script and its CI integration.",
+      );
+    }
+
+    return pass(
+      AUDIT_PROFILE_CI_DOCUMENTATION_RULE,
+      "Docs document audit profile CI checks.",
+      expectedTokens,
+    );
+  },
+};
+
