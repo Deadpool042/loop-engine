@@ -109,9 +109,14 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(json, "findings");
     const findings = json.findings;
     assertArray(findings);
+    const findingRuleIds = new Set<string>();
     for (const findingValue of findings) {
       assertRecord(findingValue);
       assertString(findingValue.ruleId, "finding.ruleId");
+      if (findingRuleIds.has(findingValue.ruleId)) {
+        throw new Error(`finding.ruleId must be unique: ${findingValue.ruleId}`);
+      }
+      findingRuleIds.add(findingValue.ruleId);
       assertString(findingValue.message, "finding.message");
 
       const findingCategoryValue = findingValue.category;

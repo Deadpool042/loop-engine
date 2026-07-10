@@ -1182,6 +1182,52 @@ export const JSON_AUDIT_EVERY_RECOMMENDATION_VALUE_ASSERTION_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_FINDING_RULE_ID_UNIQUENESS_ASSERTION_RULE: AuditRule = {
+  id: "JSON-029",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit finding ruleId uniqueness",
+  description: "json-check should assert that every audit finding ruleId is unique.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_FINDING_RULE_ID_UNIQUENESS_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so audit finding ruleId uniqueness can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const findingRuleIds = new Set<string>()",
+      "findingRuleIds.has(findingValue.ruleId)",
+      "finding.ruleId must be unique",
+      "findingRuleIds.add(findingValue.ruleId)",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_FINDING_RULE_ID_UNIQUENESS_ASSERTION_RULE,
+        "json-check does not assert audit finding ruleId uniqueness.",
+        missing,
+        "Ensure json-check rejects duplicate finding.ruleId values.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_FINDING_RULE_ID_UNIQUENESS_ASSERTION_RULE,
+      "json-check asserts audit finding ruleId uniqueness.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 
