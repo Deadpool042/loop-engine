@@ -1900,3 +1900,56 @@ export const AUDIT_PROFILE_CHECK_SCRIPT_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_PROFILE_CHECK_ALL_PUBLIC_PROFILES_RULE: AuditRule = {
+  id: "AUDIT-037",
+  category: "architecture",
+  severity: "warning",
+  title: "All public audit profiles are checked by CI",
+  description: "The audit profile CI check should cover every public audit profile.",
+  check: () => {
+    const scriptPath = "scripts/audit-profile-check.ts";
+
+    if (!existsSync(scriptPath)) {
+      return fail(
+        AUDIT_PROFILE_CHECK_ALL_PUBLIC_PROFILES_RULE,
+        "Audit profile check script is missing.",
+        [scriptPath],
+        "Create scripts/audit-profile-check.ts and cover every public audit profile.",
+      );
+    }
+
+    const scriptContent = readFileSync(scriptPath, "utf8");
+
+    const expectedTokens = [
+      "PROFILE_EXPECTATIONS",
+      "profile: \"quick\"",
+      "profile: \"strict\"",
+      "profile: \"release\"",
+      "profile: \"json\"",
+      "profile: \"docs\"",
+      "profile: \"architecture\"",
+      "categories: [\"architecture\", \"cli\"]",
+      "categories: [\"json\", \"cli\", \"docs\", \"architecture\"]",
+      "\"--profile\"",
+      "finding.category",
+    ];
+
+    const missing = expectedTokens.filter((token) => !scriptContent.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PROFILE_CHECK_ALL_PUBLIC_PROFILES_RULE,
+        "Audit profile CI check does not cover every public profile.",
+        missing,
+        "Check quick, strict, release, json, docs, and architecture profiles.",
+      );
+    }
+
+    return pass(
+      AUDIT_PROFILE_CHECK_ALL_PUBLIC_PROFILES_RULE,
+      "All public audit profiles are checked by CI.",
+      expectedTokens,
+    );
+  },
+};
+

@@ -180,6 +180,6 @@ Les profils filtrent les règles exécutées par catégorie, sans modifier le fo
 
 Le script `pnpm run audit:profiles` exécute `scripts/audit-profile-check.ts`.
 
-Il vérifie que les profils `json`, `docs` et `architecture` filtrent bien les règles par catégorie.
+Il vérifie que les profils `quick`, `strict`, `release`, `json`, `docs` et `architecture` filtrent bien les règles par catégorie.
 
 Ce contrôle est inclus dans `pnpm run ci`.

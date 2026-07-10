@@ -17,6 +17,9 @@ type ProfileExpectation = {
 };
 
 const PROFILE_EXPECTATIONS: readonly ProfileExpectation[] = [
+  { profile: "quick", categories: ["architecture", "cli"] },
+  { profile: "strict", categories: ["json", "cli", "docs", "architecture"] },
+  { profile: "release", categories: ["json", "cli", "docs", "architecture"] },
   { profile: "json", categories: ["json"] },
   { profile: "docs", categories: ["docs"] },
   { profile: "architecture", categories: ["architecture"] },

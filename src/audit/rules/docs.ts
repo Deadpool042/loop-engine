@@ -423,7 +423,7 @@ export const AUDIT_PROFILE_CI_DOCUMENTATION_RULE: AuditRule = {
     const expectedTokens = [
       "pnpm run audit:profiles",
       "scripts/audit-profile-check.ts",
-      "profils `json`, `docs` et `architecture`",
+      "profils `quick`, `strict`, `release`, `json`, `docs` et `architecture`",
       "pnpm run ci",
     ];
 

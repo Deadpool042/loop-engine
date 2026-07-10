@@ -200,6 +200,6 @@ Chaque profil sélectionne un sous-ensemble de règles selon leurs catégories. 
 
 Le script `pnpm run audit:profiles` exécute `scripts/audit-profile-check.ts`.
 
-Il vérifie explicitement que les profils `json`, `docs` et `architecture` ne retournent que les catégories attendues.
+Il vérifie explicitement que les profils `quick`, `strict`, `release`, `json`, `docs` et `architecture` ne retournent que les catégories attendues.
 
 Ce contrôle complète `audit --json --strict` dans `pnpm run ci`.
