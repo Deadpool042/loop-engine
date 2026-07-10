@@ -1272,6 +1272,52 @@ export const JSON_AUDIT_RECOMMENDATION_RULE_ID_UNIQUENESS_ASSERTION_RULE: AuditR
   },
 };
 
+export const JSON_AUDIT_RECOMMENDATION_RULE_ID_REFERENCE_ASSERTION_RULE: AuditRule = {
+  id: "JSON-031",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit recommendation ruleId references findings",
+  description: "json-check should assert that every audit recommendation ruleId references an existing finding ruleId.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_RULE_ID_REFERENCE_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so audit recommendation references can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const findingRuleIds = new Set<string>()",
+      "findingRuleIds.add(findingValue.ruleId)",
+      "!findingRuleIds.has(recommendationValue.ruleId)",
+      "recommendation.ruleId must reference an existing finding.ruleId",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_RULE_ID_REFERENCE_ASSERTION_RULE,
+        "json-check does not assert audit recommendation ruleId references findings.",
+        missing,
+        "Ensure json-check rejects recommendation.ruleId values that do not reference an existing finding.ruleId.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_RECOMMENDATION_RULE_ID_REFERENCE_ASSERTION_RULE,
+      "json-check asserts audit recommendation ruleId references findings.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 

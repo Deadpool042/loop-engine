@@ -225,6 +225,9 @@ function validatePayload(command: readonly string[], json: unknown): void {
     for (const recommendationValue of recommendations) {
       assertRecord(recommendationValue);
       assertString(recommendationValue.ruleId, "recommendation.ruleId");
+      if (!findingRuleIds.has(recommendationValue.ruleId)) {
+        throw new Error(`recommendation.ruleId must reference an existing finding.ruleId: ${recommendationValue.ruleId}`);
+      }
       if (recommendationRuleIds.has(recommendationValue.ruleId)) {
         throw new Error(`recommendation.ruleId must be unique: ${recommendationValue.ruleId}`);
       }
