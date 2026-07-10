@@ -857,12 +857,17 @@ export const AUDIT_STABLE_TAGS_DOCUMENTATION_RULE: AuditRule = {
 
     const expectedTokens = [
       "Source de vérité",
-      "Dernier tag stable global actuel : `audit-engine-v6.0`",
+      "Dernier tag stable global actuel : `audit-engine-v6.1.1`",
+      "Tag supersédé : `audit-engine-v6.1`",
+      "`audit-engine-v6.1.1` inclut `docs/audits/stable-tags.md`",
+      "`audit-engine-v6.0` reste le tag de démarrage V6",
       "Tag final stable du cycle V5 : `audit-engine-v5.14.1`",
       "Tag supersédé : `audit-engine-v5.14`",
       "Ne pas force-push.",
       "Ne pas supprimer les tags supersédés.",
       "Publier un tag correctif `.1` si une correction est nécessaire.",
+      "audit-engine-v6.1.1",
+      "audit-engine-v6.1",
       "audit-engine-v5.14.1",
       "audit-engine-v5.14",
       "audit-engine-v6.0",
