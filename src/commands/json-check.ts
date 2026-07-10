@@ -110,6 +110,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
     const findings = json.findings;
     assertArray(findings);
     const findingRuleIds = new Set<string>();
+    const findingsByRuleId = new Map<string, Record<string, unknown>>();
     for (const findingValue of findings) {
       assertRecord(findingValue);
       assertString(findingValue.ruleId, "finding.ruleId");
@@ -117,6 +118,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
         throw new Error(`finding.ruleId must be unique: ${findingValue.ruleId}`);
       }
       findingRuleIds.add(findingValue.ruleId);
+      findingsByRuleId.set(findingValue.ruleId, findingValue);
       assertString(findingValue.message, "finding.message");
 
       const findingCategoryValue = findingValue.category;
@@ -227,6 +229,10 @@ function validatePayload(command: readonly string[], json: unknown): void {
       assertString(recommendationValue.ruleId, "recommendation.ruleId");
       if (!findingRuleIds.has(recommendationValue.ruleId)) {
         throw new Error(`recommendation.ruleId must reference an existing finding.ruleId: ${recommendationValue.ruleId}`);
+      }
+      const referencedFinding = findingsByRuleId.get(recommendationValue.ruleId);
+      if (referencedFinding?.status === "pass") {
+        throw new Error(`recommendation.ruleId must reference an actionable finding.ruleId: ${recommendationValue.ruleId}`);
       }
       if (recommendationRuleIds.has(recommendationValue.ruleId)) {
         throw new Error(`recommendation.ruleId must be unique: ${recommendationValue.ruleId}`);

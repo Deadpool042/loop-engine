@@ -1317,6 +1317,53 @@ export const JSON_AUDIT_RECOMMENDATION_RULE_ID_REFERENCE_ASSERTION_RULE: AuditRu
   },
 };
 
+export const JSON_AUDIT_RECOMMENDATION_ACTIONABLE_REFERENCE_ASSERTION_RULE: AuditRule = {
+  id: "JSON-032",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit recommendations reference actionable findings",
+  description: "json-check should assert that audit recommendations do not reference passed findings.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_ACTIONABLE_REFERENCE_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so actionable recommendation references can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const findingsByRuleId = new Map<string, Record<string, unknown>>()",
+      "findingsByRuleId.set(findingValue.ruleId, findingValue)",
+      "const referencedFinding = findingsByRuleId.get(recommendationValue.ruleId)",
+      "referencedFinding?.status === \"pass\"",
+      "recommendation.ruleId must reference an actionable finding.ruleId",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_ACTIONABLE_REFERENCE_ASSERTION_RULE,
+        "json-check does not assert actionable audit recommendation references.",
+        missing,
+        "Ensure json-check rejects recommendations that reference passed findings.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_RECOMMENDATION_ACTIONABLE_REFERENCE_ASSERTION_RULE,
+      "json-check asserts audit recommendations reference actionable findings.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 
