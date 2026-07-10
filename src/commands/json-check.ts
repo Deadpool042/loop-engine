@@ -81,6 +81,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(summary, "score");
     assertField(summary, "byCategory");
     assertField(summary, "byPriority");
+    assertField(summary, "recommendationsByPriority");
     const summaryStatus = summary.status;
     assertString(summaryStatus, "summary.status");
     assertOneOf(summaryStatus, "summary.status", AUDIT_SUMMARY_STATUSES);
@@ -104,6 +105,14 @@ function validatePayload(command: readonly string[], json: unknown): void {
     for (const priority of AUDIT_PRIORITIES) {
       if (priority in byPriority) {
         assertNumber(byPriority[priority], `summary.byPriority.${priority}`);
+      }
+    }
+
+    const recommendationsByPriority = summary.recommendationsByPriority;
+    assertRecord(recommendationsByPriority);
+    for (const priority of AUDIT_PRIORITIES) {
+      if (priority in recommendationsByPriority) {
+        assertNumber(recommendationsByPriority[priority], `summary.recommendationsByPriority.${priority}`);
       }
     }
     assertField(json, "findings");
@@ -256,6 +265,26 @@ function validatePayload(command: readonly string[], json: unknown): void {
       const recommendationPriority = recommendation.priority;
       assertString(recommendationPriority, "recommendation.priority");
       assertOneOf(recommendationPriority, "recommendation.priority", AUDIT_PRIORITIES);
+    }
+
+    const recommendationPriorityCounts: Record<string, number> = {};
+    for (const recommendationValue of recommendations) {
+      assertRecord(recommendationValue);
+      const priority = recommendationValue.priority;
+      assertString(priority, "recommendation.priority");
+      assertOneOf(priority, "recommendation.priority", AUDIT_PRIORITIES);
+      recommendationPriorityCounts[priority] = (recommendationPriorityCounts[priority] ?? 0) + 1;
+    }
+
+    for (const priority of AUDIT_PRIORITIES) {
+      const actualRecommendationPriorityCount =
+        priority in recommendationsByPriority ? recommendationsByPriority[priority] : 0;
+      assertNumber(actualRecommendationPriorityCount, `summary.recommendationsByPriority.${priority}`);
+      const expectedRecommendationPriorityCount = recommendationPriorityCounts[priority] ?? 0;
+
+      if (actualRecommendationPriorityCount !== expectedRecommendationPriorityCount) {
+        throw new Error(`summary.recommendationsByPriority.${priority} must match recommendation priority count`);
+      }
     }
   } else if (commandName === "summary") {
     assertField(json, "projects");

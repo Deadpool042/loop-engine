@@ -2311,3 +2311,58 @@ export const AUDIT_RECOMMENDATION_PRIORITY_COUNT_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_RECOMMENDATION_PRIORITY_SUMMARY_RULE: AuditRule = {
+  id: "AUDIT-045",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit summary exposes recommendation counts by priority",
+  description: "Audit JSON summary should expose recommendation counts grouped by priority.",
+  check: () => {
+    const typePath = "src/audit/types.ts";
+    const runnerPath = "src/audit/runner.ts";
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(typePath) || !existsSync(runnerPath) || !existsSync(jsonCheckPath)) {
+      return fail(
+        AUDIT_RECOMMENDATION_PRIORITY_SUMMARY_RULE,
+        "Audit recommendation priority summary implementation is missing.",
+        [typePath, runnerPath, jsonCheckPath],
+        "Expose summary.recommendationsByPriority and validate it in json-check.",
+      );
+    }
+
+    const haystack = [
+      readFileSync(typePath, "utf8"),
+      readFileSync(runnerPath, "utf8"),
+      readFileSync(jsonCheckPath, "utf8"),
+    ].join("\n");
+
+    const expectedTokens = [
+      "recommendationsByPriority: Partial<Record<AuditPriority, number>>;",
+      "countAuditRecommendationsByPriority(recommendations)",
+      "recommendationsByPriority,",
+      "assertField(summary, \"recommendationsByPriority\")",
+      "const recommendationsByPriority = summary.recommendationsByPriority",
+      "assertRecord(recommendationsByPriority)",
+      "summary.recommendationsByPriority.${priority} must match recommendation priority count",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_PRIORITY_SUMMARY_RULE,
+        "Audit recommendation priority summary is incomplete.",
+        missing,
+        "Expose recommendationsByPriority in the audit summary and validate it against recommendations.",
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_PRIORITY_SUMMARY_RULE,
+      "Audit summary exposes recommendation counts by priority.",
+      expectedTokens,
+    );
+  },
+};
+
