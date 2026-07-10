@@ -1082,6 +1082,60 @@ export const JSON_AUDIT_SUMMARY_PRIORITY_COUNT_CONSISTENCY_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_EVERY_FINDING_VALUE_ASSERTION_RULE: AuditRule = {
+  id: "JSON-027",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts every audit finding value",
+  description: "json-check should assert value types and enum values for every audit finding.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_EVERY_FINDING_VALUE_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so every audit finding value can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "for (const findingValue of findings)",
+      "assertRecord(findingValue)",
+      "assertString(findingValue.ruleId, \"finding.ruleId\")",
+      "assertString(findingValue.message, \"finding.message\")",
+      "const findingCategoryValue = findingValue.category",
+      "assertOneOf(findingCategoryValue, \"finding.category\", AUDIT_CATEGORIES)",
+      "const findingSeverityValue = findingValue.severity",
+      "assertOneOf(findingSeverityValue, \"finding.severity\", AUDIT_SEVERITIES)",
+      "const findingStatusValue = findingValue.status",
+      "assertOneOf(findingStatusValue, \"finding.status\", AUDIT_FINDING_STATUSES)",
+      "const findingPriorityValue = findingValue.priority",
+      "assertOneOf(findingPriorityValue, \"finding.priority\", AUDIT_PRIORITIES)",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_EVERY_FINDING_VALUE_ASSERTION_RULE,
+        "json-check does not assert every audit finding value.",
+        missing,
+        "Ensure json-check validates every finding instead of only the first finding.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_EVERY_FINDING_VALUE_ASSERTION_RULE,
+      "json-check asserts every audit finding value.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 

@@ -109,6 +109,27 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(json, "findings");
     const findings = json.findings;
     assertArray(findings);
+    for (const findingValue of findings) {
+      assertRecord(findingValue);
+      assertString(findingValue.ruleId, "finding.ruleId");
+      assertString(findingValue.message, "finding.message");
+
+      const findingCategoryValue = findingValue.category;
+      assertString(findingCategoryValue, "finding.category");
+      assertOneOf(findingCategoryValue, "finding.category", AUDIT_CATEGORIES);
+
+      const findingSeverityValue = findingValue.severity;
+      assertString(findingSeverityValue, "finding.severity");
+      assertOneOf(findingSeverityValue, "finding.severity", AUDIT_SEVERITIES);
+
+      const findingStatusValue = findingValue.status;
+      assertString(findingStatusValue, "finding.status");
+      assertOneOf(findingStatusValue, "finding.status", AUDIT_FINDING_STATUSES);
+
+      const findingPriorityValue = findingValue.priority;
+      assertString(findingPriorityValue, "finding.priority");
+      assertOneOf(findingPriorityValue, "finding.priority", AUDIT_PRIORITIES);
+    }
     const summaryCountTotal = summary.pass + summary.warning + summary.fail + summary.skipped;
     if (summary.total !== findings.length) {
       throw new Error("summary.total must match findings length");
