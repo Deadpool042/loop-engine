@@ -705,3 +705,71 @@ export const AUDIT_FINAL_REPORT_RECOMMENDATION_DEPRECATION_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_ENGINE_V5_FINAL_REPORT_RULE: AuditRule = {
+  id: "DOCS-014",
+  category: "docs",
+  severity: "warning",
+  title: "Audit Engine V5 final report is documented",
+  description: "The repository should document the dedicated Audit Engine V5 final report and link it from the audits README.",
+  check: () => {
+    const reportPath = "docs/audits/audit-engine-v5-final.md";
+    const readmePath = "docs/audits/README.md";
+
+    if (!existsSync(reportPath) || !existsSync(readmePath)) {
+      return fail(
+        AUDIT_ENGINE_V5_FINAL_REPORT_RULE,
+        "Audit Engine V5 final report or audits README is missing.",
+        [reportPath, readmePath],
+        "Create docs/audits/audit-engine-v5-final.md and list it in docs/audits/README.md.",
+      );
+    }
+
+    const reportContent = readFileSync(reportPath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+    const haystack = `${reportContent}
+${readmeContent}`;
+
+    const expectedTokens = [
+      "Audit Engine V5 — Rapport final",
+      "V5.14",
+      "95 règles exécutables",
+      "95 règles en pass",
+      "score 100",
+      "V5.8 / V5.8.1",
+      "V5.13",
+      "summary.recommendations.total",
+      "summary.recommendations.byPriority",
+      "summary.recommendationsByPriority",
+      "legacy / déprécié",
+      "compatibilité descendante",
+      "breaking change explicite",
+      "json-check",
+      "test de non-régression",
+      "JSON-033",
+      "AUDIT-050",
+      "AUDIT-051",
+      "DOCS-012",
+      "DOCS-013",
+      "AUDIT-016",
+      "audit-engine-v5-final.md",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_ENGINE_V5_FINAL_REPORT_RULE,
+        "Audit Engine V5 final report documentation is incomplete.",
+        missing,
+        "Document the V5 final report, the recommendation contract, the key rules, and the README link.",
+      );
+    }
+
+    return pass(
+      AUDIT_ENGINE_V5_FINAL_REPORT_RULE,
+      "Audit Engine V5 final report is documented.",
+      expectedTokens,
+    );
+  },
+};
+
