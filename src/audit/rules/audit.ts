@@ -2573,3 +2573,54 @@ export const AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE: AuditR
   },
 };
 
+export const AUDIT_RECOMMENDATION_SUMMARY_SYNC_ASSERTION_RULE: AuditRule = {
+  id: "AUDIT-050",
+  category: "architecture",
+  severity: "warning",
+  title: "Recommendation summary sync is asserted at runtime",
+  description: "The JSON check should assert that the legacy summary.recommendationsByPriority and canonical summary.recommendations.byPriority fields remain synchronized.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        AUDIT_RECOMMENDATION_SUMMARY_SYNC_ASSERTION_RULE,
+        "JSON check file is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+
+    const expectedTokens = [
+      "const actualRecommendationPriorityCount",
+      "priority in recommendationsByPriority ? recommendationsByPriority[priority] : 0",
+      "const actualSummaryRecommendationPriorityCount",
+      "priority in summaryRecommendationsByPriority ? summaryRecommendationsByPriority[priority] : 0",
+      "const expectedRecommendationPriorityCount = recommendationPriorityCounts[priority] ?? 0",
+      "if (actualRecommendationPriorityCount !== expectedRecommendationPriorityCount)",
+      "if (actualSummaryRecommendationPriorityCount !== expectedRecommendationPriorityCount)",
+      "summary.recommendationsByPriority.${priority} must match recommendation priority count",
+      "summary.recommendations.byPriority.${priority} must match recommendation priority count",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_SUMMARY_SYNC_ASSERTION_RULE,
+        "Recommendation summary sync assertion is incomplete.",
+        missing,
+        "Add runtime validation in json-check.ts to assert both fields stay synchronized with the recommendations array.",
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_SUMMARY_SYNC_ASSERTION_RULE,
+      "Recommendation summary sync is asserted at runtime.",
+      expectedTokens,
+    );
+  },
+};
+
