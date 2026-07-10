@@ -1,3 +1,14 @@
+export const AUDIT_PROFILES = [
+  "quick",
+  "strict",
+  "release",
+  "docs",
+  "json",
+  "architecture",
+] as const;
+
+export type AuditProfile = (typeof AUDIT_PROFILES)[number];
+
 export type AuditCategory =
   | "architecture"
   | "duplication"

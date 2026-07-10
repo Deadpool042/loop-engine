@@ -1560,3 +1560,53 @@ export const AUDIT_RULE_ID_SEQUENCE_RULE: AuditRule = {
     );
   },
 };
+
+export const AUDIT_PROFILE_TYPE_EXPOSURE_RULE: AuditRule = {
+  id: "AUDIT-030",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit profiles are typed",
+  description: "The audit engine should expose typed audit profiles for profile-based execution.",
+  check: () => {
+    const typesPath = "src/audit/types.ts";
+
+    if (!existsSync(typesPath)) {
+      return fail(
+        AUDIT_PROFILE_TYPE_EXPOSURE_RULE,
+        "Audit types file is missing.",
+        [typesPath],
+        "Restore src/audit/types.ts so audit profiles can be typed.",
+      );
+    }
+
+    const content = readFileSync(typesPath, "utf8");
+    const expectedTokens = [
+      "export const AUDIT_PROFILES",
+      "export type AuditProfile",
+      "\"quick\"",
+      "\"strict\"",
+      "\"release\"",
+      "\"docs\"",
+      "\"json\"",
+      "\"architecture\"",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PROFILE_TYPE_EXPOSURE_RULE,
+        "Audit profiles are not fully typed.",
+        missing,
+        "Expose AUDIT_PROFILES and AuditProfile in src/audit/types.ts.",
+      );
+    }
+
+    return pass(
+      AUDIT_PROFILE_TYPE_EXPOSURE_RULE,
+      "Audit profiles are typed.",
+      expectedTokens,
+    );
+  },
+};
+
