@@ -213,3 +213,19 @@ Le parsing de `--profile` distingue deux erreurs publiques :
 - profil manquant : `Invalid audit profile: <missing>`.
 
 Dans les deux cas, le CLI retourne un code de sortie non nul.
+
+
+## Structure du contrôle des profils d'audit
+
+Le script `scripts/audit-profile-check.ts` est organisé autour de deux tables de scénarios :
+
+- `PROFILE_EXPECTATIONS` décrit les profils valides et les catégories attendues ;
+- `FAILURE_EXPECTATIONS` décrit les cas d'erreur publics.
+
+Les helpers internes séparent les responsabilités :
+
+- `runAuditProfileCommand` exécute un profil valide ;
+- `assertExpectedCategories` vérifie que les catégories retournées correspondent au profil ;
+- `assertCommandFails` vérifie les scénarios d'erreur avec code de sortie non nul.
+
+Cette structure permet d'ajouter un profil ou un cas d'erreur sans dupliquer la logique d'exécution.

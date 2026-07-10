@@ -497,3 +497,54 @@ export const AUDIT_PROFILE_ERROR_DOCUMENTATION_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_PROFILE_CHECK_STRUCTURE_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-010",
+  category: "docs",
+  severity: "warning",
+  title: "Architecture docs document audit profile check structure",
+  description: "The architecture docs should document the internal structure of the audit profile check script.",
+  check: () => {
+    const architecturePath = "docs/architecture/audit-engine.md";
+
+    if (!existsSync(architecturePath)) {
+      return fail(
+        AUDIT_PROFILE_CHECK_STRUCTURE_DOCUMENTATION_RULE,
+        "Audit architecture documentation is missing.",
+        [architecturePath],
+        "Document audit profile check script structure in docs/architecture/audit-engine.md.",
+      );
+    }
+
+    const architectureContent = readFileSync(architecturePath, "utf8");
+
+    const expectedTokens = [
+      "Structure du contrôle des profils d'audit",
+      "scripts/audit-profile-check.ts",
+      "PROFILE_EXPECTATIONS",
+      "FAILURE_EXPECTATIONS",
+      "runAuditProfileCommand",
+      "assertExpectedCategories",
+      "assertCommandFails",
+      "code de sortie non nul",
+      "sans dupliquer la logique d'exécution",
+    ];
+
+    const missing = expectedTokens.filter((token) => !architectureContent.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PROFILE_CHECK_STRUCTURE_DOCUMENTATION_RULE,
+        "Audit profile check structure documentation is incomplete.",
+        missing,
+        "Document profile expectations, failure expectations, and reusable helper responsibilities.",
+      );
+    }
+
+    return pass(
+      AUDIT_PROFILE_CHECK_STRUCTURE_DOCUMENTATION_RULE,
+      "Architecture docs document audit profile check structure.",
+      expectedTokens,
+    );
+  },
+};
+
