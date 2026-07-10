@@ -2366,3 +2366,47 @@ export const AUDIT_RECOMMENDATION_PRIORITY_SUMMARY_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_SUMMARY_CONTRACT_FORMAT_RULE: AuditRule = {
+  id: "AUDIT-046",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit summary contract fields are consistently formatted",
+  description: "Audit summary contract fields should stay aligned for readable generated reports and type reviews.",
+  check: () => {
+    const typePath = "src/audit/types.ts";
+
+    if (!existsSync(typePath)) {
+      return fail(
+        AUDIT_SUMMARY_CONTRACT_FORMAT_RULE,
+        "Audit summary contract file is missing.",
+        [typePath],
+        "Restore src/audit/types.ts.",
+      );
+    }
+
+    const content = readFileSync(typePath, "utf8");
+
+    const expectedBlock = [
+      "    score: number;",
+      "    byCategory: Partial<Record<AuditCategory, number>>;",
+      "    byPriority: Partial<Record<AuditPriority, number>>;",
+      "    recommendationsByPriority: Partial<Record<AuditPriority, number>>;",
+    ].join("\n");
+
+    if (!content.includes(expectedBlock)) {
+      return fail(
+        AUDIT_SUMMARY_CONTRACT_FORMAT_RULE,
+        "Audit summary contract fields are not consistently formatted.",
+        [expectedBlock],
+        "Align summary fields in src/audit/types.ts.",
+      );
+    }
+
+    return pass(
+      AUDIT_SUMMARY_CONTRACT_FORMAT_RULE,
+      "Audit summary contract fields are consistently formatted.",
+      [expectedBlock],
+    );
+  },
+};
+
