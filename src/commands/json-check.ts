@@ -216,6 +216,15 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(json, "recommendations");
     const recommendations = json.recommendations;
     assertArray(recommendations);
+    for (const recommendationValue of recommendations) {
+      assertRecord(recommendationValue);
+      assertString(recommendationValue.ruleId, "recommendation.ruleId");
+      assertString(recommendationValue.message, "recommendation.message");
+
+      const recommendationPriorityValue = recommendationValue.priority;
+      assertString(recommendationPriorityValue, "recommendation.priority");
+      assertOneOf(recommendationPriorityValue, "recommendation.priority", AUDIT_PRIORITIES);
+    }
     if (recommendations.length > 0) {
       const recommendation = recommendations[0];
       assertRecord(recommendation);

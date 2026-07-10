@@ -1135,6 +1135,54 @@ export const JSON_AUDIT_EVERY_FINDING_VALUE_ASSERTION_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_EVERY_RECOMMENDATION_VALUE_ASSERTION_RULE: AuditRule = {
+  id: "JSON-028",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts every audit recommendation value",
+  description: "json-check should assert value types and enum values for every audit recommendation.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_EVERY_RECOMMENDATION_VALUE_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so every audit recommendation value can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "for (const recommendationValue of recommendations)",
+      "assertRecord(recommendationValue)",
+      "assertString(recommendationValue.ruleId, \"recommendation.ruleId\")",
+      "assertString(recommendationValue.message, \"recommendation.message\")",
+      "const recommendationPriorityValue = recommendationValue.priority",
+      "assertOneOf(recommendationPriorityValue, \"recommendation.priority\", AUDIT_PRIORITIES)",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_EVERY_RECOMMENDATION_VALUE_ASSERTION_RULE,
+        "json-check does not assert every audit recommendation value.",
+        missing,
+        "Ensure json-check validates every recommendation instead of only the first recommendation.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_EVERY_RECOMMENDATION_VALUE_ASSERTION_RULE,
+      "json-check asserts every audit recommendation value.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 
