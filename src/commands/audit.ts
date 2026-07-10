@@ -1,9 +1,28 @@
 import { runAudit } from "../audit/runner.js";
-import type { AuditReport } from "../audit/types.js";
+import { isAuditProfile } from "../audit/profiles.js";
+import type { AuditProfile, AuditReport } from "../audit/types.js";
 import { terminal } from "../ui/terminal.js";
 
+
+export function parseAuditProfileOption(args: readonly string[]): AuditProfile | undefined {
+  const profileIndex = args.indexOf("--profile");
+
+  if (profileIndex === -1) {
+    return undefined;
+  }
+
+  const value = args[profileIndex + 1];
+
+  if (value === undefined || value.startsWith("--") || !isAuditProfile(value)) {
+    throw new Error(`Invalid audit profile: ${value ?? "<missing>"}`);
+  }
+
+  return value;
+}
+
 export function printAuditReport(): AuditReport {
-  const report = runAudit();
+  const profile = parseAuditProfileOption(process.argv);
+  const report = runAudit({ profile });
 
   terminal.header("Audit");
 
@@ -78,7 +97,8 @@ export function printAuditReport(): AuditReport {
 
 
 export function printAuditReportJson(): AuditReport {
-  const report = runAudit();
+  const profile = parseAuditProfileOption(process.argv);
+  const report = runAudit({ profile });
   console.log(JSON.stringify(report));
   return report;
 }

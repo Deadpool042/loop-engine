@@ -3,7 +3,7 @@ import { AUDIT_RULES } from "./rules.js";
 import { selectAuditRulesForProfile } from "./profiles.js";
 
 export type AuditRunOptions = {
-  readonly profile?: AuditProfile;
+  readonly profile?: AuditProfile | undefined;
 };
 
 export function runAudit(options: AuditRunOptions = {}): AuditReport {

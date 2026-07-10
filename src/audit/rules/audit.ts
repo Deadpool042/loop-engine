@@ -1799,3 +1799,50 @@ export const AUDIT_RUNNER_PROFILE_OPTION_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_CLI_PROFILE_PARSING_RULE: AuditRule = {
+  id: "AUDIT-035",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit command parses profile option",
+  description: "The audit command should parse and validate an optional profile before passing it to the audit runner.",
+  check: () => {
+    const commandPath = "src/commands/audit.ts";
+
+    if (!existsSync(commandPath)) {
+      return fail(
+        AUDIT_CLI_PROFILE_PARSING_RULE,
+        "Audit command file is missing.",
+        [commandPath],
+        "Create src/commands/audit.ts with profile option parsing.",
+      );
+    }
+
+    const content = readFileSync(commandPath, "utf8");
+    const expectedTokens = [
+      "parseAuditProfileOption",
+      "args.indexOf(\"--profile\")",
+      "isAuditProfile(value)",
+      "Invalid audit profile",
+      "const profile = parseAuditProfileOption(process.argv)",
+      "runAudit({ profile })",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_CLI_PROFILE_PARSING_RULE,
+        "Audit CLI profile parsing is incomplete.",
+        missing,
+        "Parse --profile in the audit command and pass the validated profile to runAudit.",
+      );
+    }
+
+    return pass(
+      AUDIT_CLI_PROFILE_PARSING_RULE,
+      "Audit command parses profile option.",
+      expectedTokens,
+    );
+  },
+};
+
