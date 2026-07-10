@@ -1610,3 +1610,54 @@ export const AUDIT_PROFILE_TYPE_EXPOSURE_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_PROFILE_DEFINITION_EXPOSURE_RULE: AuditRule = {
+  id: "AUDIT-031",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit profile definitions are exposed",
+  description: "The audit engine should expose profile definitions that map audit profiles to audit categories.",
+  check: () => {
+    const profilesPath = "src/audit/profiles.ts";
+
+    if (!existsSync(profilesPath)) {
+      return fail(
+        AUDIT_PROFILE_DEFINITION_EXPOSURE_RULE,
+        "Audit profile definitions file is missing.",
+        [profilesPath],
+        "Create src/audit/profiles.ts with AUDIT_PROFILE_DEFINITIONS.",
+      );
+    }
+
+    const content = readFileSync(profilesPath, "utf8");
+    const expectedTokens = [
+      "export type AuditProfileDefinition",
+      "export const AUDIT_PROFILE_DEFINITIONS",
+      "Record<AuditProfile, AuditProfileDefinition>",
+      "quick",
+      "strict",
+      "release",
+      "docs",
+      "json",
+      "architecture",
+      "categories",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PROFILE_DEFINITION_EXPOSURE_RULE,
+        "Audit profile definitions are incomplete.",
+        missing,
+        "Expose every supported audit profile in AUDIT_PROFILE_DEFINITIONS.",
+      );
+    }
+
+    return pass(
+      AUDIT_PROFILE_DEFINITION_EXPOSURE_RULE,
+      "Audit profile definitions are exposed.",
+      expectedTokens,
+    );
+  },
+};
+
