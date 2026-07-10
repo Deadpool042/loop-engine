@@ -33,3 +33,4 @@ Ce document est la source de vérité simple pour les tags stables documentés d
 
 - `docs/audits/audit-engine-v5-final.md`
 - `docs/audits/audit-engine-v1-final.md`
+- `docs/audits/release-checklist.md`

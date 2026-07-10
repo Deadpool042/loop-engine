@@ -895,3 +895,62 @@ export const AUDIT_STABLE_TAGS_DOCUMENTATION_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_RELEASE_CHECKLIST_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-017",
+  category: "docs",
+  severity: "warning",
+  title: "Audit tag release checklist is documented",
+  description: "The repository should document a reusable release checklist that forces an explicit worktree verification before audit tags are published.",
+  check: () => {
+    const checklistPath = "docs/audits/release-checklist.md";
+    const stableTagsPath = "docs/audits/stable-tags.md";
+    const readmePath = "docs/audits/README.md";
+
+    if (!existsSync(checklistPath) || !existsSync(stableTagsPath) || !existsSync(readmePath)) {
+      return fail(
+        AUDIT_RELEASE_CHECKLIST_DOCUMENTATION_RULE,
+        "Audit release checklist or related documentation is missing.",
+        [checklistPath, stableTagsPath, readmePath],
+        "Create docs/audits/release-checklist.md and link it from docs/audits/stable-tags.md and docs/audits/README.md.",
+      );
+    }
+
+    const checklistContent = readFileSync(checklistPath, "utf8");
+    const stableTagsContent = readFileSync(stableTagsPath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+    const haystack = `${checklistContent}\n${stableTagsContent}\n${readmeContent}`;
+
+    const expectedTokens = [
+      "git status --short --untracked-files=all",
+      "git diff --stat",
+      "git diff --staged --stat",
+      "fichiers créés attendus",
+      "fichiers non suivis attendus",
+      "tag correctif `.1`",
+      "sans force-push",
+      "ne pas supprimer les tags supersédés",
+      "ne pas réécrire l'historique",
+      "release-checklist.md",
+      "stable-tags.md",
+      "Audit tag release checklist",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RELEASE_CHECKLIST_DOCUMENTATION_RULE,
+        "Audit release checklist documentation is incomplete.",
+        missing,
+        "Document the worktree checks, the no-untracked-files rule, and the corrective .1 tagging guidance.",
+      );
+    }
+
+    return pass(
+      AUDIT_RELEASE_CHECKLIST_DOCUMENTATION_RULE,
+      "Audit tag release checklist is documented.",
+      expectedTokens,
+    );
+  },
+};
+
