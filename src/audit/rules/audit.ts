@@ -2390,6 +2390,9 @@ export const AUDIT_SUMMARY_CONTRACT_FORMAT_RULE: AuditRule = {
       "    score: number;",
       "    byCategory: Partial<Record<AuditCategory, number>>;",
       "    byPriority: Partial<Record<AuditPriority, number>>;",
+      "    /**",
+      "     * @deprecated Use recommendations.byPriority.",
+      "     */",
       "    recommendationsByPriority: Partial<Record<AuditPriority, number>>;",
       "    recommendations: {",
       "      total: number;",
@@ -2512,6 +2515,59 @@ export const AUDIT_RECOMMENDATION_TOTAL_HUMAN_REPORT_RULE: AuditRule = {
     return pass(
       AUDIT_RECOMMENDATION_TOTAL_HUMAN_REPORT_RULE,
       "Human audit report prints recommendation totals.",
+      expectedTokens,
+    );
+  },
+};
+
+export const AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE: AuditRule = {
+  id: "AUDIT-049",
+  category: "architecture",
+  severity: "warning",
+  title: "Legacy recommendation priority summary is documented",
+  description: "The legacy summary.recommendationsByPriority field should stay documented while the canonical nested recommendations summary exists.",
+  check: () => {
+    const typePath = "src/audit/types.ts";
+    const finalReportPath = "docs/audits/audit-engine-v1-final.md";
+
+    if (!existsSync(typePath) || !existsSync(finalReportPath)) {
+      return fail(
+        AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE,
+        "Legacy recommendation priority summary documentation files are missing.",
+        [typePath, finalReportPath],
+        "Document summary.recommendationsByPriority as legacy and keep summary.recommendations.byPriority canonical.",
+      );
+    }
+
+    const haystack = [
+      readFileSync(typePath, "utf8"),
+      readFileSync(finalReportPath, "utf8"),
+    ].join("\n");
+
+    const expectedTokens = [
+      "@deprecated Use recommendations.byPriority.",
+      "summary.recommendations.byPriority",
+      "summary.recommendationsByPriority",
+      "champ canonique",
+      "Champ legacy `summary.recommendationsByPriority`",
+      "compatibilité",
+      "cycle explicite de dépréciation",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE,
+        "Legacy recommendation priority summary documentation is incomplete.",
+        missing,
+        "Document the legacy field and the canonical nested replacement.",
+      );
+    }
+
+    return pass(
+      AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE,
+      "Legacy recommendation priority summary is documented.",
       expectedTokens,
     );
   },

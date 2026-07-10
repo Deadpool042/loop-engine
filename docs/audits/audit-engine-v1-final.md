@@ -269,7 +269,7 @@ Chaque finding contient :
 
 ## Règles exécutables
 
-Le moteur contient 89 règles exécutables :
+Le moteur contient 90 règles exécutables :
 
 - `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
 - `JSON-005` : couverture des commandes JSON publiques par `json-check`.
@@ -328,8 +328,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 89 règles ;
-- 89 règles en pass ;
+- 90 règles ;
+- 90 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;
@@ -347,4 +347,14 @@ Le moteur ne modifie pas les projets audités.
 Il produit un rapport humain, un rapport JSON, un score, des priorités, des recommandations et des contrôles auto-référentiels.
 
 Le prochain investissement utile n'est plus la création du moteur, mais l'élargissement progressif de ses règles.
+
+---
+
+## Compatibilité JSON — recommandations
+
+Le champ `summary.recommendations.byPriority` est le champ canonique pour les compteurs de recommandations par priorité.
+
+Le champ legacy `summary.recommendationsByPriority` reste exposé pour compatibilité avec les consommateurs JSON existants.
+
+Il ne doit pas être supprimé sans cycle explicite de dépréciation.
 

@@ -63,6 +63,9 @@ export type AuditReport = Readonly<{
     score: number;
     byCategory: Partial<Record<AuditCategory, number>>;
     byPriority: Partial<Record<AuditPriority, number>>;
+    /**
+     * @deprecated Use recommendations.byPriority.
+     */
     recommendationsByPriority: Partial<Record<AuditPriority, number>>;
     recommendations: {
       total: number;
