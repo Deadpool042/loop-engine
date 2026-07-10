@@ -604,3 +604,53 @@ export const AUDIT_ENGINE_V4_FINAL_REPORT_RULE: AuditRule = {
   },
 };
 
+export const README_RECOMMENDATION_SUMMARY_CONTRACT_RULE: AuditRule = {
+  id: "DOCS-012",
+  category: "docs",
+  severity: "warning",
+  title: "README documents recommendation summary contract",
+  description: "The README should document the stable recommendation summary contract and the legacy deprecation path.",
+  check: () => {
+    const readmePath = "README.md";
+
+    if (!existsSync(readmePath)) {
+      return fail(
+        README_RECOMMENDATION_SUMMARY_CONTRACT_RULE,
+        "README is missing.",
+        [readmePath],
+        "Restore README.md and document the recommendation summary contract.",
+      );
+    }
+
+    const content = readFileSync(readmePath, "utf8");
+    const expectedTokens = [
+      "### Contrat des recommandations JSON",
+      "summary.recommendations.total",
+      "summary.recommendations.byPriority",
+      "summary.recommendationsByPriority",
+      "legacy et déprécié",
+      "reste exposé pour compatibilité",
+      "synchronisé avec `summary.recommendationsByPriority` par `json-check`",
+      "test de non-régression",
+      "les consommateurs JSON doivent migrer vers `summary.recommendations.byPriority`",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        README_RECOMMENDATION_SUMMARY_CONTRACT_RULE,
+        "README does not document the recommendation summary contract.",
+        missing,
+        "Add a README section that documents the canonical recommendation summary fields, the legacy field, synchronization, and migration guidance.",
+      );
+    }
+
+    return pass(
+      README_RECOMMENDATION_SUMMARY_CONTRACT_RULE,
+      "README documents the recommendation summary contract.",
+      expectedTokens,
+    );
+  },
+};
+

@@ -312,6 +312,7 @@ Le moteur contient 93 règles exécutables :
 - `AUDIT-050` : assertion à l'exécution que les champs `summary.recommendationsByPriority` et `summary.recommendations.byPriority` restent synchronisés.
 - `JSON-033` : contrat JSON imbriqué des recommandations avec synchronisation legacy/canonique.
 - `AUDIT-051` : test de non-régression de la synchronisation legacy/canonique des recommandations.
+- `DOCS-012` : documentation du contrat stable des recommandations JSON et de la dépréciation du champ legacy.
 
 ## Couverture README
 
@@ -332,8 +333,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 93 règles ;
-- 93 règles en pass ;
+- 94 règles ;
+- 94 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;

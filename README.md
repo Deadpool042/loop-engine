@@ -146,6 +146,18 @@ Le rapport JSON expose notamment :
 
 Le script `pnpm run ci` exécute la validation générale puis l'audit strict. Il est utilisé par le workflow GitHub Actions du dépôt.
 
+### Contrat des recommandations JSON
+
+Le rapport JSON d'audit expose un contrat stable pour les recommandations actionnables.
+
+- `summary.recommendations.total` est le total canonique des recommandations actionnables.
+- `summary.recommendations.byPriority` est le compteur canonique par priorité.
+- `summary.recommendationsByPriority` est un champ legacy et déprécié.
+- `summary.recommendationsByPriority` reste exposé pour compatibilité avec les consommateurs JSON existants.
+- `summary.recommendations.byPriority` est synchronisé avec `summary.recommendationsByPriority` par `json-check`.
+- un test de non-régression couvre cette synchronisation.
+- les consommateurs JSON doivent migrer vers `summary.recommendations.byPriority`.
+
 ## Voir aussi
 
 - [Audit Engine V4 — Rapport final](docs/audits/audit-engine-v4-final.md)
