@@ -354,7 +354,7 @@ Le prochain investissement utile n'est plus la création du moteur, mais l'élar
 
 Le champ `summary.recommendations.byPriority` est le champ canonique pour les compteurs de recommandations par priorité.
 
-Le champ legacy `summary.recommendationsByPriority` reste exposé pour compatibilité avec les consommateurs JSON existants.
+Champ legacy `summary.recommendationsByPriority` : il reste exposé pour compatibilité avec les consommateurs JSON existants.
 
 Il ne doit pas être supprimé sans cycle explicite de dépréciation.
 
