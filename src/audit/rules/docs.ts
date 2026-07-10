@@ -654,3 +654,54 @@ export const README_RECOMMENDATION_SUMMARY_CONTRACT_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_FINAL_REPORT_RECOMMENDATION_DEPRECATION_RULE: AuditRule = {
+  id: "DOCS-013",
+  category: "docs",
+  severity: "warning",
+  title: "Final audit report documents recommendation summary deprecation cycle",
+  description: "The final audit report should formalize the canonical recommendation summary field, the legacy field, compatibility, breaking change handling, json-check synchronization, and regression test coverage.",
+  check: () => {
+    const reportPath = "docs/audits/audit-engine-v1-final.md";
+
+    if (!existsSync(reportPath)) {
+      return fail(
+        AUDIT_FINAL_REPORT_RECOMMENDATION_DEPRECATION_RULE,
+        "Final audit report is missing.",
+        [reportPath],
+        "Restore docs/audits/audit-engine-v1-final.md and document the recommendation summary deprecation cycle.",
+      );
+    }
+
+    const content = readFileSync(reportPath, "utf8");
+    const expectedTokens = [
+      "summary.recommendations.byPriority",
+      "summary.recommendationsByPriority",
+      "champ canonique",
+      "legacy / déprécié",
+      "compatibilité descendante",
+      "décision explicite de breaking change",
+      "synchronisation legacy/canonique",
+      "json-check",
+      "test de non-régression",
+      "DOCS-013",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_FINAL_REPORT_RECOMMENDATION_DEPRECATION_RULE,
+        "Final audit report does not document the recommendation summary deprecation cycle.",
+        missing,
+        "Document the canonical nested field, the legacy compatibility path, the breaking-change constraint, json-check synchronization, and the regression test.",
+      );
+    }
+
+    return pass(
+      AUDIT_FINAL_REPORT_RECOMMENDATION_DEPRECATION_RULE,
+      "Final audit report documents the recommendation summary deprecation cycle.",
+      expectedTokens,
+    );
+  },
+};
+

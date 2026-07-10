@@ -269,7 +269,7 @@ Chaque finding contient :
 
 ## Règles exécutables
 
-Le moteur contient 93 règles exécutables :
+Le moteur contient 95 règles exécutables :
 
 - `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
 - `JSON-005` : couverture des commandes JSON publiques par `json-check`.
@@ -313,6 +313,7 @@ Le moteur contient 93 règles exécutables :
 - `JSON-033` : contrat JSON imbriqué des recommandations avec synchronisation legacy/canonique.
 - `AUDIT-051` : test de non-régression de la synchronisation legacy/canonique des recommandations.
 - `DOCS-012` : documentation du contrat stable des recommandations JSON et de la dépréciation du champ legacy.
+- `DOCS-013` : formalisation du cycle de dépréciation du champ legacy `summary.recommendationsByPriority`.
 
 ## Couverture README
 
@@ -333,8 +334,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 94 règles ;
-- 94 règles en pass ;
+- 95 règles ;
+- 95 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;
@@ -359,7 +360,13 @@ Le prochain investissement utile n'est plus la création du moteur, mais l'élar
 
 Le champ `summary.recommendations.byPriority` est le champ canonique pour les compteurs de recommandations par priorité.
 
-Champ legacy `summary.recommendationsByPriority` : il reste exposé pour compatibilité avec les consommateurs JSON existants.
+Champ legacy `summary.recommendationsByPriority` : il reste exposé pour compatibilité descendante.
+legacy / déprécié
+Il est déprécié et sa suppression future exige une décision explicite de breaking change.
+Ce document formalise un cycle explicite de dépréciation.
 
-Il ne doit pas être supprimé sans cycle explicite de dépréciation.
+La synchronisation legacy/canonique est garantie par `json-check`.
+La non-régression est couverte par un test dédié.
+
+Cette formalisation explicite du cycle de dépréciation est portée par `DOCS-013`.
 
