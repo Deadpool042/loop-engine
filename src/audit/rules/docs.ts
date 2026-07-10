@@ -446,3 +446,54 @@ export const AUDIT_PROFILE_CI_DOCUMENTATION_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_PROFILE_ERROR_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-009",
+  category: "docs",
+  severity: "warning",
+  title: "Docs document audit profile errors",
+  description: "The README and architecture docs should document public audit profile error cases.",
+  check: () => {
+    const readmePath = "README.md";
+    const architecturePath = "docs/architecture/audit-engine.md";
+
+    if (!existsSync(readmePath) || !existsSync(architecturePath)) {
+      return fail(
+        AUDIT_PROFILE_ERROR_DOCUMENTATION_RULE,
+        "Audit profile error documentation files are missing.",
+        [readmePath, architecturePath],
+        "Document audit profile error behavior in README.md and docs/architecture/audit-engine.md.",
+      );
+    }
+
+    const readmeContent = readFileSync(readmePath, "utf8");
+    const architectureContent = readFileSync(architecturePath, "utf8");
+    const haystack = `${readmeContent}\n${architectureContent}`;
+
+    const expectedTokens = [
+      "Erreurs de profils d'audit",
+      "Invalid audit profile",
+      "Invalid audit profile: <missing>",
+      "profil inconnu",
+      "profil manquant",
+      "code de sortie non nul",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PROFILE_ERROR_DOCUMENTATION_RULE,
+        "Audit profile error documentation is incomplete.",
+        missing,
+        "Document unknown and missing audit profile errors.",
+      );
+    }
+
+    return pass(
+      AUDIT_PROFILE_ERROR_DOCUMENTATION_RULE,
+      "Docs document audit profile errors.",
+      expectedTokens,
+    );
+  },
+};
+

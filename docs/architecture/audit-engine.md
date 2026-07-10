@@ -203,3 +203,13 @@ Le script `pnpm run audit:profiles` exécute `scripts/audit-profile-check.ts`.
 Il vérifie explicitement que les profils `quick`, `strict`, `release`, `json`, `docs` et `architecture` ne retournent que les catégories attendues.
 
 Ce contrôle complète `audit --json --strict` dans `pnpm run ci`.
+
+
+## Erreurs de profils d'audit
+
+Le parsing de `--profile` distingue deux erreurs publiques :
+
+- profil inconnu : `Invalid audit profile` ;
+- profil manquant : `Invalid audit profile: <missing>`.
+
+Dans les deux cas, le CLI retourne un code de sortie non nul.
