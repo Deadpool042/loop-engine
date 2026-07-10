@@ -12,7 +12,8 @@
     "rag-index": "tsx src/cli.ts rag-index",
     "rag-search": "tsx src/cli.ts rag-search",
     "audit:strict": "tsx src/cli.ts audit --json --strict",
-    "ci": "pnpm run validate && pnpm run audit:strict"
+    "ci": "pnpm run validate && pnpm run audit:strict && pnpm run audit:profiles",
+    "audit:profiles": "tsx scripts/audit-profile-check.ts"
   },
   "dependencies": {
     "tsx": "^4.20.5",

@@ -453,7 +453,7 @@ export const AUDIT_CI_SCRIPT_RULE: AuditRule = {
     const content = readFileSync(packagePath, "utf8");
     const expectedTokens = [
       '"ci"',
-      '"pnpm run validate && pnpm run audit:strict"',
+      '"pnpm run validate && pnpm run audit:strict && pnpm run audit:profiles"',
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
@@ -463,7 +463,7 @@ export const AUDIT_CI_SCRIPT_RULE: AuditRule = {
         AUDIT_CI_SCRIPT_RULE,
         "CI validation script is missing or incomplete.",
         missing,
-        "Expose ci as pnpm run validate && pnpm run audit:strict.",
+        "Expose ci as pnpm run validate && pnpm run audit:strict && pnpm run audit:profiles.",
       );
     }
 
@@ -1841,6 +1841,60 @@ export const AUDIT_CLI_PROFILE_PARSING_RULE: AuditRule = {
     return pass(
       AUDIT_CLI_PROFILE_PARSING_RULE,
       "Audit command parses profile option.",
+      expectedTokens,
+    );
+  },
+};
+
+export const AUDIT_PROFILE_CHECK_SCRIPT_RULE: AuditRule = {
+  id: "AUDIT-036",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit profiles are checked by CI",
+  description: "The project should explicitly check JSON, docs, and architecture audit profiles in CI.",
+  check: () => {
+    const scriptPath = "scripts/audit-profile-check.ts";
+    const packagePath = "package.json";
+
+    if (!existsSync(scriptPath) || !existsSync(packagePath)) {
+      return fail(
+        AUDIT_PROFILE_CHECK_SCRIPT_RULE,
+        "Audit profile check script or package manifest is missing.",
+        [scriptPath, packagePath],
+        "Create scripts/audit-profile-check.ts and wire pnpm run audit:profiles into CI.",
+      );
+    }
+
+    const scriptContent = readFileSync(scriptPath, "utf8");
+    const packageContent = readFileSync(packagePath, "utf8");
+
+    const expectedTokens = [
+      "PROFILE_EXPECTATIONS",
+      "profile: \"json\"",
+      "profile: \"docs\"",
+      "profile: \"architecture\"",
+      "\"--profile\"",
+      "summary.byCategory",
+      "finding.category",
+      "\"audit:profiles\"",
+      "pnpm run audit:profiles",
+    ];
+
+    const haystack = `${scriptContent}\n${packageContent}`;
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PROFILE_CHECK_SCRIPT_RULE,
+        "Audit profile CI checks are incomplete.",
+        missing,
+        "Check json, docs, and architecture profiles and run the check from CI.",
+      );
+    }
+
+    return pass(
+      AUDIT_PROFILE_CHECK_SCRIPT_RULE,
+      "Audit profiles are checked by CI.",
       expectedTokens,
     );
   },
