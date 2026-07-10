@@ -2473,3 +2473,47 @@ export const AUDIT_RECOMMENDATION_TOTAL_SUMMARY_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_RECOMMENDATION_TOTAL_HUMAN_REPORT_RULE: AuditRule = {
+  id: "AUDIT-048",
+  category: "architecture",
+  severity: "warning",
+  title: "Human audit report prints recommendation totals",
+  description: "The human audit report should expose the total number of actionable recommendations.",
+  check: () => {
+    const commandPath = "src/commands/audit.ts";
+
+    if (!existsSync(commandPath)) {
+      return fail(
+        AUDIT_RECOMMENDATION_TOTAL_HUMAN_REPORT_RULE,
+        "Audit command file is missing.",
+        [commandPath],
+        "Restore src/commands/audit.ts.",
+      );
+    }
+
+    const content = readFileSync(commandPath, "utf8");
+
+    const expectedTokens = [
+      "Recommendations: ${report.summary.recommendations.total}",
+      "report.summary.recommendations.total",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_TOTAL_HUMAN_REPORT_RULE,
+        "Human audit report does not print recommendation totals.",
+        missing,
+        "Print report.summary.recommendations.total in the human audit summary.",
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_TOTAL_HUMAN_REPORT_RULE,
+      "Human audit report prints recommendation totals.",
+      expectedTokens,
+    );
+  },
+};
+
