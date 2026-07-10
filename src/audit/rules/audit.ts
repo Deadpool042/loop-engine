@@ -1752,3 +1752,50 @@ export const AUDIT_PROFILE_RULE_SELECTION_EXPOSURE_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_RUNNER_PROFILE_OPTION_RULE: AuditRule = {
+  id: "AUDIT-034",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit runner accepts profile options",
+  description: "The audit runner should accept internal profile options before CLI profile routing is exposed.",
+  check: () => {
+    const runnerPath = "src/audit/runner.ts";
+
+    if (!existsSync(runnerPath)) {
+      return fail(
+        AUDIT_RUNNER_PROFILE_OPTION_RULE,
+        "Audit runner file is missing.",
+        [runnerPath],
+        "Create src/audit/runner.ts with AuditRunOptions.",
+      );
+    }
+
+    const content = readFileSync(runnerPath, "utf8");
+    const expectedTokens = [
+      "export type AuditRunOptions",
+      "readonly profile?: AuditProfile",
+      "selectAuditRulesForProfile",
+      "options: AuditRunOptions = {}",
+      "options.profile === undefined",
+      "rules.map",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RUNNER_PROFILE_OPTION_RULE,
+        "Audit runner profile option support is incomplete.",
+        missing,
+        "Wire AuditRunOptions into runAudit without changing CLI behavior.",
+      );
+    }
+
+    return pass(
+      AUDIT_RUNNER_PROFILE_OPTION_RULE,
+      "Audit runner accepts profile options.",
+      expectedTokens,
+    );
+  },
+};
+

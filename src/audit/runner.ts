@@ -1,8 +1,16 @@
-import type { AuditReport } from "./types.js";
+import type { AuditProfile, AuditReport } from "./types.js";
 import { AUDIT_RULES } from "./rules.js";
+import { selectAuditRulesForProfile } from "./profiles.js";
 
-export function runAudit(): AuditReport {
-  const findings = AUDIT_RULES.map((rule) => rule.check());
+export type AuditRunOptions = {
+  readonly profile?: AuditProfile;
+};
+
+export function runAudit(options: AuditRunOptions = {}): AuditReport {
+  const rules = options.profile === undefined
+    ? AUDIT_RULES
+    : selectAuditRulesForProfile(options.profile, AUDIT_RULES);
+  const findings = rules.map((rule) => rule.check());
 
   const total = findings.length;
   const pass = findings.filter((finding) => finding.status === "pass").length;
