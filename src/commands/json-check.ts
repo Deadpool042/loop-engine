@@ -53,6 +53,287 @@ const AUDIT_SEVERITIES = ["error", "warning"] as const;
 const AUDIT_FINDING_STATUSES = ["pass", "fail", "skipped"] as const;
 const AUDIT_PRIORITIES = ["low", "medium", "high"] as const;
 
+export function validateAuditJsonPayload(json: unknown): void {
+  assertRecord(json);
+  assertField(json, "schemaVersion");
+
+  if (json.schemaVersion !== 1) {
+    throw new Error("schemaVersion != 1");
+  }
+
+  assertField(json, "generatedAt");
+  assertString(json.generatedAt, "generatedAt");
+  if (Number.isNaN(Date.parse(json.generatedAt))) {
+    throw new Error("generatedAt must be parseable date");
+  }
+
+  assertField(json, "summary");
+  const summary = json.summary;
+  assertRecord(summary);
+  assertField(summary, "status");
+  assertField(summary, "total");
+  assertField(summary, "pass");
+  assertField(summary, "warning");
+  assertField(summary, "fail");
+  assertField(summary, "skipped");
+  assertField(summary, "score");
+  assertField(summary, "byCategory");
+  assertField(summary, "byPriority");
+  assertField(summary, "recommendationsByPriority");
+  assertField(summary, "recommendations");
+
+  const summaryStatus = summary.status;
+  assertString(summaryStatus, "summary.status");
+  assertOneOf(summaryStatus, "summary.status", AUDIT_SUMMARY_STATUSES);
+  assertNumber(summary.total, "summary.total");
+  assertNumber(summary.pass, "summary.pass");
+  assertNumber(summary.warning, "summary.warning");
+  assertNumber(summary.fail, "summary.fail");
+  assertNumber(summary.skipped, "summary.skipped");
+  assertNumber(summary.score, "summary.score");
+
+  const byCategory = summary.byCategory;
+  assertRecord(byCategory);
+  for (const category of AUDIT_CATEGORIES) {
+    if (category in byCategory) {
+      assertNumber(byCategory[category], `summary.byCategory.${category}`);
+    }
+  }
+
+  const byPriority = summary.byPriority;
+  assertRecord(byPriority);
+  for (const priority of AUDIT_PRIORITIES) {
+    if (priority in byPriority) {
+      assertNumber(byPriority[priority], `summary.byPriority.${priority}`);
+    }
+  }
+
+  const recommendationsByPriority = summary.recommendationsByPriority;
+  assertRecord(recommendationsByPriority);
+  for (const priority of AUDIT_PRIORITIES) {
+    if (priority in recommendationsByPriority) {
+      assertNumber(recommendationsByPriority[priority], `summary.recommendationsByPriority.${priority}`);
+    }
+  }
+
+  const summaryRecommendations = summary.recommendations;
+  assertRecord(summaryRecommendations);
+  assertField(summaryRecommendations, "total");
+  assertField(summaryRecommendations, "byPriority");
+  assertNumber(summaryRecommendations.total, "summary.recommendations.total");
+
+  const summaryRecommendationsByPriority = summaryRecommendations.byPriority;
+  assertRecord(summaryRecommendationsByPriority);
+  for (const priority of AUDIT_PRIORITIES) {
+    if (priority in summaryRecommendationsByPriority) {
+      assertNumber(summaryRecommendationsByPriority[priority], `summary.recommendations.byPriority.${priority}`);
+    }
+  }
+
+  for (const priority of AUDIT_PRIORITIES) {
+    const actualRecommendationPriorityCount =
+      priority in recommendationsByPriority ? recommendationsByPriority[priority] : 0;
+    assertNumber(actualRecommendationPriorityCount, `summary.recommendationsByPriority.${priority}`);
+
+    const actualSummaryRecommendationPriorityCount =
+      priority in summaryRecommendationsByPriority ? summaryRecommendationsByPriority[priority] : 0;
+    assertNumber(actualSummaryRecommendationPriorityCount, `summary.recommendations.byPriority.${priority}`);
+
+    if (actualRecommendationPriorityCount !== actualSummaryRecommendationPriorityCount) {
+      throw new Error("summary.recommendations.byPriority must match summary.recommendationsByPriority");
+    }
+  }
+
+  assertField(json, "findings");
+  const findings = json.findings;
+  assertArray(findings);
+  const findingRuleIds = new Set<string>();
+  const findingsByRuleId = new Map<string, Record<string, unknown>>();
+  for (const findingValue of findings) {
+    assertRecord(findingValue);
+    assertString(findingValue.ruleId, "finding.ruleId");
+    if (findingRuleIds.has(findingValue.ruleId)) {
+      throw new Error(`finding.ruleId must be unique: ${findingValue.ruleId}`);
+    }
+    findingRuleIds.add(findingValue.ruleId);
+    findingsByRuleId.set(findingValue.ruleId, findingValue);
+    assertString(findingValue.message, "finding.message");
+
+    const findingCategoryValue = findingValue.category;
+    assertString(findingCategoryValue, "finding.category");
+    assertOneOf(findingCategoryValue, "finding.category", AUDIT_CATEGORIES);
+
+    const findingSeverityValue = findingValue.severity;
+    assertString(findingSeverityValue, "finding.severity");
+    assertOneOf(findingSeverityValue, "finding.severity", AUDIT_SEVERITIES);
+
+    const findingStatusValue = findingValue.status;
+    assertString(findingStatusValue, "finding.status");
+    assertOneOf(findingStatusValue, "finding.status", AUDIT_FINDING_STATUSES);
+
+    const findingPriorityValue = findingValue.priority;
+    assertString(findingPriorityValue, "finding.priority");
+    assertOneOf(findingPriorityValue, "finding.priority", AUDIT_PRIORITIES);
+  }
+
+  const summaryCountTotal = summary.pass + summary.warning + summary.fail + summary.skipped;
+  if (summary.total !== findings.length) {
+    throw new Error("summary.total must match findings length");
+  }
+  if (summary.total !== summaryCountTotal) {
+    throw new Error("summary.total must match summary count total");
+  }
+
+  const expectedScore = summary.total === 0 ? 100 : Math.round((summary.pass / summary.total) * 100);
+  if (summary.score !== expectedScore) {
+    throw new Error("summary.score must match pass ratio");
+  }
+
+  const expectedStatus = summary.fail > 0 ? "fail" : summary.warning > 0 ? "warning" : "pass";
+  if (summaryStatus !== expectedStatus) {
+    throw new Error("summary.status must match finding counts");
+  }
+
+  const categoryCounts: Record<string, number> = {};
+  for (const finding of findings) {
+    assertRecord(finding);
+    const category = finding.category;
+    assertString(category, "finding.category");
+    assertOneOf(category, "finding.category", AUDIT_CATEGORIES);
+    categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
+  }
+
+  for (const category of AUDIT_CATEGORIES) {
+    const actualCategoryCount = category in byCategory ? byCategory[category] : 0;
+    assertNumber(actualCategoryCount, `summary.byCategory.${category}`);
+    const expectedCategoryCount = categoryCounts[category] ?? 0;
+
+    if (actualCategoryCount !== expectedCategoryCount) {
+      throw new Error(`summary.byCategory.${category} must match finding category count`);
+    }
+  }
+
+  const priorityCounts: Record<string, number> = {};
+  for (const finding of findings) {
+    assertRecord(finding);
+    const priority = finding.priority;
+    assertString(priority, "finding.priority");
+    assertOneOf(priority, "finding.priority", AUDIT_PRIORITIES);
+    priorityCounts[priority] = (priorityCounts[priority] ?? 0) + 1;
+  }
+
+  for (const priority of AUDIT_PRIORITIES) {
+    const actualPriorityCount = priority in byPriority ? byPriority[priority] : 0;
+    assertNumber(actualPriorityCount, `summary.byPriority.${priority}`);
+    const expectedPriorityCount = priorityCounts[priority] ?? 0;
+
+    if (actualPriorityCount !== expectedPriorityCount) {
+      throw new Error(`summary.byPriority.${priority} must match finding priority count`);
+    }
+  }
+
+  if (findings.length > 0) {
+    const finding = findings[0];
+    assertRecord(finding);
+    assertField(finding, "ruleId");
+    assertField(finding, "category");
+    assertField(finding, "severity");
+    assertField(finding, "status");
+    assertField(finding, "priority");
+    assertField(finding, "message");
+    assertString(finding.ruleId, "finding.ruleId");
+    assertString(finding.message, "finding.message");
+
+    const findingCategory = finding.category;
+    assertString(findingCategory, "finding.category");
+    assertOneOf(findingCategory, "finding.category", AUDIT_CATEGORIES);
+
+    const findingSeverity = finding.severity;
+    assertString(findingSeverity, "finding.severity");
+    assertOneOf(findingSeverity, "finding.severity", AUDIT_SEVERITIES);
+
+    const findingStatus = finding.status;
+    assertString(findingStatus, "finding.status");
+    assertOneOf(findingStatus, "finding.status", AUDIT_FINDING_STATUSES);
+
+    const findingPriority = finding.priority;
+    assertString(findingPriority, "finding.priority");
+    assertOneOf(findingPriority, "finding.priority", AUDIT_PRIORITIES);
+  }
+
+  assertField(json, "recommendations");
+  const recommendations = json.recommendations;
+  assertArray(recommendations);
+  const recommendationRuleIds = new Set<string>();
+  for (const recommendationValue of recommendations) {
+    assertRecord(recommendationValue);
+    assertString(recommendationValue.ruleId, "recommendation.ruleId");
+    if (!findingRuleIds.has(recommendationValue.ruleId)) {
+      throw new Error(`recommendation.ruleId must reference an existing finding.ruleId: ${recommendationValue.ruleId}`);
+    }
+    const referencedFinding = findingsByRuleId.get(recommendationValue.ruleId);
+    if (referencedFinding?.status === "pass") {
+      throw new Error(`recommendation.ruleId must reference an actionable finding.ruleId: ${recommendationValue.ruleId}`);
+    }
+    if (recommendationRuleIds.has(recommendationValue.ruleId)) {
+      throw new Error(`recommendation.ruleId must be unique: ${recommendationValue.ruleId}`);
+    }
+    recommendationRuleIds.add(recommendationValue.ruleId);
+    assertString(recommendationValue.message, "recommendation.message");
+
+    const recommendationPriorityValue = recommendationValue.priority;
+    assertString(recommendationPriorityValue, "recommendation.priority");
+    assertOneOf(recommendationPriorityValue, "recommendation.priority", AUDIT_PRIORITIES);
+  }
+
+  if (recommendations.length > 0) {
+    const recommendation = recommendations[0];
+    assertRecord(recommendation);
+    assertField(recommendation, "ruleId");
+    assertField(recommendation, "priority");
+    assertField(recommendation, "message");
+    assertString(recommendation.ruleId, "recommendation.ruleId");
+    assertString(recommendation.message, "recommendation.message");
+
+    const recommendationPriority = recommendation.priority;
+    assertString(recommendationPriority, "recommendation.priority");
+    assertOneOf(recommendationPriority, "recommendation.priority", AUDIT_PRIORITIES);
+  }
+
+  if (summaryRecommendations.total !== recommendations.length) {
+    throw new Error("summary.recommendations.total must match recommendations length");
+  }
+
+  const recommendationPriorityCounts: Record<string, number> = {};
+  for (const recommendationValue of recommendations) {
+    assertRecord(recommendationValue);
+    const priority = recommendationValue.priority;
+    assertString(priority, "recommendation.priority");
+    assertOneOf(priority, "recommendation.priority", AUDIT_PRIORITIES);
+    recommendationPriorityCounts[priority] = (recommendationPriorityCounts[priority] ?? 0) + 1;
+  }
+
+  for (const priority of AUDIT_PRIORITIES) {
+    const actualRecommendationPriorityCount =
+      priority in recommendationsByPriority ? recommendationsByPriority[priority] : 0;
+    assertNumber(actualRecommendationPriorityCount, `summary.recommendationsByPriority.${priority}`);
+
+    const actualSummaryRecommendationPriorityCount =
+      priority in summaryRecommendationsByPriority ? summaryRecommendationsByPriority[priority] : 0;
+    assertNumber(actualSummaryRecommendationPriorityCount, `summary.recommendations.byPriority.${priority}`);
+
+    const expectedRecommendationPriorityCount = recommendationPriorityCounts[priority] ?? 0;
+
+    if (actualRecommendationPriorityCount !== expectedRecommendationPriorityCount) {
+      throw new Error(`summary.recommendationsByPriority.${priority} must match recommendation priority count`);
+    }
+
+    if (actualSummaryRecommendationPriorityCount !== expectedRecommendationPriorityCount) {
+      throw new Error(`summary.recommendations.byPriority.${priority} must match recommendation priority count`);
+    }
+  }
+}
+
 function validatePayload(command: readonly string[], json: unknown): void {
   assertRecord(json);
   assertField(json, "schemaVersion");
@@ -64,256 +345,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
   const commandName = command[0];
 
   if (commandName === "audit") {
-    assertField(json, "generatedAt");
-    assertString(json.generatedAt, "generatedAt");
-    if (Number.isNaN(Date.parse(json.generatedAt))) {
-      throw new Error("generatedAt must be parseable date");
-    }
-    assertField(json, "summary");
-    const summary = json.summary;
-    assertRecord(summary);
-    assertField(summary, "status");
-    assertField(summary, "total");
-    assertField(summary, "pass");
-    assertField(summary, "warning");
-    assertField(summary, "fail");
-    assertField(summary, "skipped");
-    assertField(summary, "score");
-    assertField(summary, "byCategory");
-    assertField(summary, "byPriority");
-    assertField(summary, "recommendationsByPriority");
-    assertField(summary, "recommendations");
-    const summaryStatus = summary.status;
-    assertString(summaryStatus, "summary.status");
-    assertOneOf(summaryStatus, "summary.status", AUDIT_SUMMARY_STATUSES);
-    assertNumber(summary.total, "summary.total");
-    assertNumber(summary.pass, "summary.pass");
-    assertNumber(summary.warning, "summary.warning");
-    assertNumber(summary.fail, "summary.fail");
-    assertNumber(summary.skipped, "summary.skipped");
-    assertNumber(summary.score, "summary.score");
-
-    const byCategory = summary.byCategory;
-    assertRecord(byCategory);
-    for (const category of AUDIT_CATEGORIES) {
-      if (category in byCategory) {
-        assertNumber(byCategory[category], `summary.byCategory.${category}`);
-      }
-    }
-
-    const byPriority = summary.byPriority;
-    assertRecord(byPriority);
-    for (const priority of AUDIT_PRIORITIES) {
-      if (priority in byPriority) {
-        assertNumber(byPriority[priority], `summary.byPriority.${priority}`);
-      }
-    }
-
-    const recommendationsByPriority = summary.recommendationsByPriority;
-    assertRecord(recommendationsByPriority);
-    for (const priority of AUDIT_PRIORITIES) {
-      if (priority in recommendationsByPriority) {
-        assertNumber(recommendationsByPriority[priority], `summary.recommendationsByPriority.${priority}`);
-      }
-    }
-
-    const summaryRecommendations = summary.recommendations;
-    assertRecord(summaryRecommendations);
-    assertField(summaryRecommendations, "total");
-    assertField(summaryRecommendations, "byPriority");
-    assertNumber(summaryRecommendations.total, "summary.recommendations.total");
-
-    const summaryRecommendationsByPriority = summaryRecommendations.byPriority;
-    assertRecord(summaryRecommendationsByPriority);
-    for (const priority of AUDIT_PRIORITIES) {
-      if (priority in summaryRecommendationsByPriority) {
-        assertNumber(summaryRecommendationsByPriority[priority], `summary.recommendations.byPriority.${priority}`);
-      }
-    }
-    assertField(json, "findings");
-    const findings = json.findings;
-    assertArray(findings);
-    const findingRuleIds = new Set<string>();
-    const findingsByRuleId = new Map<string, Record<string, unknown>>();
-    for (const findingValue of findings) {
-      assertRecord(findingValue);
-      assertString(findingValue.ruleId, "finding.ruleId");
-      if (findingRuleIds.has(findingValue.ruleId)) {
-        throw new Error(`finding.ruleId must be unique: ${findingValue.ruleId}`);
-      }
-      findingRuleIds.add(findingValue.ruleId);
-      findingsByRuleId.set(findingValue.ruleId, findingValue);
-      assertString(findingValue.message, "finding.message");
-
-      const findingCategoryValue = findingValue.category;
-      assertString(findingCategoryValue, "finding.category");
-      assertOneOf(findingCategoryValue, "finding.category", AUDIT_CATEGORIES);
-
-      const findingSeverityValue = findingValue.severity;
-      assertString(findingSeverityValue, "finding.severity");
-      assertOneOf(findingSeverityValue, "finding.severity", AUDIT_SEVERITIES);
-
-      const findingStatusValue = findingValue.status;
-      assertString(findingStatusValue, "finding.status");
-      assertOneOf(findingStatusValue, "finding.status", AUDIT_FINDING_STATUSES);
-
-      const findingPriorityValue = findingValue.priority;
-      assertString(findingPriorityValue, "finding.priority");
-      assertOneOf(findingPriorityValue, "finding.priority", AUDIT_PRIORITIES);
-    }
-    const summaryCountTotal = summary.pass + summary.warning + summary.fail + summary.skipped;
-    if (summary.total !== findings.length) {
-      throw new Error("summary.total must match findings length");
-    }
-    if (summary.total !== summaryCountTotal) {
-      throw new Error("summary.total must match summary count total");
-    }
-
-    const expectedScore = summary.total === 0 ? 100 : Math.round((summary.pass / summary.total) * 100);
-    if (summary.score !== expectedScore) {
-      throw new Error("summary.score must match pass ratio");
-    }
-
-    const expectedStatus = summary.fail > 0 ? "fail" : summary.warning > 0 ? "warning" : "pass";
-    if (summaryStatus !== expectedStatus) {
-      throw new Error("summary.status must match finding counts");
-    }
-
-    const categoryCounts: Record<string, number> = {};
-    for (const finding of findings) {
-      assertRecord(finding);
-      const category = finding.category;
-      assertString(category, "finding.category");
-      assertOneOf(category, "finding.category", AUDIT_CATEGORIES);
-      categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
-    }
-
-    for (const category of AUDIT_CATEGORIES) {
-      const actualCategoryCount = category in byCategory ? byCategory[category] : 0;
-      assertNumber(actualCategoryCount, `summary.byCategory.${category}`);
-      const expectedCategoryCount = categoryCounts[category] ?? 0;
-
-      if (actualCategoryCount !== expectedCategoryCount) {
-        throw new Error(`summary.byCategory.${category} must match finding category count`);
-      }
-    }
-
-    const priorityCounts: Record<string, number> = {};
-    for (const finding of findings) {
-      assertRecord(finding);
-      const priority = finding.priority;
-      assertString(priority, "finding.priority");
-      assertOneOf(priority, "finding.priority", AUDIT_PRIORITIES);
-      priorityCounts[priority] = (priorityCounts[priority] ?? 0) + 1;
-    }
-
-    for (const priority of AUDIT_PRIORITIES) {
-      const actualPriorityCount = priority in byPriority ? byPriority[priority] : 0;
-      assertNumber(actualPriorityCount, `summary.byPriority.${priority}`);
-      const expectedPriorityCount = priorityCounts[priority] ?? 0;
-
-      if (actualPriorityCount !== expectedPriorityCount) {
-        throw new Error(`summary.byPriority.${priority} must match finding priority count`);
-      }
-    }
-    if (findings.length > 0) {
-      const finding = findings[0];
-      assertRecord(finding);
-      assertField(finding, "ruleId");
-      assertField(finding, "category");
-      assertField(finding, "severity");
-      assertField(finding, "status");
-      assertField(finding, "priority");
-      assertField(finding, "message");
-      assertString(finding.ruleId, "finding.ruleId");
-      assertString(finding.message, "finding.message");
-
-      const findingCategory = finding.category;
-      assertString(findingCategory, "finding.category");
-      assertOneOf(findingCategory, "finding.category", AUDIT_CATEGORIES);
-
-      const findingSeverity = finding.severity;
-      assertString(findingSeverity, "finding.severity");
-      assertOneOf(findingSeverity, "finding.severity", AUDIT_SEVERITIES);
-
-      const findingStatus = finding.status;
-      assertString(findingStatus, "finding.status");
-      assertOneOf(findingStatus, "finding.status", AUDIT_FINDING_STATUSES);
-
-      const findingPriority = finding.priority;
-      assertString(findingPriority, "finding.priority");
-      assertOneOf(findingPriority, "finding.priority", AUDIT_PRIORITIES);
-    }
-    assertField(json, "recommendations");
-    const recommendations = json.recommendations;
-    assertArray(recommendations);
-    const recommendationRuleIds = new Set<string>();
-    for (const recommendationValue of recommendations) {
-      assertRecord(recommendationValue);
-      assertString(recommendationValue.ruleId, "recommendation.ruleId");
-      if (!findingRuleIds.has(recommendationValue.ruleId)) {
-        throw new Error(`recommendation.ruleId must reference an existing finding.ruleId: ${recommendationValue.ruleId}`);
-      }
-      const referencedFinding = findingsByRuleId.get(recommendationValue.ruleId);
-      if (referencedFinding?.status === "pass") {
-        throw new Error(`recommendation.ruleId must reference an actionable finding.ruleId: ${recommendationValue.ruleId}`);
-      }
-      if (recommendationRuleIds.has(recommendationValue.ruleId)) {
-        throw new Error(`recommendation.ruleId must be unique: ${recommendationValue.ruleId}`);
-      }
-      recommendationRuleIds.add(recommendationValue.ruleId);
-      assertString(recommendationValue.message, "recommendation.message");
-
-      const recommendationPriorityValue = recommendationValue.priority;
-      assertString(recommendationPriorityValue, "recommendation.priority");
-      assertOneOf(recommendationPriorityValue, "recommendation.priority", AUDIT_PRIORITIES);
-    }
-    if (recommendations.length > 0) {
-      const recommendation = recommendations[0];
-      assertRecord(recommendation);
-      assertField(recommendation, "ruleId");
-      assertField(recommendation, "priority");
-      assertField(recommendation, "message");
-      assertString(recommendation.ruleId, "recommendation.ruleId");
-      assertString(recommendation.message, "recommendation.message");
-
-      const recommendationPriority = recommendation.priority;
-      assertString(recommendationPriority, "recommendation.priority");
-      assertOneOf(recommendationPriority, "recommendation.priority", AUDIT_PRIORITIES);
-    }
-
-    if (summaryRecommendations.total !== recommendations.length) {
-      throw new Error("summary.recommendations.total must match recommendations length");
-    }
-
-    const recommendationPriorityCounts: Record<string, number> = {};
-    for (const recommendationValue of recommendations) {
-      assertRecord(recommendationValue);
-      const priority = recommendationValue.priority;
-      assertString(priority, "recommendation.priority");
-      assertOneOf(priority, "recommendation.priority", AUDIT_PRIORITIES);
-      recommendationPriorityCounts[priority] = (recommendationPriorityCounts[priority] ?? 0) + 1;
-    }
-
-    for (const priority of AUDIT_PRIORITIES) {
-      const actualRecommendationPriorityCount =
-        priority in recommendationsByPriority ? recommendationsByPriority[priority] : 0;
-      assertNumber(actualRecommendationPriorityCount, `summary.recommendationsByPriority.${priority}`);
-
-      const actualSummaryRecommendationPriorityCount =
-        priority in summaryRecommendationsByPriority ? summaryRecommendationsByPriority[priority] : 0;
-      assertNumber(actualSummaryRecommendationPriorityCount, `summary.recommendations.byPriority.${priority}`);
-
-      const expectedRecommendationPriorityCount = recommendationPriorityCounts[priority] ?? 0;
-
-      if (actualRecommendationPriorityCount !== expectedRecommendationPriorityCount) {
-        throw new Error(`summary.recommendationsByPriority.${priority} must match recommendation priority count`);
-      }
-
-      if (actualSummaryRecommendationPriorityCount !== expectedRecommendationPriorityCount) {
-        throw new Error(`summary.recommendations.byPriority.${priority} must match recommendation priority count`);
-      }
-    }
+    validateAuditJsonPayload(json);
   } else if (commandName === "summary") {
     assertField(json, "projects");
   } else if (commandName === "context") {

@@ -1396,12 +1396,14 @@ export const JSON_AUDIT_NESTED_RECOMMENDATION_SUMMARY_CONTRACT_RULE: AuditRule =
       "recommendations: {",
       "total: number;",
       "byPriority: Partial<Record<AuditPriority, number>>;",
+      "export function validateAuditJsonPayload",
       "const summaryRecommendations = summary.recommendations",
       "assertField(summaryRecommendations, \"total\")",
       "assertNumber(summaryRecommendations.total, \"summary.recommendations.total\")",
       "assertField(summaryRecommendations, \"byPriority\")",
       "const summaryRecommendationsByPriority = summaryRecommendations.byPriority",
       "assertRecord(summaryRecommendationsByPriority)",
+      "summary.recommendations.byPriority must match summary.recommendationsByPriority",
       "summary.recommendations.byPriority.${priority} must match recommendation priority count",
       "summary.recommendationsByPriority.${priority} must match recommendation priority count",
       "priority in summaryRecommendationsByPriority ? summaryRecommendationsByPriority[priority] : 0",
@@ -1423,6 +1425,53 @@ export const JSON_AUDIT_NESTED_RECOMMENDATION_SUMMARY_CONTRACT_RULE: AuditRule =
     return pass(
       JSON_AUDIT_NESTED_RECOMMENDATION_SUMMARY_CONTRACT_RULE,
       "json-check asserts the nested recommendation summary contract.",
+      expectedTokens,
+    );
+  },
+};
+
+export const JSON_AUDIT_RECOMMENDATION_SUMMARY_SYNC_REGRESSION_TEST_RULE: AuditRule = {
+  id: "AUDIT-051",
+  category: "architecture",
+  severity: "warning",
+  title: "Recommendation summary sync regression test exists",
+  description: "A regression test should prove that the JSON audit validator rejects mismatched legacy and canonical recommendation summary counts.",
+  check: () => {
+    const testPath = "tests/commands/json-check.test.ts";
+
+    if (!existsSync(testPath)) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_SUMMARY_SYNC_REGRESSION_TEST_RULE,
+        "Recommendation summary sync regression test is missing.",
+        [testPath],
+        "Add a regression test that calls validateAuditJsonPayload and expects the legacy/canonical sync error.",
+      );
+    }
+
+    const content = readFileSync(testPath, "utf8");
+    const expectedTokens = [
+      "validateAuditJsonPayload",
+      "summary.recommendationsByPriority.medium = 1",
+      "summary.recommendations.byPriority.medium = 2",
+      "summary.recommendations.byPriority must match summary.recommendationsByPriority",
+      "node:test",
+      "node:assert/strict",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_SUMMARY_SYNC_REGRESSION_TEST_RULE,
+        "Recommendation summary sync regression test is incomplete.",
+        missing,
+        "Keep the regression test focused on the mismatched legacy and canonical recommendation summary values.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_RECOMMENDATION_SUMMARY_SYNC_REGRESSION_TEST_RULE,
+      "Recommendation summary sync regression test exists.",
       expectedTokens,
     );
   },
