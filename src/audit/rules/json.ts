@@ -1227,6 +1227,52 @@ export const JSON_AUDIT_FINDING_RULE_ID_UNIQUENESS_ASSERTION_RULE: AuditRule = {
   },
 };
 
+export const JSON_AUDIT_RECOMMENDATION_RULE_ID_UNIQUENESS_ASSERTION_RULE: AuditRule = {
+  id: "JSON-030",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts audit recommendation ruleId uniqueness",
+  description: "json-check should assert that every audit recommendation ruleId is unique.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_RULE_ID_UNIQUENESS_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so audit recommendation ruleId uniqueness can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      "const recommendationRuleIds = new Set<string>()",
+      "recommendationRuleIds.has(recommendationValue.ruleId)",
+      "recommendation.ruleId must be unique",
+      "recommendationRuleIds.add(recommendationValue.ruleId)",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_AUDIT_RECOMMENDATION_RULE_ID_UNIQUENESS_ASSERTION_RULE,
+        "json-check does not assert audit recommendation ruleId uniqueness.",
+        missing,
+        "Ensure json-check rejects duplicate recommendation.ruleId values.",
+      );
+    }
+
+    return pass(
+      JSON_AUDIT_RECOMMENDATION_RULE_ID_UNIQUENESS_ASSERTION_RULE,
+      "json-check asserts audit recommendation ruleId uniqueness.",
+      expectedTokens,
+    );
+  },
+};
+
+
 
 
 

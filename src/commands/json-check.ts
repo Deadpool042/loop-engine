@@ -221,9 +221,14 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(json, "recommendations");
     const recommendations = json.recommendations;
     assertArray(recommendations);
+    const recommendationRuleIds = new Set<string>();
     for (const recommendationValue of recommendations) {
       assertRecord(recommendationValue);
       assertString(recommendationValue.ruleId, "recommendation.ruleId");
+      if (recommendationRuleIds.has(recommendationValue.ruleId)) {
+        throw new Error(`recommendation.ruleId must be unique: ${recommendationValue.ruleId}`);
+      }
+      recommendationRuleIds.add(recommendationValue.ruleId);
       assertString(recommendationValue.message, "recommendation.message");
 
       const recommendationPriorityValue = recommendationValue.priority;
