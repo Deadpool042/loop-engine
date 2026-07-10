@@ -16,6 +16,12 @@ type ProfileExpectation = {
   readonly categories: readonly string[];
 };
 
+type CommandFailureExpectation = {
+  readonly name: string;
+  readonly args: readonly string[];
+  readonly expectedOutput: string;
+};
+
 const PROFILE_EXPECTATIONS: readonly ProfileExpectation[] = [
   { profile: "quick", categories: ["architecture", "cli"] },
   { profile: "strict", categories: ["json", "cli", "docs", "architecture"] },
@@ -25,7 +31,26 @@ const PROFILE_EXPECTATIONS: readonly ProfileExpectation[] = [
   { profile: "architecture", categories: ["architecture"] },
 ];
 
-function runAuditProfile(profile: string): AuditProfileReport {
+const FAILURE_EXPECTATIONS: readonly CommandFailureExpectation[] = [
+  {
+    name: "invalid profile",
+    args: ["exec", "tsx", "src/cli.ts", "audit", "--json", "--profile", "unknown"],
+    expectedOutput: "Invalid audit profile",
+  },
+  {
+    name: "missing profile value",
+    args: ["exec", "tsx", "src/cli.ts", "audit", "--json", "--profile"],
+    expectedOutput: "Invalid audit profile: <missing>",
+  },
+];
+
+function assert(condition: boolean, message: string): void {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function runAuditProfileCommand(profile: string): AuditProfileReport {
   const output = execFileSync(
     "pnpm",
     ["exec", "tsx", "src/cli.ts", "audit", "--json", "--profile", profile],
@@ -35,21 +60,18 @@ function runAuditProfile(profile: string): AuditProfileReport {
   return JSON.parse(output) as AuditProfileReport;
 }
 
-function assert(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
-function assertProfile(expectation: ProfileExpectation): void {
-  const report = runAuditProfile(expectation.profile);
-  const expectedCategories = new Set(expectation.categories);
-  const actualCategories = Object.entries(report.summary.byCategory)
+function getActualCategories(report: AuditProfileReport): readonly string[] {
+  return Object.entries(report.summary.byCategory)
     .filter(([, count]) => (count ?? 0) > 0)
     .map(([category]) => category);
+}
 
-  assert(report.summary.total === report.findings.length, `${expectation.profile}: total should match findings length`);
-  assert(report.findings.length > 0, `${expectation.profile}: should return at least one finding`);
+function assertExpectedCategories(
+  expectation: ProfileExpectation,
+  report: AuditProfileReport,
+): void {
+  const expectedCategories = new Set(expectation.categories);
+  const actualCategories = getActualCategories(report);
 
   for (const category of actualCategories) {
     assert(
@@ -73,38 +95,38 @@ function assertProfile(expectation: ProfileExpectation): void {
   }
 }
 
+function assertProfile(expectation: ProfileExpectation): void {
+  const report = runAuditProfileCommand(expectation.profile);
 
+  assert(report.summary.total === report.findings.length, `${expectation.profile}: total should match findings length`);
+  assert(report.findings.length > 0, `${expectation.profile}: should return at least one finding`);
 
-function assertMissingProfileValueFails(): void {
-  const result = spawnSync(
-    "pnpm",
-    ["exec", "tsx", "src/cli.ts", "audit", "--json", "--profile"],
-    { encoding: "utf8" },
-  );
+  assertExpectedCategories(expectation, report);
+}
 
+function assertCommandFails(expectation: CommandFailureExpectation): void {
+  const result = spawnSync("pnpm", expectation.args, { encoding: "utf8" });
   const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
 
-  assert(result.status !== 0, "missing profile value should exit with a non-zero status");
+  assert(result.status !== 0, `${expectation.name} should exit with a non-zero status`);
   assert(
-    output.includes("Invalid audit profile: <missing>"),
-    "missing profile value should print Invalid audit profile: <missing>",
+    output.includes(expectation.expectedOutput),
+    `${expectation.name} should print ${expectation.expectedOutput}`,
   );
 }
 
 function assertInvalidProfileFails(): void {
-  const result = spawnSync(
-    "pnpm",
-    ["exec", "tsx", "src/cli.ts", "audit", "--json", "--profile", "unknown"],
-    { encoding: "utf8" },
-  );
+  const expectation = FAILURE_EXPECTATIONS.find(({ name }) => name === "invalid profile");
 
-  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  assert(expectation !== undefined, "invalid profile failure expectation should exist");
+  assertCommandFails(expectation);
+}
 
-  assert(result.status !== 0, "invalid profile should exit with a non-zero status");
-  assert(
-    output.includes("Invalid audit profile"),
-    "invalid profile should print Invalid audit profile",
-  );
+function assertMissingProfileValueFails(): void {
+  const expectation = FAILURE_EXPECTATIONS.find(({ name }) => name === "missing profile value");
+
+  assert(expectation !== undefined, "missing profile value failure expectation should exist");
+  assertCommandFails(expectation);
 }
 
 for (const expectation of PROFILE_EXPECTATIONS) {

@@ -2047,3 +2047,54 @@ export const AUDIT_MISSING_PROFILE_VALUE_CHECK_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_PROFILE_CHECK_SCRIPT_FACTORING_RULE: AuditRule = {
+  id: "AUDIT-040",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit profile check script is factored",
+  description: "The audit profile CI check script should use focused helpers for profile execution, category assertions, and failure assertions.",
+  check: () => {
+    const scriptPath = "scripts/audit-profile-check.ts";
+
+    if (!existsSync(scriptPath)) {
+      return fail(
+        AUDIT_PROFILE_CHECK_SCRIPT_FACTORING_RULE,
+        "Audit profile check script is missing.",
+        [scriptPath],
+        "Create scripts/audit-profile-check.ts and factor reusable checks into helpers.",
+      );
+    }
+
+    const scriptContent = readFileSync(scriptPath, "utf8");
+
+    const expectedTokens = [
+      "runAuditProfileCommand",
+      "getActualCategories",
+      "assertExpectedCategories",
+      "assertCommandFails",
+      "FAILURE_EXPECTATIONS",
+      "CommandFailureExpectation",
+      "PROFILE_EXPECTATIONS",
+      "assertInvalidProfileFails",
+      "assertMissingProfileValueFails",
+    ];
+
+    const missing = expectedTokens.filter((token) => !scriptContent.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_PROFILE_CHECK_SCRIPT_FACTORING_RULE,
+        "Audit profile check script is not sufficiently factored.",
+        missing,
+        "Factor profile execution, category assertions, and failure assertions into reusable helpers.",
+      );
+    }
+
+    return pass(
+      AUDIT_PROFILE_CHECK_SCRIPT_FACTORING_RULE,
+      "Audit profile check script is factored.",
+      expectedTokens,
+    );
+  },
+};
+
