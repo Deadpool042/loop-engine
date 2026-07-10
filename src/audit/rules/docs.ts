@@ -343,3 +343,57 @@ export const README_AUDIT_PROFILE_DOCUMENTATION_RULE: AuditRule = {
   },
 };
 
+export const ARCHITECTURE_AUDIT_PROFILE_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-007",
+  category: "docs",
+  severity: "warning",
+  title: "Architecture docs document audit profiles",
+  description: "The architecture audit documentation should document audit profiles and their public usage.",
+  check: () => {
+    const architecturePath = "docs/architecture/audit-engine.md";
+
+    if (!existsSync(architecturePath)) {
+      return fail(
+        ARCHITECTURE_AUDIT_PROFILE_DOCUMENTATION_RULE,
+        "Audit architecture documentation is missing.",
+        [architecturePath],
+        "Create docs/architecture/audit-engine.md and document audit profiles.",
+      );
+    }
+
+    const content = readFileSync(architecturePath, "utf8");
+    const expectedTokens = [
+      "Profils d'audit",
+      "--profile",
+      "pnpm loop audit --profile docs",
+      "pnpm loop audit --json --profile docs",
+      "pnpm loop audit --json --profile json",
+      "pnpm loop audit --json --profile architecture",
+      "`quick`",
+      "`strict`",
+      "`release`",
+      "`docs`",
+      "`json`",
+      "`architecture`",
+      "contrat de sortie",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        ARCHITECTURE_AUDIT_PROFILE_DOCUMENTATION_RULE,
+        "Audit architecture profile documentation is incomplete.",
+        missing,
+        "Document audit profiles in docs/architecture/audit-engine.md.",
+      );
+    }
+
+    return pass(
+      ARCHITECTURE_AUDIT_PROFILE_DOCUMENTATION_RULE,
+      "Architecture docs document audit profiles.",
+      expectedTokens,
+    );
+  },
+};
+

@@ -170,3 +170,27 @@ La première règle active est :
 
 La sortie JSON de `audit` est incluse dans `json-check`.
 
+
+## Profils d'audit
+
+Le moteur d'audit supporte des profils d'exécution via `--profile`.
+
+Exemples :
+
+```bash
+pnpm loop audit --profile docs
+pnpm loop audit --json --profile docs
+pnpm loop audit --json --profile json
+pnpm loop audit --json --profile architecture
+```
+
+Les profils disponibles sont :
+
+- `quick`
+- `strict`
+- `release`
+- `docs`
+- `json`
+- `architecture`
+
+Chaque profil sélectionne un sous-ensemble de règles selon leurs catégories. Le rapport conserve le même contrat de sortie, y compris en JSON.
