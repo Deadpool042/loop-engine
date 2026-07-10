@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildAuditRecommendations } from "../src/audit/recommendations.js";
+import { buildAuditRecommendations, countAuditRecommendationsByPriority } from "../src/audit/recommendations.js";
 import type { AuditFinding } from "../src/audit/types.js";
 
 const baseFinding = {
@@ -86,4 +86,41 @@ test("buildAuditRecommendations sorts recommendations by priority while keeping 
     buildAuditRecommendations(findings).map((recommendation) => recommendation.ruleId),
     ["AUDIT-994", "AUDIT-993", "AUDIT-992", "AUDIT-995"],
   );
+});
+
+
+test("countAuditRecommendationsByPriority counts recommendations by priority", () => {
+  assert.deepEqual(
+    countAuditRecommendationsByPriority([
+      {
+        ruleId: "AUDIT-991",
+        priority: "high",
+        message: "High priority recommendation.",
+      },
+      {
+        ruleId: "AUDIT-990",
+        priority: "medium",
+        message: "First medium priority recommendation.",
+      },
+      {
+        ruleId: "AUDIT-989",
+        priority: "medium",
+        message: "Second medium priority recommendation.",
+      },
+      {
+        ruleId: "AUDIT-988",
+        priority: "low",
+        message: "Low priority recommendation.",
+      },
+    ]),
+    {
+      high: 1,
+      medium: 2,
+      low: 1,
+    },
+  );
+});
+
+test("countAuditRecommendationsByPriority returns an empty object without recommendations", () => {
+  assert.deepEqual(countAuditRecommendationsByPriority([]), {});
 });

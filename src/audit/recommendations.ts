@@ -25,3 +25,15 @@ export function buildAuditRecommendations(
       message: finding.recommendation!,
     }));
 }
+
+export function countAuditRecommendationsByPriority(
+  recommendations: readonly AuditRecommendation[],
+): Partial<Record<AuditPriority, number>> {
+  return recommendations.reduce<Partial<Record<AuditPriority, number>>>(
+    (counts, recommendation) => {
+      counts[recommendation.priority] = (counts[recommendation.priority] ?? 0) + 1;
+      return counts;
+    },
+    {},
+  );
+}

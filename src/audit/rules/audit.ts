@@ -2256,3 +2256,58 @@ export const AUDIT_RECOMMENDATION_PRIORITY_SORT_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_RECOMMENDATION_PRIORITY_COUNT_RULE: AuditRule = {
+  id: "AUDIT-044",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit recommendations can be counted by priority",
+  description: "Audit recommendation reporting should expose a pure helper for counting recommendations by priority.",
+  check: () => {
+    const recommendationPath = "src/audit/recommendations.ts";
+    const testPath = "tests/recommendations.test.ts";
+
+    if (!existsSync(recommendationPath) || !existsSync(testPath)) {
+      return fail(
+        AUDIT_RECOMMENDATION_PRIORITY_COUNT_RULE,
+        "Audit recommendation priority count implementation or test is missing.",
+        [recommendationPath, testPath],
+        "Add countAuditRecommendationsByPriority and cover it with tests.",
+      );
+    }
+
+    const recommendationContent = readFileSync(recommendationPath, "utf8");
+    const testContent = readFileSync(testPath, "utf8");
+    const haystack = `${recommendationContent}\n${testContent}`;
+
+    const expectedTokens = [
+      "export function countAuditRecommendationsByPriority",
+      "recommendations: readonly AuditRecommendation[]",
+      "Partial<Record<AuditPriority, number>>",
+      "recommendations.reduce<Partial<Record<AuditPriority, number>>>",
+      "counts[recommendation.priority] = (counts[recommendation.priority] ?? 0) + 1",
+      "countAuditRecommendationsByPriority counts recommendations by priority",
+      "countAuditRecommendationsByPriority returns an empty object without recommendations",
+      "high: 1",
+      "medium: 2",
+      "low: 1",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_PRIORITY_COUNT_RULE,
+        "Audit recommendation priority count helper is incomplete.",
+        missing,
+        "Expose and test countAuditRecommendationsByPriority.",
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_PRIORITY_COUNT_RULE,
+      "Audit recommendations can be counted by priority.",
+      expectedTokens,
+    );
+  },
+};
+
