@@ -1,6 +1,7 @@
 import type { AuditProfile, AuditReport } from "./types.js";
 import { AUDIT_RULES } from "./rules.js";
 import { selectAuditRulesForProfile } from "./profiles.js";
+import { buildAuditRecommendations } from "./recommendations.js";
 
 export type AuditRunOptions = {
   readonly profile?: AuditProfile | undefined;
@@ -33,13 +34,7 @@ export function runAudit(options: AuditRunOptions = {}): AuditReport {
     },
     {},
   );
-  const recommendations = findings
-    .filter((finding) => finding.recommendation)
-    .map((finding) => ({
-      ruleId: finding.ruleId,
-      priority: finding.priority,
-      message: finding.recommendation!,
-    }));
+  const recommendations = buildAuditRecommendations(findings);
 
   return {
     schemaVersion: 1,

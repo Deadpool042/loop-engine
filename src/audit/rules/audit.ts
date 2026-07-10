@@ -2098,3 +2098,57 @@ export const AUDIT_PROFILE_CHECK_SCRIPT_FACTORING_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_RECOMMENDATION_BUILDER_RULE: AuditRule = {
+  id: "AUDIT-041",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit recommendations are built by a dedicated helper",
+  description: "Audit recommendation extraction should be isolated from the runner in a dedicated recommendation builder.",
+  check: () => {
+    const recommendationPath = "src/audit/recommendations.ts";
+    const runnerPath = "src/audit/runner.ts";
+
+    if (!existsSync(recommendationPath) || !existsSync(runnerPath)) {
+      return fail(
+        AUDIT_RECOMMENDATION_BUILDER_RULE,
+        "Audit recommendation builder or runner is missing.",
+        [recommendationPath, runnerPath],
+        "Create src/audit/recommendations.ts and use it from src/audit/runner.ts.",
+      );
+    }
+
+    const recommendationContent = readFileSync(recommendationPath, "utf8");
+    const runnerContent = readFileSync(runnerPath, "utf8");
+    const haystack = `${recommendationContent}\n${runnerContent}`;
+
+    const expectedTokens = [
+      "export function buildAuditRecommendations",
+      "readonly AuditFinding[]",
+      "readonly AuditRecommendation[]",
+      "finding.recommendation",
+      "ruleId: finding.ruleId",
+      "priority: finding.priority",
+      "message: finding.recommendation!",
+      "buildAuditRecommendations(findings)",
+      "./recommendations.js",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_BUILDER_RULE,
+        "Audit recommendation extraction is not isolated in a dedicated builder.",
+        missing,
+        "Move recommendation extraction into src/audit/recommendations.ts and call it from the runner.",
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_BUILDER_RULE,
+      "Audit recommendations are built by a dedicated helper.",
+      expectedTokens,
+    );
+  },
+};
+
