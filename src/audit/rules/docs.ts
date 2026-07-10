@@ -289,3 +289,57 @@ export const AUDIT_FINAL_REPORT_REGISTRY_CHECKS_RULE: AuditRule = {
     );
   },
 };
+
+export const README_AUDIT_PROFILE_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-006",
+  category: "docs",
+  severity: "warning",
+  title: "README documents audit profiles",
+  description: "The README should document the public audit --profile option and available profile names.",
+  check: () => {
+    const readmePath = "README.md";
+
+    if (!existsSync(readmePath)) {
+      return fail(
+        README_AUDIT_PROFILE_DOCUMENTATION_RULE,
+        "README is missing.",
+        [readmePath],
+        "Create README.md and document audit profiles.",
+      );
+    }
+
+    const content = readFileSync(readmePath, "utf8");
+    const expectedTokens = [
+      "Profils d'audit",
+      "--profile",
+      "pnpm loop audit --profile docs",
+      "pnpm loop audit --json --profile docs",
+      "pnpm loop audit --json --profile json",
+      "pnpm loop audit --json --profile architecture",
+      "`quick`",
+      "`strict`",
+      "`release`",
+      "`docs`",
+      "`json`",
+      "`architecture`",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        README_AUDIT_PROFILE_DOCUMENTATION_RULE,
+        "README audit profile documentation is incomplete.",
+        missing,
+        "Document the public audit --profile option and supported profile names.",
+      );
+    }
+
+    return pass(
+      README_AUDIT_PROFILE_DOCUMENTATION_RULE,
+      "README documents audit profiles.",
+      expectedTokens,
+    );
+  },
+};
+

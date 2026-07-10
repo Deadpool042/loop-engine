@@ -149,3 +149,28 @@ Le script `pnpm run ci` exécute la validation générale puis l'audit strict. I
 ## Voir aussi
 
 - [Audit Engine V3 — Rapport final](docs/audits/audit-engine-v3-final.md)
+
+
+### Profils d'audit
+
+La commande `audit` accepte un profil optionnel avec `--profile`.
+
+Exemples :
+
+```bash
+pnpm loop audit --profile docs
+pnpm loop audit --json --profile docs
+pnpm loop audit --json --profile json
+pnpm loop audit --json --profile architecture
+```
+
+Profils disponibles :
+
+- `quick`
+- `strict`
+- `release`
+- `docs`
+- `json`
+- `architecture`
+
+Les profils filtrent les règles exécutées par catégorie, sans modifier le format du rapport.
