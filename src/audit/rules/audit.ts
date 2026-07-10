@@ -2202,3 +2202,57 @@ export const AUDIT_RECOMMENDATION_BUILDER_TEST_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_RECOMMENDATION_PRIORITY_SORT_RULE: AuditRule = {
+  id: "AUDIT-043",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit recommendations are sorted by priority",
+  description: "Audit recommendations should be sorted deterministically by priority while preserving original order within equal priority.",
+  check: () => {
+    const recommendationPath = "src/audit/recommendations.ts";
+    const testPath = "tests/recommendations.test.ts";
+
+    if (!existsSync(recommendationPath) || !existsSync(testPath)) {
+      return fail(
+        AUDIT_RECOMMENDATION_PRIORITY_SORT_RULE,
+        "Audit recommendation priority sorting implementation or test is missing.",
+        [recommendationPath, testPath],
+        "Add priority sorting to buildAuditRecommendations and cover it with tests.",
+      );
+    }
+
+    const recommendationContent = readFileSync(recommendationPath, "utf8");
+    const testContent = readFileSync(testPath, "utf8");
+    const haystack = `${recommendationContent}\n${testContent}`;
+
+    const expectedTokens = [
+      "AUDIT_RECOMMENDATION_PRIORITY_ORDER",
+      "Record<AuditPriority, number>",
+      "high: 0",
+      "medium: 1",
+      "low: 2",
+      ".map((finding, index) => ({ finding, index }))",
+      "priorityDelta === 0 ? left.index - right.index : priorityDelta",
+      "sorts recommendations by priority while keeping original order within equal priority",
+      "[\"AUDIT-994\", \"AUDIT-993\", \"AUDIT-992\", \"AUDIT-995\"]",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RECOMMENDATION_PRIORITY_SORT_RULE,
+        "Audit recommendation priority sorting is incomplete.",
+        missing,
+        "Sort recommendations by high, medium, low priority and preserve original order within equal priority.",
+      );
+    }
+
+    return pass(
+      AUDIT_RECOMMENDATION_PRIORITY_SORT_RULE,
+      "Audit recommendations are sorted by priority.",
+      expectedTokens,
+    );
+  },
+};
+
