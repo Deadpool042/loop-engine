@@ -731,9 +731,9 @@ ${readmeContent}`;
 
     const expectedTokens = [
       "Audit Engine V5 — Rapport final",
-      "V5.14",
-      "95 règles exécutables",
-      "95 règles en pass",
+      "V5.14.1",
+      "96 règles exécutables",
+      "96 règles en pass",
       "score 100",
       "V5.8 / V5.8.1",
       "V5.13",
@@ -768,6 +768,63 @@ ${readmeContent}`;
     return pass(
       AUDIT_ENGINE_V5_FINAL_REPORT_RULE,
       "Audit Engine V5 final report is documented.",
+      expectedTokens,
+    );
+  },
+};
+
+export const AUDIT_ENGINE_V5_FINAL_STABLE_TAG_RULE: AuditRule = {
+  id: "DOCS-015",
+  category: "docs",
+  severity: "warning",
+  title: "Audit Engine V5 final stable tag is documented",
+  description: "The final Audit Engine V5 report should document that audit-engine-v5.14.1 is the final stable tag, that audit-engine-v5.14 is superseded, and that no history rewrite or force-push is required.",
+  check: () => {
+    const reportPath = "docs/audits/audit-engine-v5-final.md";
+    const readmePath = "docs/audits/README.md";
+
+    if (!existsSync(reportPath) || !existsSync(readmePath)) {
+      return fail(
+        AUDIT_ENGINE_V5_FINAL_STABLE_TAG_RULE,
+        "Audit Engine V5 final report or audits README is missing.",
+        [reportPath, readmePath],
+        "Create docs/audits/audit-engine-v5-final.md and document the final stable tag in docs/audits/README.md.",
+      );
+    }
+
+    const reportContent = readFileSync(reportPath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+    const haystack = `${reportContent}
+${readmeContent}`;
+
+    const expectedTokens = [
+      "audit-engine-v5.14.1",
+      "audit-engine-v5.14",
+      "tag final V5 complet",
+      "tag final stable",
+      "supersédé",
+      "ne doit pas être utilisé comme référence finale",
+      "L'historique n'a pas été réécrit",
+      "Aucun force-push n'est requis",
+      "inclut `docs/audits/audit-engine-v5-final.md`",
+      "96 règles pass",
+      "score 100",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_ENGINE_V5_FINAL_STABLE_TAG_RULE,
+        "Final stable tag documentation is incomplete.",
+        missing,
+        "Document the final V5 stable tag, the superseded tag, the preserved history, and the stable V5 closure.",
+      );
+    }
+
+    return pass(
+      AUDIT_ENGINE_V5_FINAL_STABLE_TAG_RULE,
+      "Audit Engine V5 final stable tag is documented.",
       expectedTokens,
     );
   },

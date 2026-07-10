@@ -1,7 +1,7 @@
 # Audit Engine V5 — Rapport final
 
 Date : 2026-07-10  
-Version : V5.14  
+Version : V5.14.1  
 Statut : finalisé
 
 ---
@@ -10,12 +10,12 @@ Statut : finalisé
 
 Le cycle V5 a consolidé le contrat JSON des recommandations sans modifier le format public.
 
-À la clôture de V5.13, le moteur contient 95 règles exécutables.
+À la clôture de V5.14.1, le moteur contient 96 règles exécutables.
 
 Résultat final :
 
-- 95 règles ;
-- 95 règles en pass ;
+- 96 règles ;
+- 96 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100.
@@ -34,6 +34,17 @@ Le cycle V5 a stabilisé le contrat de recommandations par étapes successives :
 - V5.11 : test de non-régression de la synchronisation legacy/canonique.
 - V5.12 : documentation du contrat stable des recommandations JSON dans le README.
 - V5.13 : formalisation du cycle de dépréciation dans le rapport final V1.
+
+---
+
+## Tag final stable
+
+- `audit-engine-v5.14.1` est le tag final V5 complet.
+- `audit-engine-v5.14` est supersédé et ne doit pas être utilisé comme référence finale.
+- L'historique n'a pas été réécrit.
+- Aucun force-push n'est requis.
+- `audit-engine-v5.14.1` inclut `docs/audits/audit-engine-v5-final.md`.
+- Le cycle V5 est clos sur 96 règles pass, score 100.
 
 ---
 

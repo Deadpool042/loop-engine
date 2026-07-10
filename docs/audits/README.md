@@ -16,7 +16,7 @@ Ils ne remplacent pas les documents d'architecture actifs.
 - `audit-engine-tests-v1.md` — couverture de tests.
 - `audit-engine-docs-v1.md` — documentation et risques d'obsolescence.
 - `audit-engine-v1-final.md` — rapport final Audit Engine V1.
-- `audit-engine-v5-final.md` — rapport final Audit Engine V5.
+- `audit-engine-v5-final.md` — rapport final Audit Engine V5, tag final stable `audit-engine-v5.14.1`.
 
 ## Audits RAG / Memory
 
