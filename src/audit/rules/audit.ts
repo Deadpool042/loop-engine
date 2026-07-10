@@ -1953,3 +1953,51 @@ export const AUDIT_PROFILE_CHECK_ALL_PUBLIC_PROFILES_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_INVALID_PROFILE_CHECK_RULE: AuditRule = {
+  id: "AUDIT-038",
+  category: "architecture",
+  severity: "warning",
+  title: "Invalid audit profiles are checked by CI",
+  description: "The audit profile CI check should verify that invalid profile names fail explicitly.",
+  check: () => {
+    const scriptPath = "scripts/audit-profile-check.ts";
+
+    if (!existsSync(scriptPath)) {
+      return fail(
+        AUDIT_INVALID_PROFILE_CHECK_RULE,
+        "Audit profile check script is missing.",
+        [scriptPath],
+        "Create scripts/audit-profile-check.ts and verify invalid profile handling.",
+      );
+    }
+
+    const scriptContent = readFileSync(scriptPath, "utf8");
+
+    const expectedTokens = [
+      "spawnSync",
+      "assertInvalidProfileFails",
+      "\"--profile\"",
+      "\"unknown\"",
+      "result.status !== 0",
+      "Invalid audit profile",
+    ];
+
+    const missing = expectedTokens.filter((token) => !scriptContent.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_INVALID_PROFILE_CHECK_RULE,
+        "Invalid audit profile handling is not checked by CI.",
+        missing,
+        "Check that an unknown audit profile exits non-zero and prints Invalid audit profile.",
+      );
+    }
+
+    return pass(
+      AUDIT_INVALID_PROFILE_CHECK_RULE,
+      "Invalid audit profiles are checked by CI.",
+      expectedTokens,
+    );
+  },
+};
+

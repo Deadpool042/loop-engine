@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 
 type AuditProfileReport = {
   readonly summary: {
@@ -73,8 +73,27 @@ function assertProfile(expectation: ProfileExpectation): void {
   }
 }
 
+
+function assertInvalidProfileFails(): void {
+  const result = spawnSync(
+    "pnpm",
+    ["exec", "tsx", "src/cli.ts", "audit", "--json", "--profile", "unknown"],
+    { encoding: "utf8" },
+  );
+
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+
+  assert(result.status !== 0, "invalid profile should exit with a non-zero status");
+  assert(
+    output.includes("Invalid audit profile"),
+    "invalid profile should print Invalid audit profile",
+  );
+}
+
 for (const expectation of PROFILE_EXPECTATIONS) {
   assertProfile(expectation);
 }
+
+assertInvalidProfileFails();
 
 console.log("audit profile checks passed");
