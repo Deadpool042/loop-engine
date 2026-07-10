@@ -830,3 +830,63 @@ ${readmeContent}`;
   },
 };
 
+export const AUDIT_STABLE_TAGS_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-016",
+  category: "docs",
+  severity: "warning",
+  title: "Stable audit tags are documented and consistent",
+  description: "The repository should expose a simple source of truth for the stable audit tags, and the audits documentation should reference it consistently.",
+  check: () => {
+    const stableTagsPath = "docs/audits/stable-tags.md";
+    const readmePath = "docs/audits/README.md";
+    const v5ReportPath = "docs/audits/audit-engine-v5-final.md";
+
+    if (!existsSync(stableTagsPath) || !existsSync(readmePath) || !existsSync(v5ReportPath)) {
+      return fail(
+        AUDIT_STABLE_TAGS_DOCUMENTATION_RULE,
+        "Stable tags documentation files are missing.",
+        [stableTagsPath, readmePath, v5ReportPath],
+        "Create docs/audits/stable-tags.md and keep it referenced from docs/audits/README.md and docs/audits/audit-engine-v5-final.md.",
+      );
+    }
+
+    const stableTagsContent = readFileSync(stableTagsPath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+    const v5ReportContent = readFileSync(v5ReportPath, "utf8");
+    const haystack = `${stableTagsContent}\n${readmeContent}\n${v5ReportContent}`;
+
+    const expectedTokens = [
+      "Source de vérité",
+      "Dernier tag stable global actuel : `audit-engine-v6.0`",
+      "Tag final stable du cycle V5 : `audit-engine-v5.14.1`",
+      "Tag supersédé : `audit-engine-v5.14`",
+      "Ne pas force-push.",
+      "Ne pas supprimer les tags supersédés.",
+      "Publier un tag correctif `.1` si une correction est nécessaire.",
+      "audit-engine-v5.14.1",
+      "audit-engine-v5.14",
+      "audit-engine-v6.0",
+      "audit-engine-v5-final.md",
+      "stable-tags.md",
+      "Tag final stable",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_STABLE_TAGS_DOCUMENTATION_RULE,
+        "Stable tags documentation is incomplete or inconsistent.",
+        missing,
+        "Document the stable tag source of truth, the superseded V5 tag, and the README/report references.",
+      );
+    }
+
+    return pass(
+      AUDIT_STABLE_TAGS_DOCUMENTATION_RULE,
+      "Stable audit tags are documented and consistent.",
+      expectedTokens,
+    );
+  },
+};
+

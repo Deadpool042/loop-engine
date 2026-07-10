@@ -39,6 +39,7 @@ Le cycle V5 a stabilisé le contrat de recommandations par étapes successives :
 
 ## Tag final stable
 
+- La source de vérité documentaire pour les tags stables est `docs/audits/stable-tags.md`.
 - `audit-engine-v5.14.1` est le tag final V5 complet.
 - `audit-engine-v5.14` est supersédé et ne doit pas être utilisé comme référence finale.
 - L'historique n'a pas été réécrit.
