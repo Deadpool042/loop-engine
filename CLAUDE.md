@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Objectif final
+
+Voir `docs/architecture/final-objective.md`.
+
+Cette page est la source de vérité produit : Claude doit s’y référer avant toute évolution structurante.
+
 ## What this is
 
 Loop Engine is a local, deterministic CLI orchestrator that reads and inspects a small set of local projects declared in `projects.yaml` (Creatyss, lp-infra, n8n, and itself). It reports Git state, checks required docs, surfaces roadmap candidates, and prepares short context/prompt payloads — all without ever touching the projects it inspects.

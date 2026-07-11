@@ -2,6 +2,12 @@
 
 Orchestrateur local léger pour piloter les projets de développement sans IA automatique par défaut.
 
+## Objectif final
+
+Voir `docs/architecture/final-objective.md`.
+
+Cette page est la source de vérité produit : Claude doit s’y référer avant toute évolution structurante.
+
 ## Objectifs V0
 
 - lister les projets locaux ;
