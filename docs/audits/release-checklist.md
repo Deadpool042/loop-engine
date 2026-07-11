@@ -20,6 +20,14 @@ Cette checklist formalise la vérification du worktree avant tout tag d'audit.
 ne pas supprimer les tags supersédés
 ne pas réécrire l'historique
 
+## Vérification automatisée
+
+- Exécuter `pnpm run audit:release-check` avant de créer un tag d'audit.
+- Ce script exécute l'équivalent de `git status --porcelain=v1 --untracked-files=all`.
+- Si le worktree n'est pas propre, le script affiche les fichiers concernés et se termine avec un code de sortie non nul.
+- Si le worktree est propre, le script affiche un message de succès et se termine avec un code 0.
+- Ce contrôle n'est pas intégré à `pnpm run ci` afin d'éviter toute instabilité liée aux fichiers générés par le runner GitHub Actions.
+
 ## Règle pratique
 
 Avant de publier un tag d'audit, le worktree doit être vérifié explicitement et le commit doit contenir tous les fichiers attendus.

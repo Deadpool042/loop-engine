@@ -1477,6 +1477,59 @@ export const JSON_AUDIT_RECOMMENDATION_SUMMARY_SYNC_REGRESSION_TEST_RULE: AuditR
   },
 };
 
+export const AUDIT_RELEASE_WORKTREE_CHECK_SCRIPT_RULE: AuditRule = {
+  id: "AUDIT-052",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit release worktree check is executable",
+  description: "The project should expose an executable script that fails when the worktree is not clean before an audit tag is published.",
+  check: () => {
+    const scriptPath = "scripts/audit-release-check.ts";
+    const packagePath = "package.json";
+
+    if (!existsSync(scriptPath) || !existsSync(packagePath)) {
+      return fail(
+        AUDIT_RELEASE_WORKTREE_CHECK_SCRIPT_RULE,
+        "Audit release worktree check script or package manifest is missing.",
+        [scriptPath, packagePath],
+        "Create scripts/audit-release-check.ts and wire pnpm run audit:release-check.",
+      );
+    }
+
+    const scriptContent = readFileSync(scriptPath, "utf8");
+    const packageContent = readFileSync(packagePath, "utf8");
+
+    const expectedTokens = [
+      "export function evaluateWorktreeStatus",
+      "\"status\"",
+      "--porcelain=v1",
+      "--untracked-files=all",
+      "clean: files.length === 0",
+      "process.exitCode = 1",
+      "\"audit:release-check\"",
+      "audit-release-check.ts",
+    ];
+
+    const haystack = `${scriptContent}\n${packageContent}`;
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_RELEASE_WORKTREE_CHECK_SCRIPT_RULE,
+        "Audit release worktree check script is incomplete.",
+        missing,
+        "Ensure the release check script exits non-zero and lists offending files when the worktree is not clean, and wire it through pnpm run audit:release-check.",
+      );
+    }
+
+    return pass(
+      AUDIT_RELEASE_WORKTREE_CHECK_SCRIPT_RULE,
+      "Audit release worktree check is executable.",
+      expectedTokens,
+    );
+  },
+};
+
 
 
 
