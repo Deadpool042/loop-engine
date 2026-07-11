@@ -12,6 +12,9 @@ Ce document est la source de vérité simple pour les tags stables documentés d
 - `audit-engine-v6.0` reste le tag de démarrage V6
 - Tag final stable du cycle V5 : `audit-engine-v5.14.1`
 - Tag supersédé : `audit-engine-v5.14`
+- Tag correctif V6.3 : `audit-engine-v6.3.1`
+- Tag supersédé : `audit-engine-v6.3`
+- `audit-engine-v6.3.1` inclut `docs/audits/release-checklist.md`
 
 ## Règles de publication
 
@@ -19,6 +22,7 @@ Ce document est la source de vérité simple pour les tags stables documentés d
 - Ne pas supprimer les tags supersédés.
 - Publier un tag correctif `.1` si une correction est nécessaire.
 - Conserver l'historique tel qu'il a été publié.
+- Vérifier le worktree via `docs/audits/release-checklist.md` avant tout tag d'audit.
 
 ## Cohérence documentaire
 
@@ -27,6 +31,8 @@ Ce document est la source de vérité simple pour les tags stables documentés d
 - `audit-engine-v6.0` reste le tag de démarrage V6.
 - `audit-engine-v5.14.1` reste le tag final stable du cycle V5.
 - `audit-engine-v5.14` ne doit pas être utilisé comme référence finale.
+- `audit-engine-v6.3.1` corrige `audit-engine-v6.3`, qui avait oublié `docs/audits/release-checklist.md`.
+- `audit-engine-v6.3` ne doit pas être utilisé comme référence finale.
 - Toute évolution future doit conserver cette hiérarchie de tags explicite.
 
 ## Voir aussi
