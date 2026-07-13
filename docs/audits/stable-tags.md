@@ -9,23 +9,15 @@ Ce document est la source de vérité simple pour les tags stables documentés d
 - Dernier tag stable global actuel : `audit-engine-v6.6`
 - Tag final stable du cycle V6 : `audit-engine-v6.6`
 - `audit-engine-v6.6` inclut `docs/audits/audit-engine-v6-final.md`
+- Ancien tag stable intermédiaire du cycle V6 : `audit-engine-v6.1.1`
+- Tag supersédé : `audit-engine-v6.1`
+- `audit-engine-v6.1.1` inclut `docs/audits/stable-tags.md`
 - `audit-engine-v6.0` reste le tag de démarrage V6
 - Tag final stable du cycle V5 : `audit-engine-v5.14.1`
 - Tag supersédé : `audit-engine-v5.14`
 - Tag correctif V6.3 : `audit-engine-v6.3.1`
 - Tag supersédé : `audit-engine-v6.3`
 - `audit-engine-v6.3.1` inclut `docs/audits/release-checklist.md`
-
-## Historique du cycle V6
-
-Avant la clôture V6.6, la source de vérité indiquait : Dernier tag stable global actuel : `audit-engine-v6.1.1`.
-
-Cette ancienne référence est conservée uniquement comme contexte historique :
-
-- `audit-engine-v6.1.1` inclut `docs/audits/stable-tags.md`
-- Tag supersédé : `audit-engine-v6.1`
-- `audit-engine-v6.1.1` est désormais un ancien tag stable intermédiaire du cycle V6 ;
-- `audit-engine-v6.5`, `audit-engine-v6.4`, `audit-engine-v6.3.1`, `audit-engine-v6.3`, `audit-engine-v6.2`, `audit-engine-v6.1.1` et `audit-engine-v6.1` ne doivent pas être utilisés comme référence finale du cycle.
 
 ## Règles de publication
 
@@ -38,6 +30,7 @@ Cette ancienne référence est conservée uniquement comme contexte historique :
 ## Cohérence documentaire
 
 - `audit-engine-v6.6` est le tag final stable du cycle V6 et le dernier tag stable global documenté à ce jour.
+- `audit-engine-v6.5`, `audit-engine-v6.4`, `audit-engine-v6.3.1`, `audit-engine-v6.3`, `audit-engine-v6.2`, `audit-engine-v6.1.1` et `audit-engine-v6.1` sont des tags intermédiaires ou supersédés du cycle V6 et ne doivent pas être utilisés comme référence finale.
 - `audit-engine-v6.1` ne doit pas être utilisé comme référence finale.
 - `audit-engine-v6.0` reste le tag de démarrage V6.
 - `audit-engine-v5.14.1` reste le tag final stable du cycle V5.
