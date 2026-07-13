@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Voir `docs/architecture/final-objective.md`.
 
-Cette page est la source de vérité produit : Claude doit s’y référer avant toute évolution structurante.
+Cette page constitue la source de vérité du produit et définit l'objectif final de Loop Engine.
+
+Claude doit s’y référer avant toute évolution structurante.
 
 ## What this is
 

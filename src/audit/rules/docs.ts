@@ -954,3 +954,79 @@ export const AUDIT_RELEASE_CHECKLIST_DOCUMENTATION_RULE: AuditRule = {
   },
 };
 
+export const AUDIT_FINAL_OBJECTIVE_ALIGNMENT_RULE: AuditRule = {
+  id: "DOCS-018",
+  category: "docs",
+  severity: "warning",
+  title: "Final objective is documented and referenced as the product source of truth",
+  description: "docs/architecture/final-objective.md should hold every structuring term, and CLAUDE.md and README.md should each reference it as the product source of truth.",
+  check: () => {
+    const finalObjectivePath = "docs/architecture/final-objective.md";
+    const claudePath = "CLAUDE.md";
+    const readmePath = "README.md";
+
+    const missingFiles = [finalObjectivePath, claudePath, readmePath].filter(
+      (file) => !existsSync(file),
+    );
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUDIT_FINAL_OBJECTIVE_ALIGNMENT_RULE,
+        "Final objective documentation or its referencing files are missing.",
+        missingFiles,
+        "Create docs/architecture/final-objective.md and reference it from CLAUDE.md and README.md as the product source of truth.",
+      );
+    }
+
+    const finalObjectiveContent = readFileSync(finalObjectivePath, "utf8");
+    const claudeContent = readFileSync(claudePath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+
+    const finalObjectiveTerms = [
+      "objectif final",
+      "source de vérité",
+      "local",
+      "déterministe",
+      "read-only",
+      "Claude",
+      "pas de commit automatique",
+      "pas de push automatique",
+    ];
+
+    const missingFinalObjectiveTerms = finalObjectiveTerms
+      .filter((term) => !finalObjectiveContent.includes(term))
+      .map((term) => `${finalObjectivePath}: missing "${term}"`);
+
+    const referenceMarkers = [finalObjectivePath, "source de vérité", "objectif final"];
+
+    const missingClaudeMarkers = referenceMarkers
+      .filter((marker) => !claudeContent.includes(marker))
+      .map((marker) => `${claudePath}: missing "${marker}"`);
+
+    const missingReadmeMarkers = referenceMarkers
+      .filter((marker) => !readmeContent.includes(marker))
+      .map((marker) => `${readmePath}: missing "${marker}"`);
+
+    const missing = [
+      ...missingFinalObjectiveTerms,
+      ...missingClaudeMarkers,
+      ...missingReadmeMarkers,
+    ];
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_FINAL_OBJECTIVE_ALIGNMENT_RULE,
+        "Final objective alignment is incomplete.",
+        missing,
+        "Keep docs/architecture/final-objective.md holding every structuring term, and reference it with \"source de vérité\" and \"objectif final\" from both CLAUDE.md and README.md.",
+      );
+    }
+
+    return pass(
+      AUDIT_FINAL_OBJECTIVE_ALIGNMENT_RULE,
+      "Final objective is documented and consistently referenced as the product source of truth.",
+      [...finalObjectiveTerms, ...referenceMarkers.map((marker) => `${claudePath}/${readmePath}: ${marker}`)],
+    );
+  },
+};
+

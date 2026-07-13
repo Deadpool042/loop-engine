@@ -269,7 +269,7 @@ Chaque finding contient :
 
 ## Règles exécutables
 
-Le moteur contient 100 règles exécutables :
+Le moteur contient 101 règles exécutables :
 
 - `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
 - `JSON-005` : couverture des commandes JSON publiques par `json-check`.
@@ -319,6 +319,7 @@ Le moteur contient 100 règles exécutables :
 - `DOCS-016` : documentation de la source de vérité des tags stables.
 - `DOCS-017` : documentation de la checklist de release pour les tags d'audit.
 - `AUDIT-052` : garde exécutable vérifiant la propreté du worktree avant un tag d'audit (`scripts/audit-release-check.ts`, `pnpm run audit:release-check`).
+- `DOCS-018` : alignement de l'objectif final entre `docs/architecture/final-objective.md`, `CLAUDE.md` et `README.md`.
 
 ## Couverture README
 
@@ -339,8 +340,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 100 règles ;
-- 100 règles en pass ;
+- 101 règles ;
+- 101 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;

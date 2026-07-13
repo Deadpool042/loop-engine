@@ -15,3 +15,7 @@ Son objectif final est de transformer l’état réel des projets Git, leurs doc
 Loop Engine ne doit jamais devenir un agent autonome : pas d’appel IA automatique, pas de commit automatique, pas de push automatique, pas de modification des projets observés.
 
 Claude doit donc améliorer le moteur, préserver les garde-fous, respecter les contrats JSON et travailler par petits lots vérifiables.
+
+## Source de vérité produit
+
+Ce document constitue la source de vérité de l’objectif final de Loop Engine.
