@@ -376,4 +376,3 @@ La synchronisation legacy/canonique est garantie par `json-check`.
 La non-régression est couverte par un test dédié.
 
 Cette formalisation explicite du cycle de dépréciation est portée par `DOCS-013`.
-
