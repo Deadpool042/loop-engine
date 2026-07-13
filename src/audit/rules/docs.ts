@@ -1030,3 +1030,58 @@ export const AUDIT_FINAL_OBJECTIVE_ALIGNMENT_RULE: AuditRule = {
   },
 };
 
+export const CLAUDE_MD_CURRENT_STATE_ALIGNMENT_RULE: AuditRule = {
+  id: "DOCS-019",
+  category: "docs",
+  severity: "warning",
+  title: "CLAUDE.md reflects the current state of Loop Engine",
+  description: "CLAUDE.md should document the final objective reference, the full CI validation chain, and the current CLI surface (audit, handoff, RAG, json-check) rather than stale V0/V1 wording.",
+  check: () => {
+    const claudePath = "CLAUDE.md";
+
+    if (!existsSync(claudePath)) {
+      return fail(
+        CLAUDE_MD_CURRENT_STATE_ALIGNMENT_RULE,
+        "CLAUDE.md is missing.",
+        [claudePath],
+        "Restore CLAUDE.md and document the current state of Loop Engine.",
+      );
+    }
+
+    const content = readFileSync(claudePath, "utf8");
+
+    const expectedTokens = [
+      "docs/architecture/final-objective.md",
+      "pnpm run ci",
+      "pnpm run audit:strict",
+      "pnpm run audit:profiles",
+      "pnpm run audit:release-check",
+      "audit",
+      "handoff",
+      "rag-index",
+      "rag-search",
+      "json-check",
+      "No automatic AI calls by default",
+    ];
+
+    const missing = expectedTokens
+      .filter((token) => !content.includes(token))
+      .map((token) => `${claudePath}: missing "${token}"`);
+
+    if (missing.length > 0) {
+      return fail(
+        CLAUDE_MD_CURRENT_STATE_ALIGNMENT_RULE,
+        "CLAUDE.md does not reflect the current state of Loop Engine.",
+        missing,
+        "Update CLAUDE.md to reference docs/architecture/final-objective.md, document pnpm run ci as the reference validation, list the audit/handoff/rag-index/rag-search/json-check commands, and replace V0/V1 wording with \"No automatic AI calls by default\".",
+      );
+    }
+
+    return pass(
+      CLAUDE_MD_CURRENT_STATE_ALIGNMENT_RULE,
+      "CLAUDE.md reflects the current state of Loop Engine.",
+      expectedTokens,
+    );
+  },
+};
+

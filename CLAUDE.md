@@ -12,10 +12,16 @@ Claude doit s’y référer avant toute évolution structurante.
 
 ## What this is
 
-Loop Engine is a local, deterministic CLI orchestrator that reads and inspects a small set of local projects declared in `projects.yaml` (Creatyss, lp-infra, n8n, and itself). It reports Git state, checks required docs, surfaces roadmap candidates, and prepares short context/prompt payloads — all without ever touching the projects it inspects.
+Loop Engine is a local, deterministic CLI orchestrator that reads and inspects a small set of local projects declared in `projects.yaml` (Creatyss, lp-infra, n8n, and itself). It reports Git state, checks required docs, surfaces roadmap candidates, and prepares short context/prompt payloads — all without ever touching the projects it inspects. It now also covers:
+
+- project piloting (`summary`, `status`, `doctor`, `context`, `validate`, `review`, `next`);
+- context and handoff generation (`context`, `handoff`, `prompt`) for pasting into an assistant;
+- a local RAG index and search (`rag-index`, `rag-search`);
+- an executable Audit Engine with human and JSON reports, profiles, and a strict CI mode (`audit`);
+- human-readable and JSON reports across the CLI (`--json` on most commands).
 
 **Core philosophy (non-negotiable, enforced throughout the codebase):**
-- No automatic AI calls in V0/V1 — Loop Engine only prepares context for a human to paste into an assistant.
+- No automatic AI calls by default — Loop Engine only prepares context for a human to paste into an assistant.
 - No automatic commit, no automatic push.
 - No modification of watched projects (Creatyss, lp-infra, n8n) — read-only.
 - Zero token consumption by default.
@@ -27,15 +33,21 @@ When adding a feature, do not silently violate any of the above — if a task se
 ## Commands
 
 ```bash
-pnpm loop <command>       # run the CLI (tsx src/cli.ts)
-pnpm run typecheck        # tsc --noEmit
-pnpm run test             # tsx --test tests/**/*.test.ts
-pnpm run validate         # typecheck + test (run this before considering work done)
+pnpm loop <command>            # run the CLI (tsx src/cli.ts)
+pnpm run typecheck             # tsc --noEmit
+pnpm run test                  # tsx --test tests/**/*.test.ts
+pnpm run validate              # typecheck + test + json-check
+pnpm run audit:strict          # tsx src/cli.ts audit --json --strict
+pnpm run audit:profiles        # scripts/audit-profile-check.ts (checks all public audit profiles)
+pnpm run audit:release-check   # scripts/audit-release-check.ts (release worktree check)
+pnpm run ci                    # validate + audit:strict + audit:profiles — the full reference validation
 ```
 
 Run a single test file directly: `pnpm exec tsx --test tests/intelligence/roadmap.test.ts`
 
-CLI commands (see `src/cli.ts` for the full routing table): `help`, `summary [--json]`, `status`, `doctor`, `context <project> [--json]`, `validate <project>`, `review <project> [--json]`, `next <project> [--json]`, `prompt <project> [--json]`.
+`pnpm run ci` is the full reference validation and must pass before any commit or release.
+
+CLI commands (see `src/cli.ts` for the full routing table): `help`, `summary [--json]`, `status`, `doctor`, `json-check`, `rag-index`, `rag-search`, `audit [--json] [--strict] [--profile <name>]`, `handoff <project> [--json]`, `context <project> [--json]`, `validate <project>`, `review <project> [--json]`, `next <project> [--json]`, `prompt <project> [--json]`.
 
 Loop Engine is self-hosted: it's declared in `projects.yaml` as project `loop-engine` (path `.`), so `pnpm loop context loop-engine`, `pnpm loop validate loop-engine`, etc. all work against this repo itself.
 
@@ -76,9 +88,13 @@ When adjusting keyword lists, favor precision (avoid blocking ordinary work) ove
 
 ## Docs worth reading before structural changes
 
+- `docs/architecture/final-objective.md` — final objective and product source of truth (see top of this file).
 - `docs/architecture/commands.md` — layering rules for `cli.ts` / `commands/` / `core/` / `intelligence/` / `ui/`.
 - `docs/architecture/project-intelligence.md` — `ProjectSnapshot` contract and roadmap candidate classification.
 - `docs/architecture/roadmap-reader.md` — roadmap reader formats, states, and keyword refinement history.
+- `docs/architecture/audit-engine.md` — Audit Engine architecture, profiles, and CI integration.
+- `docs/audits/release-checklist.md` — release checklist to follow before publishing an audit tag.
+- `docs/audits/stable-tags.md` — source of truth for the current stable audit tags.
 - `docs/integrations/json-consumers.md` — JSON contract and per-consumer (OpenClaw/n8n) expectations.
 
 ## Working method
