@@ -17,6 +17,7 @@ Ils ne remplacent pas les documents d'architecture actifs.
 - `audit-engine-docs-v1.md` — documentation et risques d'obsolescence.
 - `audit-engine-v1-final.md` — rapport final Audit Engine V1.
 - `audit-engine-v5-final.md` — rapport final Audit Engine V5, tag final stable `audit-engine-v5.14.1`.
+- `audit-engine-v6-final.md` — rapport final Audit Engine V6, tag final stable `audit-engine-v6.6`.
 - `stable-tags.md` — source de vérité des tags stables documentés.
 - `release-checklist.md` — checklist de vérification du worktree avant tag d'audit.
 
