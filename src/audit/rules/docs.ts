@@ -857,7 +857,7 @@ export const AUDIT_STABLE_TAGS_DOCUMENTATION_RULE: AuditRule = {
 
     const expectedTokens = [
       "Source de vérité",
-      "Dernier tag stable global actuel : `audit-engine-v6.1.1`",
+      "Dernier tag stable global actuel : `audit-engine-v6.6`",
       "Tag supersédé : `audit-engine-v6.1`",
       "`audit-engine-v6.1.1` inclut `docs/audits/stable-tags.md`",
       "`audit-engine-v6.0` reste le tag de démarrage V6",
@@ -1080,6 +1080,68 @@ export const CLAUDE_MD_CURRENT_STATE_ALIGNMENT_RULE: AuditRule = {
     return pass(
       CLAUDE_MD_CURRENT_STATE_ALIGNMENT_RULE,
       "CLAUDE.md reflects the current state of Loop Engine.",
+      expectedTokens,
+    );
+  },
+};
+
+export const AUDIT_ENGINE_V6_FINAL_REPORT_RULE: AuditRule = {
+  id: "DOCS-020",
+  category: "docs",
+  severity: "warning",
+  title: "Audit Engine V6 final report is documented",
+  description: "The repository should document the dedicated Audit Engine V6 final report, its final stable tag, and list it from the audits README.",
+  check: () => {
+    const reportPath = "docs/audits/audit-engine-v6-final.md";
+    const readmePath = "docs/audits/README.md";
+    const stableTagsPath = "docs/audits/stable-tags.md";
+
+    const missingFiles = [reportPath, readmePath, stableTagsPath].filter(
+      (file) => !existsSync(file),
+    );
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUDIT_ENGINE_V6_FINAL_REPORT_RULE,
+        "Audit Engine V6 final report or its referencing files are missing.",
+        missingFiles,
+        "Create docs/audits/audit-engine-v6-final.md and list it in docs/audits/README.md and docs/audits/stable-tags.md.",
+      );
+    }
+
+    const reportContent = readFileSync(reportPath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+    const stableTagsContent = readFileSync(stableTagsPath, "utf8");
+    const haystack = `${reportContent}\n${readmeContent}\n${stableTagsContent}`;
+
+    const expectedTokens = [
+      "Audit Engine V6 — Rapport final",
+      "V6.6",
+      "102 règles exécutables",
+      "102 règles en pass",
+      "score 100",
+      "audit-engine-v6.6",
+      "tag final stable du cycle V6",
+      "AUDIT-052",
+      "DOCS-018",
+      "DOCS-019",
+      "audit-engine-v6-final.md",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_ENGINE_V6_FINAL_REPORT_RULE,
+        "Audit Engine V6 final report documentation is incomplete.",
+        missing,
+        "Document the V6 final report, its rule count, its final stable tag, and the README/stable-tags links.",
+      );
+    }
+
+    return pass(
+      AUDIT_ENGINE_V6_FINAL_REPORT_RULE,
+      "Audit Engine V6 final report is documented.",
       expectedTokens,
     );
   },

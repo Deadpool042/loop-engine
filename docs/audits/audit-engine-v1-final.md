@@ -269,7 +269,7 @@ Chaque finding contient :
 
 ## Règles exécutables
 
-Le moteur contient 102 règles exécutables :
+Le moteur contient 103 règles exécutables :
 
 - `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
 - `JSON-005` : couverture des commandes JSON publiques par `json-check`.
@@ -321,6 +321,7 @@ Le moteur contient 102 règles exécutables :
 - `AUDIT-052` : garde exécutable vérifiant la propreté du worktree avant un tag d'audit (`scripts/audit-release-check.ts`, `pnpm run audit:release-check`).
 - `DOCS-018` : alignement de l'objectif final entre `docs/architecture/final-objective.md`, `CLAUDE.md` et `README.md`.
 - `DOCS-019` : alignement de `CLAUDE.md` avec l'état actuel de Loop Engine (objectif final, `pnpm run ci`, `audit`, `handoff`, `rag-index`, `rag-search`, `json-check`, absence d'appels IA automatiques par défaut).
+- `DOCS-020` : documentation du rapport final Audit Engine V6 et de son tag final stable `audit-engine-v6.6`.
 
 ## Couverture README
 
@@ -341,8 +342,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 102 règles ;
-- 102 règles en pass ;
+- 103 règles ;
+- 103 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;
