@@ -269,7 +269,7 @@ Chaque finding contient :
 
 ## Règles exécutables
 
-Le moteur contient 103 règles exécutables :
+Le moteur contient 104 règles exécutables :
 
 - `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
 - `JSON-005` : couverture des commandes JSON publiques par `json-check`.
@@ -322,6 +322,7 @@ Le moteur contient 103 règles exécutables :
 - `DOCS-018` : alignement de l'objectif final entre `docs/architecture/final-objective.md`, `CLAUDE.md` et `README.md`.
 - `DOCS-019` : alignement de `CLAUDE.md` avec l'état actuel de Loop Engine (objectif final, `pnpm run ci`, `audit`, `handoff`, `rag-index`, `rag-search`, `json-check`, absence d'appels IA automatiques par défaut).
 - `DOCS-020` : documentation du rapport final Audit Engine V6 et de son tag final stable `audit-engine-v6.6`.
+- `DOCS-021` : documentation de l'architecture du LoopRunner (`docs/architecture/autonomous-loop-runner.md`), de son contrat `LoopRunResult`, des modes `plan`/`execute`/`commit`/`publish`, des états du cycle, et de sa référence depuis `CLAUDE.md` et `README.md`.
 
 ## Couverture README
 
@@ -342,8 +343,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 103 règles ;
-- 103 règles en pass ;
+- 104 règles ;
+- 104 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;

@@ -1147,3 +1147,94 @@ export const AUDIT_ENGINE_V6_FINAL_REPORT_RULE: AuditRule = {
   },
 };
 
+export const AUTONOMOUS_LOOP_RUNNER_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-021",
+  category: "docs",
+  severity: "warning",
+  title: "Autonomous Loop Runner architecture is documented",
+  description: "The repository should document the LoopRunner architecture, its LoopRunResult contract, its execution modes, its cycle states, and its future CLI options, and reference it from CLAUDE.md and README.md.",
+  check: () => {
+    const runnerDocPath = "docs/architecture/autonomous-loop-runner.md";
+    const claudePath = "CLAUDE.md";
+    const readmePath = "README.md";
+
+    const missingFiles = [runnerDocPath, claudePath, readmePath].filter(
+      (file) => !existsSync(file),
+    );
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUTONOMOUS_LOOP_RUNNER_DOCUMENTATION_RULE,
+        "Autonomous Loop Runner documentation or its referencing files are missing.",
+        missingFiles,
+        "Create docs/architecture/autonomous-loop-runner.md and reference it from CLAUDE.md and README.md.",
+      );
+    }
+
+    const runnerDocContent = readFileSync(runnerDocPath, "utf8");
+    const claudeContent = readFileSync(claudePath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+
+    const expectedRunnerDocTerms = [
+      "LoopRunner",
+      "LoopRunResult",
+      "plan",
+      "execute",
+      "commit",
+      "publish",
+      "planning",
+      "executing",
+      "validating",
+      "repairing",
+      "completed",
+      "blocked",
+      "failed",
+      "cancelled",
+      "--max-repairs",
+      "--resume",
+      "force-push",
+      "boucle infinie",
+      "n8n",
+      "OpenClaw",
+      "Claude Code",
+      "External orchestration",
+      "Loop Engine",
+      "Execution agents",
+      "Interface Agent",
+    ];
+
+    const missingRunnerDocTerms = expectedRunnerDocTerms
+      .filter((term) => !runnerDocContent.includes(term))
+      .map((term) => `${runnerDocPath}: missing "${term}"`);
+
+    const missingClaudeReference = claudeContent.includes(runnerDocPath)
+      ? []
+      : [`${claudePath}: missing "${runnerDocPath}"`];
+
+    const missingReadmeReference = readmeContent.includes(runnerDocPath)
+      ? []
+      : [`${readmePath}: missing "${runnerDocPath}"`];
+
+    const missing = [
+      ...missingRunnerDocTerms,
+      ...missingClaudeReference,
+      ...missingReadmeReference,
+    ];
+
+    if (missing.length > 0) {
+      return fail(
+        AUTONOMOUS_LOOP_RUNNER_DOCUMENTATION_RULE,
+        "Autonomous Loop Runner documentation is incomplete.",
+        missing,
+        "Document LoopRunner, LoopRunResult, the plan/execute/commit/publish modes, the cycle states, --max-repairs, --resume, the no-force-push and no-infinite-loop guardrails in docs/architecture/autonomous-loop-runner.md, and reference it from CLAUDE.md and README.md.",
+      );
+    }
+
+    return pass(
+      AUTONOMOUS_LOOP_RUNNER_DOCUMENTATION_RULE,
+      "Autonomous Loop Runner architecture is documented.",
+      [...expectedRunnerDocTerms, runnerDocPath],
+    );
+  },
+};
+

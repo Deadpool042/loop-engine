@@ -10,6 +10,8 @@ Cette page constitue la source de vérité du produit et définit l'objectif fin
 
 Claude doit s’y référer avant toute évolution structurante.
 
+Loop Engine vise désormais l'orchestration autonome par petits lots. Voir `docs/architecture/autonomous-loop-runner.md` pour l'architecture du LoopRunner.
+
 ## Objectifs V0
 
 - lister les projets locaux ;
@@ -27,7 +29,8 @@ Loop Engine ne modifie pas les dépôts pilotés.
 - 0 token consommé par défaut.
 - Pas de commit automatique.
 - Pas de push automatique.
-- Les validations locales passent avant toute revue IA.
+- Commit et push ne surviennent que sous un mode explicitement sélectionné (`commit`, `publish`) ; le mode par défaut (`plan`) ne modifie rien.
+- Les validations locales passent avant toute revue IA, et avant tout commit ou publication.
 - Les projets pilotés restent indépendants.
 
 ## Commandes
@@ -113,6 +116,7 @@ Les commandes doivent consommer le `ProjectSnapshot` plutôt que relire directem
 
 Voir aussi :
 
+- `docs/architecture/autonomous-loop-runner.md`
 - `docs/architecture/commands.md`
 - `docs/architecture/json-contracts.md`
 - `docs/architecture/project-intelligence.md`

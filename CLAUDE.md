@@ -20,12 +20,15 @@ Loop Engine is a local, deterministic CLI orchestrator that reads and inspects a
 - an executable Audit Engine with human and JSON reports, profiles, and a strict CI mode (`audit`);
 - human-readable and JSON reports across the CLI (`--json` on most commands).
 
+Loop Engine now also targets autonomous orchestration by small lots — see `docs/architecture/autonomous-loop-runner.md` for the LoopRunner architecture (planning → executing → validating → repairing → completed/blocked/failed/cancelled, and the `plan`/`execute`/`commit`/`publish` modes).
+
 **Core philosophy (non-negotiable, enforced throughout the codebase):**
 - No automatic AI calls by default — Loop Engine only prepares context for a human to paste into an assistant.
 - No automatic commit, no automatic push.
+- Commit and push only happen under an explicitly selected mode (`commit`, `publish`); the default mode (`plan`) never commits or pushes.
 - No modification of watched projects (Creatyss, lp-infra, n8n) — read-only.
 - Zero token consumption by default.
-- Local validations always come before any AI review.
+- Local validations always come before any AI review, and always before any commit or publication.
 - Human stays in control of decisions; the roadmap reader is deliberately naive/conservative rather than clever.
 
 When adding a feature, do not silently violate any of the above — if a task seems to require it, flag it instead of implementing it.
@@ -89,6 +92,7 @@ When adjusting keyword lists, favor precision (avoid blocking ordinary work) ove
 ## Docs worth reading before structural changes
 
 - `docs/architecture/final-objective.md` — final objective and product source of truth (see top of this file).
+- `docs/architecture/autonomous-loop-runner.md` — LoopRunner architecture and contracts for the autonomous small-lot cycle (plan/execute/commit/publish modes, state machine, `LoopRunResult`).
 - `docs/architecture/commands.md` — layering rules for `cli.ts` / `commands/` / `core/` / `intelligence/` / `ui/`.
 - `docs/architecture/project-intelligence.md` — `ProjectSnapshot` contract and roadmap candidate classification.
 - `docs/architecture/roadmap-reader.md` — roadmap reader formats, states, and keyword refinement history.
