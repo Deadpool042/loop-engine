@@ -1238,3 +1238,58 @@ export const AUTONOMOUS_LOOP_RUNNER_DOCUMENTATION_RULE: AuditRule = {
   },
 };
 
+export const LOOP_RUNNER_PLAN_MODE_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-022",
+  category: "docs",
+  severity: "warning",
+  title: "LoopRunner plan mode (V7.2) is documented",
+  description: "The repository should document that only the LoopRunner plan mode is implemented, that no agent is called, and that no modification, commit, or push happens, referencing this from CLAUDE.md and README.md.",
+  check: () => {
+    const runnerDocPath = "docs/architecture/autonomous-loop-runner.md";
+    const claudePath = "CLAUDE.md";
+    const readmePath = "README.md";
+
+    const missingFiles = [runnerDocPath, claudePath, readmePath].filter(
+      (file) => !existsSync(file),
+    );
+
+    if (missingFiles.length > 0) {
+      return fail(
+        LOOP_RUNNER_PLAN_MODE_DOCUMENTATION_RULE,
+        "LoopRunner plan mode documentation or its referencing files are missing.",
+        missingFiles,
+        "Document the V7.2 plan mode in docs/architecture/autonomous-loop-runner.md, CLAUDE.md, and README.md.",
+      );
+    }
+
+    const runnerDocContent = readFileSync(runnerDocPath, "utf8");
+    const claudeContent = readFileSync(claudePath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+    const haystack = `${runnerDocContent}\n${claudeContent}\n${readmeContent}`;
+
+    const expectedTokens = [
+      "V7.2",
+      "runLoopPlan",
+      "mode `plan`",
+      "Loop run mode not implemented",
+    ];
+
+    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        LOOP_RUNNER_PLAN_MODE_DOCUMENTATION_RULE,
+        "LoopRunner plan mode (V7.2) documentation is incomplete.",
+        missing,
+        "Document V7.2, runLoopPlan, the plan-only mode, and the mode-not-implemented rejection across docs/architecture/autonomous-loop-runner.md, CLAUDE.md, and README.md.",
+      );
+    }
+
+    return pass(
+      LOOP_RUNNER_PLAN_MODE_DOCUMENTATION_RULE,
+      "LoopRunner plan mode (V7.2) is documented.",
+      expectedTokens,
+    );
+  },
+};
+

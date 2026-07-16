@@ -2623,4 +2623,3 @@ export const AUDIT_RECOMMENDATION_SUMMARY_SYNC_ASSERTION_RULE: AuditRule = {
     );
   },
 };
-

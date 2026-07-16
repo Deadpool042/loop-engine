@@ -13,6 +13,7 @@ import { printProjectPrompt, printProjectPromptJson } from "./commands/prompt.js
 import { printStatus } from "./commands/status.js";
 import { printDoctor } from "./commands/doctor.js";
 import { printAuditReport, printAuditReportJson } from "./commands/audit.js";
+import { isLoopRunMode, runLoopRunCommand } from "./commands/run.js";
 import { loadConfig } from "./core/config.js";
 import { findProject, getRequiredProjectName } from "./core/project.js";
 import { terminal } from "./ui/terminal.js";
@@ -145,7 +146,45 @@ if (command === "help" || command === "--help" || command === "-h") {
   } else {
     printProjectPrompt(project);
   }
+} else if (command === "run") {
+  const project = resolveProjectOrExit("run");
+  const json = process.argv.includes("--json");
+
+  const modeIndex = process.argv.indexOf("--mode");
+  let mode = "plan";
+
+  if (modeIndex >= 0) {
+    const modeArgument = process.argv[modeIndex + 1];
+
+    if (modeArgument === undefined || modeArgument.startsWith("--")) {
+      const message = "Missing value for --mode";
+      if (json) {
+        printJsonError("missing_mode_value", message);
+      } else {
+        terminal.error(message);
+      }
+      process.exit(1);
+    }
+
+    mode = modeArgument;
+  }
+
+  if (!isLoopRunMode(mode)) {
+    const message = `Unknown loop run mode: ${mode}`;
+    if (json) {
+      printJsonError("unknown_mode", message);
+    } else {
+      terminal.error(message);
+    }
+    process.exit(1);
+  }
+
+  const exitCode = runLoopRunCommand(project, mode, json);
+
+  if (exitCode !== 0) {
+    process.exitCode = exitCode;
+  }
 } else {
-  terminal.error("Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>|next <project>|prompt <project>");
+  terminal.error("Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>");
   process.exit(1);
 }

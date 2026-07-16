@@ -9,6 +9,7 @@ const COMMANDS = [
   ["review", "loop-engine", "--json"],
   ["handoff", "loop-engine", "--json"],
   ["rag-search", "roadmap", "--json"],
+  ["run", "loop-engine", "--mode", "plan", "--json"],
 ] as const;
 
 function assertRecord(value: unknown): asserts value is Record<string, unknown> {
@@ -366,6 +367,29 @@ function validatePayload(command: readonly string[], json: unknown): void {
   } else if (commandName === "rag-search") {
     assertField(json, "query");
     assertField(json, "results");
+  } else if (commandName === "run") {
+    assertField(json, "runId");
+    assertField(json, "project");
+    assertField(json, "mode");
+    assertField(json, "status");
+    assertField(json, "steps");
+    assertField(json, "modifiedFiles");
+    assertField(json, "commit");
+    assertField(json, "publication");
+    assertField(json, "failure");
+
+    if (json.mode !== "plan") {
+      throw new Error("run json-check fixture must use mode plan");
+    }
+    if (!Array.isArray(json.modifiedFiles) || json.modifiedFiles.length !== 0) {
+      throw new Error("run modifiedFiles must be empty in plan mode");
+    }
+    if (json.commit !== null) {
+      throw new Error("run commit must be null in plan mode");
+    }
+    if (json.publication !== null) {
+      throw new Error("run publication must be null in plan mode");
+    }
   }
 }
 

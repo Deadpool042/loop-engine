@@ -2,7 +2,9 @@
 
 ## Statut
 
-Lot V7.1 — architecture et contrats uniquement. Aucun code d'exécution, aucune commande `run` implémentée.
+Lot V7.1 — architecture et contrats uniquement (historique).
+
+Lot V7.2 — noyau du LoopRunner implémenté, **mode `plan` uniquement**. La commande `pnpm loop run <project>` est routée par la CLI et exécute `runLoopPlan`. Aucun agent n'est appelé, aucune modification du worktree, aucun commit et aucun push ne sont effectués. Les modes `execute`, `commit` et `publish` restent non implémentés et sont rejetés explicitement (voir section 11).
 
 ## Objectif
 
@@ -107,7 +109,7 @@ Transitions autorisées :
 
 - `idle -> planning`
 - `planning -> ready | blocked | failed`
-- `ready -> executing | cancelled`
+- `ready -> executing | completed | cancelled`
 - `executing -> validating | failed | cancelled`
 - `validating -> completed | repairing | failed`
 - `repairing -> executing | validating | failed`
@@ -117,6 +119,7 @@ Règles complémentaires :
 
 - toute transition non listée ci-dessus est interdite ;
 - `cancelled` est accessible depuis `ready`, `executing` ou `repairing`, jamais depuis `completed` ;
+- `ready -> completed` correspond à l'achèvement d'un cycle en mode `plan` : aucune phase d'exécution n'a lieu, le cycle se termine directement depuis `ready`. C'est une transition de première classe de la machine à états, jamais un contournement du runner ; `runLoopPlan` y passe par le même mécanisme `transition()` que tout autre changement d'état ;
 - une publication (mode `publish`) ne peut avoir lieu qu'après une transition réussie vers `completed`, jamais depuis `validating` ou `repairing` directement ;
 - `repairing -> executing | validating | failed` respecte toujours le budget `--max-repairs` : au-delà, seule la transition vers `failed` est autorisée.
 
@@ -155,9 +158,9 @@ Cette évolution ne retire aucune protection existante :
 
 Voir `docs/architecture/final-objective.md`, `CLAUDE.md` et `README.md` pour la formulation à jour de la philosophie produit.
 
-## 10. Portée de ce lot
+## 10. Portée du lot V7.1
 
-Ce lot est un lot de conception et de contrats uniquement :
+Ce lot était un lot de conception et de contrats uniquement :
 
 - aucun code d'exécution d'agent ;
 - aucune commande `run` implémentée ;
@@ -165,6 +168,27 @@ Ce lot est un lot de conception et de contrats uniquement :
 - aucun push ;
 - aucun tag ;
 - aucune modification des projets observés.
+
+## 11. Portée du lot V7.2 — noyau du LoopRunner, mode `plan`
+
+Ce lot implémente le noyau exécutable du runner, strictement limité au mode `plan` :
+
+- `src/loop/types.ts` — `LoopRunMode`, `LoopRunStatus`, `LoopRunStep`, `LoopRunFailure`, `LoopRunResult` ;
+- `src/loop/state-machine.ts` — `canTransition(from, to)`, implémentant exactement la machine à états de la section 7, y compris `ready -> completed` (achèvement direct d'un cycle `plan`) ;
+- `src/loop/planner.ts` — `planLoopCycle(project)`, un `LoopPlanner` pur qui compose `buildProjectSnapshot` (donc `next`/roadmap) sans dupliquer sa logique, et retourne soit un candidat prêt avec ses étapes prévues, soit un statut bloqué ;
+- `src/loop/runner.ts` — `runLoopPlan(projectName, options?)`, qui orchestre `idle -> planning -> ready -> completed` (candidat sûr disponible) ou `idle -> planning -> blocked` (aucun candidat sûr disponible, y compris lorsque le seul candidat détecté est `blocked` au sens de la roadmap) ;
+- `src/commands/run.ts` et le routage CLI `pnpm loop run <project> [--mode plan] [--json]`.
+
+Règles strictes de ce lot :
+
+- **seul le mode `plan` est exécutable** ; `execute`, `commit` et `publish` sont rejetés avec le message `Loop run mode not implemented: <mode>` et un code de sortie non nul (JSON : `{"schemaVersion":1,"ok":false,"error":{"code":"mode_not_implemented","message":"..."}}`) ;
+- le mode par défaut de `pnpm loop run <project>` est `plan` ;
+- en mode `plan`, `runLoopPlan` n'appelle aucun agent (Claude Code, OpenClaw ou futur agent), n'écrit aucun fichier, ne lance aucun commit et aucun push ;
+- `modifiedFiles` est toujours vide, `commit` et `publication` toujours `null`, et `failure` reste `null` en cas de succès ;
+- un candidat de roadmap dont le `kind` est `blocked` n'est jamais traité comme prêt à démarrer : le cycle passe alors à `blocked`, cohérent avec la politique déjà appliquée par `next` (voir `CLAUDE.md`) ;
+- la sortie `--json` d'un run réussi ou bloqué reste toujours un `LoopRunResult` valide avec `schemaVersion: 1`, même quand `status` vaut `blocked` — seul le rejet d'un mode non implémenté produit un code de sortie non nul ;
+- l'horloge, le générateur de `runId` et le planner sont injectables dans `runLoopPlan`, ce qui rend les tests entièrement déterministes ;
+- `LoopExecutor`, `LoopValidator`, `LoopRepairer`, `LoopCommitter` et `LoopPublisher` restent non implémentés ; ils feront l'objet de lots ultérieurs, de même que les adaptateurs `ClaudeCodeAgent`, `OpenClawAgent` et l'intégration n8n.
 
 ## Architecture d'intégration
 

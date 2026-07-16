@@ -72,4 +72,30 @@ describe("json outputs", () => {
     assert.equal(json.schemaVersion, 1);
     assert.ok(Array.isArray(json.instructions));
   });
+
+  it("run --mode plan --json exposes a LoopRunResult and touches nothing", () => {
+    const json = runJson("pnpm exec tsx src/cli.ts run loop-engine --mode plan --json") as {
+      schemaVersion?: unknown;
+      mode?: unknown;
+      status?: unknown;
+      modifiedFiles?: unknown;
+      commit?: unknown;
+      publication?: unknown;
+    };
+
+    assert.equal(json.schemaVersion, 1);
+    assert.equal(json.mode, "plan");
+    assert.ok(typeof json.status === "string");
+    assert.deepEqual(json.modifiedFiles, []);
+    assert.equal(json.commit, null);
+    assert.equal(json.publication, null);
+  });
+
+  it("run defaults to mode plan when --mode is omitted", () => {
+    const json = runJson("pnpm exec tsx src/cli.ts run loop-engine --json") as {
+      mode?: unknown;
+    };
+
+    assert.equal(json.mode, "plan");
+  });
 });

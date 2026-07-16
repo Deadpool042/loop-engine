@@ -1530,6 +1530,129 @@ export const AUDIT_RELEASE_WORKTREE_CHECK_SCRIPT_RULE: AuditRule = {
   },
 };
 
+export const LOOP_RUNNER_TYPES_EXPOSURE_RULE: AuditRule = {
+  id: "AUDIT-053",
+  category: "architecture",
+  severity: "error",
+  title: "LoopRunner public types are exposed",
+  description: "The LoopRunner core should expose LoopRunMode, LoopRunStatus, and LoopRunResult from src/loop/types.ts.",
+  check: () => {
+    const typesPath = "src/loop/types.ts";
+
+    if (!existsSync(typesPath)) {
+      return fail(
+        LOOP_RUNNER_TYPES_EXPOSURE_RULE,
+        "LoopRunner types file is missing.",
+        [typesPath],
+        "Restore src/loop/types.ts so the LoopRunner contract can be verified.",
+      );
+    }
+
+    const content = readFileSync(typesPath, "utf8");
+    const expectedTokens = [
+      "export type LoopRunMode",
+      "export type LoopRunStatus",
+      "export type LoopRunResult",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        LOOP_RUNNER_TYPES_EXPOSURE_RULE,
+        "Some LoopRunner public types are missing from src/loop/types.ts.",
+        missing,
+        "Export LoopRunMode, LoopRunStatus, and LoopRunResult from src/loop/types.ts.",
+      );
+    }
+
+    return pass(
+      LOOP_RUNNER_TYPES_EXPOSURE_RULE,
+      "LoopRunner public types are exposed.",
+      expectedTokens,
+    );
+  },
+};
+
+export const LOOP_RUNNER_STATE_MACHINE_RULE: AuditRule = {
+  id: "AUDIT-054",
+  category: "architecture",
+  severity: "error",
+  title: "LoopRunner state machine helper exists",
+  description: "The LoopRunner core should expose a pure canTransition(from, to) helper in src/loop/state-machine.ts.",
+  check: () => {
+    const stateMachinePath = "src/loop/state-machine.ts";
+
+    if (!existsSync(stateMachinePath)) {
+      return fail(
+        LOOP_RUNNER_STATE_MACHINE_RULE,
+        "LoopRunner state machine file is missing.",
+        [stateMachinePath],
+        "Restore src/loop/state-machine.ts so the LoopRunner state machine can be verified.",
+      );
+    }
+
+    const content = readFileSync(stateMachinePath, "utf8");
+    const expectedTokens = ["export function canTransition"];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        LOOP_RUNNER_STATE_MACHINE_RULE,
+        "canTransition is missing from src/loop/state-machine.ts.",
+        missing,
+        "Export canTransition(from, to) from src/loop/state-machine.ts.",
+      );
+    }
+
+    return pass(
+      LOOP_RUNNER_STATE_MACHINE_RULE,
+      "LoopRunner state machine helper exists.",
+      expectedTokens,
+    );
+  },
+};
+
+export const LOOP_RUNNER_PLAN_MODE_RULE: AuditRule = {
+  id: "AUDIT-055",
+  category: "architecture",
+  severity: "error",
+  title: "LoopRunner plan mode runner exists",
+  description: "The LoopRunner core should expose runLoopPlan(projectName, options?) in src/loop/runner.ts.",
+  check: () => {
+    const runnerPath = "src/loop/runner.ts";
+
+    if (!existsSync(runnerPath)) {
+      return fail(
+        LOOP_RUNNER_PLAN_MODE_RULE,
+        "LoopRunner runner file is missing.",
+        [runnerPath],
+        "Restore src/loop/runner.ts so the LoopRunner plan mode can be verified.",
+      );
+    }
+
+    const content = readFileSync(runnerPath, "utf8");
+    const expectedTokens = ["export function runLoopPlan"];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        LOOP_RUNNER_PLAN_MODE_RULE,
+        "runLoopPlan is missing from src/loop/runner.ts.",
+        missing,
+        "Export runLoopPlan(projectName, options?) from src/loop/runner.ts.",
+      );
+    }
+
+    return pass(
+      LOOP_RUNNER_PLAN_MODE_RULE,
+      "LoopRunner plan mode runner exists.",
+      expectedTokens,
+    );
+  },
+};
 
 
 

@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Objectif final
 
@@ -8,7 +8,7 @@ Voir `docs/architecture/final-objective.md`.
 
 Cette page constitue la source de vérité du produit et définit l'objectif final de Loop Engine.
 
-Claude doit s’y référer avant toute évolution structurante.
+Codex doit s’y référer avant toute évolution structurante.
 
 ## What this is
 
