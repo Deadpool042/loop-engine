@@ -494,15 +494,17 @@ export const AUDIT_GITHUB_ACTIONS_CI_RULE: AuditRule = {
     }
 
     const content = readFileSync(workflowPath, "utf8");
-    const expectedTokens = [
-      "uses: actions/checkout@v4",
-      "uses: pnpm/action-setup@v4",
-      "uses: actions/setup-node@v4",
-      "run: pnpm install --frozen-lockfile",
-      "run: pnpm run ci",
-    ];
+    const expectedPatterns = [
+  /uses:\s*actions\/checkout@v\d+/,
+  /uses:\s*pnpm\/action-setup@v\d+/,
+  /uses:\s*actions\/setup-node@v\d+/,
+  /run:\s*pnpm install --frozen-lockfile/,
+  /run:\s*pnpm run ci/,
+];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+const missing = expectedPatterns
+  .filter((pattern) => !pattern.test(content))
+  .map((pattern) => pattern.source);
 
     if (missing.length > 0) {
       return fail(
@@ -516,7 +518,7 @@ export const AUDIT_GITHUB_ACTIONS_CI_RULE: AuditRule = {
     return pass(
       AUDIT_GITHUB_ACTIONS_CI_RULE,
       "GitHub Actions CI workflow runs pnpm run ci.",
-      expectedTokens,
+      expectedPatterns.map((pattern) => pattern.source),
     );
   },
 };
