@@ -247,6 +247,8 @@ Agent
 
 Le `LoopRunner` ne connaît que cette interface — jamais une implémentation d'agent particulière. Remplacer ou ajouter un agent d'exécution ne modifie donc jamais la machine à états, la validation, ni la politique Git du runner.
 
+Depuis le lot V7.3, cette interface conceptuelle est typée localement dans `src/agents/` (`AgentRuntime`, `AgentProfile`, `AgentRegistry`, `AgentSelector`, stratégie d'escalade) — sans aucun appel réseau ni mode `execute`. Voir `docs/architecture/agent-orchestration.md`.
+
 ## Voir aussi
 
 - `docs/architecture/final-objective.md`
@@ -254,3 +256,4 @@ Le `LoopRunner` ne connaît que cette interface — jamais une implémentation d
 - `docs/architecture/project-intelligence.md`
 - `docs/architecture/roadmap-reader.md`
 - `docs/architecture/audit-engine.md`
+- `docs/architecture/agent-orchestration.md`

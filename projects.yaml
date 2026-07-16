@@ -38,3 +38,5 @@ projects:
       - docs/architecture/project-intelligence.md
     validation:
       - pnpm run validate
+    roadmap:
+      - docs/roadmap/loop-engine.md

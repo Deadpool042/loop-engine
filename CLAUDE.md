@@ -63,6 +63,7 @@ Layering is strict and one-directional: `cli.ts` → `commands/` → `loop/` →
 - **`src/loop/`** — the LoopRunner core (V7.2, `plan` mode only): `types.ts` (`LoopRunMode`, `LoopRunStatus`, `LoopRunResult`, …), `state-machine.ts` (`canTransition`), `planner.ts` (`planLoopCycle`, composes `intelligence/project-snapshot.ts` without duplicating it), `runner.ts` (`runLoopPlan`). See `docs/architecture/autonomous-loop-runner.md`.
 - **`src/intelligence/`** — the engine. `project-snapshot.ts` builds the central `ProjectSnapshot` (see `src/intelligence/snapshot.ts` for the type) by merging declarative config (`projects.yaml`) with computed state (Git, docs, roadmap). `roadmap.ts` is the roadmap reader (see below). **This is the single source of truth commands must consume — never have a command re-read Git/docs/roadmap directly.**
 - **`src/core/`** — small, deterministic low-level primitives: `config.ts` (loads/parses `projects.yaml`), `git.ts` (shells out to `git`, always fails soft to `"unknown"`/`null`), `docs.ts` (file existence checks), `project.ts` (project lookup/arg parsing).
+- **`src/agents/`** — the agent orchestration layer (V7.3, local/deterministic only): `types.ts` (`AgentRuntime`, `AgentProvider`, `AgentCapability`, `AgentPermission`, `AgentEffort`, `AgentBudget`, `AgentProfile`), `registry.ts` (`AgentRegistry`), `selector.ts` (`selectAgentProfile`, smallest-capable-first with rejection explainability), `escalation.ts` (`escalateAgentProfile`, triggered only by an explicit failure). No network calls, no provider SDK, no `execute` mode, not wired into any CLI command; consumed only by a future `LoopExecutor`, never the reverse. See `docs/architecture/agent-orchestration.md`.
 - **`src/ui/terminal.ts`** — the only place that formats terminal output; commands call `terminal.*` rather than inlining styling.
 
 Before adding a new command: check whether the data already exists on `ProjectSnapshot`; if not, extend `intelligence/` rather than computing it ad hoc inside the command.
@@ -94,6 +95,7 @@ When adjusting keyword lists, favor precision (avoid blocking ordinary work) ove
 
 - `docs/architecture/final-objective.md` — final objective and product source of truth (see top of this file).
 - `docs/architecture/autonomous-loop-runner.md` — LoopRunner architecture and contracts for the autonomous small-lot cycle (plan/execute/commit/publish modes, state machine, `LoopRunResult`).
+- `docs/architecture/agent-orchestration.md` — agent orchestration layer (`src/agents/`): types, registry, selector, escalation strategy — local and deterministic, no execute mode.
 - `docs/architecture/commands.md` — layering rules for `cli.ts` / `commands/` / `core/` / `intelligence/` / `ui/`.
 - `docs/architecture/project-intelligence.md` — `ProjectSnapshot` contract and roadmap candidate classification.
 - `docs/architecture/roadmap-reader.md` — roadmap reader formats, states, and keyword refinement history.
