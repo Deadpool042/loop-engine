@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 
+import { defaultAgentRegistry } from "../agents/registry.js";
+import type { AgentRegistry } from "../agents/registry.js";
 import { loadConfig, type Config, type ProjectConfig } from "../core/config.js";
 import { findProject } from "../core/project.js";
+import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
+import { resolvePolicy } from "../policy/resolver.js";
+import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
 import { planLoopCycle, type LoopPlan } from "./planner.js";
 import { canTransition } from "./state-machine.js";
 import type {
@@ -18,6 +23,9 @@ export type LoopRunPlanOptions = Readonly<{
   generateRunId?: () => string;
   loadConfig?: () => Config;
   planLoopCycle?: (project: ProjectConfig) => LoopPlan;
+  agentPolicy?: AgentPolicy;
+  agentRegistry?: AgentRegistry;
+  resolvePolicy?: typeof resolvePolicy;
 }>;
 
 export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {}): LoopRunResult {
@@ -25,6 +33,9 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
   const generateRunId = options.generateRunId ?? (() => randomUUID());
   const resolveConfig = options.loadConfig ?? loadConfig;
   const plan = options.planLoopCycle ?? planLoopCycle;
+  const policy = options.agentPolicy ?? DEFAULT_AGENT_POLICY;
+  const registry = options.agentRegistry ?? defaultAgentRegistry;
+  const resolveAgentPolicy = options.resolvePolicy ?? resolvePolicy;
 
   const mode: LoopRunMode = "plan";
   const runId = generateRunId();
@@ -52,7 +63,11 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
     steps.push({ name: stepName, status: stepStatus, startedAt: timestamp, completedAt: timestamp, details });
   }
 
-  function finalize(candidate: LoopRunResult["candidate"], failure: LoopRunFailure | null): LoopRunResult {
+  function finalize(
+    candidate: LoopRunResult["candidate"],
+    failure: LoopRunFailure | null,
+    agentPolicy: AgentPolicyResolution | null = null,
+  ): LoopRunResult {
     return {
       schemaVersion: 1,
       runId,
@@ -68,6 +83,7 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
       commit: null,
       publication: null,
       failure,
+      agentPolicy,
     };
   }
 
@@ -112,5 +128,16 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
   // through executing/validating.
   transition("completed", "completed", "completed", cycle.plannedSteps);
 
-  return finalize(cycle.candidate, null);
+  // Forecast-only: resolves which agent profile *would* be selected for this
+  // candidate, without ever calling it. Pure lookup against a local
+  // registry — no network, no process, no side effect. See
+  // docs/architecture/agent-policy-engine.md.
+  const agentPolicy = resolveAgentPolicy({
+    policy,
+    registry,
+    candidate: cycle.candidate,
+    mode: "plan",
+  });
+
+  return finalize(cycle.candidate, null, agentPolicy);
 }

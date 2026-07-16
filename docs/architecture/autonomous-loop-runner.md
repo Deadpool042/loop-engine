@@ -59,7 +59,8 @@ Contrat conceptuel, destiné à guider une future implémentation TypeScript et 
 - `modifiedFiles` — liste des fichiers modifiés par l'agent pendant `executing` ;
 - `commit` — référence du commit créé si le mode `commit` ou `publish` a validé le lot, nul sinon ;
 - `publication` — détails de push/tag si le mode `publish` a été utilisé, nul sinon ;
-- `failure` — raison structurée de l'échec ou du blocage, nulle en cas de succès.
+- `failure` — raison structurée de l'échec ou du blocage, nulle en cas de succès ;
+- `agentPolicy` — champ additif (V7.4) : une résolution de politique d'agent **prévisionnelle** (`AgentPolicyResolution`, voir `docs/architecture/agent-policy-engine.md`) pour le candidat sélectionné, nulle si le cycle est `blocked` ou `failed`. Ajout rétrocompatible : `schemaVersion` reste `1`.
 
 Ce contrat doit rester suffisamment précis pour qu'une implémentation ultérieure puisse le typer directement en TypeScript, sans reformulation.
 
@@ -190,6 +191,20 @@ Règles strictes de ce lot :
 - l'horloge, le générateur de `runId` et le planner sont injectables dans `runLoopPlan`, ce qui rend les tests entièrement déterministes ;
 - `LoopExecutor`, `LoopValidator`, `LoopRepairer`, `LoopCommitter` et `LoopPublisher` restent non implémentés ; ils feront l'objet de lots ultérieurs, de même que les adaptateurs `ClaudeCodeAgent`, `OpenClawAgent` et l'intégration n8n.
 
+## 12. Portée du lot V7.4 — Agent Policy Engine (prévision en mode `plan`)
+
+Ce lot relie la couche `src/agents/` (V7.3) au `LoopRunner` via un moteur de politique local et déterministe (`src/policy/`, voir `docs/architecture/agent-policy-engine.md`), **sans implémenter le mode `execute`** et sans modifier le comportement terminal du mode `plan` (`idle -> planning -> ready -> completed` ou `idle -> planning -> blocked`, inchangé).
+
+Une fois le cycle `ready`, `runLoopPlan` calcule une résolution de politique prévisionnelle pour le candidat sélectionné — quelles capacités, permissions, effort et budget le lot demanderait, et quel profil d'agent serait sélectionné si le cycle passait un jour à l'exécution réelle — sans jamais appeler cet agent. Le résultat est exposé sur le champ additif `agentPolicy` de `LoopRunResult` (voir section 3).
+
+Règles strictes de ce lot :
+
+- aucun agent n'est appelé, aucun réseau, aucun SDK fournisseur, aucun processus externe ;
+- le mode `plan` ne fait jamais d'appel réel (`DEFAULT_MODE_BUDGETS.plan.maxCalls` vaut `0`) ; la sélection prévisionnelle utilise un budget de capacité distinct (simulant le mode `execute`) uniquement pour évaluer quel profil *serait* sélectionné, jamais pour en appeler un ;
+- aucune permission d'écriture n'est jamais requise en mode `plan`, quelle que soit la catégorie du lot (`getAllowedPermissionsForMode("plan")` ne contient que `read_only`) ;
+- `LoopExecutor`, `LoopValidator`, `LoopRepairer`, `LoopCommitter` et `LoopPublisher` restent non implémentés, inchangé depuis V7.2 ;
+- aucun commit, push ou tag automatique.
+
 ## Architecture d'intégration
 
 Loop Engine est le moteur d'orchestration autonome. Les agents IA (Claude Code, OpenClaw, futurs agents) ne sont que des exécutants. n8n orchestre les déclenchements externes, sans jamais porter de logique métier.
@@ -257,3 +272,4 @@ Depuis le lot V7.3, cette interface conceptuelle est typée localement dans `src
 - `docs/architecture/roadmap-reader.md`
 - `docs/architecture/audit-engine.md`
 - `docs/architecture/agent-orchestration.md`
+- `docs/architecture/agent-policy-engine.md`

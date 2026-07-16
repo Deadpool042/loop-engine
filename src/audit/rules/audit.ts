@@ -1518,21 +1518,28 @@ export const AUDIT_RULE_ID_SEQUENCE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule ids are contiguous within the AUDIT prefix",
-  description: "AUDIT-prefixed rule ids should form a contiguous sequence without gaps.",
+  description: "AUDIT-prefixed rule ids should form a contiguous sequence without gaps, across every rule file — not only src/audit/rules/audit.ts, since AUDIT-prefixed architecture rules can also live in src/audit/rules/json.ts.",
   check: () => {
-    const ruleFile = "src/audit/rules/audit.ts";
+    const ruleFiles = [
+      "src/audit/rules/json.ts",
+      "src/audit/rules/cli.ts",
+      "src/audit/rules/docs.ts",
+      "src/audit/rules/audit.ts",
+    ];
 
-    if (!existsSync(ruleFile)) {
+    const missingFiles = ruleFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
       return fail(
         AUDIT_RULE_ID_SEQUENCE_RULE,
-        "Audit rule file is missing.",
-        [ruleFile],
-        "Restore src/audit/rules/audit.ts so AUDIT rule id sequencing can be verified.",
+        "Some audit rule files are missing.",
+        missingFiles,
+        "Restore the missing audit rule files so AUDIT rule id sequencing can be verified.",
       );
     }
 
-    const content = readFileSync(ruleFile, "utf8");
-    const auditIds = Array.from(content.matchAll(/\bid:\s*"AUDIT-(\d{3})"/g))
+    const auditIds = ruleFiles
+      .flatMap((file) => Array.from(readFileSync(file, "utf8").matchAll(/\bid:\s*"AUDIT-(\d{3})"/g)))
       .map((match) => Number(match[1]))
       .filter((id) => Number.isInteger(id))
       .sort((left, right) => left - right);
@@ -2622,6 +2629,316 @@ export const AUDIT_RECOMMENDATION_SUMMARY_SYNC_ASSERTION_RULE: AuditRule = {
       AUDIT_RECOMMENDATION_SUMMARY_SYNC_ASSERTION_RULE,
       "Recommendation summary sync is asserted at runtime.",
       expectedTokens,
+    );
+  },
+};
+
+export const AUDIT_POLICY_ENGINE_MODULE_PRESENCE_RULE: AuditRule = {
+  id: "AUDIT-056",
+  category: "architecture",
+  severity: "warning",
+  title: "Agent Policy Engine module is present",
+  description: "The Agent Policy Engine (V7.4) should expose types, defaults, and a resolver as a dedicated src/policy/ module.",
+  check: () => {
+    const expectations = [
+      { file: "src/policy/types.ts", token: "export type LoopTaskRequirements" },
+      { file: "src/policy/types.ts", token: "export type AgentPolicy " },
+      { file: "src/policy/types.ts", token: "export type AgentPolicyResolution" },
+      { file: "src/policy/defaults.ts", token: "export function getAllowedPermissionsForMode" },
+      { file: "src/policy/defaults.ts", token: "export const DEFAULT_AGENT_POLICY" },
+      { file: "src/policy/resolver.ts", token: "export function resolvePolicy" },
+      { file: "src/policy/resolver.ts", token: "export function classifyLoopTaskCategory" },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_POLICY_ENGINE_MODULE_PRESENCE_RULE,
+        "Agent Policy Engine module is missing or incomplete.",
+        missing,
+        "Restore src/policy/types.ts, src/policy/defaults.ts, and src/policy/resolver.ts with LoopTaskRequirements, AgentPolicy, AgentPolicyResolution, getAllowedPermissionsForMode, DEFAULT_AGENT_POLICY, resolvePolicy, and classifyLoopTaskCategory.",
+      );
+    }
+
+    return pass(
+      AUDIT_POLICY_ENGINE_MODULE_PRESENCE_RULE,
+      "Agent Policy Engine module is present.",
+      expectations.map(({ file, token }) => `${file} -> ${token}`),
+    );
+  },
+};
+
+export const AUDIT_POLICY_CAPABILITY_PERMISSION_SEPARATION_RULE: AuditRule = {
+  id: "AUDIT-057",
+  category: "architecture",
+  severity: "warning",
+  title: "Policy requirements separate capabilities from permissions",
+  description: "LoopTaskRequirements should expose requiredCapabilities and requiredPermissions as two distinct fields, never merged into one.",
+  check: () => {
+    const typesPath = "src/policy/types.ts";
+
+    if (!existsSync(typesPath)) {
+      return fail(
+        AUDIT_POLICY_CAPABILITY_PERMISSION_SEPARATION_RULE,
+        "Policy types file is missing.",
+        [typesPath],
+        "Restore src/policy/types.ts so capability/permission separation can be verified.",
+      );
+    }
+
+    const content = readFileSync(typesPath, "utf8");
+    const expectedTokens = [
+      "requiredCapabilities: readonly AgentCapability[];",
+      "requiredPermissions: readonly AgentPermission[];",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_POLICY_CAPABILITY_PERMISSION_SEPARATION_RULE,
+        "Policy requirements do not clearly separate capabilities from permissions.",
+        missing,
+        "Keep requiredCapabilities and requiredPermissions as two distinct readonly fields on LoopTaskRequirements.",
+      );
+    }
+
+    return pass(
+      AUDIT_POLICY_CAPABILITY_PERMISSION_SEPARATION_RULE,
+      "Policy requirements separate capabilities from permissions.",
+      expectedTokens,
+    );
+  },
+};
+
+export const AUDIT_POLICY_MODE_PERMISSION_CEILING_RULE: AuditRule = {
+  id: "AUDIT-058",
+  category: "architecture",
+  severity: "warning",
+  title: "Permission ceilings are enforced per mode",
+  description: "The policy engine should expose a per-mode permission ceiling where plan/execute/commit/publish each include exactly the previous mode's permissions plus one new one, and git_tag is never implicit.",
+  check: () => {
+    const defaultsPath = "src/policy/defaults.ts";
+
+    if (!existsSync(defaultsPath)) {
+      return fail(
+        AUDIT_POLICY_MODE_PERMISSION_CEILING_RULE,
+        "Policy defaults file is missing.",
+        [defaultsPath],
+        "Restore src/policy/defaults.ts so per-mode permission ceilings can be verified.",
+      );
+    }
+
+    const content = readFileSync(defaultsPath, "utf8");
+    const expectedTokens = [
+      'plan: ["read_only"]',
+      'execute: ["read_only", "write_worktree", "shell_exec"]',
+      'commit: ["read_only", "write_worktree", "shell_exec", "git_commit"]',
+      'publish: ["read_only", "write_worktree", "shell_exec", "git_commit", "git_push"]',
+      "export function getAllowedPermissionsForMode",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    const ceilingsStart = content.indexOf("const MODE_PERMISSION_CEILINGS");
+    const ceilingsEnd = content.indexOf("};", ceilingsStart);
+    const ceilingsBlock = ceilingsStart >= 0 && ceilingsEnd >= 0 ? content.slice(ceilingsStart, ceilingsEnd) : "";
+    const grantsGitTag = ceilingsBlock.includes("git_tag");
+
+    if (missing.length > 0 || grantsGitTag || !ceilingsBlock) {
+      return fail(
+        AUDIT_POLICY_MODE_PERMISSION_CEILING_RULE,
+        "Per-mode permission ceilings are incomplete or grant git_tag implicitly.",
+        [...missing, ...(grantsGitTag ? ["git_tag must never be part of a mode ceiling"] : []), ...(ceilingsBlock ? [] : ["MODE_PERMISSION_CEILINGS block not found"])],
+        "Keep getAllowedPermissionsForMode returning exactly plan/execute/commit/publish's cumulative ceilings, and never include git_tag.",
+      );
+    }
+
+    return pass(
+      AUDIT_POLICY_MODE_PERMISSION_CEILING_RULE,
+      "Permission ceilings are enforced per mode and git_tag is never implicit.",
+      expectedTokens,
+    );
+  },
+};
+
+export const AUDIT_POLICY_RESTRICTIVE_MERGE_RULE: AuditRule = {
+  id: "AUDIT-059",
+  category: "architecture",
+  severity: "warning",
+  title: "Budgets, providers, and runtimes are merged restrictively",
+  description: "The policy engine should expose restrictive-merge helpers for budgets, providers, runtimes, and maximum effort so a caller (e.g. n8n) can only narrow a policy, never widen it.",
+  check: () => {
+    const defaultsPath = "src/policy/defaults.ts";
+
+    if (!existsSync(defaultsPath)) {
+      return fail(
+        AUDIT_POLICY_RESTRICTIVE_MERGE_RULE,
+        "Policy defaults file is missing.",
+        [defaultsPath],
+        "Restore src/policy/defaults.ts so restrictive-merge helpers can be verified.",
+      );
+    }
+
+    const content = readFileSync(defaultsPath, "utf8");
+    const expectedTokens = [
+      "export function mergeBudgetsRestrictively",
+      "export function mergeAllowedProviders",
+      "export function mergeAllowedRuntimes",
+      "export function restrictMaximumEffort",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_POLICY_RESTRICTIVE_MERGE_RULE,
+        "Restrictive-merge helpers are incomplete.",
+        missing,
+        "Expose mergeBudgetsRestrictively, mergeAllowedProviders, mergeAllowedRuntimes, and restrictMaximumEffort from src/policy/defaults.ts.",
+      );
+    }
+
+    return pass(
+      AUDIT_POLICY_RESTRICTIVE_MERGE_RULE,
+      "Budgets, providers, and runtimes are merged restrictively.",
+      expectedTokens,
+    );
+  },
+};
+
+export const AUDIT_POLICY_FORECAST_INTEGRATION_RULE: AuditRule = {
+  id: "AUDIT-060",
+  category: "architecture",
+  severity: "warning",
+  title: "LoopRunner computes a forecast-only agent policy in mode plan",
+  description: "runLoopPlan should resolve an agent policy for the selected candidate in mode plan and expose it as an additive LoopRunResult field, without ever invoking an agent.",
+  check: () => {
+    const expectations = [
+      { file: "src/loop/types.ts", token: "agentPolicy: AgentPolicyResolution | null;" },
+      { file: "src/loop/runner.ts", token: "import { resolvePolicy } from \"../policy/resolver.js\";" },
+      { file: "src/loop/runner.ts", token: 'mode: "plan",' },
+      { file: "src/commands/run.ts", token: "agentPolicy: result.agentPolicy" },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        AUDIT_POLICY_FORECAST_INTEGRATION_RULE,
+        "The forecast-only agent policy integration is incomplete.",
+        missing,
+        "Ensure LoopRunResult exposes agentPolicy, runLoopPlan resolves it in mode plan via resolvePolicy, and the run command exposes it in JSON output.",
+      );
+    }
+
+    return pass(
+      AUDIT_POLICY_FORECAST_INTEGRATION_RULE,
+      "LoopRunner computes a forecast-only agent policy in mode plan.",
+      expectations.map(({ file, token }) => `${file} -> ${token}`),
+    );
+  },
+};
+
+export const AUDIT_POLICY_NO_REAL_EXECUTION_RULE: AuditRule = {
+  id: "AUDIT-061",
+  category: "architecture",
+  severity: "warning",
+  title: "Policy engine performs no real execution or network I/O",
+  description: "src/policy/ should never perform network I/O, spawn a process, or introduce a real execute mode — resolvePolicy stays a pure, local, deterministic lookup.",
+  check: () => {
+    const policyFiles = ["src/policy/types.ts", "src/policy/defaults.ts", "src/policy/resolver.ts"];
+    const missingFiles = policyFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUDIT_POLICY_NO_REAL_EXECUTION_RULE,
+        "Some policy engine files are missing.",
+        missingFiles,
+        "Restore the missing src/policy/ files so the no-real-execution invariant can be verified.",
+      );
+    }
+
+    const forbiddenPatterns = [/\bfetch\(/, /require\(["']https?["']\)/, /child_process/, /--force\b/];
+
+    const violations = policyFiles.flatMap((file) => {
+      const content = readFileSync(file, "utf8");
+
+      return forbiddenPatterns
+        .filter((pattern) => pattern.test(content))
+        .map((pattern) => `${file}: matches ${pattern.source}`);
+    });
+
+    if (violations.length > 0) {
+      return fail(
+        AUDIT_POLICY_NO_REAL_EXECUTION_RULE,
+        "The policy engine contains a forbidden execution or network pattern.",
+        violations,
+        "Keep src/policy/ free of fetch, child_process, dynamic https requires, and force-push patterns.",
+      );
+    }
+
+    return pass(
+      AUDIT_POLICY_NO_REAL_EXECUTION_RULE,
+      "Policy engine performs no real execution or network I/O.",
+      policyFiles,
+    );
+  },
+};
+
+export const AUDIT_POLICY_DEPENDENCY_DIRECTION_RULE: AuditRule = {
+  id: "AUDIT-062",
+  category: "architecture",
+  severity: "warning",
+  title: "Policy engine dependencies stay unidirectional",
+  description: "src/policy/ should never depend on src/loop/, src/commands/, or src/cli.ts, and src/agents/ should never depend on src/policy/.",
+  check: () => {
+    const policyFiles = ["src/policy/types.ts", "src/policy/defaults.ts", "src/policy/resolver.ts"];
+    const agentFiles = ["src/agents/types.ts", "src/agents/registry.ts", "src/agents/selector.ts", "src/agents/escalation.ts"];
+    const allFiles = [...policyFiles, ...agentFiles];
+
+    const missingFiles = allFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AUDIT_POLICY_DEPENDENCY_DIRECTION_RULE,
+        "Some policy or agent engine files are missing.",
+        missingFiles,
+        "Restore the missing src/policy/ and src/agents/ files so dependency direction can be verified.",
+      );
+    }
+
+    const forbiddenInPolicy = /from\s+["'].*\/(loop|commands)\//;
+    const forbiddenCliInPolicy = /from\s+["'].*cli\.js["']/;
+    const forbiddenInAgents = /from\s+["'].*\/policy\//;
+
+    const violations = [
+      ...policyFiles
+        .filter((file) => forbiddenInPolicy.test(readFileSync(file, "utf8")) || forbiddenCliInPolicy.test(readFileSync(file, "utf8")))
+        .map((file) => `${file}: imports loop/, commands/, or cli.js`),
+      ...agentFiles
+        .filter((file) => forbiddenInAgents.test(readFileSync(file, "utf8")))
+        .map((file) => `${file}: imports policy/`),
+    ];
+
+    if (violations.length > 0) {
+      return fail(
+        AUDIT_POLICY_DEPENDENCY_DIRECTION_RULE,
+        "Policy engine dependency direction is violated.",
+        violations,
+        "Keep src/policy/ independent of src/loop/, src/commands/, and src/cli.ts, and keep src/agents/ independent of src/policy/.",
+      );
+    }
+
+    return pass(
+      AUDIT_POLICY_DEPENDENCY_DIRECTION_RULE,
+      "Policy engine dependencies stay unidirectional.",
+      allFiles,
     );
   },
 };

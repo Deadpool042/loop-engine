@@ -14,6 +14,8 @@ Son objectif final est de transformer l’état réel des projets Git, leurs doc
 
 Loop Engine vise désormais l'orchestration autonome par petits lots : analyser un projet, sélectionner le prochain micro-lot, préparer le contexte, déléguer l'exécution à un agent, valider le résultat, corriger ou arrêter en cas d'échec, committer si le lot est validé, recommencer, et ne publier que lorsqu'un mode explicite l'autorise. Voir `docs/architecture/autonomous-loop-runner.md`.
 
+Le choix de l'agent qui exécuterait un micro-lot est lui-même déterministe et local : un moteur de politique (`src/policy/`) transforme un micro-lot planifié en capacités, permissions, effort et budget requis, puis en sélection d'agent explicable — prévisionnelle en mode `plan`, jamais un appel réel. Voir `docs/architecture/agent-policy-engine.md`.
+
 Le comportement par défaut reste non destructif : pas d'appel IA automatique, pas de commit automatique, pas de push automatique, pas de modification des projets observés. Ces garanties ne s'effacent jamais devant un mode explicitement sélectionné : pas de commit automatique et pas de push automatique restent la règle tant qu'un mode `commit` ou `publish` n'a pas été explicitement demandé par l'humain.
 
 Claude doit donc améliorer le moteur, préserver les garde-fous, respecter les contrats JSON et travailler par petits lots vérifiables.

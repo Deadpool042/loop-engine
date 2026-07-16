@@ -4,6 +4,8 @@
 
 Lot V7.3 — types, registry, selector et stratégie d'escalade, **entièrement locaux et déterministes**. Aucun appel réseau, aucun SDK fournisseur, aucune clé API, aucun mode `execute` implémenté dans ce lot.
 
+Lot V7.4 — cette couche est désormais consommée par un moteur de politique (`src/policy/`) qui relie un micro-lot planifié à une sélection d'agent prévisionnelle, intégrée au `LoopRunner` en mode `plan` uniquement. Voir `docs/architecture/agent-policy-engine.md`. Le sens de dépendance posé ici (`src/agents/` ne dépend jamais de `src/loop/`, `src/commands/`, `src/cli.ts` — ni, depuis V7.4, de `src/policy/`) reste inchangé.
+
 ## Objectif
 
 Donner à Loop Engine un vocabulaire typé pour raisonner sur "quel agent d'exécution utiliser pour un micro-lot donné", sans jamais invoquer un agent réel. Ce lot prépare le terrain pour un futur `LoopExecutor` (mode `execute` du [LoopRunner](autonomous-loop-runner.md)) sans l'implémenter : sélectionner un profil reste une décision pure, testable sans réseau, sans process externe, sans effet de bord.
@@ -117,6 +119,7 @@ Explicitement hors périmètre de ce lot :
 
 ## Voir aussi
 
+- `docs/architecture/agent-policy-engine.md`
 - `docs/architecture/autonomous-loop-runner.md`
 - `docs/architecture/final-objective.md`
 - `CLAUDE.md`

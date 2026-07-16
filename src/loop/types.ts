@@ -1,4 +1,5 @@
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
+import type { AgentPolicyResolution } from "../policy/types.js";
 
 export const LOOP_RUN_MODES = ["plan", "execute", "commit", "publish"] as const;
 
@@ -50,4 +51,10 @@ export type LoopRunResult = Readonly<{
   commit: null;
   publication: null;
   failure: LoopRunFailure | null;
+  // Additive field (V7.4): a forecast-only agent policy resolution for the
+  // selected candidate, computed without ever calling the selected agent.
+  // Null whenever no candidate was ready (blocked/failed cycles). Adding
+  // this field is backward compatible: schemaVersion stays 1. See
+  // docs/architecture/agent-policy-engine.md.
+  agentPolicy: AgentPolicyResolution | null;
 }>;

@@ -37,6 +37,19 @@ function printLoopRunResult(result: LoopRunResult): void {
     terminal.error(`${result.failure.code}: ${result.failure.message}`);
   }
 
+  terminal.section("Agent policy (forecast)");
+  if (result.agentPolicy) {
+    terminal.info(`Status: ${result.agentPolicy.status}`);
+    if (result.agentPolicy.selection?.outcome === "selected") {
+      terminal.info(
+        `Would select: ${result.agentPolicy.selection.profile.id} (effort ${result.agentPolicy.selection.profile.effort})`,
+      );
+    }
+    terminal.info("No agent was called.");
+  } else {
+    terminal.warning("No agent policy resolution available for this cycle.");
+  }
+
   terminal.section("Worktree");
   terminal.success("No modification performed.");
 }
@@ -58,6 +71,7 @@ function printLoopRunResultJson(result: LoopRunResult): void {
       commit: result.commit,
       publication: result.publication,
       failure: result.failure,
+      agentPolicy: result.agentPolicy,
     }),
   );
 }

@@ -81,6 +81,11 @@ describe("json outputs", () => {
       modifiedFiles?: unknown;
       commit?: unknown;
       publication?: unknown;
+      agentPolicy?: {
+        mode?: unknown;
+        status?: unknown;
+        requirements?: { executionBudget?: { maxCalls?: unknown } };
+      } | null;
     };
 
     assert.equal(json.schemaVersion, 1);
@@ -89,6 +94,14 @@ describe("json outputs", () => {
     assert.deepEqual(json.modifiedFiles, []);
     assert.equal(json.commit, null);
     assert.equal(json.publication, null);
+    assert.ok("agentPolicy" in json);
+
+    if (json.agentPolicy) {
+      assert.equal(json.agentPolicy.mode, "plan");
+      assert.ok(typeof json.agentPolicy.status === "string");
+      // The forecast never implies a real call: this run's own budget stays 0.
+      assert.equal(json.agentPolicy.requirements?.executionBudget?.maxCalls, 0);
+    }
   });
 
   it("run defaults to mode plan when --mode is omitted", () => {

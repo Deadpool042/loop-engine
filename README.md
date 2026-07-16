@@ -53,7 +53,7 @@ Loop Engine ne modifie pas les dépôts pilotés.
 - `pnpm loop prompt creatyss` : génère un prompt court à coller dans un assistant IA.
 - `pnpm loop prompt creatyss --json` : génère le contexte de prompt en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop run creatyss` : lance un cycle du LoopRunner. **Seul le mode `plan` est implémenté (V7.2)** ; c'est aussi le mode par défaut. Aucun agent n'est appelé, aucune modification du worktree, aucun commit et aucun push.
-- `pnpm loop run creatyss --mode plan --json` : sortie JSON du cycle (`LoopRunResult`, `schemaVersion: 1`).
+- `pnpm loop run creatyss --mode plan --json` : sortie JSON du cycle (`LoopRunResult`, `schemaVersion: 1`), incluant depuis V7.4 un champ `agentPolicy` — une sélection d'agent **prévisionnelle** (forecast) pour le candidat sélectionné, jamais un appel réel. Voir `docs/architecture/agent-policy-engine.md`.
 - `pnpm loop run creatyss --mode execute|commit|publish` : rejeté explicitement (`Loop run mode not implemented: <mode>`, code de sortie non nul) ; ces modes seront implémentés dans des lots ultérieurs. Voir `docs/architecture/autonomous-loop-runner.md`.
 
 ## Configuration
@@ -135,6 +135,8 @@ Voir aussi :
 - `docs/integrations/openclaw-read-only.md`
 - `docs/integrations/openclaw-read-only-checklist.md`
 - `docs/architecture/audit-engine.md`
+- `docs/architecture/agent-orchestration.md`
+- `docs/architecture/agent-policy-engine.md`
 
 ## Audit et CI
 

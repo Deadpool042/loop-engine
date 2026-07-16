@@ -67,6 +67,10 @@ describe("runLoopPlan", () => {
     assert.equal(result.commit, null);
     assert.equal(result.publication, null);
     assert.equal(result.failure, null);
+    assert.ok(result.agentPolicy, "a completed plan cycle exposes an agent policy forecast");
+    assert.equal(result.agentPolicy?.mode, "plan");
+    // The forecast never implies a real call: this run's own budget stays 0.
+    assert.equal(result.agentPolicy?.requirements.executionBudget.maxCalls, 0);
     assert.ok(result.steps.length >= 3);
     assert.equal(result.steps.at(-1)?.name, "completed");
     assert.deepEqual(result.steps.at(-1)?.details, ["Prepare context", "Prepare prompt"]);
@@ -115,6 +119,7 @@ describe("runLoopPlan", () => {
     assert.deepEqual(result.modifiedFiles, []);
     assert.equal(result.commit, null);
     assert.equal(result.publication, null);
+    assert.equal(result.agentPolicy, null);
   });
 
   it("returns blocked when only a blocked candidate is available", () => {
@@ -134,6 +139,7 @@ describe("runLoopPlan", () => {
     assert.equal(result.status, "blocked");
     assert.equal(result.candidate?.kind, "blocked");
     assert.equal(result.failure?.code, "no_safe_candidate");
+    assert.equal(result.agentPolicy, null);
   });
 
   it("fails when the project is unknown", () => {
@@ -145,6 +151,7 @@ describe("runLoopPlan", () => {
     assert.equal(result.status, "failed");
     assert.equal(result.failure?.code, "unknown_project");
     assert.equal(result.candidate, null);
+    assert.equal(result.agentPolicy, null);
   });
 
   it("never modifies the worktree, commits, or publishes regardless of the outcome", () => {
@@ -173,5 +180,43 @@ describe("runLoopPlan", () => {
       assert.equal(outcome.publication, null);
       assert.equal(outcome.validation, null);
     }
+  });
+
+  it("computes the agent policy forecast via the injectable resolvePolicy — never a hardcoded call", () => {
+    const project = fixtureProject();
+    const candidate = fixtureCandidate("safe");
+    let calls = 0;
+
+    const result = runLoopPlan(project.name, {
+      ...deterministicOptions(),
+      loadConfig: () => fixtureConfig(project),
+      planLoopCycle: () => ({ outcome: "ready", candidate, plannedSteps: [] }),
+      resolvePolicy: (input) => {
+        calls += 1;
+        return {
+          policyId: "fixture-policy",
+          mode: input.mode,
+          status: "no_compatible_agent",
+          requirements: {
+            category: "code",
+            mode: input.mode,
+            requiredCapabilities: [],
+            requiredPermissions: [],
+            minimumEffort: "low",
+            maximumEffort: "low",
+            contextBudget: { maxFiles: 1, maxCharacters: 1, maxEstimatedTokens: 1, includeFullFiles: false },
+            executionBudget: { maxTokens: null, maxCostUsd: null, maxDurationMs: null, maxCalls: 0, maxRepairs: 0 },
+            rationale: ["fixture"],
+          },
+          selectionRequest: { requiredCapabilities: [], requiredPermissions: [] },
+          selection: null,
+          reasons: ["fixture reason"],
+        };
+      },
+    });
+
+    assert.equal(calls, 1);
+    assert.equal(result.agentPolicy?.policyId, "fixture-policy");
+    assert.equal(result.agentPolicy?.status, "no_compatible_agent");
   });
 });

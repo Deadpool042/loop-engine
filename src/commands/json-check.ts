@@ -377,6 +377,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(json, "commit");
     assertField(json, "publication");
     assertField(json, "failure");
+    assertField(json, "agentPolicy");
 
     if (json.mode !== "plan") {
       throw new Error("run json-check fixture must use mode plan");
@@ -390,6 +391,76 @@ function validatePayload(command: readonly string[], json: unknown): void {
     if (json.publication !== null) {
       throw new Error("run publication must be null in plan mode");
     }
+
+    validateAgentPolicyField(json.agentPolicy);
+  }
+}
+
+const AGENT_POLICY_MODES = ["plan", "execute", "commit", "publish"] as const;
+const AGENT_POLICY_STATUS_CODES = [
+  "resolved",
+  "no_safe_candidate",
+  "no_compatible_agent",
+  "policy_disabled",
+  "permission_denied",
+  "budget_exhausted",
+  "effort_not_supported",
+  "provider_not_allowed",
+  "runtime_not_allowed",
+] as const;
+
+// agentPolicy (V7.4) is additive and legitimately null whenever no roadmap
+// candidate was ready (blocked/failed cycles) — this validates the *shape*
+// whenever the field is non-null, it never requires a candidate to exist.
+function validateAgentPolicyField(agentPolicy: unknown): void {
+  if (agentPolicy === null) {
+    return;
+  }
+
+  assertRecord(agentPolicy);
+  assertField(agentPolicy, "policyId");
+  assertField(agentPolicy, "mode");
+  assertField(agentPolicy, "status");
+  assertField(agentPolicy, "requirements");
+  assertField(agentPolicy, "selectionRequest");
+  assertField(agentPolicy, "selection");
+  assertField(agentPolicy, "reasons");
+
+  assertString(agentPolicy.policyId, "agentPolicy.policyId");
+  assertOneOf(agentPolicy.mode as string, "agentPolicy.mode", AGENT_POLICY_MODES);
+  assertOneOf(agentPolicy.status as string, "agentPolicy.status", AGENT_POLICY_STATUS_CODES);
+
+  const requirements = agentPolicy.requirements;
+  assertRecord(requirements);
+  assertField(requirements, "category");
+  assertField(requirements, "requiredCapabilities");
+  assertField(requirements, "requiredPermissions");
+  assertField(requirements, "executionBudget");
+  assertArray(requirements.requiredCapabilities);
+  assertArray(requirements.requiredPermissions);
+
+  const executionBudget = requirements.executionBudget;
+  assertRecord(executionBudget);
+  assertField(executionBudget, "maxCalls");
+
+  if (agentPolicy.mode === "plan" && executionBudget.maxCalls !== 0) {
+    throw new Error("agentPolicy.requirements.executionBudget.maxCalls must be 0 in mode plan");
+  }
+
+  const reasons = agentPolicy.reasons;
+  assertArray(reasons);
+  if (reasons.length === 0) {
+    throw new Error("agentPolicy.reasons must not be empty");
+  }
+  for (const reason of reasons) {
+    assertString(reason, "agentPolicy.reasons[]");
+  }
+
+  const selection = agentPolicy.selection;
+  if (selection !== null) {
+    assertRecord(selection);
+    assertField(selection, "outcome");
+    assertOneOf(selection.outcome as string, "agentPolicy.selection.outcome", ["selected", "no_match"]);
   }
 }
 

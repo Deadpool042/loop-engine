@@ -5,3 +5,4 @@ Roadmap interne de Loop Engine, lue par son propre roadmap reader (`pnpm loop ne
 ## Lots
 
 - [x] Lot V7.3 — Agent orchestration layer (types, registry, selector, escalade) — local, déterministe, sans mode execute
+- [x] Lot V7.4 — Agent Policy Engine et intégration déterministe au LoopRunner

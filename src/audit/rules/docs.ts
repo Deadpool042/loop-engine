@@ -1293,3 +1293,70 @@ export const LOOP_RUNNER_PLAN_MODE_DOCUMENTATION_RULE: AuditRule = {
   },
 };
 
+export const AGENT_POLICY_ENGINE_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-023",
+  category: "docs",
+  severity: "warning",
+  title: "Agent Policy Engine (V7.4) and the n8n boundary are documented",
+  description: "The repository should document the Agent Policy Engine, its forecast-only integration with the LoopRunner's plan mode, and the restrictive-merge boundary applied to n8n requests, referencing it from CLAUDE.md and README.md.",
+  check: () => {
+    const policyDocPath = "docs/architecture/agent-policy-engine.md";
+    const claudePath = "CLAUDE.md";
+    const readmePath = "README.md";
+
+    const missingFiles = [policyDocPath, claudePath, readmePath].filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        AGENT_POLICY_ENGINE_DOCUMENTATION_RULE,
+        "Agent Policy Engine documentation or its referencing files are missing.",
+        missingFiles,
+        "Create docs/architecture/agent-policy-engine.md and reference it from CLAUDE.md and README.md.",
+      );
+    }
+
+    const policyDocContent = readFileSync(policyDocPath, "utf8");
+    const claudeContent = readFileSync(claudePath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+
+    const expectedPolicyDocTerms = [
+      "V7.4",
+      "AgentPolicyResolution",
+      "getAllowedPermissionsForMode",
+      "Fusion toujours restrictive",
+      "prévisionnelle",
+      "n8n",
+      "git_tag",
+    ];
+
+    const missingPolicyDocTerms = expectedPolicyDocTerms
+      .filter((term) => !policyDocContent.includes(term))
+      .map((term) => `${policyDocPath}: missing "${term}"`);
+
+    const missingClaudeReference = claudeContent.includes(policyDocPath)
+      ? []
+      : [`${claudePath}: missing "${policyDocPath}"`];
+
+    const missingReadmeReference = readmeContent.includes(policyDocPath)
+      ? []
+      : [`${readmePath}: missing "${policyDocPath}"`];
+
+    const missing = [...missingPolicyDocTerms, ...missingClaudeReference, ...missingReadmeReference];
+
+    if (missing.length > 0) {
+      return fail(
+        AGENT_POLICY_ENGINE_DOCUMENTATION_RULE,
+        "Agent Policy Engine documentation is incomplete.",
+        missing,
+        "Document V7.4, AgentPolicyResolution, getAllowedPermissionsForMode, the restrictive-merge principle, the forecast-only preview, the n8n boundary, and git_tag separation in docs/architecture/agent-policy-engine.md, and reference it from CLAUDE.md and README.md.",
+      );
+    }
+
+    return pass(
+      AGENT_POLICY_ENGINE_DOCUMENTATION_RULE,
+      "Agent Policy Engine (V7.4) and the n8n boundary are documented.",
+      [...expectedPolicyDocTerms, policyDocPath],
+    );
+  },
+};
+

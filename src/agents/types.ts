@@ -31,6 +31,9 @@ export const AGENT_CAPABILITIES = [
 
 export type AgentCapability = (typeof AGENT_CAPABILITIES)[number];
 
+// git_tag is deliberately separate from git_push: creating a tag is never an
+// implicit consequence of a permission that allows pushing a branch. See
+// docs/architecture/agent-policy-engine.md.
 export const AGENT_PERMISSIONS = [
   "read_only",
   "write_worktree",
@@ -38,6 +41,7 @@ export const AGENT_PERMISSIONS = [
   "shell_exec",
   "git_commit",
   "git_push",
+  "git_tag",
 ] as const;
 
 export type AgentPermission = (typeof AGENT_PERMISSIONS)[number];
