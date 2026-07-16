@@ -118,7 +118,7 @@ describe("invariant: the plan-mode forecast budget never authorizes a real call"
         runtime: "custom",
         provider: "local",
         model: "fixture-model",
-        effort: "low",
+        effort: "medium",
         capabilities: ["code_edit", "shell_exec", "test_execution"],
         permissions: ["read_only", "write_worktree", "shell_exec"],
         budget: { maxTokens: null, maxCostUsd: null, maxDurationMs: null, maxCalls: 1, maxRepairs: 1 },

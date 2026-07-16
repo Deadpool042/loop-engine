@@ -15,6 +15,7 @@ export type AgentBudgetCeiling = Partial<
 export type AgentSelectionRequest = Readonly<{
   requiredCapabilities: readonly AgentCapability[];
   requiredPermissions: readonly AgentPermission[];
+  minEffort?: AgentEffort;
   maxEffort?: AgentEffort;
   budgetCeiling?: AgentBudgetCeiling;
 }>;
@@ -70,6 +71,13 @@ export function evaluateAgentProfile(
 
   if (missingPermissions.length > 0) {
     return { ok: false, reason: `missing permissions: ${missingPermissions.join(", ")}` };
+  }
+
+  if (request.minEffort && compareAgentEffort(profile.effort, request.minEffort) < 0) {
+    return {
+      ok: false,
+      reason: `effort ${profile.effort} is below min effort ${request.minEffort}`,
+    };
   }
 
   if (request.maxEffort && compareAgentEffort(profile.effort, request.maxEffort) > 0) {

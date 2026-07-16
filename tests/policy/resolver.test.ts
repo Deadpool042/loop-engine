@@ -243,7 +243,7 @@ describe("resolvePolicy — gates, in order", () => {
   });
 
   it("resolves with a forecast selection in mode plan — a compatible agent is found without being called", () => {
-    const registry = createAgentRegistry([profile({ id: "forecastable" })]);
+    const registry = createAgentRegistry([profile({ id: "forecastable", effort: "medium" })]);
 
     const result = resolvePolicy({
       policy: policy(),

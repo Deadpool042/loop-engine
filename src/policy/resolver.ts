@@ -275,6 +275,7 @@ export function resolvePolicy(input: ResolvePolicyInput): AgentPolicyResolution 
   const selectionRequest = {
     requiredCapabilities: requirements.requiredCapabilities,
     requiredPermissions: requirements.requiredPermissions,
+    minEffort: requirements.minimumEffort,
     maxEffort: maximumEffort,
     budgetCeiling: {
       maxTokens: budget.maxTokens,

@@ -63,7 +63,7 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     effort: "medium",
     capabilities: ["code_edit", "shell_exec", "test_execution"],
     permissions: ["read_only", "write_worktree", "shell_exec"],
-    budget: { maxTokens: 150_000, maxCostUsd: 4, maxDurationMs: 300_000, maxCalls: 2, maxRepairs: 1 },
+    budget: { maxTokens: 150_000, maxCostUsd: 4, maxDurationMs: 300_000, maxCalls: 1, maxRepairs: 1 },
   },
   {
     id: "openclaw.medium",
