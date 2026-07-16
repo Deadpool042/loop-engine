@@ -15,8 +15,8 @@ import {
 import type { AgentPolicy, AgentPolicyMode, ContextBudget } from "./types.js";
 
 // Permission ceiling per mode. Each mode includes every permission of the
-// mode before it, plus exactly one new one — this mirrors "chaque mode
-// inclut les garanties du mode précédent" from
+// mode before it, plus only the additional permissions required by that mode.
+// This mirrors "chaque mode inclut les garanties du mode précédent" from
 // docs/architecture/autonomous-loop-runner.md. git_tag is never included
 // here: it is never implicit, see AgentPolicy.allowTagCreation and
 // resolvePolicy in resolver.ts.
