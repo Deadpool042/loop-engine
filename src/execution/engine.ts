@@ -1,6 +1,10 @@
 import { createExecutionClock } from "./clock.js";
 import { executeStep } from "./step.js";
 import {
+  createExecutionEventRecorder,
+  emitExecutionEvent,
+} from "./events.js";
+import {
   completeExecution,
   createExecutionSession,
   failExecution,
@@ -23,19 +27,45 @@ export function execute(
   options: ExecuteOptions,
 ): ExecutionResult {
   const clock = createExecutionClock(options.now);
+  const recorder = createExecutionEventRecorder();
   const startedAt = clock.now();
 
   let session = createExecutionSession(options.sessionId, startedAt);
   session = startExecution(session);
 
+  emitExecutionEvent(recorder, {
+    type: "execution.started",
+    sessionId: session.sessionId,
+    at: session.startedAt,
+  });
+
   const results: ExecutionStepResult[] = [];
 
   try {
     for (const step of steps) {
-      results.push(executeStep(step, clock));
+      emitExecutionEvent(recorder, {
+        type: "step.started",
+        name: step.name,
+        at: clock.now(),
+      });
+
+      const result = executeStep(step, clock);
+      results.push(result);
+
+      emitExecutionEvent(recorder, {
+        type: "step.completed",
+        name: result.name,
+        at: result.completedAt,
+      });
     }
 
     session = completeExecution(session);
+
+    emitExecutionEvent(recorder, {
+      type: "execution.completed",
+      sessionId: session.sessionId,
+      at: clock.now(),
+    });
 
     return {
       schemaVersion: 1,
@@ -48,6 +78,12 @@ export function execute(
     };
   } catch (error) {
     session = failExecution(session);
+
+    emitExecutionEvent(recorder, {
+      type: "execution.failed",
+      sessionId: session.sessionId,
+      at: clock.now(),
+    });
 
     const failure: ExecutionFailure = {
       code: "execution_failed",

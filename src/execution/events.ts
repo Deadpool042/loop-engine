@@ -36,3 +36,10 @@ export function createExecutionEventRecorder(): ExecutionEventRecorder {
     },
   });
 }
+
+export function emitExecutionEvent(
+  recorder: ExecutionEventRecorder,
+  event: ExecutionEvent,
+): void {
+  recorder.record(event);
+}
