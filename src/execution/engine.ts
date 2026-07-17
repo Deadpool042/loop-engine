@@ -1,4 +1,5 @@
 import { createExecutionClock } from "./clock.js";
+import { executeStep } from "./step.js";
 import {
   completeExecution,
   createExecutionSession,
@@ -31,17 +32,7 @@ export function execute(
 
   try {
     for (const step of steps) {
-      const stepStartedAt = clock.now();
-      const details = step.run();
-      const stepCompletedAt = clock.now();
-
-      results.push({
-        name: step.name,
-        startedAt: stepStartedAt,
-        completedAt: stepCompletedAt,
-        success: true,
-        details,
-      });
+      results.push(executeStep(step, clock));
     }
 
     session = completeExecution(session);
