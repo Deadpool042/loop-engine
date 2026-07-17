@@ -4,6 +4,11 @@ export type ExecutionStatus =
   | "completed"
   | "failed";
 
+export type ExecutionStep = Readonly<{
+  name: string;
+  run: () => readonly string[];
+}>;
+
 export type ExecutionStepResult = Readonly<{
   name: string;
   startedAt: string;

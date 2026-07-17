@@ -1,7 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { execute, type ExecutionStep } from "../../src/execution/engine.js";
+import { execute } from "../../src/execution/engine.js";
+import type { ExecutionStep } from "../../src/execution/types.js";
 
 describe("execution engine", () => {
   const now = (() => {

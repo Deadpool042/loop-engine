@@ -7,13 +7,9 @@ import {
 import type {
   ExecutionFailure,
   ExecutionResult,
+  ExecutionStep,
   ExecutionStepResult,
 } from "./types.js";
-
-export type ExecutionStep = Readonly<{
-  name: string;
-  run: () => readonly string[];
-}>;
 
 export type ExecuteOptions = Readonly<{
   sessionId: string;

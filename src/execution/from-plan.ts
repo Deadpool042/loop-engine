@@ -1,5 +1,5 @@
 import type { ExecutionPlan } from "../executor/types.js";
-import type { ExecutionStep } from "./engine.js";
+import type { ExecutionStep } from "./types.js";
 
 export function executionStepsFromPlan(
   plan: ExecutionPlan,
