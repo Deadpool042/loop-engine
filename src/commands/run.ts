@@ -50,6 +50,18 @@ function printLoopRunResult(result: LoopRunResult): void {
     terminal.warning("No agent policy resolution available for this cycle.");
   }
 
+  terminal.section("Context package (forecast)");
+  if (result.contextPackage) {
+    const { files, omitted, totalCharacters, estimatedTokens, truncated } = result.contextPackage;
+    terminal.info(`Files included: ${files.length} (${totalCharacters} chars, ~${estimatedTokens} tokens)`);
+    terminal.info(`Omitted: ${omitted.length}`);
+    if (truncated) {
+      terminal.warning("Context was truncated to fit the budget.");
+    }
+  } else {
+    terminal.warning("No context package available for this cycle.");
+  }
+
   terminal.section("Worktree");
   terminal.success("No modification performed.");
 }
@@ -72,6 +84,7 @@ function printLoopRunResultJson(result: LoopRunResult): void {
       publication: result.publication,
       failure: result.failure,
       agentPolicy: result.agentPolicy,
+      contextPackage: result.contextPackage,
     }),
   );
 }

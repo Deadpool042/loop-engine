@@ -1360,3 +1360,69 @@ export const AGENT_POLICY_ENGINE_DOCUMENTATION_RULE: AuditRule = {
   },
 };
 
+export const MINIMAL_CONTEXT_BUILDER_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-024",
+  category: "docs",
+  severity: "warning",
+  title: "Minimal Context Builder (V7.5) is documented",
+  description: "The repository should document the Minimal Context Builder, its bounded/deterministic guarantees, and its additive integration with the LoopRunner's plan mode, referencing it from CLAUDE.md and README.md.",
+  check: () => {
+    const builderDocPath = "docs/architecture/minimal-context-builder.md";
+    const claudePath = "CLAUDE.md";
+    const readmePath = "README.md";
+
+    const missingFiles = [builderDocPath, claudePath, readmePath].filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        MINIMAL_CONTEXT_BUILDER_DOCUMENTATION_RULE,
+        "Minimal Context Builder documentation or its referencing files are missing.",
+        missingFiles,
+        "Create docs/architecture/minimal-context-builder.md and reference it from CLAUDE.md and README.md.",
+      );
+    }
+
+    const builderDocContent = readFileSync(builderDocPath, "utf8");
+    const claudeContent = readFileSync(claudePath, "utf8");
+    const readmeContent = readFileSync(readmePath, "utf8");
+
+    const expectedBuilderDocTerms = [
+      "V7.5",
+      "MinimalContextPackage",
+      "buildMinimalContext",
+      "outside_project",
+      "includeFullFiles",
+      "contextPackage",
+    ];
+
+    const missingBuilderDocTerms = expectedBuilderDocTerms
+      .filter((term) => !builderDocContent.includes(term))
+      .map((term) => `${builderDocPath}: missing "${term}"`);
+
+    const missingClaudeReference = claudeContent.includes(builderDocPath)
+      ? []
+      : [`${claudePath}: missing "${builderDocPath}"`];
+
+    const missingReadmeReference = readmeContent.includes(builderDocPath)
+      ? []
+      : [`${readmePath}: missing "${builderDocPath}"`];
+
+    const missing = [...missingBuilderDocTerms, ...missingClaudeReference, ...missingReadmeReference];
+
+    if (missing.length > 0) {
+      return fail(
+        MINIMAL_CONTEXT_BUILDER_DOCUMENTATION_RULE,
+        "Minimal Context Builder documentation is incomplete.",
+        missing,
+        "Document V7.5, MinimalContextPackage, buildMinimalContext, the outside_project confinement rule, includeFullFiles, and the contextPackage field in docs/architecture/minimal-context-builder.md, and reference it from CLAUDE.md and README.md.",
+      );
+    }
+
+    return pass(
+      MINIMAL_CONTEXT_BUILDER_DOCUMENTATION_RULE,
+      "Minimal Context Builder (V7.5) is documented.",
+      [...expectedBuilderDocTerms, builderDocPath],
+    );
+  },
+};
+

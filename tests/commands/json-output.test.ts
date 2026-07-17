@@ -84,7 +84,16 @@ describe("json outputs", () => {
       agentPolicy?: {
         mode?: unknown;
         status?: unknown;
-        requirements?: { executionBudget?: { maxCalls?: unknown } };
+        requirements?: { executionBudget?: { maxCalls?: unknown }; contextBudget?: unknown };
+      } | null;
+      contextPackage?: {
+        project?: unknown;
+        budget?: unknown;
+        files?: unknown;
+        omitted?: unknown;
+        totalCharacters?: unknown;
+        estimatedTokens?: unknown;
+        truncated?: unknown;
       } | null;
     };
 
@@ -95,12 +104,26 @@ describe("json outputs", () => {
     assert.equal(json.commit, null);
     assert.equal(json.publication, null);
     assert.ok("agentPolicy" in json);
+    assert.ok("contextPackage" in json);
+    // contextPackage is null exactly when agentPolicy is null (blocked/failed
+    // cycles); both are populated together for a completed cycle.
+    assert.equal(json.agentPolicy === null, json.contextPackage === null);
 
     if (json.agentPolicy) {
       assert.equal(json.agentPolicy.mode, "plan");
       assert.ok(typeof json.agentPolicy.status === "string");
       // The forecast never implies a real call: this run's own budget stays 0.
       assert.equal(json.agentPolicy.requirements?.executionBudget?.maxCalls, 0);
+    }
+
+    if (json.contextPackage) {
+      assert.equal(typeof json.contextPackage.project, "string");
+      assert.ok(Array.isArray(json.contextPackage.files));
+      assert.ok(Array.isArray(json.contextPackage.omitted));
+      assert.ok(typeof json.contextPackage.totalCharacters === "number");
+      assert.ok(typeof json.contextPackage.estimatedTokens === "number");
+      assert.ok(typeof json.contextPackage.truncated === "boolean");
+      assert.deepEqual(json.contextPackage.budget, json.agentPolicy?.requirements?.contextBudget);
     }
   });
 

@@ -161,7 +161,9 @@ Cette valeur reste `requirements.executionBudget` — un champ purement informat
 
 ## Politique de contexte
 
-`ContextBudget` (`maxFiles`, `maxCharacters`, `maxEstimatedTokens`, `includeFullFiles`) est dérivé de manière déterministe à partir de l'effort minimum requis (`getContextBudgetForEffort`, `src/policy/defaults.ts`) : plus l'effort minimum est élevé, plus le budget de contexte s'élargit, toujours borné (jamais illimité, à aucun niveau d'effort). Ce lot produit uniquement ce budget et sa justification (`rationale`) ; il ne construit pas encore le paquet de contexte final (pas de lecture de fichiers, pas d'appel à `context`/`rag-search` depuis `src/policy/`).
+`ContextBudget` (`maxFiles`, `maxCharacters`, `maxEstimatedTokens`, `includeFullFiles`) est dérivé de manière déterministe à partir de l'effort minimum requis (`getContextBudgetForEffort`, `src/policy/defaults.ts`) : plus l'effort minimum est élevé, plus le budget de contexte s'élargit, toujours borné (jamais illimité, à aucun niveau d'effort). Ce lot (V7.4) produit uniquement ce budget et sa justification (`rationale`) ; `src/policy/` ne lit jamais de fichier et n'appelle jamais `context`/`rag-search`.
+
+Depuis le lot V7.5, ce budget est effectivement consommé par le [Minimal Context Builder](minimal-context-builder.md) (`src/context/`) : `runLoopPlan` construit un `MinimalContextPackage` via `buildMinimalContext(snapshot, agentPolicy.requirements.contextBudget)`, exposé sur le champ additif `contextPackage` de `LoopRunResult`. `src/policy/` continue de ne dépendre à aucun moment de `src/context/` — c'est le `LoopRunner` qui relie les deux, jamais l'inverse.
 
 ## Intégration au LoopRunner (mode `plan`)
 
@@ -220,6 +222,7 @@ Explicitement hors périmètre :
 
 - `docs/architecture/agent-orchestration.md`
 - `docs/architecture/autonomous-loop-runner.md`
+- `docs/architecture/minimal-context-builder.md`
 - `docs/architecture/final-objective.md`
 - `docs/architecture/roadmap-reader.md`
 - `CLAUDE.md`

@@ -269,7 +269,7 @@ Chaque finding contient :
 
 ## Règles exécutables
 
-Le moteur contient 116 règles exécutables :
+Le moteur contient 124 règles exécutables :
 
 - `JSON-001` : présence de `schemaVersion` dans les sorties JSON publiques.
 - `JSON-005` : couverture des commandes JSON publiques par `json-check`.
@@ -323,6 +323,17 @@ Le moteur contient 116 règles exécutables :
 - `DOCS-019` : alignement de `CLAUDE.md` avec l'état actuel de Loop Engine (objectif final, `pnpm run ci`, `audit`, `handoff`, `rag-index`, `rag-search`, `json-check`, absence d'appels IA automatiques par défaut).
 - `DOCS-020` : documentation du rapport final Audit Engine V6 et de son tag final stable `audit-engine-v6.6`.
 - `DOCS-021` : documentation de l'architecture du LoopRunner (`docs/architecture/autonomous-loop-runner.md`), de son contrat `LoopRunResult`, des modes `plan`/`execute`/`commit`/`publish`, des états du cycle, et de sa référence depuis `CLAUDE.md` et `README.md`.
+- `DOCS-022` : documentation du mode `plan` (V7.2) du LoopRunner et de ses garanties (aucun agent appelé, aucune modification, aucun commit, aucun push).
+- `DOCS-023` : documentation de l'Agent Policy Engine (V7.4) et de la frontière n8n (fusion restrictive, sélection prévisionnelle, `getAllowedPermissionsForMode`, séparation de `git_tag`).
+- `AUDIT-056` à `AUDIT-062` : présence du module `src/policy/`, séparation capacités/permissions, plafonds de permissions par mode, primitives de fusion restrictive, intégration prévisionnelle au LoopRunner, absence d'exécution réelle, direction des dépendances `policy/`↔`agents/`.
+- `DOCS-024` : documentation du Minimal Context Builder (V7.5) et de son intégration additive au LoopRunner.
+- `AUDIT-063` : présence du module `src/context/` (types, confinement de chemin, collecte de sources, estimation de tokens, builder).
+- `AUDIT-064` : application stricte de chaque dimension du `ContextBudget` (`maxFiles`, `maxCharacters`, `maxEstimatedTokens`, `includeFullFiles`).
+- `AUDIT-065` : confinement de toute lecture sous `snapshot.project.path`, rejet des chemins externes et des traversées `../`.
+- `AUDIT-066` : absence d'appel réseau ou de processus externe dans `src/context/`.
+- `AUDIT-067` : construction du paquet de contexte par le LoopRunner en mode `plan`, à partir de `agentPolicy.requirements.contextBudget`.
+- `AUDIT-068` : direction des dépendances `context/`↔`policy/`↔`agents/` toujours unidirectionnelle.
+- `JSON-034` : assertion par `json-check` de la structure de `contextPackage` et de sa parité de nullité avec `agentPolicy`.
 
 ## Couverture README
 
@@ -343,8 +354,8 @@ La section `Voir aussi` est également vérifiée pour éviter les liens documen
 
 État validé :
 
-- 116 règles ;
-- 116 règles en pass ;
+- 124 règles ;
+- 124 règles en pass ;
 - 0 warning ;
 - 0 fail ;
 - score 100 ;

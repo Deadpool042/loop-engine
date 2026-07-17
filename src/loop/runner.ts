@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { defaultAgentRegistry } from "../agents/registry.js";
 import type { AgentRegistry } from "../agents/registry.js";
+import { buildMinimalContext } from "../context/builder.js";
+import type { MinimalContextPackage } from "../context/types.js";
 import { loadConfig, type Config, type ProjectConfig } from "../core/config.js";
 import { findProject } from "../core/project.js";
 import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
@@ -26,6 +28,7 @@ export type LoopRunPlanOptions = Readonly<{
   agentPolicy?: AgentPolicy;
   agentRegistry?: AgentRegistry;
   resolvePolicy?: typeof resolvePolicy;
+  buildMinimalContext?: typeof buildMinimalContext;
 }>;
 
 export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {}): LoopRunResult {
@@ -36,6 +39,7 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
   const policy = options.agentPolicy ?? DEFAULT_AGENT_POLICY;
   const registry = options.agentRegistry ?? defaultAgentRegistry;
   const resolveAgentPolicy = options.resolvePolicy ?? resolvePolicy;
+  const buildContextPackage = options.buildMinimalContext ?? buildMinimalContext;
 
   const mode: LoopRunMode = "plan";
   const runId = generateRunId();
@@ -67,6 +71,7 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
     candidate: LoopRunResult["candidate"],
     failure: LoopRunFailure | null,
     agentPolicy: AgentPolicyResolution | null = null,
+    contextPackage: MinimalContextPackage | null = null,
   ): LoopRunResult {
     return {
       schemaVersion: 1,
@@ -84,6 +89,7 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
       publication: null,
       failure,
       agentPolicy,
+      contextPackage,
     };
   }
 
@@ -139,5 +145,12 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
     mode: "plan",
   });
 
-  return finalize(cycle.candidate, null, agentPolicy);
+  // Bounded, deterministic, local: builds the Minimal Context Package (V7.5)
+  // from the same snapshot the planner already computed, using the context
+  // budget the policy forecast just derived. No file read outside the
+  // project, no network, no agent call. See
+  // docs/architecture/minimal-context-builder.md.
+  const contextPackage = buildContextPackage(cycle.snapshot, agentPolicy.requirements.contextBudget);
+
+  return finalize(cycle.candidate, null, agentPolicy, contextPackage);
 }

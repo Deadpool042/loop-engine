@@ -1,12 +1,17 @@
 import type { ProjectConfig } from "../core/config.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
+import type { ProjectSnapshot } from "../intelligence/snapshot.js";
 
 export type LoopPlan =
   | Readonly<{
       outcome: "ready";
       candidate: RoadmapCandidate;
       plannedSteps: readonly string[];
+      // Exposed so runLoopPlan can build the Minimal Context Package (V7.5)
+      // via buildMinimalContext(snapshot, budget) without a second, duplicate
+      // buildProjectSnapshot call — see docs/architecture/minimal-context-builder.md.
+      snapshot: ProjectSnapshot;
     }>
   | Readonly<{
       outcome: "blocked";
@@ -48,5 +53,6 @@ export function planLoopCycle(project: ProjectConfig): LoopPlan {
     outcome: "ready",
     candidate,
     plannedSteps: [`Select roadmap candidate: ${candidate.text}`, ...PLANNED_STEPS_AFTER_CANDIDATE],
+    snapshot,
   };
 }

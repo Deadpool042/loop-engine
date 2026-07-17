@@ -378,6 +378,7 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(json, "publication");
     assertField(json, "failure");
     assertField(json, "agentPolicy");
+    assertField(json, "contextPackage");
 
     if (json.mode !== "plan") {
       throw new Error("run json-check fixture must use mode plan");
@@ -393,6 +394,17 @@ function validatePayload(command: readonly string[], json: unknown): void {
     }
 
     validateAgentPolicyField(json.agentPolicy);
+
+    // contextPackage (V7.5) is additive and, like agentPolicy, legitimately
+    // null whenever no roadmap candidate was ready (blocked/failed cycles).
+    // The two fields must stay null together and non-null together: this
+    // validates the *non-null* structure whenever a cycle actually
+    // completed, without hardcoding an assumption about live roadmap state.
+    if ((json.agentPolicy === null) !== (json.contextPackage === null)) {
+      throw new Error("run contextPackage nullness must match agentPolicy nullness");
+    }
+
+    validateContextPackageField(json.contextPackage);
   }
 }
 
@@ -461,6 +473,86 @@ function validateAgentPolicyField(agentPolicy: unknown): void {
     assertRecord(selection);
     assertField(selection, "outcome");
     assertOneOf(selection.outcome as string, "agentPolicy.selection.outcome", ["selected", "no_match"]);
+  }
+}
+
+const CONTEXT_SOURCE_KINDS = ["required_doc", "roadmap"] as const;
+const CONTEXT_OMISSION_REASONS = [
+  "duplicate",
+  "missing",
+  "outside_project",
+  "file_limit",
+  "character_limit",
+  "token_limit",
+] as const;
+
+// contextPackage (V7.5) is additive, see validatePayload's "run" branch for
+// the nullness contract shared with agentPolicy. This validates only the
+// *shape* of a non-null MinimalContextPackage.
+function validateContextPackageField(contextPackage: unknown): void {
+  if (contextPackage === null) {
+    return;
+  }
+
+  assertRecord(contextPackage);
+  assertField(contextPackage, "project");
+  assertField(contextPackage, "budget");
+  assertField(contextPackage, "files");
+  assertField(contextPackage, "omitted");
+  assertField(contextPackage, "totalCharacters");
+  assertField(contextPackage, "estimatedTokens");
+  assertField(contextPackage, "truncated");
+
+  assertString(contextPackage.project, "contextPackage.project");
+
+  const budget = contextPackage.budget;
+  assertRecord(budget);
+  assertNumber(budget.maxFiles, "contextPackage.budget.maxFiles");
+  assertNumber(budget.maxCharacters, "contextPackage.budget.maxCharacters");
+  assertNumber(budget.maxEstimatedTokens, "contextPackage.budget.maxEstimatedTokens");
+  if (typeof budget.includeFullFiles !== "boolean") {
+    throw new Error("contextPackage.budget.includeFullFiles must be boolean");
+  }
+
+  const files = contextPackage.files;
+  assertArray(files);
+  if (files.length > budget.maxFiles) {
+    throw new Error("contextPackage.files.length must not exceed contextPackage.budget.maxFiles");
+  }
+  for (const file of files) {
+    assertRecord(file);
+    assertString(file.path, "contextPackage.files[].path");
+    assertOneOf(file.kind as string, "contextPackage.files[].kind", CONTEXT_SOURCE_KINDS);
+    assertString(file.content, "contextPackage.files[].content");
+    assertNumber(file.originalCharacters, "contextPackage.files[].originalCharacters");
+    assertNumber(file.includedCharacters, "contextPackage.files[].includedCharacters");
+    assertNumber(file.estimatedTokens, "contextPackage.files[].estimatedTokens");
+    if (typeof file.truncated !== "boolean") {
+      throw new Error("contextPackage.files[].truncated must be boolean");
+    }
+    if (file.includedCharacters > file.originalCharacters) {
+      throw new Error("contextPackage.files[].includedCharacters must not exceed originalCharacters");
+    }
+  }
+
+  const omitted = contextPackage.omitted;
+  assertArray(omitted);
+  for (const omission of omitted) {
+    assertRecord(omission);
+    assertString(omission.path, "contextPackage.omitted[].path");
+    assertOneOf(omission.reason as string, "contextPackage.omitted[].reason", CONTEXT_OMISSION_REASONS);
+  }
+
+  assertNumber(contextPackage.totalCharacters, "contextPackage.totalCharacters");
+  assertNumber(contextPackage.estimatedTokens, "contextPackage.estimatedTokens");
+  if (contextPackage.totalCharacters > budget.maxCharacters) {
+    throw new Error("contextPackage.totalCharacters must not exceed contextPackage.budget.maxCharacters");
+  }
+  if (contextPackage.estimatedTokens > budget.maxEstimatedTokens) {
+    throw new Error("contextPackage.estimatedTokens must not exceed contextPackage.budget.maxEstimatedTokens");
+  }
+  if (typeof contextPackage.truncated !== "boolean") {
+    throw new Error("contextPackage.truncated must be boolean");
   }
 }
 

@@ -1654,6 +1654,54 @@ export const LOOP_RUNNER_PLAN_MODE_RULE: AuditRule = {
   },
 };
 
+export const JSON_CHECK_CONTEXT_PACKAGE_ASSERTION_RULE: AuditRule = {
+  id: "JSON-034",
+  category: "json",
+  severity: "warning",
+  title: "json-check asserts the contextPackage field structure",
+  description: "json-check should assert that run --json exposes contextPackage, that its nullness matches agentPolicy, and validate its stable shape when non-null.",
+  check: () => {
+    const jsonCheckPath = "src/commands/json-check.ts";
+
+    if (!existsSync(jsonCheckPath)) {
+      return fail(
+        JSON_CHECK_CONTEXT_PACKAGE_ASSERTION_RULE,
+        "json-check command is missing.",
+        [jsonCheckPath],
+        "Restore src/commands/json-check.ts so contextPackage assertions can be verified.",
+      );
+    }
+
+    const content = readFileSync(jsonCheckPath, "utf8");
+    const expectedTokens = [
+      'assertField(json, "contextPackage")',
+      "function validateContextPackageField",
+      "contextPackage nullness must match agentPolicy nullness",
+      "validateContextPackageField(json.contextPackage)",
+      "contextPackage.budget.maxFiles",
+      "contextPackage.budget.maxCharacters",
+      "contextPackage.budget.maxEstimatedTokens",
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        JSON_CHECK_CONTEXT_PACKAGE_ASSERTION_RULE,
+        "json-check does not fully assert the contextPackage field structure.",
+        missing,
+        "Ensure json-check asserts contextPackage's presence, its nullness parity with agentPolicy, and validates its budget/files/omitted shape via validateContextPackageField.",
+      );
+    }
+
+    return pass(
+      JSON_CHECK_CONTEXT_PACKAGE_ASSERTION_RULE,
+      "json-check asserts the contextPackage field structure.",
+      expectedTokens,
+    );
+  },
+};
+
 
 
 

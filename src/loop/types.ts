@@ -1,3 +1,4 @@
+import type { MinimalContextPackage } from "../context/types.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import type { AgentPolicyResolution } from "../policy/types.js";
 
@@ -57,4 +58,10 @@ export type LoopRunResult = Readonly<{
   // this field is backward compatible: schemaVersion stays 1. See
   // docs/architecture/agent-policy-engine.md.
   agentPolicy: AgentPolicyResolution | null;
+  // Additive field (V7.5): a bounded, deterministic context package built
+  // from agentPolicy.requirements.contextBudget for the selected candidate.
+  // Null whenever no candidate was ready (blocked/failed cycles) — same rule
+  // as agentPolicy. Adding this field is backward compatible: schemaVersion
+  // stays 1. See docs/architecture/minimal-context-builder.md.
+  contextPackage: MinimalContextPackage | null;
 }>;

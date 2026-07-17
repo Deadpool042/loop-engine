@@ -61,6 +61,7 @@ Contrat conceptuel, destiné à guider une future implémentation TypeScript et 
 - `publication` — détails de push/tag si le mode `publish` a été utilisé, nul sinon ;
 - `failure` — raison structurée de l'échec ou du blocage, nulle en cas de succès ;
 - `agentPolicy` — champ additif (V7.4) : une résolution de politique d'agent **prévisionnelle** (`AgentPolicyResolution`, voir `docs/architecture/agent-policy-engine.md`) pour le candidat sélectionné, nulle si le cycle est `blocked` ou `failed`. Ajout rétrocompatible : `schemaVersion` reste `1`.
+- `contextPackage` — champ additif (V7.5) : un paquet de contexte **borné et déterministe** (`MinimalContextPackage`, voir `docs/architecture/minimal-context-builder.md`) construit à partir de `agentPolicy.requirements.contextBudget`, nul si le cycle est `blocked` ou `failed` — exactement la même règle que `agentPolicy`. Ajout rétrocompatible : `schemaVersion` reste `1`.
 
 Ce contrat doit rester suffisamment précis pour qu'une implémentation ultérieure puisse le typer directement en TypeScript, sans reformulation.
 
@@ -205,6 +206,21 @@ Règles strictes de ce lot :
 - `LoopExecutor`, `LoopValidator`, `LoopRepairer`, `LoopCommitter` et `LoopPublisher` restent non implémentés, inchangé depuis V7.2 ;
 - aucun commit, push ou tag automatique.
 
+## 13. Portée du lot V7.5 — Minimal Context Builder (paquet de contexte en mode `plan`)
+
+Ce lot relie le budget de contexte déjà calculé par `src/policy/` (section "Politique de contexte" de `docs/architecture/agent-policy-engine.md`) à un paquet de contexte réellement construit (`src/context/`, voir `docs/architecture/minimal-context-builder.md`), sans modifier le comportement terminal du mode `plan` (`idle -> planning -> ready -> completed` ou `idle -> planning -> blocked`, inchangé).
+
+Une fois le cycle `ready` et la résolution de politique calculée, `runLoopPlan` construit un `MinimalContextPackage` via `buildMinimalContext(snapshot, agentPolicy.requirements.contextBudget)` — le `snapshot` étant celui déjà calculé par `planLoopCycle`, exposé sur la variante `"ready"` de `LoopPlan` pour éviter toute reconstruction dupliquée. Le résultat est exposé sur le champ additif `contextPackage` de `LoopRunResult` (voir section 3).
+
+Règles strictes de ce lot :
+
+- aucun agent n'est appelé, aucun réseau, aucun processus externe ;
+- les seules sources considérées sont `snapshot.docs.required` et `snapshot.roadmap.paths`, dans leur ordre déclaré ;
+- toute lecture reste confinée sous `snapshot.project.path` — un chemin absolu externe ou un `../` qui en sortirait est omis (`outside_project`), jamais lu ;
+- `contextPackage.files.length`, `contextPackage.totalCharacters` et `contextPackage.estimatedTokens` ne dépassent jamais `contextPackage.budget`, à aucun moment ;
+- `LoopExecutor`, `LoopValidator`, `LoopRepairer`, `LoopCommitter` et `LoopPublisher` restent non implémentés, inchangé depuis V7.2 ;
+- aucun commit, push ou tag automatique.
+
 ## Architecture d'intégration
 
 Loop Engine est le moteur d'orchestration autonome. Les agents IA (Claude Code, OpenClaw, futurs agents) ne sont que des exécutants. n8n orchestre les déclenchements externes, sans jamais porter de logique métier.
@@ -273,3 +289,4 @@ Depuis le lot V7.3, cette interface conceptuelle est typée localement dans `src
 - `docs/architecture/audit-engine.md`
 - `docs/architecture/agent-orchestration.md`
 - `docs/architecture/agent-policy-engine.md`
+- `docs/architecture/minimal-context-builder.md`

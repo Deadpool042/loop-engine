@@ -2942,3 +2942,276 @@ export const AUDIT_POLICY_DEPENDENCY_DIRECTION_RULE: AuditRule = {
     );
   },
 };
+
+export const CONTEXT_BUILDER_MODULE_PRESENCE_RULE: AuditRule = {
+  id: "AUDIT-063",
+  category: "architecture",
+  severity: "warning",
+  title: "Minimal Context Builder module is present",
+  description: "The Minimal Context Builder (V7.5) should expose types, path confinement, source collection, token estimation, and a builder as a dedicated src/context/ module.",
+  check: () => {
+    const expectations = [
+      { file: "src/context/types.ts", token: "export type MinimalContextPackage" },
+      { file: "src/context/types.ts", token: "export type ContextOmissionReason" },
+      { file: "src/context/path.ts", token: "export function resolveContextPath" },
+      { file: "src/context/sources.ts", token: "export function collectContextSources" },
+      { file: "src/context/context-cost-estimator.ts", token: "export function estimateTokens" },
+      { file: "src/context/builder.ts", token: "export function buildMinimalContext" },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        CONTEXT_BUILDER_MODULE_PRESENCE_RULE,
+        "Minimal Context Builder module is missing or incomplete.",
+        missing,
+        "Restore src/context/types.ts, path.ts, sources.ts, context-cost-estimator.ts, and builder.ts with MinimalContextPackage, ContextOmissionReason, resolveContextPath, collectContextSources, estimateTokens, and buildMinimalContext.",
+      );
+    }
+
+    return pass(
+      CONTEXT_BUILDER_MODULE_PRESENCE_RULE,
+      "Minimal Context Builder module is present.",
+      expectations.map(({ file, token }) => `${file} -> ${token}`),
+    );
+  },
+};
+
+export const CONTEXT_BUILDER_BUDGET_ENFORCEMENT_RULE: AuditRule = {
+  id: "AUDIT-064",
+  category: "architecture",
+  severity: "warning",
+  title: "Context builder enforces every ContextBudget dimension",
+  description: "buildMinimalContext should enforce maxFiles, maxCharacters, maxEstimatedTokens, and includeFullFiles — never exceeding any of them.",
+  check: () => {
+    const builderPath = "src/context/builder.ts";
+
+    if (!existsSync(builderPath)) {
+      return fail(
+        CONTEXT_BUILDER_BUDGET_ENFORCEMENT_RULE,
+        "Context builder file is missing.",
+        [builderPath],
+        "Restore src/context/builder.ts so budget enforcement can be verified.",
+      );
+    }
+
+    const content = readFileSync(builderPath, "utf8");
+    const expectedTokens = [
+      "budget.maxFiles",
+      "budget.maxCharacters",
+      "budget.maxEstimatedTokens",
+      "budget.includeFullFiles",
+      '"file_limit"',
+      '"character_limit"',
+      '"token_limit"',
+    ];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        CONTEXT_BUILDER_BUDGET_ENFORCEMENT_RULE,
+        "Context builder does not enforce every ContextBudget dimension.",
+        missing,
+        "Ensure buildMinimalContext checks maxFiles, maxCharacters, maxEstimatedTokens, and includeFullFiles, and reports file_limit/character_limit/token_limit omissions.",
+      );
+    }
+
+    return pass(
+      CONTEXT_BUILDER_BUDGET_ENFORCEMENT_RULE,
+      "Context builder enforces every ContextBudget dimension.",
+      expectedTokens,
+    );
+  },
+};
+
+export const CONTEXT_BUILDER_PATH_CONFINEMENT_RULE: AuditRule = {
+  id: "AUDIT-065",
+  category: "architecture",
+  severity: "error",
+  title: "Context builder confines every read under the project path",
+  description: "buildMinimalContext should reject absolute external paths and ../ traversals outside snapshot.project.path, reporting them as outside_project, before ever reading a file.",
+  check: () => {
+    const pathFile = "src/context/path.ts";
+    const builderFile = "src/context/builder.ts";
+
+    if (!existsSync(pathFile) || !existsSync(builderFile)) {
+      return fail(
+        CONTEXT_BUILDER_PATH_CONFINEMENT_RULE,
+        "Context builder path confinement files are missing.",
+        [pathFile, builderFile],
+        "Restore src/context/path.ts and src/context/builder.ts so path confinement can be verified.",
+      );
+    }
+
+    const content = `${readFileSync(pathFile, "utf8")}\n${readFileSync(builderFile, "utf8")}`;
+    const expectedTokens = ["insideProject", '"outside_project"', "resolveContextPath"];
+
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+
+    if (missing.length > 0) {
+      return fail(
+        CONTEXT_BUILDER_PATH_CONFINEMENT_RULE,
+        "Context builder does not confine reads under the project path.",
+        missing,
+        "Ensure resolveContextPath computes insideProject and buildMinimalContext omits out-of-project sources with reason outside_project before reading them.",
+      );
+    }
+
+    return pass(
+      CONTEXT_BUILDER_PATH_CONFINEMENT_RULE,
+      "Context builder confines every read under the project path.",
+      expectedTokens,
+    );
+  },
+};
+
+export const CONTEXT_BUILDER_NO_NETWORK_RULE: AuditRule = {
+  id: "AUDIT-066",
+  category: "architecture",
+  severity: "warning",
+  title: "Context builder performs no network I/O or process spawn",
+  description: "src/context/ should never perform network I/O, spawn a process, or introduce an execute mode — buildMinimalContext stays a pure, local, deterministic file read.",
+  check: () => {
+    const contextFiles = [
+      "src/context/types.ts",
+      "src/context/path.ts",
+      "src/context/sources.ts",
+      "src/context/context-cost-estimator.ts",
+      "src/context/builder.ts",
+    ];
+    const missingFiles = contextFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        CONTEXT_BUILDER_NO_NETWORK_RULE,
+        "Some context builder files are missing.",
+        missingFiles,
+        "Restore the missing src/context/ files so the no-network invariant can be verified.",
+      );
+    }
+
+    const forbiddenPatterns = [/\bfetch\(/, /require\(["']https?["']\)/, /child_process/];
+
+    const violations = contextFiles.flatMap((file) => {
+      const content = readFileSync(file, "utf8");
+
+      return forbiddenPatterns
+        .filter((pattern) => pattern.test(content))
+        .map((pattern) => `${file}: matches ${pattern.source}`);
+    });
+
+    if (violations.length > 0) {
+      return fail(
+        CONTEXT_BUILDER_NO_NETWORK_RULE,
+        "The context builder contains a forbidden network or process pattern.",
+        violations,
+        "Keep src/context/ free of fetch, child_process, and dynamic https requires.",
+      );
+    }
+
+    return pass(
+      CONTEXT_BUILDER_NO_NETWORK_RULE,
+      "Context builder performs no network I/O or process spawn.",
+      contextFiles,
+    );
+  },
+};
+
+export const CONTEXT_BUILDER_LOOP_INTEGRATION_RULE: AuditRule = {
+  id: "AUDIT-067",
+  category: "architecture",
+  severity: "warning",
+  title: "LoopRunner builds a Minimal Context Package in mode plan",
+  description: "runLoopPlan should build a MinimalContextPackage for a completed plan cycle using agentPolicy.requirements.contextBudget, and expose it as an additive LoopRunResult field.",
+  check: () => {
+    const expectations = [
+      { file: "src/loop/types.ts", token: "contextPackage: MinimalContextPackage | null;" },
+      { file: "src/loop/planner.ts", token: "snapshot: ProjectSnapshot;" },
+      { file: "src/loop/runner.ts", token: "import { buildMinimalContext } from \"../context/builder.js\";" },
+      { file: "src/loop/runner.ts", token: "agentPolicy.requirements.contextBudget" },
+      { file: "src/commands/run.ts", token: "contextPackage: result.contextPackage" },
+    ];
+
+    const missing = expectations
+      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .map(({ file, token }) => `${file} -> ${token}`);
+
+    if (missing.length > 0) {
+      return fail(
+        CONTEXT_BUILDER_LOOP_INTEGRATION_RULE,
+        "The Minimal Context Package integration is incomplete.",
+        missing,
+        "Ensure LoopRunResult exposes contextPackage, LoopPlan's ready outcome carries a snapshot, runLoopPlan builds the package via buildMinimalContext(snapshot, agentPolicy.requirements.contextBudget), and the run command exposes it in JSON output.",
+      );
+    }
+
+    return pass(
+      CONTEXT_BUILDER_LOOP_INTEGRATION_RULE,
+      "LoopRunner builds a Minimal Context Package in mode plan.",
+      expectations.map(({ file, token }) => `${file} -> ${token}`),
+    );
+  },
+};
+
+export const CONTEXT_BUILDER_DEPENDENCY_DIRECTION_RULE: AuditRule = {
+  id: "AUDIT-068",
+  category: "architecture",
+  severity: "warning",
+  title: "Context builder dependencies stay unidirectional",
+  description: "src/context/ should never depend on src/commands/, src/loop/, or src/cli.ts, and src/policy/ and src/agents/ should never depend on src/context/.",
+  check: () => {
+    const contextFiles = [
+      "src/context/types.ts",
+      "src/context/path.ts",
+      "src/context/sources.ts",
+      "src/context/context-cost-estimator.ts",
+      "src/context/builder.ts",
+    ];
+    const policyFiles = ["src/policy/types.ts", "src/policy/defaults.ts", "src/policy/resolver.ts"];
+    const agentFiles = ["src/agents/types.ts", "src/agents/registry.ts", "src/agents/selector.ts", "src/agents/escalation.ts"];
+    const allFiles = [...contextFiles, ...policyFiles, ...agentFiles];
+
+    const missingFiles = allFiles.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        CONTEXT_BUILDER_DEPENDENCY_DIRECTION_RULE,
+        "Some context, policy, or agent engine files are missing.",
+        missingFiles,
+        "Restore the missing src/context/, src/policy/, and src/agents/ files so dependency direction can be verified.",
+      );
+    }
+
+    const forbiddenInContext = /from\s+["'].*\/(commands|loop)\//;
+    const forbiddenCliInContext = /from\s+["'].*cli\.js["']/;
+    const forbiddenContextInOthers = /from\s+["'].*\/context\//;
+
+    const violations = [
+      ...contextFiles
+        .filter((file) => forbiddenInContext.test(readFileSync(file, "utf8")) || forbiddenCliInContext.test(readFileSync(file, "utf8")))
+        .map((file) => `${file}: imports commands/, loop/, or cli.js`),
+      ...[...policyFiles, ...agentFiles]
+        .filter((file) => forbiddenContextInOthers.test(readFileSync(file, "utf8")))
+        .map((file) => `${file}: imports context/`),
+    ];
+
+    if (violations.length > 0) {
+      return fail(
+        CONTEXT_BUILDER_DEPENDENCY_DIRECTION_RULE,
+        "Context builder dependency direction is violated.",
+        violations,
+        "Keep src/context/ independent of src/commands/, src/loop/, and src/cli.ts, and keep src/policy/ and src/agents/ independent of src/context/.",
+      );
+    }
+
+    return pass(
+      CONTEXT_BUILDER_DEPENDENCY_DIRECTION_RULE,
+      "Context builder dependencies stay unidirectional.",
+      allFiles,
+    );
+  },
+};
