@@ -1,3 +1,4 @@
+import { createExecutionClock } from "./clock.js";
 import {
   completeExecution,
   createExecutionSession,
@@ -20,7 +21,8 @@ export function execute(
   steps: readonly ExecutionStep[],
   options: ExecuteOptions,
 ): ExecutionResult {
-  const startedAt = options.now();
+  const clock = createExecutionClock(options.now);
+  const startedAt = clock.now();
 
   let session = createExecutionSession(options.sessionId, startedAt);
   session = startExecution(session);
@@ -29,9 +31,9 @@ export function execute(
 
   try {
     for (const step of steps) {
-      const stepStartedAt = options.now();
+      const stepStartedAt = clock.now();
       const details = step.run();
-      const stepCompletedAt = options.now();
+      const stepCompletedAt = clock.now();
 
       results.push({
         name: step.name,
@@ -49,7 +51,7 @@ export function execute(
       sessionId: session.sessionId,
       status: session.status,
       startedAt: session.startedAt,
-      completedAt: options.now(),
+      completedAt: clock.now(),
       steps: results,
       failure: null,
     };
@@ -67,7 +69,7 @@ export function execute(
       sessionId: session.sessionId,
       status: session.status,
       startedAt: session.startedAt,
-      completedAt: options.now(),
+      completedAt: clock.now(),
       steps: results,
       failure,
     };
