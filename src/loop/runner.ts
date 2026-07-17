@@ -12,6 +12,7 @@ import { resolvePolicy } from "../policy/resolver.js";
 import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
 import { planLoopCycle, type LoopPlan } from "./planner.js";
 import { canTransition } from "./state-machine.js";
+import { executePlan } from "../execution/pipeline.js";
 import type {
   LoopRunFailure,
   LoopRunMode,
@@ -45,12 +46,17 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
   const mode: LoopRunMode = "plan";
   const runId = generateRunId();
   const startedAt = now();
-  const executionSession = createExecutionPlan({
+  const executionPlan = createExecutionPlan({
     sessionId: runId,
     createdAt: startedAt,
   });
 
-  void executionSession;
+  const executionResult = executePlan(
+    executionPlan,
+    now,
+  );
+
+  void executionResult;
   const steps: LoopRunStep[] = [];
   let status: LoopRunStatus = "idle";
 
@@ -82,11 +88,11 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
   ): LoopRunResult {
     return {
       schemaVersion: 1,
-      runId: executionSession.sessionId,
+      runId: executionPlan.session.sessionId,
       project: projectName,
       mode,
       status,
-      startedAt: executionSession.createdAt,
+      startedAt: executionPlan.session.createdAt,
       completedAt: now(),
       candidate,
       steps,

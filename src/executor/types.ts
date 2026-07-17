@@ -20,3 +20,14 @@ export interface ExecutionSession {
   readonly executionMode: ExecutionMode;
   readonly executionState: ExecutionState;
 }
+
+
+export interface ExecutionPlanStep {
+  readonly name: string;
+  readonly details: readonly string[];
+}
+
+export interface ExecutionPlan {
+  readonly session: ExecutionSession;
+  readonly steps: readonly ExecutionPlanStep[];
+}
