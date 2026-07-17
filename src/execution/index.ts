@@ -10,3 +10,4 @@ export * from "./memory-recorder.js";
 export * from "./reporter.js";
 export * from "./summary.js";
 export * from "./markdown-reporter.js";
+export * from "./json-reporter.js";
