@@ -9,3 +9,4 @@ export * from "./events.js";
 export * from "./memory-recorder.js";
 export * from "./reporter.js";
 export * from "./summary.js";
+export * from "./markdown-reporter.js";
