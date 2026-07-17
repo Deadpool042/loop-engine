@@ -1,6 +1,6 @@
 import { createExecutionSession } from "./session.js";
 import { transitionExecutionSession } from "./state-machine.js";
-import type { ExecutionSession } from "./types.js";
+import type { ExecutionPlan } from "./types.js";
 
 export interface CreateExecutionPlanOptions {
   readonly sessionId: string;
@@ -9,11 +9,17 @@ export interface CreateExecutionPlanOptions {
 
 export function createExecutionPlan(
   options: CreateExecutionPlanOptions,
-): ExecutionSession {
-  const session = createExecutionSession({
-    sessionId: options.sessionId,
-    createdAt: options.createdAt,
-  });
+): ExecutionPlan {
+  const session = transitionExecutionSession(
+    createExecutionSession({
+      sessionId: options.sessionId,
+      createdAt: options.createdAt,
+    }),
+    "prepared",
+  );
 
-  return transitionExecutionSession(session, "prepared");
+  return Object.freeze({
+    session,
+    steps: Object.freeze([]),
+  });
 }
