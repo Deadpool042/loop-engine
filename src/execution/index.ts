@@ -6,3 +6,4 @@ export * from "./pipeline.js";
 export * from "./clock.js";
 export * from "./step.js";
 export * from "./events.js";
+export * from "./memory-recorder.js";
