@@ -17,9 +17,12 @@ import type {
   ExecutionStepResult,
 } from "./types.js";
 
+import type { ExecutionEventRecorder } from "./events.js";
+
 export type ExecuteOptions = Readonly<{
   sessionId: string;
   now: () => string;
+  recorder?: ExecutionEventRecorder;
 }>;
 
 export function execute(
@@ -27,7 +30,7 @@ export function execute(
   options: ExecuteOptions,
 ): ExecutionResult {
   const clock = createExecutionClock(options.now);
-  const recorder = createExecutionEventRecorder();
+  const recorder = options.recorder ?? createExecutionEventRecorder();
   const startedAt = clock.now();
 
   let session = createExecutionSession(options.sessionId, startedAt);
