@@ -119,3 +119,8 @@ responsabilités, propriété des contrats, frontière d'exécution, machine à 
 invariants, modèle de menace, garanties de sécurité et évolution future. Il ne
 crée ni Bridge, ni exécution, ni interaction Runtime ou Transport. Voir
 `docs/architecture/execution-architecture-rfc.md`.
+
+V13.1 ajoute le RFC d'approbation opérateur et ses contrats déclaratifs :
+cycle de vie explicite, traçabilité de revue, portée, version, expiration et
+révocation. Une approbation reste une preuve et ne crée ni Bridge ni exécution.
+Voir `docs/architecture/operator-approval-rfc.md`.

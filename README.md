@@ -157,6 +157,7 @@ Voir aussi :
 - `docs/architecture/boundary-handoff.md`
 - `docs/architecture/execution-boundary-rfc.md`
 - `docs/architecture/execution-architecture-rfc.md`
+- `docs/architecture/operator-approval-rfc.md`
 
 ## Audit et CI
 

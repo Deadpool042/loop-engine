@@ -936,7 +936,10 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("noBoundaryHandoffSurfaceRule(") ||
             ruleSource.includes("executionBoundaryRfcRule(") ||
             ruleSource.includes("noExecutionBoundaryRfcSurfaceRule(") ||
-            ruleSource.includes("executionArchitectureRfcRule(");
+            ruleSource.includes("executionArchitectureRfcRule(") ||
+            ruleSource.includes("operatorApprovalRfcRule(") ||
+            ruleSource.includes("operatorApprovalRfcDocumentRule(") ||
+            ruleSource.includes("noOperatorApprovalRfcSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9581,5 +9584,219 @@ export const EXECUTION_ARCHITECTURE_RFC_ROADMAP_NON_GOALS_RULE: AuditRule =
       "a Bridge;",
       "adapter payloads;",
       "provider invocation;",
+    ],
+  );
+
+const OPERATOR_APPROVAL_RFC_DOCUMENT_PATH =
+  "docs/architecture/operator-approval-rfc.md";
+
+const OPERATOR_APPROVAL_RFC_FILES = [
+  "types.ts",
+  "errors.ts",
+  "validation.ts",
+  "evaluation.ts",
+  "support.ts",
+  "index.ts",
+].map((file) => `src/authority/rfc/${file}`);
+
+const OPERATOR_APPROVAL_RFC_AUDIT_METADATA = {
+  introducedIn: "V13.1",
+  tags: ["architecture", "documentation", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function operatorApprovalRfcRule(
+  id: string,
+  category: AuditRule["category"],
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category,
+    severity: "error",
+    title,
+    description,
+    metadata: { ...OPERATOR_APPROVAL_RFC_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function operatorApprovalRfcDocumentRule(
+  id: string,
+  category: AuditRule["category"],
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  expectedTokens: readonly string[],
+): AuditRule {
+  return operatorApprovalRfcRule(id, category, title, description, dependsOn, (rule) => {
+    if (!existsSync(OPERATOR_APPROVAL_RFC_DOCUMENT_PATH)) {
+      return fail(
+        rule,
+        "Operator approval RFC is missing.",
+        [OPERATOR_APPROVAL_RFC_DOCUMENT_PATH],
+        "Restore the V13.1 operator approval RFC.",
+      );
+    }
+    const content = readFileSync(OPERATOR_APPROVAL_RFC_DOCUMENT_PATH, "utf8");
+    const missing = expectedTokens.filter((token) => !content.includes(token));
+    return missing.length === 0
+      ? pass(rule, title + ".", expectedTokens)
+      : fail(
+          rule,
+          title + " is incomplete.",
+          missing,
+          "Document the required V13.1 operator approval RFC content.",
+        );
+  });
+}
+
+function noOperatorApprovalRfcSurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return operatorApprovalRfcRule(id, "architecture", title, description, dependsOn, (rule) => {
+    const files = OPERATOR_APPROVAL_RFC_FILES.concat("src/core/operator-approval.ts");
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(transportRequestSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep OperatorApprovalRFC declarative and isolated from operational layers.",
+        );
+  });
+}
+
+export const OPERATOR_APPROVAL_RFC_MODULE_RULE: AuditRule =
+  operatorApprovalRfcRule(
+    "AUDIT-294",
+    "architecture",
+    "OperatorApprovalRFC module exists",
+    "V13.1 must expose the operator approval RFC contracts and Core integration point.",
+    ["AUDIT-293"],
+    (rule) => {
+      const files = OPERATOR_APPROVAL_RFC_FILES.concat("src/core/operator-approval.ts");
+      const missing = files.filter((path) => !existsSync(path));
+      return missing.length === 0
+        ? pass(rule, "OperatorApprovalRFC module exists.", files)
+        : fail(rule, "OperatorApprovalRFC module files are missing.", missing, "Restore the V13.1 operator approval RFC contracts.");
+    },
+  );
+
+export const OPERATOR_APPROVAL_RFC_LIFECYCLE_RULE: AuditRule =
+  operatorApprovalRfcDocumentRule(
+    "AUDIT-295",
+    "docs",
+    "Operator approval RFC documents the lifecycle",
+    "The RFC must document every operator approval lifecycle state and transition.",
+    ["AUDIT-294"],
+    ["## Lifecycle and state machine", "draft", "submitted", "under_review", "approved", "rejected", "expired", "revoked", "superseded"],
+  );
+
+export const OPERATOR_APPROVAL_RFC_STATE_MACHINE_RULE: AuditRule =
+  operatorApprovalRfcRule(
+    "AUDIT-296",
+    "architecture",
+    "Operator approval state machine is explicit",
+    "OperatorApprovalRFC must expose stable states and validate explicit transitions.",
+    ["AUDIT-295"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/authority/rfc/types.ts",
+        ["OPERATOR_APPROVAL_STATES", "OperatorApprovalState", "draft", "submitted", "under_review", "approved", "rejected", "expired", "revoked", "superseded"],
+        "Operator approval state machine is explicit.",
+      ),
+  );
+
+export const OPERATOR_APPROVAL_RFC_REVIEW_MODEL_RULE: AuditRule =
+  operatorApprovalRfcRule(
+    "AUDIT-297",
+    "architecture",
+    "Operator approval review model is traceable",
+    "The review contract must record reviewer, timestamp, scope, version, evidence, expiry policy, and revocation reason.",
+    ["AUDIT-296"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/authority/rfc/types.ts",
+        ["OperatorApprovalReview", "reviewerId", "reviewedAt", "approvalScope", "approvalVersion", "evidenceReferences", "expiryPolicy", "revocationReason"],
+        "Operator approval review model is traceable.",
+      ),
+  );
+
+export const OPERATOR_APPROVAL_RFC_VALIDATION_RULE: AuditRule =
+  operatorApprovalRfcRule(
+    "AUDIT-298",
+    "architecture",
+    "Operator approval validation is deterministic",
+    "Validation must check evidence, scope, version, review completeness, transition, expiry, and revocation without side effects.",
+    ["AUDIT-297"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/authority/rfc/validation.ts",
+        ["validateOperatorApprovalInput", "validateOperatorApprovalRFC", "operator_approval_transition_invalid", "operator_approval_expired", "operator_approval_revoked"],
+        "Operator approval validation is deterministic.",
+      ),
+  );
+
+export const OPERATOR_APPROVAL_RFC_SECURITY_RULE: AuditRule =
+  operatorApprovalRfcDocumentRule(
+    "AUDIT-299",
+    "docs",
+    "Operator approval RFC documents security guarantees",
+    "The RFC must document default deny, explicit approval, immutable evidence, review traceability, revocation traceability, and expiry enforcement.",
+    ["AUDIT-298"],
+    ["## Security guarantees", "default deny", "explicit approval", "immutable approvals", "review traceability", "revocation traceability", "expiry enforcement"],
+  );
+
+export const OPERATOR_APPROVAL_RFC_DEFAULT_DENY_RULE: AuditRule =
+  operatorApprovalRfcRule(
+    "AUDIT-300",
+    "architecture",
+    "Operator approval defaults to deny",
+    "Every operator approval result must keep approval-derived execution disabled and not started.",
+    ["AUDIT-299"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/authority/rfc/types.ts",
+        ["approved: boolean", "revoked: boolean", "expired: boolean", "executionAllowed: false", "executionStarted: false"],
+        "Operator approval defaults to deny.",
+      ),
+  );
+
+export const OPERATOR_APPROVAL_RFC_NO_EXECUTION_RULE: AuditRule =
+  noOperatorApprovalRfcSurfaceRule(
+    "AUDIT-301",
+    "OperatorApprovalRFC has no execution surface",
+    "OperatorApprovalRFC must not depend on runtime, transport, provider, process, filesystem, network, or operational request layers.",
+    ["AUDIT-300"],
+    [
+      /RuntimeRequest/,
+      /TransportRequest/,
+      /TransportAdapterRequest/,
+      /RuntimeAdapter/,
+      /TransportAdapter/,
+      /child_process|node:child_process/,
+      /\bspawn\s*\(|\bexec(?:File|Sync)?\s*\(|\bfork\s*\(/,
+      /process\.env/,
+      /node:fs|readFileSync|writeFileSync/,
+      /node:(http|https|net|tls)|\bfetch\s*\(/,
+      /from\s+["'][^"']*\/(cli|commands|loop|runtime|transports|providers)\//,
     ],
   );
