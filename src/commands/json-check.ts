@@ -12,7 +12,9 @@ const COMMANDS = [
   ["run", "loop-engine", "--mode", "plan", "--json"],
 ] as const;
 
-function assertRecord(value: unknown): asserts value is Record<string, unknown> {
+function assertRecord(
+  value: unknown,
+): asserts value is Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("expected JSON object");
   }
@@ -42,7 +44,11 @@ function assertNumber(value: unknown, field: string): asserts value is number {
   }
 }
 
-function assertOneOf(value: string, field: string, values: readonly string[]): void {
+function assertOneOf(
+  value: string,
+  field: string,
+  values: readonly string[],
+): void {
   if (!values.includes(value)) {
     throw new Error(`${field} must be one of: ${values.join(", ")}`);
   }
@@ -113,7 +119,10 @@ export function validateAuditJsonPayload(json: unknown): void {
   assertRecord(recommendationsByPriority);
   for (const priority of AUDIT_PRIORITIES) {
     if (priority in recommendationsByPriority) {
-      assertNumber(recommendationsByPriority[priority], `summary.recommendationsByPriority.${priority}`);
+      assertNumber(
+        recommendationsByPriority[priority],
+        `summary.recommendationsByPriority.${priority}`,
+      );
     }
   }
 
@@ -127,21 +136,39 @@ export function validateAuditJsonPayload(json: unknown): void {
   assertRecord(summaryRecommendationsByPriority);
   for (const priority of AUDIT_PRIORITIES) {
     if (priority in summaryRecommendationsByPriority) {
-      assertNumber(summaryRecommendationsByPriority[priority], `summary.recommendations.byPriority.${priority}`);
+      assertNumber(
+        summaryRecommendationsByPriority[priority],
+        `summary.recommendations.byPriority.${priority}`,
+      );
     }
   }
 
   for (const priority of AUDIT_PRIORITIES) {
     const actualRecommendationPriorityCount =
-      priority in recommendationsByPriority ? recommendationsByPriority[priority] : 0;
-    assertNumber(actualRecommendationPriorityCount, `summary.recommendationsByPriority.${priority}`);
+      priority in recommendationsByPriority
+        ? recommendationsByPriority[priority]
+        : 0;
+    assertNumber(
+      actualRecommendationPriorityCount,
+      `summary.recommendationsByPriority.${priority}`,
+    );
 
     const actualSummaryRecommendationPriorityCount =
-      priority in summaryRecommendationsByPriority ? summaryRecommendationsByPriority[priority] : 0;
-    assertNumber(actualSummaryRecommendationPriorityCount, `summary.recommendations.byPriority.${priority}`);
+      priority in summaryRecommendationsByPriority
+        ? summaryRecommendationsByPriority[priority]
+        : 0;
+    assertNumber(
+      actualSummaryRecommendationPriorityCount,
+      `summary.recommendations.byPriority.${priority}`,
+    );
 
-    if (actualRecommendationPriorityCount !== actualSummaryRecommendationPriorityCount) {
-      throw new Error("summary.recommendations.byPriority must match summary.recommendationsByPriority");
+    if (
+      actualRecommendationPriorityCount !==
+      actualSummaryRecommendationPriorityCount
+    ) {
+      throw new Error(
+        "summary.recommendations.byPriority must match summary.recommendationsByPriority",
+      );
     }
   }
 
@@ -177,7 +204,8 @@ export function validateAuditJsonPayload(json: unknown): void {
     assertOneOf(findingPriorityValue, "finding.priority", AUDIT_PRIORITIES);
   }
 
-  const summaryCountTotal = summary.pass + summary.warning + summary.fail + summary.skipped;
+  const summaryCountTotal =
+    summary.pass + summary.warning + summary.fail + summary.skipped;
   if (summary.total !== findings.length) {
     throw new Error("summary.total must match findings length");
   }
@@ -185,12 +213,16 @@ export function validateAuditJsonPayload(json: unknown): void {
     throw new Error("summary.total must match summary count total");
   }
 
-  const expectedScore = summary.total === 0 ? 100 : Math.round((summary.pass / summary.total) * 100);
+  const expectedScore =
+    summary.total === 0
+      ? 100
+      : Math.round((summary.pass / summary.total) * 100);
   if (summary.score !== expectedScore) {
     throw new Error("summary.score must match pass ratio");
   }
 
-  const expectedStatus = summary.fail > 0 ? "fail" : summary.warning > 0 ? "warning" : "pass";
+  const expectedStatus =
+    summary.fail > 0 ? "fail" : summary.warning > 0 ? "warning" : "pass";
   if (summaryStatus !== expectedStatus) {
     throw new Error("summary.status must match finding counts");
   }
@@ -205,12 +237,15 @@ export function validateAuditJsonPayload(json: unknown): void {
   }
 
   for (const category of AUDIT_CATEGORIES) {
-    const actualCategoryCount = category in byCategory ? byCategory[category] : 0;
+    const actualCategoryCount =
+      category in byCategory ? byCategory[category] : 0;
     assertNumber(actualCategoryCount, `summary.byCategory.${category}`);
     const expectedCategoryCount = categoryCounts[category] ?? 0;
 
     if (actualCategoryCount !== expectedCategoryCount) {
-      throw new Error(`summary.byCategory.${category} must match finding category count`);
+      throw new Error(
+        `summary.byCategory.${category} must match finding category count`,
+      );
     }
   }
 
@@ -224,12 +259,15 @@ export function validateAuditJsonPayload(json: unknown): void {
   }
 
   for (const priority of AUDIT_PRIORITIES) {
-    const actualPriorityCount = priority in byPriority ? byPriority[priority] : 0;
+    const actualPriorityCount =
+      priority in byPriority ? byPriority[priority] : 0;
     assertNumber(actualPriorityCount, `summary.byPriority.${priority}`);
     const expectedPriorityCount = priorityCounts[priority] ?? 0;
 
     if (actualPriorityCount !== expectedPriorityCount) {
-      throw new Error(`summary.byPriority.${priority} must match finding priority count`);
+      throw new Error(
+        `summary.byPriority.${priority} must match finding priority count`,
+      );
     }
   }
 
@@ -270,21 +308,31 @@ export function validateAuditJsonPayload(json: unknown): void {
     assertRecord(recommendationValue);
     assertString(recommendationValue.ruleId, "recommendation.ruleId");
     if (!findingRuleIds.has(recommendationValue.ruleId)) {
-      throw new Error(`recommendation.ruleId must reference an existing finding.ruleId: ${recommendationValue.ruleId}`);
+      throw new Error(
+        `recommendation.ruleId must reference an existing finding.ruleId: ${recommendationValue.ruleId}`,
+      );
     }
     const referencedFinding = findingsByRuleId.get(recommendationValue.ruleId);
     if (referencedFinding?.status === "pass") {
-      throw new Error(`recommendation.ruleId must reference an actionable finding.ruleId: ${recommendationValue.ruleId}`);
+      throw new Error(
+        `recommendation.ruleId must reference an actionable finding.ruleId: ${recommendationValue.ruleId}`,
+      );
     }
     if (recommendationRuleIds.has(recommendationValue.ruleId)) {
-      throw new Error(`recommendation.ruleId must be unique: ${recommendationValue.ruleId}`);
+      throw new Error(
+        `recommendation.ruleId must be unique: ${recommendationValue.ruleId}`,
+      );
     }
     recommendationRuleIds.add(recommendationValue.ruleId);
     assertString(recommendationValue.message, "recommendation.message");
 
     const recommendationPriorityValue = recommendationValue.priority;
     assertString(recommendationPriorityValue, "recommendation.priority");
-    assertOneOf(recommendationPriorityValue, "recommendation.priority", AUDIT_PRIORITIES);
+    assertOneOf(
+      recommendationPriorityValue,
+      "recommendation.priority",
+      AUDIT_PRIORITIES,
+    );
   }
 
   if (recommendations.length > 0) {
@@ -298,11 +346,17 @@ export function validateAuditJsonPayload(json: unknown): void {
 
     const recommendationPriority = recommendation.priority;
     assertString(recommendationPriority, "recommendation.priority");
-    assertOneOf(recommendationPriority, "recommendation.priority", AUDIT_PRIORITIES);
+    assertOneOf(
+      recommendationPriority,
+      "recommendation.priority",
+      AUDIT_PRIORITIES,
+    );
   }
 
   if (summaryRecommendations.total !== recommendations.length) {
-    throw new Error("summary.recommendations.total must match recommendations length");
+    throw new Error(
+      "summary.recommendations.total must match recommendations length",
+    );
   }
 
   const recommendationPriorityCounts: Record<string, number> = {};
@@ -311,26 +365,47 @@ export function validateAuditJsonPayload(json: unknown): void {
     const priority = recommendationValue.priority;
     assertString(priority, "recommendation.priority");
     assertOneOf(priority, "recommendation.priority", AUDIT_PRIORITIES);
-    recommendationPriorityCounts[priority] = (recommendationPriorityCounts[priority] ?? 0) + 1;
+    recommendationPriorityCounts[priority] =
+      (recommendationPriorityCounts[priority] ?? 0) + 1;
   }
 
   for (const priority of AUDIT_PRIORITIES) {
     const actualRecommendationPriorityCount =
-      priority in recommendationsByPriority ? recommendationsByPriority[priority] : 0;
-    assertNumber(actualRecommendationPriorityCount, `summary.recommendationsByPriority.${priority}`);
+      priority in recommendationsByPriority
+        ? recommendationsByPriority[priority]
+        : 0;
+    assertNumber(
+      actualRecommendationPriorityCount,
+      `summary.recommendationsByPriority.${priority}`,
+    );
 
     const actualSummaryRecommendationPriorityCount =
-      priority in summaryRecommendationsByPriority ? summaryRecommendationsByPriority[priority] : 0;
-    assertNumber(actualSummaryRecommendationPriorityCount, `summary.recommendations.byPriority.${priority}`);
+      priority in summaryRecommendationsByPriority
+        ? summaryRecommendationsByPriority[priority]
+        : 0;
+    assertNumber(
+      actualSummaryRecommendationPriorityCount,
+      `summary.recommendations.byPriority.${priority}`,
+    );
 
-    const expectedRecommendationPriorityCount = recommendationPriorityCounts[priority] ?? 0;
+    const expectedRecommendationPriorityCount =
+      recommendationPriorityCounts[priority] ?? 0;
 
-    if (actualRecommendationPriorityCount !== expectedRecommendationPriorityCount) {
-      throw new Error(`summary.recommendationsByPriority.${priority} must match recommendation priority count`);
+    if (
+      actualRecommendationPriorityCount !== expectedRecommendationPriorityCount
+    ) {
+      throw new Error(
+        `summary.recommendationsByPriority.${priority} must match recommendation priority count`,
+      );
     }
 
-    if (actualSummaryRecommendationPriorityCount !== expectedRecommendationPriorityCount) {
-      throw new Error(`summary.recommendations.byPriority.${priority} must match recommendation priority count`);
+    if (
+      actualSummaryRecommendationPriorityCount !==
+      expectedRecommendationPriorityCount
+    ) {
+      throw new Error(
+        `summary.recommendations.byPriority.${priority} must match recommendation priority count`,
+      );
     }
   }
 }
@@ -401,7 +476,9 @@ function validatePayload(command: readonly string[], json: unknown): void {
     // validates the *non-null* structure whenever a cycle actually
     // completed, without hardcoding an assumption about live roadmap state.
     if ((json.agentPolicy === null) !== (json.contextPackage === null)) {
-      throw new Error("run contextPackage nullness must match agentPolicy nullness");
+      throw new Error(
+        "run contextPackage nullness must match agentPolicy nullness",
+      );
     }
 
     validateContextPackageField(json.contextPackage);
@@ -439,8 +516,16 @@ function validateAgentPolicyField(agentPolicy: unknown): void {
   assertField(agentPolicy, "reasons");
 
   assertString(agentPolicy.policyId, "agentPolicy.policyId");
-  assertOneOf(agentPolicy.mode as string, "agentPolicy.mode", AGENT_POLICY_MODES);
-  assertOneOf(agentPolicy.status as string, "agentPolicy.status", AGENT_POLICY_STATUS_CODES);
+  assertOneOf(
+    agentPolicy.mode as string,
+    "agentPolicy.mode",
+    AGENT_POLICY_MODES,
+  );
+  assertOneOf(
+    agentPolicy.status as string,
+    "agentPolicy.status",
+    AGENT_POLICY_STATUS_CODES,
+  );
 
   const requirements = agentPolicy.requirements;
   assertRecord(requirements);
@@ -456,7 +541,9 @@ function validateAgentPolicyField(agentPolicy: unknown): void {
   assertField(executionBudget, "maxCalls");
 
   if (agentPolicy.mode === "plan" && executionBudget.maxCalls !== 0) {
-    throw new Error("agentPolicy.requirements.executionBudget.maxCalls must be 0 in mode plan");
+    throw new Error(
+      "agentPolicy.requirements.executionBudget.maxCalls must be 0 in mode plan",
+    );
   }
 
   const reasons = agentPolicy.reasons;
@@ -472,7 +559,10 @@ function validateAgentPolicyField(agentPolicy: unknown): void {
   if (selection !== null) {
     assertRecord(selection);
     assertField(selection, "outcome");
-    assertOneOf(selection.outcome as string, "agentPolicy.selection.outcome", ["selected", "no_match"]);
+    assertOneOf(selection.outcome as string, "agentPolicy.selection.outcome", [
+      "selected",
+      "no_match",
+    ]);
   }
 }
 
@@ -509,7 +599,10 @@ function validateContextPackageField(contextPackage: unknown): void {
   assertRecord(budget);
   assertNumber(budget.maxFiles, "contextPackage.budget.maxFiles");
   assertNumber(budget.maxCharacters, "contextPackage.budget.maxCharacters");
-  assertNumber(budget.maxEstimatedTokens, "contextPackage.budget.maxEstimatedTokens");
+  assertNumber(
+    budget.maxEstimatedTokens,
+    "contextPackage.budget.maxEstimatedTokens",
+  );
   if (typeof budget.includeFullFiles !== "boolean") {
     throw new Error("contextPackage.budget.includeFullFiles must be boolean");
   }
@@ -517,21 +610,38 @@ function validateContextPackageField(contextPackage: unknown): void {
   const files = contextPackage.files;
   assertArray(files);
   if (files.length > budget.maxFiles) {
-    throw new Error("contextPackage.files.length must not exceed contextPackage.budget.maxFiles");
+    throw new Error(
+      "contextPackage.files.length must not exceed contextPackage.budget.maxFiles",
+    );
   }
   for (const file of files) {
     assertRecord(file);
     assertString(file.path, "contextPackage.files[].path");
-    assertOneOf(file.kind as string, "contextPackage.files[].kind", CONTEXT_SOURCE_KINDS);
+    assertOneOf(
+      file.kind as string,
+      "contextPackage.files[].kind",
+      CONTEXT_SOURCE_KINDS,
+    );
     assertString(file.content, "contextPackage.files[].content");
-    assertNumber(file.originalCharacters, "contextPackage.files[].originalCharacters");
-    assertNumber(file.includedCharacters, "contextPackage.files[].includedCharacters");
-    assertNumber(file.estimatedTokens, "contextPackage.files[].estimatedTokens");
+    assertNumber(
+      file.originalCharacters,
+      "contextPackage.files[].originalCharacters",
+    );
+    assertNumber(
+      file.includedCharacters,
+      "contextPackage.files[].includedCharacters",
+    );
+    assertNumber(
+      file.estimatedTokens,
+      "contextPackage.files[].estimatedTokens",
+    );
     if (typeof file.truncated !== "boolean") {
       throw new Error("contextPackage.files[].truncated must be boolean");
     }
     if (file.includedCharacters > file.originalCharacters) {
-      throw new Error("contextPackage.files[].includedCharacters must not exceed originalCharacters");
+      throw new Error(
+        "contextPackage.files[].includedCharacters must not exceed originalCharacters",
+      );
     }
   }
 
@@ -540,16 +650,30 @@ function validateContextPackageField(contextPackage: unknown): void {
   for (const omission of omitted) {
     assertRecord(omission);
     assertString(omission.path, "contextPackage.omitted[].path");
-    assertOneOf(omission.reason as string, "contextPackage.omitted[].reason", CONTEXT_OMISSION_REASONS);
+    assertOneOf(
+      omission.reason as string,
+      "contextPackage.omitted[].reason",
+      CONTEXT_OMISSION_REASONS,
+    );
   }
 
-  assertNumber(contextPackage.totalCharacters, "contextPackage.totalCharacters");
-  assertNumber(contextPackage.estimatedTokens, "contextPackage.estimatedTokens");
+  assertNumber(
+    contextPackage.totalCharacters,
+    "contextPackage.totalCharacters",
+  );
+  assertNumber(
+    contextPackage.estimatedTokens,
+    "contextPackage.estimatedTokens",
+  );
   if (contextPackage.totalCharacters > budget.maxCharacters) {
-    throw new Error("contextPackage.totalCharacters must not exceed contextPackage.budget.maxCharacters");
+    throw new Error(
+      "contextPackage.totalCharacters must not exceed contextPackage.budget.maxCharacters",
+    );
   }
   if (contextPackage.estimatedTokens > budget.maxEstimatedTokens) {
-    throw new Error("contextPackage.estimatedTokens must not exceed contextPackage.budget.maxEstimatedTokens");
+    throw new Error(
+      "contextPackage.estimatedTokens must not exceed contextPackage.budget.maxEstimatedTokens",
+    );
   }
   if (typeof contextPackage.truncated !== "boolean") {
     throw new Error("contextPackage.truncated must be boolean");

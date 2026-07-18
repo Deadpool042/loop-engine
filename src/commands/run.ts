@@ -1,6 +1,10 @@
 import type { ProjectConfig } from "../core/config.js";
 import { runLoopPlan } from "../loop/runner.js";
-import { LOOP_RUN_MODES, type LoopRunMode, type LoopRunResult } from "../loop/types.js";
+import {
+  LOOP_RUN_MODES,
+  type LoopRunMode,
+  type LoopRunResult,
+} from "../loop/types.js";
 import { terminal } from "../ui/terminal.js";
 import { printJsonError } from "./json-error.js";
 
@@ -52,13 +56,8 @@ function printLoopRunResult(result: LoopRunResult): void {
 
   terminal.section("Context package (forecast)");
   if (result.contextPackage) {
-    const {
-      files,
-      omitted,
-      totalCharacters,
-      estimatedTokens,
-      truncated,
-    } = result.contextPackage;
+    const { files, omitted, totalCharacters, estimatedTokens, truncated } =
+      result.contextPackage;
 
     terminal.info(
       `Files included: ${files.length} (${totalCharacters} chars, ~${estimatedTokens} tokens)`,
@@ -99,7 +98,11 @@ function printLoopRunResultJson(result: LoopRunResult): void {
   );
 }
 
-export function runLoopRunCommand(project: ProjectConfig, mode: LoopRunMode, json: boolean): number {
+export function runLoopRunCommand(
+  project: ProjectConfig,
+  mode: LoopRunMode,
+  json: boolean,
+): number {
   if (mode !== "plan") {
     const message = `Loop run mode not implemented: ${mode}`;
 

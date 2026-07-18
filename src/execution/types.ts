@@ -1,8 +1,4 @@
-export type ExecutionStatus =
-  | "prepared"
-  | "running"
-  | "completed"
-  | "failed";
+export type ExecutionStatus = "prepared" | "running" | "completed" | "failed";
 
 export type ExecutionStep = Readonly<{
   name: string;

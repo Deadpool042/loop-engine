@@ -3,8 +3,9 @@ import { isAuditProfile } from "../audit/profiles.js";
 import type { AuditProfile, AuditReport } from "../audit/types.js";
 import { terminal } from "../ui/terminal.js";
 
-
-export function parseAuditProfileOption(args: readonly string[]): AuditProfile | undefined {
+export function parseAuditProfileOption(
+  args: readonly string[],
+): AuditProfile | undefined {
   const profileIndex = args.indexOf("--profile");
 
   if (profileIndex === -1) {
@@ -95,7 +96,6 @@ export function printAuditReport(): AuditReport {
 
   return report;
 }
-
 
 export function printAuditReportJson(): AuditReport {
   const profile = parseAuditProfileOption(process.argv);

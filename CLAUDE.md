@@ -27,6 +27,7 @@ As of V7.4, `runLoopPlan` additionally resolves a **forecast-only** agent policy
 As of V7.5, `runLoopPlan` additionally builds a bounded, deterministic **Minimal Context Package** via `src/context/` (see `docs/architecture/minimal-context-builder.md`) whenever a plan cycle reaches `completed`, using `agentPolicy.requirements.contextBudget` — sources are limited to `snapshot.docs.required` and `snapshot.roadmap.paths`, every read stays confined under `snapshot.project.path`, and the result never exceeds `maxFiles`/`maxCharacters`/`maxEstimatedTokens`. Exposed as `LoopRunResult.contextPackage`, `null` for `blocked`/`failed` cycles exactly like `agentPolicy`.
 
 **Core philosophy (non-negotiable, enforced throughout the codebase):**
+
 - No automatic AI calls by default — Loop Engine only prepares context for a human to paste into an assistant.
 - No automatic commit, no automatic push.
 - Commit and push only happen under an explicitly selected mode (`commit`, `publish`); the default mode (`plan`) never commits or pushes.
@@ -81,7 +82,7 @@ Deterministic, keyword-based, intentionally naive — no NLP, no dependency reso
 - A line becomes a **candidate** if it matches patterns like `- [ ]`, `TODO`, `Prochain`, `Lot `, `H1-L`/`H2-L`/`H3-L`, `⏳`, etc. (`CANDIDATE_PATTERNS`).
 - Each candidate gets a **status**: `todo` / `in_progress` (`⏳`, "en cours") / `done` (`- [x]`) / `unknown`.
 - Each candidate gets a **kind** via keyword matching on the lowercased line:
-  - `blocked`: `production finale`, `mise en production`, `paiement`, `migration`, `delete`, `supprimer`. Note `prod` alone is *not* blocking (avoids false positives on `produit`).
+  - `blocked`: `production finale`, `mise en production`, `paiement`, `migration`, `delete`, `supprimer`. Note `prod` alone is _not_ blocking (avoids false positives on `produit`).
   - `warning`: `déploiement`/`deploiement`, `vps`, `dns`, `bascule`, `sécurité`/`securite`.
   - otherwise `safe`.
 - `selectRoadmapCandidate` ignores `done` candidates, then prefers `safe` > `warning` > `blocked` (a `blocked`-only result should never be presented as a safe next micro-lot — the `next` command must make that distinction, not silently recommend it).
@@ -117,11 +118,13 @@ When adjusting keyword lists, favor precision (avoid blocking ordinary work) ove
 Work in small, reversible lots.
 
 Before a significant change:
+
 - read the relevant docs and source files;
 - prefer an audit/design lot when architecture is unclear;
 - avoid broad refactors unless explicitly requested.
 
 For every code lot:
+
 - keep the patch minimal;
 - run `pnpm run validate`;
 - list modified files;

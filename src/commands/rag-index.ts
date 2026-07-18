@@ -53,7 +53,9 @@ function collectMarkdownFiles(path: string): string[] {
 }
 
 function titleFromContent(content: string, fallback: string): string {
-  const firstHeading = content.split("\n").find((line) => line.startsWith("# "));
+  const firstHeading = content
+    .split("\n")
+    .find((line) => line.startsWith("# "));
 
   return firstHeading?.replace(/^#\s+/, "").trim() || fallback;
 }
@@ -132,7 +134,9 @@ function buildDocuments(path: string): readonly RagDocument[] {
 }
 
 export function runRagIndex(): void {
-  const files = SOURCE_PATHS.flatMap((sourcePath) => collectMarkdownFiles(sourcePath));
+  const files = SOURCE_PATHS.flatMap((sourcePath) =>
+    collectMarkdownFiles(sourcePath),
+  );
   const documents = files.flatMap((file) => buildDocuments(file));
 
   mkdirSync(".loop-engine", { recursive: true });

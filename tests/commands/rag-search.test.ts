@@ -54,11 +54,14 @@ describe("rag-search command", () => {
   it("prints json results when requested", () => {
     rebuildIndex();
 
-    const output = execSync("pnpm exec tsx src/cli.ts rag-search roadmap --json", {
-      cwd: process.cwd(),
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const output = execSync(
+      "pnpm exec tsx src/cli.ts rag-search roadmap --json",
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
 
     const json = JSON.parse(output) as {
       schemaVersion?: unknown;

@@ -18,7 +18,6 @@ export function printNextProjectAction(project: ProjectConfig): void {
     terminal.success("No blocked candidate.");
   }
 
-
   terminal.section("Project");
   terminal.info(`Type: ${snapshot.project.type}`);
   terminal.info(`Path: ${snapshot.project.path}`);
@@ -94,7 +93,9 @@ export function printNextProjectAction(project: ProjectConfig): void {
         terminal.warning("Frame this candidate before implementation.");
         terminal.info("Prefer a short Cowork lot before Code.");
       } else {
-        terminal.success("Candidate looks compatible with a small reversible lot.");
+        terminal.success(
+          "Candidate looks compatible with a small reversible lot.",
+        );
       }
     } else {
       terminal.warning("No roadmap candidate detected.");
@@ -129,27 +130,24 @@ export function printNextProjectAction(project: ProjectConfig): void {
   terminal.info("5. Run review before commit.");
 }
 
-
 export function printNextProjectActionJson(project: ProjectConfig): void {
   const snapshot = buildProjectSnapshot(project);
   const selectedCandidate = snapshot.roadmap.selectedCandidate;
 
   console.log(
-    JSON.stringify(
-      {
-        schemaVersion: 1,
-        project: snapshot.project,
-        git: snapshot.git,
-        roadmap: {
-          available: snapshot.roadmap.available,
-          paths: snapshot.roadmap.paths,
-          selectedCandidate,
-          stats: snapshot.roadmap.stats,
-          summary: snapshot.roadmap.summary,
-        },
-        validation: snapshot.validation,
-        health: snapshot.health,
+    JSON.stringify({
+      schemaVersion: 1,
+      project: snapshot.project,
+      git: snapshot.git,
+      roadmap: {
+        available: snapshot.roadmap.available,
+        paths: snapshot.roadmap.paths,
+        selectedCandidate,
+        stats: snapshot.roadmap.stats,
+        summary: snapshot.roadmap.summary,
       },
-    ),
+      validation: snapshot.validation,
+      health: snapshot.health,
+    }),
   );
 }

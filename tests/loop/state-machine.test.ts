@@ -32,7 +32,9 @@ describe("canTransition", () => {
   }
 
   it("rejects every transition not explicitly documented", () => {
-    const validSet = new Set(VALID_TRANSITIONS.map(([from, to]) => `${from}->${to}`));
+    const validSet = new Set(
+      VALID_TRANSITIONS.map(([from, to]) => `${from}->${to}`),
+    );
 
     for (const from of LOOP_RUN_STATUSES) {
       for (const to of LOOP_RUN_STATUSES) {

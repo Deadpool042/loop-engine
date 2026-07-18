@@ -71,7 +71,6 @@ Automatiser le déterministe.
 Limiter l'IA au jugement.  
 Garder l'humain sur les décisions.
 
-
 ### Lecture du summary
 
 La commande `pnpm loop summary` affiche une vue compacte du workspace.
@@ -105,7 +104,6 @@ Cette boucle reste déterministe :
 - aucun appel IA automatique ;
 - aucune modification automatique ;
 - aucune validation implicite hors des commandes configurées.
-
 
 ## Structure du projet
 
@@ -182,7 +180,6 @@ Le rapport JSON d'audit expose un contrat stable pour les recommandations action
 
 - [Audit Engine V3 — Rapport final](docs/audits/audit-engine-v3-final.md)
 
-
 ### Profils d'audit
 
 La commande `audit` accepte un profil optionnel avec `--profile`.
@@ -207,7 +204,6 @@ Profils disponibles :
 
 Les profils filtrent les règles exécutées par catégorie, sans modifier le format du rapport.
 
-
 ### Contrôle CI des profils d'audit
 
 Le script `pnpm run audit:profiles` exécute `scripts/audit-profile-check.ts`.
@@ -215,7 +211,6 @@ Le script `pnpm run audit:profiles` exécute `scripts/audit-profile-check.ts`.
 Il vérifie que les profils `quick`, `strict`, `release`, `json`, `docs` et `architecture` filtrent bien les règles par catégorie.
 
 Ce contrôle est inclus dans `pnpm run ci`.
-
 
 ### Erreurs de profils d'audit
 

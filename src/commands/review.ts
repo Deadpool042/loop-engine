@@ -64,7 +64,6 @@ export function printReviewContext(project: ProjectConfig): void {
   terminal.info("Prefer small, reversible changes.");
 }
 
-
 export function printReviewContextJson(project: ProjectConfig): void {
   const snapshot = buildProjectSnapshot(project);
 
@@ -77,16 +76,14 @@ export function printReviewContextJson(project: ProjectConfig): void {
     : "";
 
   console.log(
-    JSON.stringify(
-      {
-        schemaVersion: 1,
-        project: snapshot.project,
-        git: snapshot.git,
-        gitStatus,
-        diffStat,
-        validation: snapshot.validation,
-        health: snapshot.health,
-      },
-    ),
+    JSON.stringify({
+      schemaVersion: 1,
+      project: snapshot.project,
+      git: snapshot.git,
+      gitStatus,
+      diffStat,
+      validation: snapshot.validation,
+      health: snapshot.health,
+    }),
   );
 }

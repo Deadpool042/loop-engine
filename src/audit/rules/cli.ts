@@ -15,7 +15,8 @@ export const CLI_COMMAND_COVERAGE_RULE: AuditRule = {
     const expectedCommands = PUBLIC_COMMANDS;
 
     const missing = expectedCommands.filter(
-      (command) => !content.includes(`"${command}"`) && !content.includes(`'${command}'`),
+      (command) =>
+        !content.includes(`"${command}"`) && !content.includes(`'${command}'`),
     );
 
     if (missing.length > 0) {

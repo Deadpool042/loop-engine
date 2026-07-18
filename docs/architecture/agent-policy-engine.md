@@ -113,11 +113,11 @@ Codes de statut (`AGENT_POLICY_STATUS_CODES`) : `resolved`, `no_safe_candidate`,
 
 `getAllowedPermissionsForMode(mode)` (`src/policy/defaults.ts`) — chaque mode inclut strictement les permissions du mode précédent, plus exactement une nouvelle :
 
-| Mode      | Permissions                                                    |
-|-----------|------------------------------------------------------------------|
-| `plan`    | `read_only`                                                       |
-| `execute` | `read_only`, `write_worktree`, `shell_exec`                       |
-| `commit`  | `read_only`, `write_worktree`, `shell_exec`, `git_commit`          |
+| Mode      | Permissions                                                           |
+| --------- | --------------------------------------------------------------------- |
+| `plan`    | `read_only`                                                           |
+| `execute` | `read_only`, `write_worktree`, `shell_exec`                           |
+| `commit`  | `read_only`, `write_worktree`, `shell_exec`, `git_commit`             |
 | `publish` | `read_only`, `write_worktree`, `shell_exec`, `git_commit`, `git_push` |
 
 `git_tag` n'apparaît **jamais** dans ce plafond, quel que soit le mode : elle reste une permission séparée du `git_push` (`AGENT_PERMISSIONS` dans `src/agents/types.ts`), jamais implicite. Elle ne peut être envisagée que via `AgentPolicy.allowTagCreation`, en mode `publish`, et ce lot ne l'accorde jamais automatiquement (pas de mode `execute` réel).

@@ -13,10 +13,7 @@ export const executionFixture: ExecutionResult = {
       startedAt: "2026-01-01T10:00:00Z",
       completedAt: "2026-01-01T10:00:10Z",
       success: true,
-      details: [
-        "candidate selected",
-        "roadmap generated",
-      ],
+      details: ["candidate selected", "roadmap generated"],
     },
   ],
 };

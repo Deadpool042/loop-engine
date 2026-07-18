@@ -50,7 +50,9 @@ export function printDoctor(config: Config): void {
     if (project.validation.length === 0) {
       terminal.warning("No validation command configured");
     } else {
-      terminal.success(`${project.validation.length} validation command(s) configured`);
+      terminal.success(
+        `${project.validation.length} validation command(s) configured`,
+      );
     }
   }
 

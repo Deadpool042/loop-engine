@@ -54,10 +54,8 @@ Cette intégration ne fournit pas encore :
 - exécution d'actions ;
 - système d'approbation avancé.
 
-
 ## Checklist
 
 Avant toute intégration réelle avec OpenClaw, utiliser :
 
 - `docs/integrations/openclaw-read-only-checklist.md`
-

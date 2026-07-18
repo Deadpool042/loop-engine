@@ -4,7 +4,8 @@ import { resolve } from "node:path";
 import { type ProjectConfig } from "../core/config.js";
 
 export type RoadmapCandidateKind = "safe" | "warning" | "blocked";
-export type RoadmapCandidateStatus = "todo" | "in_progress" | "done" | "unknown";
+export type RoadmapCandidateStatus =
+  "todo" | "in_progress" | "done" | "unknown";
 export type RoadmapPriority = "p1" | "p2" | "p3" | "default";
 
 export type RoadmapCandidate = Readonly<{
@@ -36,7 +37,6 @@ const CANDIDATE_PATTERNS = [
   "⏳",
 ] as const;
 
-
 const BLOCKED_PATTERNS = [
   "production finale",
   "mise en production",
@@ -55,8 +55,6 @@ const WARNING_PATTERNS = [
   "sécurité",
   "securite",
 ] as const;
-
-
 
 function detectCandidatePriority(line: string): RoadmapPriority {
   const match = line.match(/\[\s*(p[1-3])\s*\]/i);
@@ -78,7 +76,11 @@ function detectCandidateStatus(line: string): RoadmapCandidateStatus {
     return "done";
   }
 
-  if (line.includes("⏳") || line.includes("En cours") || line.includes("en cours")) {
+  if (
+    line.includes("⏳") ||
+    line.includes("En cours") ||
+    line.includes("en cours")
+  ) {
     return "in_progress";
   }
 
@@ -162,7 +164,6 @@ export function findRoadmapCandidates(
 
   return candidates;
 }
-
 
 const PRIORITY_ORDER: readonly RoadmapPriority[] = [
   "p1",

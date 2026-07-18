@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { AGENT_PERMISSIONS, UNBOUNDED_AGENT_BUDGET, type AgentBudget } from "../../src/agents/types.js";
+import {
+  AGENT_PERMISSIONS,
+  UNBOUNDED_AGENT_BUDGET,
+  type AgentBudget,
+} from "../../src/agents/types.js";
 import {
   DEFAULT_MODE_BUDGETS,
   getAllowedPermissionsForMode,
@@ -23,7 +27,9 @@ describe("getAllowedPermissionsForMode", () => {
 
   it("execute never grants git_commit", () => {
     assert.ok(!getAllowedPermissionsForMode("execute").includes("git_commit"));
-    assert.ok(getAllowedPermissionsForMode("execute").includes("write_worktree"));
+    assert.ok(
+      getAllowedPermissionsForMode("execute").includes("write_worktree"),
+    );
   });
 
   it("commit never grants git_push", () => {
@@ -47,7 +53,9 @@ describe("getAllowedPermissionsForMode", () => {
   it("every mode's ceiling only uses declared AgentPermission values", () => {
     for (const mode of AGENT_POLICY_MODES) {
       for (const permission of getAllowedPermissionsForMode(mode)) {
-        assert.ok((AGENT_PERMISSIONS as readonly string[]).includes(permission));
+        assert.ok(
+          (AGENT_PERMISSIONS as readonly string[]).includes(permission),
+        );
       }
     }
   });
@@ -79,12 +87,18 @@ describe("DEFAULT_MODE_BUDGETS", () => {
 
 describe("getForecastSelectionBudgetForMode — a compatibility simulation, never an executable authorization", () => {
   it("simulates mode execute for a plan forecast (never gates the preview on plan's own 0-call budget)", () => {
-    assert.deepEqual(getForecastSelectionBudgetForMode("plan"), DEFAULT_MODE_BUDGETS.execute);
+    assert.deepEqual(
+      getForecastSelectionBudgetForMode("plan"),
+      DEFAULT_MODE_BUDGETS.execute,
+    );
   });
 
   it("matches the mode's own default for execute/commit/publish", () => {
     for (const mode of ["execute", "commit", "publish"] as const) {
-      assert.deepEqual(getForecastSelectionBudgetForMode(mode), DEFAULT_MODE_BUDGETS[mode]);
+      assert.deepEqual(
+        getForecastSelectionBudgetForMode(mode),
+        DEFAULT_MODE_BUDGETS[mode],
+      );
     }
   });
 });
@@ -105,26 +119,53 @@ describe("mergeBudgetsRestrictively", () => {
   });
 
   it("a null (unbounded) global never widens a bounded request beyond the request itself", () => {
-    const merged = mergeBudgetsRestrictively(budget({ maxTokens: null }), budget({ maxTokens: 1_000 }));
+    const merged = mergeBudgetsRestrictively(
+      budget({ maxTokens: null }),
+      budget({ maxTokens: 1_000 }),
+    );
     assert.equal(merged.maxTokens, 1_000);
   });
 
   it("a null (unbounded) requested value defers to the global bound, never becomes unlimited", () => {
-    const merged = mergeBudgetsRestrictively(budget({ maxTokens: 1_000 }), budget({ maxTokens: null }));
+    const merged = mergeBudgetsRestrictively(
+      budget({ maxTokens: 1_000 }),
+      budget({ maxTokens: null }),
+    );
     assert.equal(merged.maxTokens, 1_000);
   });
 
   it("both null stays null (still explicitly unbounded, not accidentally so)", () => {
-    const merged = mergeBudgetsRestrictively(budget({ maxTokens: null }), budget({ maxTokens: null }));
+    const merged = mergeBudgetsRestrictively(
+      budget({ maxTokens: null }),
+      budget({ maxTokens: null }),
+    );
     assert.equal(merged.maxTokens, null);
   });
 
   it("never produces a result looser than either input on any dimension", () => {
-    const global = budget({ maxTokens: 500, maxCostUsd: 2, maxDurationMs: 60_000, maxCalls: 3, maxRepairs: 1 });
-    const requested = budget({ maxTokens: 2_000, maxCostUsd: 1, maxDurationMs: 120_000, maxCalls: 1, maxRepairs: 5 });
+    const global = budget({
+      maxTokens: 500,
+      maxCostUsd: 2,
+      maxDurationMs: 60_000,
+      maxCalls: 3,
+      maxRepairs: 1,
+    });
+    const requested = budget({
+      maxTokens: 2_000,
+      maxCostUsd: 1,
+      maxDurationMs: 120_000,
+      maxCalls: 1,
+      maxRepairs: 5,
+    });
     const merged = mergeBudgetsRestrictively(global, requested);
 
-    for (const dimension of ["maxTokens", "maxCostUsd", "maxDurationMs", "maxCalls", "maxRepairs"] as const) {
+    for (const dimension of [
+      "maxTokens",
+      "maxCostUsd",
+      "maxDurationMs",
+      "maxCalls",
+      "maxRepairs",
+    ] as const) {
       assert.ok(merged[dimension]! <= global[dimension]!);
       assert.ok(merged[dimension]! <= requested[dimension]!);
     }
@@ -150,23 +191,36 @@ describe("toBudget", () => {
 
 describe("mergeAllowedProviders / mergeAllowedRuntimes — restrictive intersection, never widened", () => {
   it("requested providers narrow the global list to their intersection", () => {
-    const result = mergeAllowedProviders(["anthropic", "openai"], ["openai", "google"]);
+    const result = mergeAllowedProviders(
+      ["anthropic", "openai"],
+      ["openai", "google"],
+    );
     assert.deepEqual(result, ["openai"]);
   });
 
   it("a requested provider outside the global allow-list is dropped, never added", () => {
-    const result = mergeAllowedProviders(["anthropic"], ["anthropic", "openai"]);
+    const result = mergeAllowedProviders(
+      ["anthropic"],
+      ["anthropic", "openai"],
+    );
     assert.deepEqual(result, ["anthropic"]);
   });
 
   it("undefined on one side defers entirely to the other side", () => {
-    assert.deepEqual(mergeAllowedProviders(undefined, ["anthropic"]), ["anthropic"]);
-    assert.deepEqual(mergeAllowedProviders(["anthropic"], undefined), ["anthropic"]);
+    assert.deepEqual(mergeAllowedProviders(undefined, ["anthropic"]), [
+      "anthropic",
+    ]);
+    assert.deepEqual(mergeAllowedProviders(["anthropic"], undefined), [
+      "anthropic",
+    ]);
     assert.equal(mergeAllowedProviders(undefined, undefined), undefined);
   });
 
   it("runtimes follow the same restrictive-intersection rule", () => {
-    const result = mergeAllowedRuntimes(["claude_code", "codex"], ["codex", "gemini_cli"]);
+    const result = mergeAllowedRuntimes(
+      ["claude_code", "codex"],
+      ["codex", "gemini_cli"],
+    );
     assert.deepEqual(result, ["codex"]);
   });
 });
@@ -197,8 +251,18 @@ describe("context budget by effort", () => {
 
   it("mergeContextBudgetsRestrictively takes the minimum on every numeric dimension", () => {
     const merged = mergeContextBudgetsRestrictively(
-      { maxFiles: 10, maxCharacters: 1_000, maxEstimatedTokens: 500, includeFullFiles: true },
-      { maxFiles: 2, maxCharacters: 5_000, maxEstimatedTokens: 100, includeFullFiles: false },
+      {
+        maxFiles: 10,
+        maxCharacters: 1_000,
+        maxEstimatedTokens: 500,
+        includeFullFiles: true,
+      },
+      {
+        maxFiles: 2,
+        maxCharacters: 5_000,
+        maxEstimatedTokens: 100,
+        includeFullFiles: false,
+      },
     );
 
     assert.equal(merged.maxFiles, 2);

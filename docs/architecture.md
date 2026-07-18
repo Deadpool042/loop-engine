@@ -14,6 +14,7 @@ Loop Engine est un orchestrateur local, sobre et déterministe.
 ## Responsabilités
 
 Loop Engine peut :
+
 - scanner les projets configurés ;
 - détecter l'état Git ;
 - vérifier la présence des documents importants ;
@@ -21,6 +22,7 @@ Loop Engine peut :
 - préparer un contexte court pour un modèle IA.
 
 Loop Engine ne doit pas :
+
 - modifier Creatyss, lp-infra ou n8n sans commande explicite ;
 - lancer des agents en boucle ;
 - consommer des tokens en continu ;

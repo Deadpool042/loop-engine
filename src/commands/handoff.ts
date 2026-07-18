@@ -42,10 +42,13 @@ export function printProjectHandoff(project: ProjectConfig): void {
   }
 
   terminal.section("Instructions");
-  terminal.info("Use this handoff as context for a human-supervised assistant session.");
-  terminal.info("Do not start implementation without explicit human confirmation.");
+  terminal.info(
+    "Use this handoff as context for a human-supervised assistant session.",
+  );
+  terminal.info(
+    "Do not start implementation without explicit human confirmation.",
+  );
 }
-
 
 export function printProjectHandoffJson(project: ProjectConfig): void {
   const snapshot = buildProjectSnapshot(project);

@@ -30,11 +30,10 @@ describe("executionResultFromLoopRun", () => {
           details: ["detail"],
         },
       ],
-      schemaVersion: 1
+      schemaVersion: 1,
     } satisfies LoopRunResult;
 
     const execution = executionResultFromLoopRun(input);
-
 
     assert.equal(execution.sessionId, "run-1");
     assert.equal(execution.status, "completed");

@@ -7,7 +7,11 @@ import type { AgentProfile } from "../../src/agents/types.js";
 import { DEFAULT_AGENT_POLICY } from "../../src/policy/defaults.js";
 import { resolvePolicy } from "../../src/policy/resolver.js";
 
-const POLICY_FILES = ["src/policy/types.ts", "src/policy/defaults.ts", "src/policy/resolver.ts"];
+const POLICY_FILES = [
+  "src/policy/types.ts",
+  "src/policy/defaults.ts",
+  "src/policy/resolver.ts",
+];
 
 describe("invariant: src/policy/ never depends on src/loop/, src/commands/, or src/cli.ts", () => {
   for (const file of POLICY_FILES) {
@@ -20,7 +24,12 @@ describe("invariant: src/policy/ never depends on src/loop/, src/commands/, or s
 });
 
 describe("invariant: src/agents/ never depends on src/policy/ (dependency direction stays policy -> agents)", () => {
-  const agentFiles = ["src/agents/types.ts", "src/agents/registry.ts", "src/agents/selector.ts", "src/agents/escalation.ts"];
+  const agentFiles = [
+    "src/agents/types.ts",
+    "src/agents/registry.ts",
+    "src/agents/selector.ts",
+    "src/agents/escalation.ts",
+  ];
 
   for (const file of agentFiles) {
     it(`${file} does not import policy/`, () => {
@@ -78,7 +87,13 @@ describe("invariant: resolvePolicy never invokes a real agent — it only ever r
       effort: "low",
       capabilities: ["code_edit"],
       permissions: ["read_only", "write_worktree", "shell_exec"],
-      budget: { maxTokens: null, maxCostUsd: null, maxDurationMs: null, maxCalls: 1, maxRepairs: 1 },
+      budget: {
+        maxTokens: null,
+        maxCostUsd: null,
+        maxDurationMs: null,
+        maxCalls: 1,
+        maxRepairs: 1,
+      },
     };
     const registry = createAgentRegistry([profile]);
     const before = JSON.stringify(registry);
@@ -121,7 +136,13 @@ describe("invariant: the plan-mode forecast budget never authorizes a real call"
         effort: "medium",
         capabilities: ["code_edit", "shell_exec", "test_execution"],
         permissions: ["read_only", "write_worktree", "shell_exec"],
-        budget: { maxTokens: null, maxCostUsd: null, maxDurationMs: null, maxCalls: 1, maxRepairs: 1 },
+        budget: {
+          maxTokens: null,
+          maxCostUsd: null,
+          maxDurationMs: null,
+          maxCalls: 1,
+          maxRepairs: 1,
+        },
       },
     ]);
 

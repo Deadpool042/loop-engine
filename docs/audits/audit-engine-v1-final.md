@@ -65,15 +65,15 @@ ROI : ⭐⭐⭐⭐☆
 
 # État des domaines
 
-| Domaine | État |
-|----------|------|
-| Architecture | 🟢 |
-| Snapshot | 🟢 |
-| CLI | 🟢 |
-| JSON | 🟢 |
-| Documentation | 🟢 |
-| Tests | 🟡 |
-| Audit | 🟡 |
+| Domaine       | État |
+| ------------- | ---- |
+| Architecture  | 🟢   |
+| Snapshot      | 🟢   |
+| CLI           | 🟢   |
+| JSON          | 🟢   |
+| Documentation | 🟢   |
+| Tests         | 🟡   |
+| Audit         | 🟡   |
 
 ---
 
@@ -389,4 +389,3 @@ La synchronisation legacy/canonique est garantie par `json-check`.
 La non-régression est couverte par un test dédié.
 
 Cette formalisation explicite du cycle de dépréciation est portée par `DOCS-013`.
-

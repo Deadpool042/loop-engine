@@ -26,7 +26,13 @@ function fixtureSnapshot(
 ): ProjectSnapshot {
   return {
     project: { name: "fixture-project", type: "test", path: projectPath },
-    git: { branch: "main", clean: true, requiresGit: true, statusText: "", lastCommit: null },
+    git: {
+      branch: "main",
+      clean: true,
+      requiresGit: true,
+      statusText: "",
+      lastCommit: null,
+    },
     docs: { required: requiredDocs, missing: [] },
     validation: { commands: [], configured: false },
     roadmap: {
@@ -34,7 +40,16 @@ function fixtureSnapshot(
       paths: roadmapPaths,
       candidates: [],
       selectedCandidate: null,
-      stats: { total: 0, todo: 0, inProgress: 0, done: 0, unknown: 0, safe: 0, warning: 0, blocked: 0 },
+      stats: {
+        total: 0,
+        todo: 0,
+        inProgress: 0,
+        done: 0,
+        unknown: 0,
+        safe: 0,
+        warning: 0,
+        blocked: 0,
+      },
       summary: { active: 0, done: 0, selectable: 0, hasBlocked: false },
     },
     health: "good",
@@ -66,7 +81,11 @@ describe("buildMinimalContext", () => {
     writeFileSync(join(projectDir, "r1.md"), "R1");
     writeFileSync(join(projectDir, "r2.md"), "R2");
 
-    const snapshot = fixtureSnapshot(projectDir, ["b.md", "a.md"], ["r2.md", "r1.md"]);
+    const snapshot = fixtureSnapshot(
+      projectDir,
+      ["b.md", "a.md"],
+      ["r2.md", "r1.md"],
+    );
     const pkg = buildMinimalContext(snapshot, fixtureBudget());
 
     assert.deepEqual(
@@ -78,10 +97,17 @@ describe("buildMinimalContext", () => {
   it("deduplicates by normalized path, keeping the first occurrence and omitting the rest", () => {
     writeFileSync(join(projectDir, "shared.md"), "shared content");
 
-    const snapshot = fixtureSnapshot(projectDir, ["shared.md", "./shared.md"], ["sub/../shared.md"]);
+    const snapshot = fixtureSnapshot(
+      projectDir,
+      ["shared.md", "./shared.md"],
+      ["sub/../shared.md"],
+    );
     const pkg = buildMinimalContext(snapshot, fixtureBudget());
 
-    assert.deepEqual(pkg.files.map((file) => file.path), ["shared.md"]);
+    assert.deepEqual(
+      pkg.files.map((file) => file.path),
+      ["shared.md"],
+    );
     assert.deepEqual(
       pkg.omitted.map((omission) => omission.reason),
       ["duplicate", "duplicate"],
@@ -89,7 +115,11 @@ describe("buildMinimalContext", () => {
   });
 
   it("omits paths that resolve outside the project as outside_project", () => {
-    const snapshot = fixtureSnapshot(projectDir, ["../outside.md", "/etc/passwd"], []);
+    const snapshot = fixtureSnapshot(
+      projectDir,
+      ["../outside.md", "/etc/passwd"],
+      [],
+    );
     const pkg = buildMinimalContext(snapshot, fixtureBudget());
 
     assert.deepEqual(pkg.files, []);
@@ -104,7 +134,9 @@ describe("buildMinimalContext", () => {
     const pkg = buildMinimalContext(snapshot, fixtureBudget());
 
     assert.deepEqual(pkg.files, []);
-    assert.deepEqual(pkg.omitted, [{ path: "does-not-exist.md", reason: "missing" }]);
+    assert.deepEqual(pkg.omitted, [
+      { path: "does-not-exist.md", reason: "missing" },
+    ]);
   });
 
   it("enforces maxFiles: excess files are omitted as file_limit", () => {
@@ -115,7 +147,10 @@ describe("buildMinimalContext", () => {
     const snapshot = fixtureSnapshot(projectDir, ["a.md", "b.md", "c.md"], []);
     const pkg = buildMinimalContext(snapshot, fixtureBudget({ maxFiles: 2 }));
 
-    assert.deepEqual(pkg.files.map((file) => file.path), ["a.md", "b.md"]);
+    assert.deepEqual(
+      pkg.files.map((file) => file.path),
+      ["a.md", "b.md"],
+    );
     assert.deepEqual(pkg.omitted, [{ path: "c.md", reason: "file_limit" }]);
     assert.ok(pkg.files.length <= 2);
   });
@@ -126,7 +161,11 @@ describe("buildMinimalContext", () => {
     const snapshot = fixtureSnapshot(projectDir, ["a.md"], []);
     const pkg = buildMinimalContext(
       snapshot,
-      fixtureBudget({ maxCharacters: 40, maxEstimatedTokens: 10_000, includeFullFiles: false }),
+      fixtureBudget({
+        maxCharacters: 40,
+        maxEstimatedTokens: 10_000,
+        includeFullFiles: false,
+      }),
     );
 
     assert.equal(pkg.files.length, 1);
@@ -145,7 +184,11 @@ describe("buildMinimalContext", () => {
     const snapshot = fixtureSnapshot(projectDir, ["a.md"], []);
     const pkg = buildMinimalContext(
       snapshot,
-      fixtureBudget({ maxCharacters: 10_000, maxEstimatedTokens: 5, includeFullFiles: false }),
+      fixtureBudget({
+        maxCharacters: 10_000,
+        maxEstimatedTokens: 5,
+        includeFullFiles: false,
+      }),
     );
 
     assert.equal(pkg.files.length, 1);
@@ -163,7 +206,11 @@ describe("buildMinimalContext", () => {
     const snapshot = fixtureSnapshot(projectDir, ["a.md", "b.md", "c.md"], []);
     const pkg = buildMinimalContext(
       snapshot,
-      fixtureBudget({ maxCharacters: 50, maxEstimatedTokens: 12, includeFullFiles: false }),
+      fixtureBudget({
+        maxCharacters: 50,
+        maxEstimatedTokens: 12,
+        includeFullFiles: false,
+      }),
     );
 
     assert.ok(pkg.totalCharacters <= 50);
@@ -178,14 +225,20 @@ describe("buildMinimalContext", () => {
     const snapshot = fixtureSnapshot(projectDir, ["a.md", "b.md"], []);
     const pkg = buildMinimalContext(
       snapshot,
-      fixtureBudget({ maxCharacters: 40, maxEstimatedTokens: 10_000, includeFullFiles: true }),
+      fixtureBudget({
+        maxCharacters: 40,
+        maxEstimatedTokens: 10_000,
+        includeFullFiles: true,
+      }),
     );
 
     assert.equal(pkg.files.length, 1);
     assert.equal(pkg.files[0].path, "a.md");
     assert.equal(pkg.files[0].includedCharacters, 30);
     assert.equal(pkg.files[0].truncated, false);
-    assert.deepEqual(pkg.omitted, [{ path: "b.md", reason: "character_limit" }]);
+    assert.deepEqual(pkg.omitted, [
+      { path: "b.md", reason: "character_limit" },
+    ]);
     assert.ok(pkg.totalCharacters <= 40);
   });
 
@@ -194,7 +247,10 @@ describe("buildMinimalContext", () => {
     writeFileSync(join(projectDir, "b.md"), "y".repeat(10));
 
     const snapshot = fixtureSnapshot(projectDir, ["a.md", "b.md"], []);
-    const pkg = buildMinimalContext(snapshot, fixtureBudget({ includeFullFiles: true }));
+    const pkg = buildMinimalContext(
+      snapshot,
+      fixtureBudget({ includeFullFiles: true }),
+    );
 
     assert.equal(pkg.files.length, 2);
     assert.ok(pkg.files.every((file) => file.truncated === false));

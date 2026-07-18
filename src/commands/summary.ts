@@ -26,8 +26,7 @@ export function printWorkspaceSummary(config: Config): void {
           ? "⚠"
           : "✖";
 
-    const roadmapIndicator =
-      snapshot.roadmap.summary.hasBlocked ? "🔴" : "🟢";
+    const roadmapIndicator = snapshot.roadmap.summary.hasBlocked ? "🔴" : "🟢";
 
     const roadmapState =
       `${roadmapIndicator} roadmap A:${snapshot.roadmap.summary.active}` +

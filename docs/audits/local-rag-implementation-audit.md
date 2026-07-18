@@ -75,4 +75,3 @@ Premier lot Code recommandé :
 - lire les sources autorisées ;
 - produire un fichier local reconstructible ;
 - ne pas ajouter de recherche dans le même lot.
-

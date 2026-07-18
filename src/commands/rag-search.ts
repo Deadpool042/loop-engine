@@ -28,7 +28,6 @@ function countOccurrences(content: string, query: string): number {
   return normalizedContent.split(normalizedQuery).length - 1;
 }
 
-
 function buildSnippet(content: string, query: string): string {
   const normalizedContent = content.toLowerCase();
   const normalizedQuery = query.toLowerCase();
@@ -52,7 +51,14 @@ export function runRagSearch(
 ): void {
   if (!query || query.trim().length === 0) {
     if (options?.json) {
-      console.log(JSON.stringify({ schemaVersion: 1, query: query ?? "", results: [], error: "missing_query" }));
+      console.log(
+        JSON.stringify({
+          schemaVersion: 1,
+          query: query ?? "",
+          results: [],
+          error: "missing_query",
+        }),
+      );
     } else {
       console.error("Usage: pnpm exec tsx src/cli.ts rag-search <query>");
     }
@@ -62,7 +68,14 @@ export function runRagSearch(
 
   if (!existsSync(INDEX_PATH)) {
     if (options?.json) {
-      console.log(JSON.stringify({ schemaVersion: 1, query, results: [], error: "missing_index" }));
+      console.log(
+        JSON.stringify({
+          schemaVersion: 1,
+          query,
+          results: [],
+          error: "missing_index",
+        }),
+      );
     } else {
       console.error(`Missing ${INDEX_PATH}. Run pnpm run rag-index first.`);
     }

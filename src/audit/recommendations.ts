@@ -1,6 +1,13 @@
-import type { AuditFinding, AuditPriority, AuditRecommendation } from "./types.js";
+import type {
+  AuditFinding,
+  AuditPriority,
+  AuditRecommendation,
+} from "./types.js";
 
-export const AUDIT_RECOMMENDATION_PRIORITY_ORDER: Record<AuditPriority, number> = {
+export const AUDIT_RECOMMENDATION_PRIORITY_ORDER: Record<
+  AuditPriority,
+  number
+> = {
   high: 0,
   medium: 1,
   low: 2,
@@ -31,7 +38,8 @@ export function countAuditRecommendationsByPriority(
 ): Partial<Record<AuditPriority, number>> {
   return recommendations.reduce<Partial<Record<AuditPriority, number>>>(
     (counts, recommendation) => {
-      counts[recommendation.priority] = (counts[recommendation.priority] ?? 0) + 1;
+      counts[recommendation.priority] =
+        (counts[recommendation.priority] ?? 0) + 1;
       return counts;
     },
     {},

@@ -1,11 +1,17 @@
 import type { ProjectSnapshot } from "../intelligence/snapshot.js";
 import type { ContextSource } from "./types.js";
 
-export function collectContextSources(snapshot: ProjectSnapshot): readonly ContextSource[] {
+export function collectContextSources(
+  snapshot: ProjectSnapshot,
+): readonly ContextSource[] {
   const sources: ContextSource[] = [];
   const seen = new Set<string>();
 
-  const addSource = (path: string, kind: ContextSource["kind"], priority: number): void => {
+  const addSource = (
+    path: string,
+    kind: ContextSource["kind"],
+    priority: number,
+  ): void => {
     if (seen.has(path)) {
       return;
     }
@@ -22,5 +28,8 @@ export function collectContextSources(snapshot: ProjectSnapshot): readonly Conte
     addSource(path, "roadmap", snapshot.docs.required.length + index);
   });
 
-  return sources.sort((left, right) => left.priority - right.priority || left.path.localeCompare(right.path));
+  return sources.sort(
+    (left, right) =>
+      left.priority - right.priority || left.path.localeCompare(right.path),
+  );
 }

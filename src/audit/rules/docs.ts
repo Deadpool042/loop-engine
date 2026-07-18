@@ -7,7 +7,8 @@ export const AUDIT_DOCUMENTATION_COVERAGE_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Audit engine documentation covers human and JSON reports",
-  description: "The audit documentation should describe both human-readable and JSON report outputs.",
+  description:
+    "The audit documentation should describe both human-readable and JSON report outputs.",
   check: () => {
     const docsPath = "docs/audits/audit-engine-v1-final.md";
 
@@ -22,12 +23,7 @@ export const AUDIT_DOCUMENTATION_COVERAGE_RULE: AuditRule = {
 
     const content = readFileSync(docsPath, "utf8").toLowerCase();
 
-    const expectedTerms = [
-      "audit",
-      "--json",
-      "rapport humain",
-      "rapport json",
-    ];
+    const expectedTerms = ["audit", "--json", "rapport humain", "rapport json"];
 
     const missing = expectedTerms.filter(
       (term) => !content.includes(term.toLowerCase()),
@@ -106,7 +102,8 @@ export const README_SEE_ALSO_UNIQUE_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "README see also links are unique",
-  description: "The README should not list duplicate documentation links in the See also section.",
+  description:
+    "The README should not list duplicate documentation links in the See also section.",
   check: () => {
     const readmePath = "README.md";
 
@@ -170,7 +167,8 @@ export const AUDIT_FINAL_REPORT_README_CHECKS_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Final audit report documents README checks",
-  description: "The final audit report should mention the README audit rules and current rule count.",
+  description:
+    "The final audit report should mention the README audit rules and current rule count.",
   check: () => {
     const reportPath = "docs/audits/audit-engine-v1-final.md";
 
@@ -249,7 +247,8 @@ export const AUDIT_FINAL_REPORT_REGISTRY_CHECKS_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Final audit report documents registry checks",
-  description: "The final audit report should document audit registry integrity checks.",
+  description:
+    "The final audit report should document audit registry integrity checks.",
   check: () => {
     const reportPath = "docs/audits/audit-engine-v1-final.md";
 
@@ -295,7 +294,8 @@ export const README_AUDIT_PROFILE_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "README documents audit profiles",
-  description: "The README should document the public audit --profile option and available profile names.",
+  description:
+    "The README should document the public audit --profile option and available profile names.",
   check: () => {
     const readmePath = "README.md";
 
@@ -348,7 +348,8 @@ export const ARCHITECTURE_AUDIT_PROFILE_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Architecture docs document audit profiles",
-  description: "The architecture audit documentation should document audit profiles and their public usage.",
+  description:
+    "The architecture audit documentation should document audit profiles and their public usage.",
   check: () => {
     const architecturePath = "docs/architecture/audit-engine.md";
 
@@ -402,7 +403,8 @@ export const AUDIT_PROFILE_CI_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Docs document audit profile CI checks",
-  description: "The README and architecture docs should document the audit profile CI check script.",
+  description:
+    "The README and architecture docs should document the audit profile CI check script.",
   check: () => {
     const readmePath = "README.md";
     const architecturePath = "docs/architecture/audit-engine.md";
@@ -451,7 +453,8 @@ export const AUDIT_PROFILE_ERROR_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Docs document audit profile errors",
-  description: "The README and architecture docs should document public audit profile error cases.",
+  description:
+    "The README and architecture docs should document public audit profile error cases.",
   check: () => {
     const readmePath = "README.md";
     const architecturePath = "docs/architecture/audit-engine.md";
@@ -502,7 +505,8 @@ export const AUDIT_PROFILE_CHECK_STRUCTURE_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Architecture docs document audit profile check structure",
-  description: "The architecture docs should document the internal structure of the audit profile check script.",
+  description:
+    "The architecture docs should document the internal structure of the audit profile check script.",
   check: () => {
     const architecturePath = "docs/architecture/audit-engine.md";
 
@@ -529,7 +533,9 @@ export const AUDIT_PROFILE_CHECK_STRUCTURE_DOCUMENTATION_RULE: AuditRule = {
       "sans dupliquer la logique d'exécution",
     ];
 
-    const missing = expectedTokens.filter((token) => !architectureContent.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !architectureContent.includes(token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -553,7 +559,8 @@ export const AUDIT_ENGINE_V4_FINAL_REPORT_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Audit Engine V4 final report is documented",
-  description: "The repository should document the final Audit Engine V4 report and link it from the README.",
+  description:
+    "The repository should document the final Audit Engine V4 report and link it from the README.",
   check: () => {
     const reportPath = "docs/audits/audit-engine-v4-final.md";
     const readmePath = "README.md";
@@ -609,7 +616,8 @@ export const README_RECOMMENDATION_SUMMARY_CONTRACT_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "README documents recommendation summary contract",
-  description: "The README should document the stable recommendation summary contract and the legacy deprecation path.",
+  description:
+    "The README should document the stable recommendation summary contract and the legacy deprecation path.",
   check: () => {
     const readmePath = "README.md";
 
@@ -658,8 +666,10 @@ export const AUDIT_FINAL_REPORT_RECOMMENDATION_DEPRECATION_RULE: AuditRule = {
   id: "DOCS-013",
   category: "docs",
   severity: "warning",
-  title: "Final audit report documents recommendation summary deprecation cycle",
-  description: "The final audit report should formalize the canonical recommendation summary field, the legacy field, compatibility, breaking change handling, json-check synchronization, and regression test coverage.",
+  title:
+    "Final audit report documents recommendation summary deprecation cycle",
+  description:
+    "The final audit report should formalize the canonical recommendation summary field, the legacy field, compatibility, breaking change handling, json-check synchronization, and regression test coverage.",
   check: () => {
     const reportPath = "docs/audits/audit-engine-v1-final.md";
 
@@ -710,7 +720,8 @@ export const AUDIT_ENGINE_V5_FINAL_REPORT_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Audit Engine V5 final report is documented",
-  description: "The repository should document the dedicated Audit Engine V5 final report and link it from the audits README.",
+  description:
+    "The repository should document the dedicated Audit Engine V5 final report and link it from the audits README.",
   check: () => {
     const reportPath = "docs/audits/audit-engine-v5-final.md";
     const readmePath = "docs/audits/README.md";
@@ -778,7 +789,8 @@ export const AUDIT_ENGINE_V5_FINAL_STABLE_TAG_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Audit Engine V5 final stable tag is documented",
-  description: "The final Audit Engine V5 report should document that audit-engine-v5.14.1 is the final stable tag, that audit-engine-v5.14 is superseded, and that no history rewrite or force-push is required.",
+  description:
+    "The final Audit Engine V5 report should document that audit-engine-v5.14.1 is the final stable tag, that audit-engine-v5.14 is superseded, and that no history rewrite or force-push is required.",
   check: () => {
     const reportPath = "docs/audits/audit-engine-v5-final.md";
     const readmePath = "docs/audits/README.md";
@@ -835,13 +847,18 @@ export const AUDIT_STABLE_TAGS_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Stable audit tags are documented and consistent",
-  description: "The repository should expose a simple source of truth for the stable audit tags, and the audits documentation should reference it consistently.",
+  description:
+    "The repository should expose a simple source of truth for the stable audit tags, and the audits documentation should reference it consistently.",
   check: () => {
     const stableTagsPath = "docs/audits/stable-tags.md";
     const readmePath = "docs/audits/README.md";
     const v5ReportPath = "docs/audits/audit-engine-v5-final.md";
 
-    if (!existsSync(stableTagsPath) || !existsSync(readmePath) || !existsSync(v5ReportPath)) {
+    if (
+      !existsSync(stableTagsPath) ||
+      !existsSync(readmePath) ||
+      !existsSync(v5ReportPath)
+    ) {
       return fail(
         AUDIT_STABLE_TAGS_DOCUMENTATION_RULE,
         "Stable tags documentation files are missing.",
@@ -900,13 +917,18 @@ export const AUDIT_RELEASE_CHECKLIST_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Audit tag release checklist is documented",
-  description: "The repository should document a reusable release checklist that forces an explicit worktree verification before audit tags are published.",
+  description:
+    "The repository should document a reusable release checklist that forces an explicit worktree verification before audit tags are published.",
   check: () => {
     const checklistPath = "docs/audits/release-checklist.md";
     const stableTagsPath = "docs/audits/stable-tags.md";
     const readmePath = "docs/audits/README.md";
 
-    if (!existsSync(checklistPath) || !existsSync(stableTagsPath) || !existsSync(readmePath)) {
+    if (
+      !existsSync(checklistPath) ||
+      !existsSync(stableTagsPath) ||
+      !existsSync(readmePath)
+    ) {
       return fail(
         AUDIT_RELEASE_CHECKLIST_DOCUMENTATION_RULE,
         "Audit release checklist or related documentation is missing.",
@@ -958,8 +980,10 @@ export const AUDIT_FINAL_OBJECTIVE_ALIGNMENT_RULE: AuditRule = {
   id: "DOCS-018",
   category: "docs",
   severity: "warning",
-  title: "Final objective is documented and referenced as the product source of truth",
-  description: "docs/architecture/final-objective.md should hold every structuring term, and CLAUDE.md and README.md should each reference it as the product source of truth.",
+  title:
+    "Final objective is documented and referenced as the product source of truth",
+  description:
+    "docs/architecture/final-objective.md should hold every structuring term, and CLAUDE.md and README.md should each reference it as the product source of truth.",
   check: () => {
     const finalObjectivePath = "docs/architecture/final-objective.md";
     const claudePath = "CLAUDE.md";
@@ -997,7 +1021,11 @@ export const AUDIT_FINAL_OBJECTIVE_ALIGNMENT_RULE: AuditRule = {
       .filter((term) => !finalObjectiveContent.includes(term))
       .map((term) => `${finalObjectivePath}: missing "${term}"`);
 
-    const referenceMarkers = [finalObjectivePath, "source de vérité", "objectif final"];
+    const referenceMarkers = [
+      finalObjectivePath,
+      "source de vérité",
+      "objectif final",
+    ];
 
     const missingClaudeMarkers = referenceMarkers
       .filter((marker) => !claudeContent.includes(marker))
@@ -1018,14 +1046,19 @@ export const AUDIT_FINAL_OBJECTIVE_ALIGNMENT_RULE: AuditRule = {
         AUDIT_FINAL_OBJECTIVE_ALIGNMENT_RULE,
         "Final objective alignment is incomplete.",
         missing,
-        "Keep docs/architecture/final-objective.md holding every structuring term, and reference it with \"source de vérité\" and \"objectif final\" from both CLAUDE.md and README.md.",
+        'Keep docs/architecture/final-objective.md holding every structuring term, and reference it with "source de vérité" and "objectif final" from both CLAUDE.md and README.md.',
       );
     }
 
     return pass(
       AUDIT_FINAL_OBJECTIVE_ALIGNMENT_RULE,
       "Final objective is documented and consistently referenced as the product source of truth.",
-      [...finalObjectiveTerms, ...referenceMarkers.map((marker) => `${claudePath}/${readmePath}: ${marker}`)],
+      [
+        ...finalObjectiveTerms,
+        ...referenceMarkers.map(
+          (marker) => `${claudePath}/${readmePath}: ${marker}`,
+        ),
+      ],
     );
   },
 };
@@ -1035,7 +1068,8 @@ export const CLAUDE_MD_CURRENT_STATE_ALIGNMENT_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "CLAUDE.md reflects the current state of Loop Engine",
-  description: "CLAUDE.md should document the final objective reference, the full CI validation chain, and the current CLI surface (audit, handoff, RAG, json-check) rather than stale V0/V1 wording.",
+  description:
+    "CLAUDE.md should document the final objective reference, the full CI validation chain, and the current CLI surface (audit, handoff, RAG, json-check) rather than stale V0/V1 wording.",
   check: () => {
     const claudePath = "CLAUDE.md";
 
@@ -1073,7 +1107,7 @@ export const CLAUDE_MD_CURRENT_STATE_ALIGNMENT_RULE: AuditRule = {
         CLAUDE_MD_CURRENT_STATE_ALIGNMENT_RULE,
         "CLAUDE.md does not reflect the current state of Loop Engine.",
         missing,
-        "Update CLAUDE.md to reference docs/architecture/final-objective.md, document pnpm run ci as the reference validation, list the audit/handoff/rag-index/rag-search/json-check commands, and replace V0/V1 wording with \"No automatic AI calls by default\".",
+        'Update CLAUDE.md to reference docs/architecture/final-objective.md, document pnpm run ci as the reference validation, list the audit/handoff/rag-index/rag-search/json-check commands, and replace V0/V1 wording with "No automatic AI calls by default".',
       );
     }
 
@@ -1090,7 +1124,8 @@ export const AUDIT_ENGINE_V6_FINAL_REPORT_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Audit Engine V6 final report is documented",
-  description: "The repository should document the dedicated Audit Engine V6 final report, its final stable tag, and list it from the audits README.",
+  description:
+    "The repository should document the dedicated Audit Engine V6 final report, its final stable tag, and list it from the audits README.",
   check: () => {
     const reportPath = "docs/audits/audit-engine-v6-final.md";
     const readmePath = "docs/audits/README.md";
@@ -1152,7 +1187,8 @@ export const AUTONOMOUS_LOOP_RUNNER_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Autonomous Loop Runner architecture is documented",
-  description: "The repository should document the LoopRunner architecture, its LoopRunResult contract, its execution modes, its cycle states, and its future CLI options, and reference it from CLAUDE.md and README.md.",
+  description:
+    "The repository should document the LoopRunner architecture, its LoopRunResult contract, its execution modes, its cycle states, and its future CLI options, and reference it from CLAUDE.md and README.md.",
   check: () => {
     const runnerDocPath = "docs/architecture/autonomous-loop-runner.md";
     const claudePath = "CLAUDE.md";
@@ -1243,7 +1279,8 @@ export const LOOP_RUNNER_PLAN_MODE_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "LoopRunner plan mode (V7.2) is documented",
-  description: "The repository should document that only the LoopRunner plan mode is implemented, that no agent is called, and that no modification, commit, or push happens, referencing this from CLAUDE.md and README.md.",
+  description:
+    "The repository should document that only the LoopRunner plan mode is implemented, that no agent is called, and that no modification, commit, or push happens, referencing this from CLAUDE.md and README.md.",
   check: () => {
     const runnerDocPath = "docs/architecture/autonomous-loop-runner.md";
     const claudePath = "CLAUDE.md";
@@ -1298,13 +1335,16 @@ export const AGENT_POLICY_ENGINE_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Agent Policy Engine (V7.4) and the n8n boundary are documented",
-  description: "The repository should document the Agent Policy Engine, its forecast-only integration with the LoopRunner's plan mode, and the restrictive-merge boundary applied to n8n requests, referencing it from CLAUDE.md and README.md.",
+  description:
+    "The repository should document the Agent Policy Engine, its forecast-only integration with the LoopRunner's plan mode, and the restrictive-merge boundary applied to n8n requests, referencing it from CLAUDE.md and README.md.",
   check: () => {
     const policyDocPath = "docs/architecture/agent-policy-engine.md";
     const claudePath = "CLAUDE.md";
     const readmePath = "README.md";
 
-    const missingFiles = [policyDocPath, claudePath, readmePath].filter((file) => !existsSync(file));
+    const missingFiles = [policyDocPath, claudePath, readmePath].filter(
+      (file) => !existsSync(file),
+    );
 
     if (missingFiles.length > 0) {
       return fail(
@@ -1341,7 +1381,11 @@ export const AGENT_POLICY_ENGINE_DOCUMENTATION_RULE: AuditRule = {
       ? []
       : [`${readmePath}: missing "${policyDocPath}"`];
 
-    const missing = [...missingPolicyDocTerms, ...missingClaudeReference, ...missingReadmeReference];
+    const missing = [
+      ...missingPolicyDocTerms,
+      ...missingClaudeReference,
+      ...missingReadmeReference,
+    ];
 
     if (missing.length > 0) {
       return fail(
@@ -1365,13 +1409,16 @@ export const MINIMAL_CONTEXT_BUILDER_DOCUMENTATION_RULE: AuditRule = {
   category: "docs",
   severity: "warning",
   title: "Minimal Context Builder (V7.5) is documented",
-  description: "The repository should document the Minimal Context Builder, its bounded/deterministic guarantees, and its additive integration with the LoopRunner's plan mode, referencing it from CLAUDE.md and README.md.",
+  description:
+    "The repository should document the Minimal Context Builder, its bounded/deterministic guarantees, and its additive integration with the LoopRunner's plan mode, referencing it from CLAUDE.md and README.md.",
   check: () => {
     const builderDocPath = "docs/architecture/minimal-context-builder.md";
     const claudePath = "CLAUDE.md";
     const readmePath = "README.md";
 
-    const missingFiles = [builderDocPath, claudePath, readmePath].filter((file) => !existsSync(file));
+    const missingFiles = [builderDocPath, claudePath, readmePath].filter(
+      (file) => !existsSync(file),
+    );
 
     if (missingFiles.length > 0) {
       return fail(
@@ -1407,7 +1454,11 @@ export const MINIMAL_CONTEXT_BUILDER_DOCUMENTATION_RULE: AuditRule = {
       ? []
       : [`${readmePath}: missing "${builderDocPath}"`];
 
-    const missing = [...missingBuilderDocTerms, ...missingClaudeReference, ...missingReadmeReference];
+    const missing = [
+      ...missingBuilderDocTerms,
+      ...missingClaudeReference,
+      ...missingReadmeReference,
+    ];
 
     if (missing.length > 0) {
       return fail(
@@ -1425,4 +1476,3 @@ export const MINIMAL_CONTEXT_BUILDER_DOCUMENTATION_RULE: AuditRule = {
     );
   },
 };
-

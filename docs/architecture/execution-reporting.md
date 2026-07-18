@@ -79,3 +79,4 @@ Les fichiers de référence sont stockés dans :
 ```text
 tests/fixtures/reports/report.json
 tests/fixtures/reports/report.md
+```

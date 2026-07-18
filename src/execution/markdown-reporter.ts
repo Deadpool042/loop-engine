@@ -1,12 +1,7 @@
 import { createExecutionSummary } from "./summary.js";
-import type {
-  ExecutionResult,
-  ExecutionStepResult,
-} from "./types.js";
+import type { ExecutionResult, ExecutionStepResult } from "./types.js";
 
-function renderMarkdownStep(
-  step: ExecutionStepResult,
-): readonly string[] {
+function renderMarkdownStep(step: ExecutionStepResult): readonly string[] {
   return [
     `### ${step.name}`,
     "",
@@ -17,9 +12,7 @@ function renderMarkdownStep(
   ];
 }
 
-export function renderExecutionMarkdown(
-  result: ExecutionResult,
-): string {
+export function renderExecutionMarkdown(result: ExecutionResult): string {
   const summary = createExecutionSummary(result);
 
   const lines = [
@@ -41,5 +34,5 @@ export function renderExecutionMarkdown(
     }
   }
 
-  return lines.join("\n");
+  return `${lines.join("\n")}\n`;
 }

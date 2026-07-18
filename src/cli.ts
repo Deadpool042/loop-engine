@@ -1,15 +1,32 @@
-
-import { printProjectContext, printProjectContextJson } from "./commands/context.js";
-import { printProjectHandoff, printProjectHandoffJson } from "./commands/handoff.js";
+import {
+  printProjectContext,
+  printProjectContextJson,
+} from "./commands/context.js";
+import {
+  printProjectHandoff,
+  printProjectHandoffJson,
+} from "./commands/handoff.js";
 import { validateProject } from "./commands/validate.js";
-import { printReviewContext, printReviewContextJson } from "./commands/review.js";
-import { printWorkspaceSummary, printWorkspaceSummaryJson } from "./commands/summary.js";
+import {
+  printReviewContext,
+  printReviewContextJson,
+} from "./commands/review.js";
+import {
+  printWorkspaceSummary,
+  printWorkspaceSummaryJson,
+} from "./commands/summary.js";
 import { printHelp } from "./commands/help.js";
 import { runJsonCheck } from "./commands/json-check.js";
 import { runRagIndex } from "./commands/rag-index.js";
 import { runRagSearch } from "./commands/rag-search.js";
-import { printNextProjectAction, printNextProjectActionJson } from "./commands/next.js";
-import { printProjectPrompt, printProjectPromptJson } from "./commands/prompt.js";
+import {
+  printNextProjectAction,
+  printNextProjectActionJson,
+} from "./commands/next.js";
+import {
+  printProjectPrompt,
+  printProjectPromptJson,
+} from "./commands/prompt.js";
 import { printStatus } from "./commands/status.js";
 import { printDoctor } from "./commands/doctor.js";
 import { printAuditReport, printAuditReportJson } from "./commands/audit.js";
@@ -19,14 +36,15 @@ import { findProject, getRequiredProjectName } from "./core/project.js";
 import { terminal } from "./ui/terminal.js";
 import { printJsonError } from "./commands/json-error.js";
 
-
-
 function resolveProjectOrExit(commandName: string) {
   const config = loadConfig();
 
   if (!process.argv[3] || process.argv[3].startsWith("--")) {
     if (process.argv.includes("--json")) {
-      printJsonError("missing_project", `Missing project argument for ${commandName}`);
+      printJsonError(
+        "missing_project",
+        `Missing project argument for ${commandName}`,
+      );
     } else {
       terminal.error(`Missing project argument for ${commandName}`);
     }
@@ -66,7 +84,9 @@ if (command === "help" || command === "--help" || command === "-h") {
   const json = process.argv.includes("--json");
   const limitIndex = process.argv.indexOf("--limit");
   const limit =
-    limitIndex >= 0 ? Number.parseInt(process.argv[limitIndex + 1] ?? "", 10) : undefined;
+    limitIndex >= 0
+      ? Number.parseInt(process.argv[limitIndex + 1] ?? "", 10)
+      : undefined;
   const pathIndex = process.argv.indexOf("--path");
   const pathPrefix = pathIndex >= 0 ? process.argv[pathIndex + 1] : undefined;
 
@@ -82,7 +102,10 @@ if (command === "help" || command === "--help" || command === "-h") {
         return false;
       }
 
-      return argumentsList[index - 1] !== "--limit" && argumentsList[index - 1] !== "--path";
+      return (
+        argumentsList[index - 1] !== "--limit" &&
+        argumentsList[index - 1] !== "--path"
+      );
     })
     .join(" ");
 
@@ -185,6 +208,8 @@ if (command === "help" || command === "--help" || command === "-h") {
     process.exitCode = exitCode;
   }
 } else {
-  terminal.error("Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>");
+  terminal.error(
+    "Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>",
+  );
   process.exit(1);
 }

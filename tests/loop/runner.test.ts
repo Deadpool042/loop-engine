@@ -18,10 +18,19 @@ function fixtureProject(): ProjectConfig {
   };
 }
 
-function fixtureSnapshot(project: ProjectConfig, candidate: RoadmapCandidate): ProjectSnapshot {
+function fixtureSnapshot(
+  project: ProjectConfig,
+  candidate: RoadmapCandidate,
+): ProjectSnapshot {
   return {
     project: { name: project.name, type: project.type, path: project.path },
-    git: { branch: "main", clean: true, requiresGit: true, statusText: "", lastCommit: null },
+    git: {
+      branch: "main",
+      clean: true,
+      requiresGit: true,
+      statusText: "",
+      lastCommit: null,
+    },
     docs: { required: [], missing: [] },
     validation: { commands: [], configured: false },
     roadmap: {
@@ -29,7 +38,16 @@ function fixtureSnapshot(project: ProjectConfig, candidate: RoadmapCandidate): P
       paths: ["roadmap.md"],
       candidates: [candidate],
       selectedCandidate: candidate,
-      stats: { total: 1, todo: 1, inProgress: 0, done: 0, unknown: 0, safe: 1, warning: 0, blocked: 0 },
+      stats: {
+        total: 1,
+        todo: 1,
+        inProgress: 0,
+        done: 0,
+        unknown: 0,
+        safe: 1,
+        warning: 0,
+        blocked: 0,
+      },
       summary: { active: 1, done: 0, selectable: 1, hasBlocked: false },
     },
     health: "good",
@@ -40,13 +58,18 @@ function fixtureConfig(project: ProjectConfig): Config {
   return { projects: [project] };
 }
 
-function fixtureCandidate(kind: RoadmapCandidate["kind"] = "safe"): RoadmapCandidate {
+function fixtureCandidate(
+  kind: RoadmapCandidate["kind"] = "safe",
+): RoadmapCandidate {
   return {
     path: "roadmap.md",
     line: 3,
     text: "- [ ] Small safe micro-lot",
     kind,
-    reason: kind === "safe" ? "no sensitive keyword detected" : "contains sensitive keyword",
+    reason:
+      kind === "safe"
+        ? "no sensitive keyword detected"
+        : "contains sensitive keyword",
     status: "todo",
     priority: "default",
   };
@@ -87,16 +110,28 @@ describe("runLoopPlan", () => {
     assert.equal(result.commit, null);
     assert.equal(result.publication, null);
     assert.equal(result.failure, null);
-    assert.ok(result.agentPolicy, "a completed plan cycle exposes an agent policy forecast");
+    assert.ok(
+      result.agentPolicy,
+      "a completed plan cycle exposes an agent policy forecast",
+    );
     assert.equal(result.agentPolicy?.mode, "plan");
     // The forecast never implies a real call: this run's own budget stays 0.
     assert.equal(result.agentPolicy?.requirements.executionBudget.maxCalls, 0);
-    assert.ok(result.contextPackage, "a completed plan cycle exposes a context package");
+    assert.ok(
+      result.contextPackage,
+      "a completed plan cycle exposes a context package",
+    );
     assert.equal(result.contextPackage?.project, project.name);
-    assert.deepEqual(result.contextPackage?.budget, result.agentPolicy?.requirements.contextBudget);
+    assert.deepEqual(
+      result.contextPackage?.budget,
+      result.agentPolicy?.requirements.contextBudget,
+    );
     assert.ok(result.steps.length >= 3);
     assert.equal(result.steps.at(-1)?.name, "completed");
-    assert.deepEqual(result.steps.at(-1)?.details, ["Prepare context", "Prepare prompt"]);
+    assert.deepEqual(result.steps.at(-1)?.details, [
+      "Prepare context",
+      "Prepare prompt",
+    ]);
     assert.deepEqual(
       result.steps.map((step) => step.name),
       ["planning", "ready", "completed"],
@@ -124,7 +159,10 @@ describe("runLoopPlan", () => {
       result.steps.map((step) => step.name),
       ["planning", "ready", "completed"],
     );
-    assert.equal(result.steps.filter((step) => step.name === "completed").length, 1);
+    assert.equal(
+      result.steps.filter((step) => step.name === "completed").length,
+      1,
+    );
     assert.equal(canTransition("ready", "completed"), true);
     assert.equal(canTransition("completed", "completed"), false);
   });
@@ -162,7 +200,8 @@ describe("runLoopPlan", () => {
       planLoopCycle: () => ({
         outcome: "blocked",
         candidate,
-        reason: "Only a blocked roadmap candidate is available; choose a smaller safe prerequisite first.",
+        reason:
+          "Only a blocked roadmap candidate is available; choose a smaller safe prerequisite first.",
       }),
     });
 
@@ -204,7 +243,11 @@ describe("runLoopPlan", () => {
       runLoopPlan(project.name, {
         ...deterministicOptions(),
         loadConfig: () => fixtureConfig(project),
-        planLoopCycle: () => ({ outcome: "blocked", candidate: null, reason: "none" }),
+        planLoopCycle: () => ({
+          outcome: "blocked",
+          candidate: null,
+          reason: "none",
+        }),
       }),
       runLoopPlan("does-not-exist", {
         ...deterministicOptions(),
@@ -225,7 +268,12 @@ describe("runLoopPlan", () => {
     const candidate = fixtureCandidate("safe");
     let calls = 0;
 
-    const contextBudget = { maxFiles: 1, maxCharacters: 1, maxEstimatedTokens: 1, includeFullFiles: false };
+    const contextBudget = {
+      maxFiles: 1,
+      maxCharacters: 1,
+      maxEstimatedTokens: 1,
+      includeFullFiles: false,
+    };
 
     const result = runLoopPlan(project.name, {
       ...deterministicOptions(),
@@ -250,10 +298,19 @@ describe("runLoopPlan", () => {
             minimumEffort: "low",
             maximumEffort: "low",
             contextBudget,
-            executionBudget: { maxTokens: null, maxCostUsd: null, maxDurationMs: null, maxCalls: 0, maxRepairs: 0 },
+            executionBudget: {
+              maxTokens: null,
+              maxCostUsd: null,
+              maxDurationMs: null,
+              maxCalls: 0,
+              maxRepairs: 0,
+            },
             rationale: ["fixture"],
           },
-          selectionRequest: { requiredCapabilities: [], requiredPermissions: [] },
+          selectionRequest: {
+            requiredCapabilities: [],
+            requiredPermissions: [],
+          },
           selection: null,
           reasons: ["fixture reason"],
         };
@@ -278,7 +335,12 @@ describe("runLoopPlan", () => {
 
     const fixturePackage = {
       project: project.name,
-      budget: { maxFiles: 0, maxCharacters: 0, maxEstimatedTokens: 0, includeFullFiles: false },
+      budget: {
+        maxFiles: 0,
+        maxCharacters: 0,
+        maxEstimatedTokens: 0,
+        includeFullFiles: false,
+      },
       files: [],
       omitted: [],
       totalCharacters: 0,
@@ -289,7 +351,12 @@ describe("runLoopPlan", () => {
     const result = runLoopPlan(project.name, {
       ...deterministicOptions(),
       loadConfig: () => fixtureConfig(project),
-      planLoopCycle: () => ({ outcome: "ready", candidate, plannedSteps: [], snapshot }),
+      planLoopCycle: () => ({
+        outcome: "ready",
+        candidate,
+        plannedSteps: [],
+        snapshot,
+      }),
       buildMinimalContext: (receivedSnapshot, budget) => {
         calls += 1;
         receivedBudget = budget;
@@ -299,7 +366,10 @@ describe("runLoopPlan", () => {
     });
 
     assert.equal(calls, 1);
-    assert.deepEqual(receivedBudget, result.agentPolicy?.requirements.contextBudget);
+    assert.deepEqual(
+      receivedBudget,
+      result.agentPolicy?.requirements.contextBudget,
+    );
     assert.deepEqual(result.contextPackage, fixturePackage);
   });
 });

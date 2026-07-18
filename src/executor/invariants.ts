@@ -17,8 +17,6 @@ export function assertExecutionTransition(
   to: ExecutionState,
 ): void {
   if (!isExecutionTransitionAllowed(from, to)) {
-    throw new Error(
-      `Illegal execution transition: ${from} -> ${to}.`,
-    );
+    throw new Error(`Illegal execution transition: ${from} -> ${to}.`);
   }
 }

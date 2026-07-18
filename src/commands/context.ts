@@ -52,27 +52,24 @@ export function printProjectContext(project: ProjectConfig): void {
   terminal.info("Lancer les validations avant review ou commit.");
 }
 
-
 export function printProjectContextJson(project: ProjectConfig): void {
   const snapshot = buildProjectSnapshot(project);
 
   console.log(
-    JSON.stringify(
-      {
-        schemaVersion: 1,
-        project: snapshot.project,
-        git: snapshot.git,
-        docs: snapshot.docs,
-        roadmap: {
-          available: snapshot.roadmap.available,
-          paths: snapshot.roadmap.paths,
-          selectedCandidate: snapshot.roadmap.selectedCandidate,
-          stats: snapshot.roadmap.stats,
-          summary: snapshot.roadmap.summary,
-        },
-        validation: snapshot.validation,
-        health: snapshot.health,
+    JSON.stringify({
+      schemaVersion: 1,
+      project: snapshot.project,
+      git: snapshot.git,
+      docs: snapshot.docs,
+      roadmap: {
+        available: snapshot.roadmap.available,
+        paths: snapshot.roadmap.paths,
+        selectedCandidate: snapshot.roadmap.selectedCandidate,
+        stats: snapshot.roadmap.stats,
+        summary: snapshot.roadmap.summary,
       },
-    ),
+      validation: snapshot.validation,
+      health: snapshot.health,
+    }),
   );
 }

@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import {
-  renderExecutionReport,
-  type ExecutionReportFormat,
-} from "./report.js";
+import { renderExecutionReport, type ExecutionReportFormat } from "./report.js";
 import type { ExecutionResult } from "./types.js";
 
 const result: ExecutionResult = {
@@ -63,10 +60,7 @@ describe("ExecutionReport", () => {
     ];
 
     for (const format of formats) {
-      assert.equal(
-        typeof renderExecutionReport(result, { format }),
-        "string",
-      );
+      assert.equal(typeof renderExecutionReport(result, { format }), "string");
     }
   });
 });

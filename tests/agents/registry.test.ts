@@ -41,7 +41,11 @@ describe("createAgentRegistry", () => {
 
   it("rejects duplicate profile ids", () => {
     assert.throws(
-      () => createAgentRegistry([fixtureProfile({ id: "dup" }), fixtureProfile({ id: "dup" })]),
+      () =>
+        createAgentRegistry([
+          fixtureProfile({ id: "dup" }),
+          fixtureProfile({ id: "dup" }),
+        ]),
       /Duplicate agent profile id: dup/,
     );
   });
@@ -69,8 +73,12 @@ describe("defaultAgentRegistry", () => {
   });
 
   it("covers more than one runtime and more than one effort level", () => {
-    const runtimes = new Set(DEFAULT_AGENT_PROFILES.map((profile) => profile.runtime));
-    const efforts = new Set(DEFAULT_AGENT_PROFILES.map((profile) => profile.effort));
+    const runtimes = new Set(
+      DEFAULT_AGENT_PROFILES.map((profile) => profile.runtime),
+    );
+    const efforts = new Set(
+      DEFAULT_AGENT_PROFILES.map((profile) => profile.effort),
+    );
 
     assert.ok(runtimes.size > 1);
     assert.ok(efforts.size > 1);
@@ -79,6 +87,9 @@ describe("defaultAgentRegistry", () => {
   it("is queryable through findAgentProfile", () => {
     const first = DEFAULT_AGENT_PROFILES[0];
     assert.ok(first);
-    assert.equal(findAgentProfile(defaultAgentRegistry, first.id)?.id, first.id);
+    assert.equal(
+      findAgentProfile(defaultAgentRegistry, first.id)?.id,
+      first.id,
+    );
   });
 });

@@ -33,7 +33,10 @@ export type LoopRunPlanOptions = Readonly<{
   buildMinimalContext?: typeof buildMinimalContext;
 }>;
 
-export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {}): LoopRunResult {
+export function runLoopPlan(
+  projectName: string,
+  options: LoopRunPlanOptions = {},
+): LoopRunResult {
   const now = options.now ?? (() => new Date().toISOString());
   const generateRunId = options.generateRunId ?? (() => randomUUID());
   const resolveConfig = options.loadConfig ?? loadConfig;
@@ -41,7 +44,8 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
   const policy = options.agentPolicy ?? DEFAULT_AGENT_POLICY;
   const registry = options.agentRegistry ?? defaultAgentRegistry;
   const resolveAgentPolicy = options.resolvePolicy ?? resolvePolicy;
-  const buildContextPackage = options.buildMinimalContext ?? buildMinimalContext;
+  const buildContextPackage =
+    options.buildMinimalContext ?? buildMinimalContext;
 
   const mode: LoopRunMode = "plan";
   const runId = generateRunId();
@@ -51,10 +55,7 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
     createdAt: startedAt,
   });
 
-  const executionResult = executePlan(
-    executionPlan,
-    now,
-  );
+  const executionResult = executePlan(executionPlan, now);
 
   void executionResult;
   const steps: LoopRunStep[] = [];
@@ -77,7 +78,13 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
 
     status = to;
     const timestamp = now();
-    steps.push({ name: stepName, status: stepStatus, startedAt: timestamp, completedAt: timestamp, details });
+    steps.push({
+      name: stepName,
+      status: stepStatus,
+      startedAt: timestamp,
+      completedAt: timestamp,
+      details,
+    });
   }
 
   function finalize(
@@ -109,10 +116,14 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
   const config = resolveConfig();
   const project = findProject(config, projectName);
 
-  transition("planning", "planning", "completed", [`Resolving project: ${projectName}`]);
+  transition("planning", "planning", "completed", [
+    `Resolving project: ${projectName}`,
+  ]);
 
   if (!project) {
-    transition("failed", "failed", "failed", [`Unknown project: ${projectName}`]);
+    transition("failed", "failed", "failed", [
+      `Unknown project: ${projectName}`,
+    ]);
 
     return finalize(null, {
       code: "unknown_project",
@@ -140,7 +151,9 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
   // completed. There is no ready -> ready or completed -> completed self
   // transition; `status` only ever holds the previous value at the time
   // canTransition is checked.
-  transition("ready", "ready", "completed", [`Selected candidate: ${cycle.candidate.text}`]);
+  transition("ready", "ready", "completed", [
+    `Selected candidate: ${cycle.candidate.text}`,
+  ]);
 
   // Mode "plan" never executes: ready -> completed is a first-class transition
   // (see state-machine.ts) that reports the cycle as done without ever going
@@ -163,7 +176,10 @@ export function runLoopPlan(projectName: string, options: LoopRunPlanOptions = {
   // budget the policy forecast just derived. No file read outside the
   // project, no network, no agent call. See
   // docs/architecture/minimal-context-builder.md.
-  const contextPackage = buildContextPackage(cycle.snapshot, agentPolicy.requirements.contextBudget);
+  const contextPackage = buildContextPackage(
+    cycle.snapshot,
+    agentPolicy.requirements.contextBudget,
+  );
 
   return finalize(cycle.candidate, null, agentPolicy, contextPackage);
 }

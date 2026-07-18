@@ -6,7 +6,9 @@ export type WorktreeStatus = {
   readonly files: readonly string[];
 };
 
-export function evaluateWorktreeStatus(porcelainOutput: string): WorktreeStatus {
+export function evaluateWorktreeStatus(
+  porcelainOutput: string,
+): WorktreeStatus {
   const files = porcelainOutput
     .split("\n")
     .map((line) => line.trimEnd())
@@ -31,7 +33,9 @@ function main(): void {
   const status = evaluateWorktreeStatus(output);
 
   if (!status.clean) {
-    console.error("Worktree is not clean. Commit, stash, or ignore the following files before tagging an audit release:");
+    console.error(
+      "Worktree is not clean. Commit, stash, or ignore the following files before tagging an audit release:",
+    );
     for (const file of status.files) {
       console.error(`  ${file}`);
     }
@@ -42,6 +46,9 @@ function main(): void {
   console.log("Worktree is clean. Safe to proceed with the audit release tag.");
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main();
 }

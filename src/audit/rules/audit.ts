@@ -7,7 +7,8 @@ export const AUDIT_SCORE_EXPOSURE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit score is exposed in model, runner, and human report",
-  description: "The audit score should be typed, computed, and displayed in the human audit report.",
+  description:
+    "The audit score should be typed, computed, and displayed in the human audit report.",
   check: () => {
     const expectations = [
       {
@@ -25,7 +26,10 @@ export const AUDIT_SCORE_EXPOSURE_RULE: AuditRule = {
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -50,7 +54,8 @@ export const AUDIT_PRIORITY_EXPOSURE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit findings expose priority",
-  description: "Audit findings should expose a priority field for downstream reporting.",
+  description:
+    "Audit findings should expose a priority field for downstream reporting.",
   check: () => {
     const expectations = [
       {
@@ -64,7 +69,10 @@ export const AUDIT_PRIORITY_EXPOSURE_RULE: AuditRule = {
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -89,7 +97,8 @@ export const AUDIT_RECOMMENDATION_SUPPORT_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit findings support recommendations",
-  description: "Audit findings should support structured recommendations for downstream reporting.",
+  description:
+    "Audit findings should support structured recommendations for downstream reporting.",
   check: () => {
     const expectations = [
       {
@@ -107,7 +116,10 @@ export const AUDIT_RECOMMENDATION_SUPPORT_RULE: AuditRule = {
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -132,7 +144,8 @@ export const AUDIT_CATEGORY_SUMMARY_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit summary exposes category counts",
-  description: "The audit summary should expose finding counts grouped by category.",
+  description:
+    "The audit summary should expose finding counts grouped by category.",
   check: () => {
     const expectations = [
       {
@@ -150,7 +163,10 @@ export const AUDIT_CATEGORY_SUMMARY_RULE: AuditRule = {
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -175,7 +191,8 @@ export const AUDIT_RECOMMENDATION_REPORT_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Human audit report prints recommendations",
-  description: "The human audit report should expose actionable recommendations when findings provide them.",
+  description:
+    "The human audit report should expose actionable recommendations when findings provide them.",
   check: () => {
     const expectations = [
       {
@@ -189,7 +206,10 @@ export const AUDIT_RECOMMENDATION_REPORT_RULE: AuditRule = {
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -214,7 +234,8 @@ export const AUDIT_PRIORITY_SUMMARY_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit summary exposes priority counts",
-  description: "The audit summary should expose finding counts grouped by priority.",
+  description:
+    "The audit summary should expose finding counts grouped by priority.",
   check: () => {
     const expectations = [
       {
@@ -232,7 +253,10 @@ export const AUDIT_PRIORITY_SUMMARY_RULE: AuditRule = {
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -257,7 +281,8 @@ export const AUDIT_RECOMMENDATION_SUMMARY_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit report exposes recommendation summary",
-  description: "The audit JSON report should expose a top-level recommendation summary for downstream reporting.",
+  description:
+    "The audit JSON report should expose a top-level recommendation summary for downstream reporting.",
   check: () => {
     const expectations = [
       {
@@ -275,7 +300,10 @@ export const AUDIT_RECOMMENDATION_SUMMARY_RULE: AuditRule = {
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -300,7 +328,8 @@ export const AUDIT_GLOBAL_STATUS_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit summary exposes global status",
-  description: "The audit summary should expose a global status for downstream reporting and CI usage.",
+  description:
+    "The audit summary should expose a global status for downstream reporting and CI usage.",
   check: () => {
     const expectations = [
       {
@@ -322,7 +351,10 @@ export const AUDIT_GLOBAL_STATUS_RULE: AuditRule = {
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -347,7 +379,8 @@ export const AUDIT_STRICT_MODE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit command supports strict mode",
-  description: "The audit command should support strict mode for CI-oriented non-zero exits.",
+  description:
+    "The audit command should support strict mode for CI-oriented non-zero exits.",
   check: () => {
     const expectations = [
       {
@@ -369,7 +402,10 @@ export const AUDIT_STRICT_MODE_RULE: AuditRule = {
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -394,7 +430,8 @@ export const AUDIT_STRICT_SCRIPT_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit strict script is available",
-  description: "The project should expose a package script for strict audit usage in CI.",
+  description:
+    "The project should expose a package script for strict audit usage in CI.",
   check: () => {
     const packagePath = "package.json";
 
@@ -437,7 +474,8 @@ export const AUDIT_CI_SCRIPT_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "CI script runs validation and strict audit",
-  description: "The project should expose a CI script that runs validation and strict audit checks.",
+  description:
+    "The project should expose a CI script that runs validation and strict audit checks.",
   check: () => {
     const packagePath = "package.json";
 
@@ -480,7 +518,8 @@ export const AUDIT_GITHUB_ACTIONS_CI_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "GitHub Actions runs CI script",
-  description: "The repository should expose a GitHub Actions workflow that runs the CI script.",
+  description:
+    "The repository should expose a GitHub Actions workflow that runs the CI script.",
   check: () => {
     const workflowPath = ".github/workflows/ci.yml";
 
@@ -495,16 +534,16 @@ export const AUDIT_GITHUB_ACTIONS_CI_RULE: AuditRule = {
 
     const content = readFileSync(workflowPath, "utf8");
     const expectedPatterns = [
-  /uses:\s*actions\/checkout@v\d+/,
-  /uses:\s*pnpm\/action-setup@v\d+/,
-  /uses:\s*actions\/setup-node@v\d+/,
-  /run:\s*pnpm install --frozen-lockfile/,
-  /run:\s*pnpm run ci/,
-];
+      /uses:\s*actions\/checkout@v\d+/,
+      /uses:\s*pnpm\/action-setup@v\d+/,
+      /uses:\s*actions\/setup-node@v\d+/,
+      /run:\s*pnpm install --frozen-lockfile/,
+      /run:\s*pnpm run ci/,
+    ];
 
-const missing = expectedPatterns
-  .filter((pattern) => !pattern.test(content))
-  .map((pattern) => pattern.source);
+    const missing = expectedPatterns
+      .filter((pattern) => !pattern.test(content))
+      .map((pattern) => pattern.source);
 
     if (missing.length > 0) {
       return fail(
@@ -528,7 +567,8 @@ export const AUDIT_RULE_ORDER_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rules are ordered logically",
-  description: "Critical audit rules should stay in logical order for stable human and JSON reporting.",
+  description:
+    "Critical audit rules should stay in logical order for stable human and JSON reporting.",
   check: () => {
     const rulesPath = "src/audit/rules.ts";
 
@@ -603,7 +643,8 @@ export const AUDIT_CLI_STRICT_ROUTING_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit strict mode is routed by the CLI",
-  description: "The CLI audit branch should parse --strict and set a non-zero exit code when the audit status is not pass.",
+  description:
+    "The CLI audit branch should parse --strict and set a non-zero exit code when the audit status is not pass.",
   check: () => {
     const cliPath = "src/cli.ts";
 
@@ -636,7 +677,9 @@ export const AUDIT_CLI_STRICT_ROUTING_RULE: AuditRule = {
       "process.exitCode = 1",
     ];
 
-    const missing = expectedTokens.filter((token) => !auditBranch.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !auditBranch.includes(token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -720,7 +763,8 @@ export const AUDIT_RULE_REGISTRY_COMPLETENESS_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule registry is complete",
-  description: "The audit rule registry should include every exported audit rule exactly once.",
+  description:
+    "The audit rule registry should include every exported audit rule exactly once.",
   check: () => {
     const registryPath = "src/audit/rules.ts";
     const ruleFiles = [
@@ -805,7 +849,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule metadata is complete",
-  description: "Every audit rule should expose a title and description for human reports.",
+  description:
+    "Every audit rule should expose a title and description for human reports.",
   check: () => {
     const ruleFiles = [
       "src/audit/rules/json.ts",
@@ -871,7 +916,8 @@ export const AUDIT_RULE_CATEGORY_VALIDITY_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule categories are valid",
-  description: "Every audit rule should use one of the supported audit categories.",
+  description:
+    "Every audit rule should use one of the supported audit categories.",
   check: () => {
     const ruleFiles = [
       "src/audit/rules/json.ts",
@@ -933,7 +979,8 @@ export const AUDIT_RULE_SEVERITY_VALIDITY_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule severities are valid",
-  description: "Every audit rule should use one of the supported audit severities.",
+  description:
+    "Every audit rule should use one of the supported audit severities.",
   check: () => {
     const ruleFiles = [
       "src/audit/rules/json.ts",
@@ -995,7 +1042,8 @@ export const AUDIT_RULE_PRIORITY_VALIDITY_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule priorities are valid",
-  description: "Every audit finding helper should use one of the supported audit priorities.",
+  description:
+    "Every audit finding helper should use one of the supported audit priorities.",
   check: () => {
     const findingFile = "src/audit/findings.ts";
     const validPriorities = ["low", "medium", "high"];
@@ -1040,7 +1088,8 @@ export const AUDIT_FINDING_STATUS_VALIDITY_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit finding statuses are valid",
-  description: "Every audit finding helper should use one of the supported audit statuses.",
+  description:
+    "Every audit finding helper should use one of the supported audit statuses.",
   check: () => {
     const findingFile = "src/audit/findings.ts";
     const validStatuses = ["pass", "fail", "skipped"];
@@ -1055,9 +1104,7 @@ export const AUDIT_FINDING_STATUS_VALIDITY_RULE: AuditRule = {
     }
 
     const content = readFileSync(findingFile, "utf8");
-    const statusMatches = Array.from(
-      content.matchAll(/status:\s*"([^"]+)"/g),
-    );
+    const statusMatches = Array.from(content.matchAll(/status:\s*"([^"]+)"/g));
 
     const invalidStatuses = statusMatches
       .map((match) => match[1])
@@ -1086,7 +1133,8 @@ export const AUDIT_FINDING_IDENTITY_FIELDS_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit finding identity fields are preserved",
-  description: "Audit finding helpers should preserve rule id, category, and severity.",
+  description:
+    "Audit finding helpers should preserve rule id, category, and severity.",
   check: () => {
     const findingFile = "src/audit/findings.ts";
     const expectedTokens = [
@@ -1105,7 +1153,9 @@ export const AUDIT_FINDING_IDENTITY_FIELDS_RULE: AuditRule = {
     }
 
     const content = readFileSync(findingFile, "utf8");
-    const missingTokens = expectedTokens.filter((token) => !content.includes(token));
+    const missingTokens = expectedTokens.filter(
+      (token) => !content.includes(token),
+    );
 
     if (missingTokens.length > 0) {
       return fail(
@@ -1129,14 +1179,11 @@ export const AUDIT_FINDING_DIAGNOSTIC_FIELDS_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit finding diagnostic fields are preserved",
-  description: "Audit finding helpers should preserve diagnostic message, details, and recommendations.",
+  description:
+    "Audit finding helpers should preserve diagnostic message, details, and recommendations.",
   check: () => {
     const findingFile = "src/audit/findings.ts";
-    const expectedTokens = [
-      "message",
-      "details",
-      "recommendation",
-    ];
+    const expectedTokens = ["message", "details", "recommendation"];
 
     if (!existsSync(findingFile)) {
       return fail(
@@ -1174,7 +1221,8 @@ export const AUDIT_RULE_ID_PREFIX_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule ids match their categories",
-  description: "Every audit rule id should use the prefix associated with its declared category.",
+  description:
+    "Every audit rule id should use the prefix associated with its declared category.",
   check: () => {
     const ruleFiles = [
       "src/audit/rules/json.ts",
@@ -1214,9 +1262,17 @@ export const AUDIT_RULE_ID_PREFIX_RULE: AuditRule = {
           const ruleSource = content.slice(start, nextStart);
           const id = ruleSource.match(/\bid:\s*"([^"]+)"/)?.[1];
           const category = ruleSource.match(/\bcategory:\s*"([^"]+)"/)?.[1];
-          const expectedPrefix = category ? expectedPrefixes[category] : undefined;
+          const expectedPrefix = category
+            ? expectedPrefixes[category]
+            : undefined;
 
-          if (!ruleName || !id || !category || !expectedPrefix || id.startsWith(expectedPrefix)) {
+          if (
+            !ruleName ||
+            !id ||
+            !category ||
+            !expectedPrefix ||
+            id.startsWith(expectedPrefix)
+          ) {
             return "";
           }
 
@@ -1237,7 +1293,9 @@ export const AUDIT_RULE_ID_PREFIX_RULE: AuditRule = {
     return pass(
       AUDIT_RULE_ID_PREFIX_RULE,
       "Audit rule ids match their categories.",
-      Object.entries(expectedPrefixes).map(([category, prefix]) => `${category}: ${prefix}`),
+      Object.entries(expectedPrefixes).map(
+        ([category, prefix]) => `${category}: ${prefix}`,
+      ),
     );
   },
 };
@@ -1247,7 +1305,8 @@ export const AUDIT_RULE_TITLE_UNIQUENESS_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule titles are unique",
-  description: "Every audit rule title should be unique for clear human audit reports.",
+  description:
+    "Every audit rule title should be unique for clear human audit reports.",
   check: () => {
     const ruleFiles = [
       "src/audit/rules/json.ts",
@@ -1283,9 +1342,8 @@ export const AUDIT_RULE_TITLE_UNIQUENESS_RULE: AuditRule = {
 
           return ruleName && title ? { ruleName, title } : undefined;
         })
-        .filter(
-          (entry): entry is { ruleName: string; title: string } =>
-            Boolean(entry),
+        .filter((entry): entry is { ruleName: string; title: string } =>
+          Boolean(entry),
         );
     });
 
@@ -1321,7 +1379,8 @@ export const AUDIT_RULE_DESCRIPTION_UNIQUENESS_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule descriptions are unique",
-  description: "Every audit rule description should be unique for clear audit rule documentation.",
+  description:
+    "Every audit rule description should be unique for clear audit rule documentation.",
   check: () => {
     const ruleFiles = [
       "src/audit/rules/json.ts",
@@ -1353,13 +1412,16 @@ export const AUDIT_RULE_DESCRIPTION_UNIQUENESS_RULE: AuditRule = {
           const start = match.index ?? 0;
           const nextStart = exports[index + 1]?.index ?? content.length;
           const ruleSource = content.slice(start, nextStart);
-          const description = ruleSource.match(/\bdescription:\s*"([^"]+)"/)?.[1];
+          const description = ruleSource.match(
+            /\bdescription:\s*"([^"]+)"/,
+          )?.[1];
 
-          return ruleName && description ? { ruleName, description } : undefined;
+          return ruleName && description
+            ? { ruleName, description }
+            : undefined;
         })
-        .filter(
-          (entry): entry is { ruleName: string; description: string } =>
-            Boolean(entry),
+        .filter((entry): entry is { ruleName: string; description: string } =>
+          Boolean(entry),
         );
     });
 
@@ -1398,7 +1460,8 @@ export const AUDIT_RULE_EXPORT_NAME_CONVENTION_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule export names follow convention",
-  description: "Every exported audit rule should use an uppercase _RULE export name for registry consistency.",
+  description:
+    "Every exported audit rule should use an uppercase _RULE export name for registry consistency.",
   check: () => {
     const ruleFiles = [
       "src/audit/rules/json.ts",
@@ -1455,7 +1518,8 @@ export const AUDIT_RULE_EXPORT_NAME_UNIQUENESS_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule export names are unique",
-  description: "Every exported audit rule should use a unique export name across rule files.",
+  description:
+    "Every exported audit rule should use a unique export name across rule files.",
   check: () => {
     const ruleFiles = [
       "src/audit/rules/json.ts",
@@ -1489,7 +1553,10 @@ export const AUDIT_RULE_EXPORT_NAME_UNIQUENESS_RULE: AuditRule = {
     const exportsByName = new Map<string, string[]>();
 
     for (const { file, ruleName } of exportEntries) {
-      exportsByName.set(ruleName, [...(exportsByName.get(ruleName) ?? []), file]);
+      exportsByName.set(ruleName, [
+        ...(exportsByName.get(ruleName) ?? []),
+        file,
+      ]);
     }
 
     const duplicateExports = Array.from(exportsByName.entries())
@@ -1518,7 +1585,8 @@ export const AUDIT_RULE_ID_SEQUENCE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rule ids are contiguous within the AUDIT prefix",
-  description: "AUDIT-prefixed rule ids should form a contiguous sequence without gaps, across every rule file — not only src/audit/rules/audit.ts, since AUDIT-prefixed architecture rules can also live in src/audit/rules/json.ts.",
+  description:
+    "AUDIT-prefixed rule ids should form a contiguous sequence without gaps, across every rule file — not only src/audit/rules/audit.ts, since AUDIT-prefixed architecture rules can also live in src/audit/rules/json.ts.",
   check: () => {
     const ruleFiles = [
       "src/audit/rules/json.ts",
@@ -1539,7 +1607,11 @@ export const AUDIT_RULE_ID_SEQUENCE_RULE: AuditRule = {
     }
 
     const auditIds = ruleFiles
-      .flatMap((file) => Array.from(readFileSync(file, "utf8").matchAll(/\bid:\s*"AUDIT-(\d{3})"/g)))
+      .flatMap((file) =>
+        Array.from(
+          readFileSync(file, "utf8").matchAll(/\bid:\s*"AUDIT-(\d{3})"/g),
+        ),
+      )
       .map((match) => Number(match[1]))
       .filter((id) => Number.isInteger(id))
       .sort((left, right) => left - right);
@@ -1575,7 +1647,8 @@ export const AUDIT_PROFILE_TYPE_EXPOSURE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit profiles are typed",
-  description: "The audit engine should expose typed audit profiles for profile-based execution.",
+  description:
+    "The audit engine should expose typed audit profiles for profile-based execution.",
   check: () => {
     const typesPath = "src/audit/types.ts";
 
@@ -1592,12 +1665,12 @@ export const AUDIT_PROFILE_TYPE_EXPOSURE_RULE: AuditRule = {
     const expectedTokens = [
       "export const AUDIT_PROFILES",
       "export type AuditProfile",
-      "\"quick\"",
-      "\"strict\"",
-      "\"release\"",
-      "\"docs\"",
-      "\"json\"",
-      "\"architecture\"",
+      '"quick"',
+      '"strict"',
+      '"release"',
+      '"docs"',
+      '"json"',
+      '"architecture"',
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
@@ -1624,7 +1697,8 @@ export const AUDIT_PROFILE_DEFINITION_EXPOSURE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit profile definitions are exposed",
-  description: "The audit engine should expose profile definitions that map audit profiles to audit categories.",
+  description:
+    "The audit engine should expose profile definitions that map audit profiles to audit categories.",
   check: () => {
     const profilesPath = "src/audit/profiles.ts";
 
@@ -1675,7 +1749,8 @@ export const AUDIT_PROFILE_HELPERS_EXPOSURE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit profile helpers are exposed",
-  description: "The audit engine should expose helpers for validating and resolving audit profiles.",
+  description:
+    "The audit engine should expose helpers for validating and resolving audit profiles.",
   check: () => {
     const profilesPath = "src/audit/profiles.ts";
 
@@ -1720,7 +1795,8 @@ export const AUDIT_PROFILE_RULE_SELECTION_EXPOSURE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit rules are selectable by profile",
-  description: "The audit engine should expose a pure helper for selecting audit rules by audit profile.",
+  description:
+    "The audit engine should expose a pure helper for selecting audit rules by audit profile.",
   check: () => {
     const profilesPath = "src/audit/profiles.ts";
 
@@ -1766,7 +1842,8 @@ export const AUDIT_RUNNER_PROFILE_OPTION_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit runner accepts profile options",
-  description: "The audit runner should accept internal profile options before CLI profile routing is exposed.",
+  description:
+    "The audit runner should accept internal profile options before CLI profile routing is exposed.",
   check: () => {
     const runnerPath = "src/audit/runner.ts";
 
@@ -1813,7 +1890,8 @@ export const AUDIT_CLI_PROFILE_PARSING_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit command parses profile option",
-  description: "The audit command should parse and validate an optional profile before passing it to the audit runner.",
+  description:
+    "The audit command should parse and validate an optional profile before passing it to the audit runner.",
   check: () => {
     const commandPath = "src/commands/audit.ts";
 
@@ -1829,7 +1907,7 @@ export const AUDIT_CLI_PROFILE_PARSING_RULE: AuditRule = {
     const content = readFileSync(commandPath, "utf8");
     const expectedTokens = [
       "parseAuditProfileOption",
-      "args.indexOf(\"--profile\")",
+      'args.indexOf("--profile")',
       "isAuditProfile(value)",
       "Invalid audit profile",
       "const profile = parseAuditProfileOption(process.argv)",
@@ -1860,7 +1938,8 @@ export const AUDIT_PROFILE_CHECK_SCRIPT_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit profiles are checked by CI",
-  description: "The project should explicitly check JSON, docs, and architecture audit profiles in CI.",
+  description:
+    "The project should explicitly check JSON, docs, and architecture audit profiles in CI.",
   check: () => {
     const scriptPath = "scripts/audit-profile-check.ts";
     const packagePath = "package.json";
@@ -1879,13 +1958,13 @@ export const AUDIT_PROFILE_CHECK_SCRIPT_RULE: AuditRule = {
 
     const expectedTokens = [
       "PROFILE_EXPECTATIONS",
-      "profile: \"json\"",
-      "profile: \"docs\"",
-      "profile: \"architecture\"",
-      "\"--profile\"",
+      'profile: "json"',
+      'profile: "docs"',
+      'profile: "architecture"',
+      '"--profile"',
       "summary.byCategory",
       "finding.category",
-      "\"audit:profiles\"",
+      '"audit:profiles"',
       "pnpm run audit:profiles",
     ];
 
@@ -1914,7 +1993,8 @@ export const AUDIT_PROFILE_CHECK_ALL_PUBLIC_PROFILES_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "All public audit profiles are checked by CI",
-  description: "The audit profile CI check should cover every public audit profile.",
+  description:
+    "The audit profile CI check should cover every public audit profile.",
   check: () => {
     const scriptPath = "scripts/audit-profile-check.ts";
 
@@ -1931,19 +2011,21 @@ export const AUDIT_PROFILE_CHECK_ALL_PUBLIC_PROFILES_RULE: AuditRule = {
 
     const expectedTokens = [
       "PROFILE_EXPECTATIONS",
-      "profile: \"quick\"",
-      "profile: \"strict\"",
-      "profile: \"release\"",
-      "profile: \"json\"",
-      "profile: \"docs\"",
-      "profile: \"architecture\"",
-      "categories: [\"architecture\", \"cli\"]",
-      "categories: [\"json\", \"cli\", \"docs\", \"architecture\"]",
-      "\"--profile\"",
+      'profile: "quick"',
+      'profile: "strict"',
+      'profile: "release"',
+      'profile: "json"',
+      'profile: "docs"',
+      'profile: "architecture"',
+      'categories: ["architecture", "cli"]',
+      'categories: ["json", "cli", "docs", "architecture"]',
+      '"--profile"',
       "finding.category",
     ];
 
-    const missing = expectedTokens.filter((token) => !scriptContent.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !scriptContent.includes(token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -1967,7 +2049,8 @@ export const AUDIT_INVALID_PROFILE_CHECK_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Invalid audit profiles are checked by CI",
-  description: "The audit profile CI check should verify that invalid profile names fail explicitly.",
+  description:
+    "The audit profile CI check should verify that invalid profile names fail explicitly.",
   check: () => {
     const scriptPath = "scripts/audit-profile-check.ts";
 
@@ -1985,13 +2068,15 @@ export const AUDIT_INVALID_PROFILE_CHECK_RULE: AuditRule = {
     const expectedTokens = [
       "spawnSync",
       "assertInvalidProfileFails",
-      "\"--profile\"",
-      "\"unknown\"",
+      '"--profile"',
+      '"unknown"',
       "result.status !== 0",
       "Invalid audit profile",
     ];
 
-    const missing = expectedTokens.filter((token) => !scriptContent.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !scriptContent.includes(token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -2015,7 +2100,8 @@ export const AUDIT_MISSING_PROFILE_VALUE_CHECK_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Missing audit profile values are checked by CI",
-  description: "The audit profile CI check should verify that --profile without a value fails explicitly.",
+  description:
+    "The audit profile CI check should verify that --profile without a value fails explicitly.",
   check: () => {
     const scriptPath = "scripts/audit-profile-check.ts";
 
@@ -2032,12 +2118,14 @@ export const AUDIT_MISSING_PROFILE_VALUE_CHECK_RULE: AuditRule = {
 
     const expectedTokens = [
       "assertMissingProfileValueFails",
-      "\"--profile\"",
+      '"--profile"',
       "Invalid audit profile: <missing>",
       "result.status !== 0",
     ];
 
-    const missing = expectedTokens.filter((token) => !scriptContent.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !scriptContent.includes(token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -2061,7 +2149,8 @@ export const AUDIT_PROFILE_CHECK_SCRIPT_FACTORING_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit profile check script is factored",
-  description: "The audit profile CI check script should use focused helpers for profile execution, category assertions, and failure assertions.",
+  description:
+    "The audit profile CI check script should use focused helpers for profile execution, category assertions, and failure assertions.",
   check: () => {
     const scriptPath = "scripts/audit-profile-check.ts";
 
@@ -2088,7 +2177,9 @@ export const AUDIT_PROFILE_CHECK_SCRIPT_FACTORING_RULE: AuditRule = {
       "assertMissingProfileValueFails",
     ];
 
-    const missing = expectedTokens.filter((token) => !scriptContent.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !scriptContent.includes(token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -2112,7 +2203,8 @@ export const AUDIT_RECOMMENDATION_BUILDER_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit recommendations are built by a dedicated helper",
-  description: "Audit recommendation extraction should be isolated from the runner in a dedicated recommendation builder.",
+  description:
+    "Audit recommendation extraction should be isolated from the runner in a dedicated recommendation builder.",
   check: () => {
     const recommendationPath = "src/audit/recommendations.ts";
     const runnerPath = "src/audit/runner.ts";
@@ -2166,7 +2258,8 @@ export const AUDIT_RECOMMENDATION_BUILDER_TEST_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit recommendation builder is covered by tests",
-  description: "The dedicated audit recommendation builder should be covered by unit tests.",
+  description:
+    "The dedicated audit recommendation builder should be covered by unit tests.",
   check: () => {
     const testPath = "tests/recommendations.test.ts";
 
@@ -2186,13 +2279,15 @@ export const AUDIT_RECOMMENDATION_BUILDER_TEST_RULE: AuditRule = {
       "extracts actionable finding recommendations",
       "returns an empty list when no findings are actionable",
       "assert.deepEqual",
-      "recommendation: \"Fix the failing audit rule.\"",
-      "priority: \"medium\"",
-      "message: \"Fix the failing audit rule.\"",
+      'recommendation: "Fix the failing audit rule."',
+      'priority: "medium"',
+      'message: "Fix the failing audit rule."',
       "[]",
     ];
 
-    const missing = expectedTokens.filter((token) => !testContent.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !testContent.includes(token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -2216,7 +2311,8 @@ export const AUDIT_RECOMMENDATION_PRIORITY_SORT_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit recommendations are sorted by priority",
-  description: "Audit recommendations should be sorted deterministically by priority while preserving original order within equal priority.",
+  description:
+    "Audit recommendations should be sorted deterministically by priority while preserving original order within equal priority.",
   check: () => {
     const recommendationPath = "src/audit/recommendations.ts";
     const testPath = "tests/recommendations.test.ts";
@@ -2243,7 +2339,7 @@ export const AUDIT_RECOMMENDATION_PRIORITY_SORT_RULE: AuditRule = {
       ".map((finding, index) => ({ finding, index }))",
       "priorityDelta === 0 ? left.index - right.index : priorityDelta",
       "sorts recommendations by priority while keeping original order within equal priority",
-      "[\"AUDIT-994\", \"AUDIT-993\", \"AUDIT-992\", \"AUDIT-995\"]",
+      '["AUDIT-994", "AUDIT-993", "AUDIT-992", "AUDIT-995"]',
     ];
 
     const missing = expectedTokens.filter((token) => !haystack.includes(token));
@@ -2270,7 +2366,8 @@ export const AUDIT_RECOMMENDATION_PRIORITY_COUNT_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit recommendations can be counted by priority",
-  description: "Audit recommendation reporting should expose a pure helper for counting recommendations by priority.",
+  description:
+    "Audit recommendation reporting should expose a pure helper for counting recommendations by priority.",
   check: () => {
     const recommendationPath = "src/audit/recommendations.ts";
     const testPath = "tests/recommendations.test.ts";
@@ -2325,13 +2422,18 @@ export const AUDIT_RECOMMENDATION_PRIORITY_SUMMARY_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit summary exposes recommendation counts by priority",
-  description: "Audit JSON summary should expose recommendation counts grouped by priority.",
+  description:
+    "Audit JSON summary should expose recommendation counts grouped by priority.",
   check: () => {
     const typePath = "src/audit/types.ts";
     const runnerPath = "src/audit/runner.ts";
     const jsonCheckPath = "src/commands/json-check.ts";
 
-    if (!existsSync(typePath) || !existsSync(runnerPath) || !existsSync(jsonCheckPath)) {
+    if (
+      !existsSync(typePath) ||
+      !existsSync(runnerPath) ||
+      !existsSync(jsonCheckPath)
+    ) {
       return fail(
         AUDIT_RECOMMENDATION_PRIORITY_SUMMARY_RULE,
         "Audit recommendation priority summary implementation is missing.",
@@ -2350,7 +2452,7 @@ export const AUDIT_RECOMMENDATION_PRIORITY_SUMMARY_RULE: AuditRule = {
       "recommendationsByPriority: Partial<Record<AuditPriority, number>>;",
       "countAuditRecommendationsByPriority(recommendations)",
       "recommendationsByPriority,",
-      "assertField(summary, \"recommendationsByPriority\")",
+      'assertField(summary, "recommendationsByPriority")',
       "const recommendationsByPriority = summary.recommendationsByPriority",
       "assertRecord(recommendationsByPriority)",
       "summary.recommendationsByPriority.${priority} must match recommendation priority count",
@@ -2380,7 +2482,8 @@ export const AUDIT_SUMMARY_CONTRACT_FORMAT_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit summary contract fields are consistently formatted",
-  description: "Audit summary contract fields should stay aligned for readable generated reports and type reviews.",
+  description:
+    "Audit summary contract fields should stay aligned for readable generated reports and type reviews.",
   check: () => {
     const typePath = "src/audit/types.ts";
 
@@ -2431,13 +2534,18 @@ export const AUDIT_RECOMMENDATION_TOTAL_SUMMARY_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Audit summary exposes recommendation totals",
-  description: "Audit JSON summary should expose the total number of actionable recommendations.",
+  description:
+    "Audit JSON summary should expose the total number of actionable recommendations.",
   check: () => {
     const typePath = "src/audit/types.ts";
     const runnerPath = "src/audit/runner.ts";
     const jsonCheckPath = "src/commands/json-check.ts";
 
-    if (!existsSync(typePath) || !existsSync(runnerPath) || !existsSync(jsonCheckPath)) {
+    if (
+      !existsSync(typePath) ||
+      !existsSync(runnerPath) ||
+      !existsSync(jsonCheckPath)
+    ) {
       return fail(
         AUDIT_RECOMMENDATION_TOTAL_SUMMARY_RULE,
         "Audit recommendation total summary implementation is missing.",
@@ -2460,8 +2568,8 @@ export const AUDIT_RECOMMENDATION_TOTAL_SUMMARY_RULE: AuditRule = {
       "total: recommendations.length",
       "recommendations: recommendationsSummary,",
       "const summaryRecommendations = summary.recommendations",
-      "assertField(summaryRecommendations, \"total\")",
-      "assertNumber(summaryRecommendations.total, \"summary.recommendations.total\")",
+      'assertField(summaryRecommendations, "total")',
+      'assertNumber(summaryRecommendations.total, "summary.recommendations.total")',
       "summary.recommendations.total must match recommendations length",
       "summary.recommendations.byPriority.${priority} must match recommendation priority count",
     ];
@@ -2490,7 +2598,8 @@ export const AUDIT_RECOMMENDATION_TOTAL_HUMAN_REPORT_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Human audit report prints recommendation totals",
-  description: "The human audit report should expose the total number of actionable recommendations.",
+  description:
+    "The human audit report should expose the total number of actionable recommendations.",
   check: () => {
     const commandPath = "src/commands/audit.ts";
 
@@ -2529,65 +2638,70 @@ export const AUDIT_RECOMMENDATION_TOTAL_HUMAN_REPORT_RULE: AuditRule = {
   },
 };
 
-export const AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE: AuditRule = {
-  id: "AUDIT-049",
-  category: "architecture",
-  severity: "warning",
-  title: "Legacy recommendation priority summary is documented",
-  description: "The legacy summary.recommendationsByPriority field should stay documented while the canonical nested recommendations summary exists.",
-  check: () => {
-    const typePath = "src/audit/types.ts";
-    const finalReportPath = "docs/audits/audit-engine-v1-final.md";
+export const AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE: AuditRule =
+  {
+    id: "AUDIT-049",
+    category: "architecture",
+    severity: "warning",
+    title: "Legacy recommendation priority summary is documented",
+    description:
+      "The legacy summary.recommendationsByPriority field should stay documented while the canonical nested recommendations summary exists.",
+    check: () => {
+      const typePath = "src/audit/types.ts";
+      const finalReportPath = "docs/audits/audit-engine-v1-final.md";
 
-    if (!existsSync(typePath) || !existsSync(finalReportPath)) {
-      return fail(
-        AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE,
-        "Legacy recommendation priority summary documentation files are missing.",
-        [typePath, finalReportPath],
-        "Document summary.recommendationsByPriority as legacy and keep summary.recommendations.byPriority canonical.",
+      if (!existsSync(typePath) || !existsSync(finalReportPath)) {
+        return fail(
+          AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE,
+          "Legacy recommendation priority summary documentation files are missing.",
+          [typePath, finalReportPath],
+          "Document summary.recommendationsByPriority as legacy and keep summary.recommendations.byPriority canonical.",
+        );
+      }
+
+      const haystack = [
+        readFileSync(typePath, "utf8"),
+        readFileSync(finalReportPath, "utf8"),
+      ].join("\n");
+
+      const expectedTokens = [
+        "@deprecated Use recommendations.byPriority.",
+        "summary.recommendations.byPriority",
+        "summary.recommendationsByPriority",
+        "champ canonique",
+        "Champ legacy `summary.recommendationsByPriority`",
+        "compatibilité",
+        "cycle explicite de dépréciation",
+      ];
+
+      const missing = expectedTokens.filter(
+        (token) => !haystack.includes(token),
       );
-    }
 
-    const haystack = [
-      readFileSync(typePath, "utf8"),
-      readFileSync(finalReportPath, "utf8"),
-    ].join("\n");
+      if (missing.length > 0) {
+        return fail(
+          AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE,
+          "Legacy recommendation priority summary documentation is incomplete.",
+          missing,
+          "Document the legacy field and the canonical nested replacement.",
+        );
+      }
 
-    const expectedTokens = [
-      "@deprecated Use recommendations.byPriority.",
-      "summary.recommendations.byPriority",
-      "summary.recommendationsByPriority",
-      "champ canonique",
-      "Champ legacy `summary.recommendationsByPriority`",
-      "compatibilité",
-      "cycle explicite de dépréciation",
-    ];
-
-    const missing = expectedTokens.filter((token) => !haystack.includes(token));
-
-    if (missing.length > 0) {
-      return fail(
+      return pass(
         AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE,
-        "Legacy recommendation priority summary documentation is incomplete.",
-        missing,
-        "Document the legacy field and the canonical nested replacement.",
+        "Legacy recommendation priority summary is documented.",
+        expectedTokens,
       );
-    }
-
-    return pass(
-      AUDIT_LEGACY_RECOMMENDATIONS_BY_PRIORITY_DOCUMENTATION_RULE,
-      "Legacy recommendation priority summary is documented.",
-      expectedTokens,
-    );
-  },
-};
+    },
+  };
 
 export const AUDIT_RECOMMENDATION_SUMMARY_SYNC_ASSERTION_RULE: AuditRule = {
   id: "AUDIT-050",
   category: "architecture",
   severity: "warning",
   title: "Recommendation summary sync is asserted at runtime",
-  description: "The JSON check should assert that the legacy summary.recommendationsByPriority and canonical summary.recommendations.byPriority fields remain synchronized.",
+  description:
+    "The JSON check should assert that the legacy summary.recommendationsByPriority and canonical summary.recommendations.byPriority fields remain synchronized.",
   check: () => {
     const jsonCheckPath = "src/commands/json-check.ts";
 
@@ -2638,20 +2752,42 @@ export const AUDIT_POLICY_ENGINE_MODULE_PRESENCE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Agent Policy Engine module is present",
-  description: "The Agent Policy Engine (V7.4) should expose types, defaults, and a resolver as a dedicated src/policy/ module.",
+  description:
+    "The Agent Policy Engine (V7.4) should expose types, defaults, and a resolver as a dedicated src/policy/ module.",
   check: () => {
     const expectations = [
-      { file: "src/policy/types.ts", token: "export type LoopTaskRequirements" },
+      {
+        file: "src/policy/types.ts",
+        token: "export type LoopTaskRequirements",
+      },
       { file: "src/policy/types.ts", token: "export type AgentPolicy " },
-      { file: "src/policy/types.ts", token: "export type AgentPolicyResolution" },
-      { file: "src/policy/defaults.ts", token: "export function getAllowedPermissionsForMode" },
-      { file: "src/policy/defaults.ts", token: "export const DEFAULT_AGENT_POLICY" },
-      { file: "src/policy/resolver.ts", token: "export function resolvePolicy" },
-      { file: "src/policy/resolver.ts", token: "export function classifyLoopTaskCategory" },
+      {
+        file: "src/policy/types.ts",
+        token: "export type AgentPolicyResolution",
+      },
+      {
+        file: "src/policy/defaults.ts",
+        token: "export function getAllowedPermissionsForMode",
+      },
+      {
+        file: "src/policy/defaults.ts",
+        token: "export const DEFAULT_AGENT_POLICY",
+      },
+      {
+        file: "src/policy/resolver.ts",
+        token: "export function resolvePolicy",
+      },
+      {
+        file: "src/policy/resolver.ts",
+        token: "export function classifyLoopTaskCategory",
+      },
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -2676,7 +2812,8 @@ export const AUDIT_POLICY_CAPABILITY_PERMISSION_SEPARATION_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Policy requirements separate capabilities from permissions",
-  description: "LoopTaskRequirements should expose requiredCapabilities and requiredPermissions as two distinct fields, never merged into one.",
+  description:
+    "LoopTaskRequirements should expose requiredCapabilities and requiredPermissions as two distinct fields, never merged into one.",
   check: () => {
     const typesPath = "src/policy/types.ts";
 
@@ -2719,7 +2856,8 @@ export const AUDIT_POLICY_MODE_PERMISSION_CEILING_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Permission ceilings are enforced per mode",
-  description: "The policy engine should expose a per-mode permission ceiling where plan/execute/commit/publish each include exactly the previous mode's permissions plus one new one, and git_tag is never implicit.",
+  description:
+    "The policy engine should expose a per-mode permission ceiling where plan/execute/commit/publish each include exactly the previous mode's permissions plus one new one, and git_tag is never implicit.",
   check: () => {
     const defaultsPath = "src/policy/defaults.ts";
 
@@ -2745,14 +2883,25 @@ export const AUDIT_POLICY_MODE_PERMISSION_CEILING_RULE: AuditRule = {
 
     const ceilingsStart = content.indexOf("const MODE_PERMISSION_CEILINGS");
     const ceilingsEnd = content.indexOf("};", ceilingsStart);
-    const ceilingsBlock = ceilingsStart >= 0 && ceilingsEnd >= 0 ? content.slice(ceilingsStart, ceilingsEnd) : "";
+    const ceilingsBlock =
+      ceilingsStart >= 0 && ceilingsEnd >= 0
+        ? content.slice(ceilingsStart, ceilingsEnd)
+        : "";
     const grantsGitTag = ceilingsBlock.includes("git_tag");
 
     if (missing.length > 0 || grantsGitTag || !ceilingsBlock) {
       return fail(
         AUDIT_POLICY_MODE_PERMISSION_CEILING_RULE,
         "Per-mode permission ceilings are incomplete or grant git_tag implicitly.",
-        [...missing, ...(grantsGitTag ? ["git_tag must never be part of a mode ceiling"] : []), ...(ceilingsBlock ? [] : ["MODE_PERMISSION_CEILINGS block not found"])],
+        [
+          ...missing,
+          ...(grantsGitTag
+            ? ["git_tag must never be part of a mode ceiling"]
+            : []),
+          ...(ceilingsBlock
+            ? []
+            : ["MODE_PERMISSION_CEILINGS block not found"]),
+        ],
         "Keep getAllowedPermissionsForMode returning exactly plan/execute/commit/publish's cumulative ceilings, and never include git_tag.",
       );
     }
@@ -2770,7 +2919,8 @@ export const AUDIT_POLICY_RESTRICTIVE_MERGE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Budgets, providers, and runtimes are merged restrictively",
-  description: "The policy engine should expose restrictive-merge helpers for budgets, providers, runtimes, and maximum effort so a caller (e.g. n8n) can only narrow a policy, never widen it.",
+  description:
+    "The policy engine should expose restrictive-merge helpers for budgets, providers, runtimes, and maximum effort so a caller (e.g. n8n) can only narrow a policy, never widen it.",
   check: () => {
     const defaultsPath = "src/policy/defaults.ts";
 
@@ -2815,17 +2965,27 @@ export const AUDIT_POLICY_FORECAST_INTEGRATION_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "LoopRunner computes a forecast-only agent policy in mode plan",
-  description: "runLoopPlan should resolve an agent policy for the selected candidate in mode plan and expose it as an additive LoopRunResult field, without ever invoking an agent.",
+  description:
+    "runLoopPlan should resolve an agent policy for the selected candidate in mode plan and expose it as an additive LoopRunResult field, without ever invoking an agent.",
   check: () => {
     const expectations = [
-      { file: "src/loop/types.ts", token: "agentPolicy: AgentPolicyResolution | null;" },
-      { file: "src/loop/runner.ts", token: "import { resolvePolicy } from \"../policy/resolver.js\";" },
+      {
+        file: "src/loop/types.ts",
+        token: "agentPolicy: AgentPolicyResolution | null;",
+      },
+      {
+        file: "src/loop/runner.ts",
+        token: 'import { resolvePolicy } from "../policy/resolver.js";',
+      },
       { file: "src/loop/runner.ts", token: 'mode: "plan",' },
       { file: "src/commands/run.ts", token: "agentPolicy: result.agentPolicy" },
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -2850,9 +3010,14 @@ export const AUDIT_POLICY_NO_REAL_EXECUTION_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Policy engine performs no real execution or network I/O",
-  description: "src/policy/ should never perform network I/O, spawn a process, or introduce a real execute mode — resolvePolicy stays a pure, local, deterministic lookup.",
+  description:
+    "src/policy/ should never perform network I/O, spawn a process, or introduce a real execute mode — resolvePolicy stays a pure, local, deterministic lookup.",
   check: () => {
-    const policyFiles = ["src/policy/types.ts", "src/policy/defaults.ts", "src/policy/resolver.ts"];
+    const policyFiles = [
+      "src/policy/types.ts",
+      "src/policy/defaults.ts",
+      "src/policy/resolver.ts",
+    ];
     const missingFiles = policyFiles.filter((file) => !existsSync(file));
 
     if (missingFiles.length > 0) {
@@ -2864,7 +3029,12 @@ export const AUDIT_POLICY_NO_REAL_EXECUTION_RULE: AuditRule = {
       );
     }
 
-    const forbiddenPatterns = [/\bfetch\(/, /require\(["']https?["']\)/, /child_process/, /--force\b/];
+    const forbiddenPatterns = [
+      /\bfetch\(/,
+      /require\(["']https?["']\)/,
+      /child_process/,
+      /--force\b/,
+    ];
 
     const violations = policyFiles.flatMap((file) => {
       const content = readFileSync(file, "utf8");
@@ -2896,10 +3066,20 @@ export const AUDIT_POLICY_DEPENDENCY_DIRECTION_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Policy engine dependencies stay unidirectional",
-  description: "src/policy/ should never depend on src/loop/, src/commands/, or src/cli.ts, and src/agents/ should never depend on src/policy/.",
+  description:
+    "src/policy/ should never depend on src/loop/, src/commands/, or src/cli.ts, and src/agents/ should never depend on src/policy/.",
   check: () => {
-    const policyFiles = ["src/policy/types.ts", "src/policy/defaults.ts", "src/policy/resolver.ts"];
-    const agentFiles = ["src/agents/types.ts", "src/agents/registry.ts", "src/agents/selector.ts", "src/agents/escalation.ts"];
+    const policyFiles = [
+      "src/policy/types.ts",
+      "src/policy/defaults.ts",
+      "src/policy/resolver.ts",
+    ];
+    const agentFiles = [
+      "src/agents/types.ts",
+      "src/agents/registry.ts",
+      "src/agents/selector.ts",
+      "src/agents/escalation.ts",
+    ];
     const allFiles = [...policyFiles, ...agentFiles];
 
     const missingFiles = allFiles.filter((file) => !existsSync(file));
@@ -2919,7 +3099,11 @@ export const AUDIT_POLICY_DEPENDENCY_DIRECTION_RULE: AuditRule = {
 
     const violations = [
       ...policyFiles
-        .filter((file) => forbiddenInPolicy.test(readFileSync(file, "utf8")) || forbiddenCliInPolicy.test(readFileSync(file, "utf8")))
+        .filter(
+          (file) =>
+            forbiddenInPolicy.test(readFileSync(file, "utf8")) ||
+            forbiddenCliInPolicy.test(readFileSync(file, "utf8")),
+        )
         .map((file) => `${file}: imports loop/, commands/, or cli.js`),
       ...agentFiles
         .filter((file) => forbiddenInAgents.test(readFileSync(file, "utf8")))
@@ -2948,19 +3132,41 @@ export const CONTEXT_BUILDER_MODULE_PRESENCE_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Minimal Context Builder module is present",
-  description: "The Minimal Context Builder (V7.5) should expose types, path confinement, source collection, token estimation, and a builder as a dedicated src/context/ module.",
+  description:
+    "The Minimal Context Builder (V7.5) should expose types, path confinement, source collection, token estimation, and a builder as a dedicated src/context/ module.",
   check: () => {
     const expectations = [
-      { file: "src/context/types.ts", token: "export type MinimalContextPackage" },
-      { file: "src/context/types.ts", token: "export type ContextOmissionReason" },
-      { file: "src/context/path.ts", token: "export function resolveContextPath" },
-      { file: "src/context/sources.ts", token: "export function collectContextSources" },
-      { file: "src/context/context-cost-estimator.ts", token: "export function estimateTokens" },
-      { file: "src/context/builder.ts", token: "export function buildMinimalContext" },
+      {
+        file: "src/context/types.ts",
+        token: "export type MinimalContextPackage",
+      },
+      {
+        file: "src/context/types.ts",
+        token: "export type ContextOmissionReason",
+      },
+      {
+        file: "src/context/path.ts",
+        token: "export function resolveContextPath",
+      },
+      {
+        file: "src/context/sources.ts",
+        token: "export function collectContextSources",
+      },
+      {
+        file: "src/context/context-cost-estimator.ts",
+        token: "export function estimateTokens",
+      },
+      {
+        file: "src/context/builder.ts",
+        token: "export function buildMinimalContext",
+      },
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -2985,7 +3191,8 @@ export const CONTEXT_BUILDER_BUDGET_ENFORCEMENT_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Context builder enforces every ContextBudget dimension",
-  description: "buildMinimalContext should enforce maxFiles, maxCharacters, maxEstimatedTokens, and includeFullFiles — never exceeding any of them.",
+  description:
+    "buildMinimalContext should enforce maxFiles, maxCharacters, maxEstimatedTokens, and includeFullFiles — never exceeding any of them.",
   check: () => {
     const builderPath = "src/context/builder.ts";
 
@@ -3033,7 +3240,8 @@ export const CONTEXT_BUILDER_PATH_CONFINEMENT_RULE: AuditRule = {
   category: "architecture",
   severity: "error",
   title: "Context builder confines every read under the project path",
-  description: "buildMinimalContext should reject absolute external paths and ../ traversals outside snapshot.project.path, reporting them as outside_project, before ever reading a file.",
+  description:
+    "buildMinimalContext should reject absolute external paths and ../ traversals outside snapshot.project.path, reporting them as outside_project, before ever reading a file.",
   check: () => {
     const pathFile = "src/context/path.ts";
     const builderFile = "src/context/builder.ts";
@@ -3048,7 +3256,11 @@ export const CONTEXT_BUILDER_PATH_CONFINEMENT_RULE: AuditRule = {
     }
 
     const content = `${readFileSync(pathFile, "utf8")}\n${readFileSync(builderFile, "utf8")}`;
-    const expectedTokens = ["insideProject", '"outside_project"', "resolveContextPath"];
+    const expectedTokens = [
+      "insideProject",
+      '"outside_project"',
+      "resolveContextPath",
+    ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
 
@@ -3074,7 +3286,8 @@ export const CONTEXT_BUILDER_NO_NETWORK_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "Context builder performs no network I/O or process spawn",
-  description: "src/context/ should never perform network I/O, spawn a process, or introduce an execute mode — buildMinimalContext stays a pure, local, deterministic file read.",
+  description:
+    "src/context/ should never perform network I/O, spawn a process, or introduce an execute mode — buildMinimalContext stays a pure, local, deterministic file read.",
   check: () => {
     const contextFiles = [
       "src/context/types.ts",
@@ -3094,7 +3307,11 @@ export const CONTEXT_BUILDER_NO_NETWORK_RULE: AuditRule = {
       );
     }
 
-    const forbiddenPatterns = [/\bfetch\(/, /require\(["']https?["']\)/, /child_process/];
+    const forbiddenPatterns = [
+      /\bfetch\(/,
+      /require\(["']https?["']\)/,
+      /child_process/,
+    ];
 
     const violations = contextFiles.flatMap((file) => {
       const content = readFileSync(file, "utf8");
@@ -3126,18 +3343,34 @@ export const CONTEXT_BUILDER_LOOP_INTEGRATION_RULE: AuditRule = {
   category: "architecture",
   severity: "warning",
   title: "LoopRunner builds a Minimal Context Package in mode plan",
-  description: "runLoopPlan should build a MinimalContextPackage for a completed plan cycle using agentPolicy.requirements.contextBudget, and expose it as an additive LoopRunResult field.",
+  description:
+    "runLoopPlan should build a MinimalContextPackage for a completed plan cycle using agentPolicy.requirements.contextBudget, and expose it as an additive LoopRunResult field.",
   check: () => {
     const expectations = [
-      { file: "src/loop/types.ts", token: "contextPackage: MinimalContextPackage | null;" },
+      {
+        file: "src/loop/types.ts",
+        token: "contextPackage: MinimalContextPackage | null;",
+      },
       { file: "src/loop/planner.ts", token: "snapshot: ProjectSnapshot;" },
-      { file: "src/loop/runner.ts", token: "import { buildMinimalContext } from \"../context/builder.js\";" },
-      { file: "src/loop/runner.ts", token: "agentPolicy.requirements.contextBudget" },
-      { file: "src/commands/run.ts", token: "contextPackage: result.contextPackage" },
+      {
+        file: "src/loop/runner.ts",
+        token: 'import { buildMinimalContext } from "../context/builder.js";',
+      },
+      {
+        file: "src/loop/runner.ts",
+        token: "agentPolicy.requirements.contextBudget",
+      },
+      {
+        file: "src/commands/run.ts",
+        token: "contextPackage: result.contextPackage",
+      },
     ];
 
     const missing = expectations
-      .filter(({ file, token }) => !existsSync(file) || !readFileSync(file, "utf8").includes(token))
+      .filter(
+        ({ file, token }) =>
+          !existsSync(file) || !readFileSync(file, "utf8").includes(token),
+      )
       .map(({ file, token }) => `${file} -> ${token}`);
 
     if (missing.length > 0) {
@@ -3157,12 +3390,233 @@ export const CONTEXT_BUILDER_LOOP_INTEGRATION_RULE: AuditRule = {
   },
 };
 
+export const EXECUTION_REPORTING_ARCHITECTURE_DOCUMENTATION_RULE: AuditRule = {
+  id: "AUDIT-069",
+  category: "architecture",
+  severity: "warning",
+  title: "Execution reporting architecture contract is documented",
+  description:
+    "The repository should document the JSON and Markdown execution report contracts, schema evolution, compatibility, and golden fixtures.",
+  check: () => {
+    const documentationPath = "docs/architecture/execution-reporting.md";
+
+    if (!existsSync(documentationPath)) {
+      return fail(
+        EXECUTION_REPORTING_ARCHITECTURE_DOCUMENTATION_RULE,
+        "Execution reporting architecture documentation is missing.",
+        [documentationPath],
+        "Create docs/architecture/execution-reporting.md and document the execution report contract.",
+      );
+    }
+
+    const content = readFileSync(documentationPath, "utf8");
+    const expectedTerms = [
+      "report.json",
+      "report.md",
+      "schemaVersion",
+      "Golden fixtures",
+      "breaking change",
+      "extensions additives",
+    ];
+
+    const missing = expectedTerms
+      .filter((term) => !content.includes(term))
+      .map((term) => `${documentationPath}: missing "${term}"`);
+
+    if (missing.length > 0) {
+      return fail(
+        EXECUTION_REPORTING_ARCHITECTURE_DOCUMENTATION_RULE,
+        "Execution reporting architecture documentation is incomplete.",
+        missing,
+        "Document report.json, report.md, schemaVersion, golden fixtures, additive extensions, and breaking changes.",
+      );
+    }
+
+    return pass(
+      EXECUTION_REPORTING_ARCHITECTURE_DOCUMENTATION_RULE,
+      "Execution reporting architecture contract is documented.",
+      [documentationPath, ...expectedTerms],
+    );
+  },
+};
+
+export const README_EXECUTION_REPORTING_DOCUMENTATION_RULE: AuditRule = {
+  id: "AUDIT-070",
+  category: "architecture",
+  severity: "warning",
+  title: "README documents execution reporting",
+  description:
+    "README.md should expose the JSON and Markdown execution reports, their golden fixtures, the regeneration command, and the architecture documentation.",
+  check: () => {
+    const readmePath = "README.md";
+
+    if (!existsSync(readmePath)) {
+      return fail(
+        README_EXECUTION_REPORTING_DOCUMENTATION_RULE,
+        "README.md is missing.",
+        [readmePath],
+        "Restore README.md and document execution reporting.",
+      );
+    }
+
+    const content = readFileSync(readmePath, "utf8");
+    const expectedTerms = [
+      "Rapports d’exécution",
+      "report.json",
+      "report.md",
+      "tests/fixtures/reports/report.json",
+      "tests/fixtures/reports/report.md",
+      "pnpm run reports:fixtures",
+      "docs/architecture/execution-reporting.md",
+    ];
+
+    const missing = expectedTerms
+      .filter((term) => !content.includes(term))
+      .map((term) => `${readmePath}: missing "${term}"`);
+
+    if (missing.length > 0) {
+      return fail(
+        README_EXECUTION_REPORTING_DOCUMENTATION_RULE,
+        "README execution reporting documentation is incomplete.",
+        missing,
+        "Document the execution report formats, fixtures, regeneration command, and architecture contract in README.md.",
+      );
+    }
+
+    return pass(
+      README_EXECUTION_REPORTING_DOCUMENTATION_RULE,
+      "README documents execution reporting.",
+      [readmePath, ...expectedTerms],
+    );
+  },
+};
+
+export const EXECUTION_REPORT_GOLDEN_FIXTURES_RULE: AuditRule = {
+  id: "AUDIT-071",
+  category: "architecture",
+  severity: "warning",
+  title: "Execution report golden fixtures are present and structured",
+  description:
+    "The repository should retain valid JSON and Markdown golden fixtures for deterministic execution report regression checks.",
+  check: () => {
+    const jsonFixturePath = "tests/fixtures/reports/report.json";
+    const markdownFixturePath = "tests/fixtures/reports/report.md";
+    const fixturePaths = [jsonFixturePath, markdownFixturePath];
+
+    const missingFiles = fixturePaths.filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        EXECUTION_REPORT_GOLDEN_FIXTURES_RULE,
+        "Execution report golden fixtures are missing.",
+        missingFiles,
+        "Create the JSON and Markdown golden fixtures under tests/fixtures/reports/.",
+      );
+    }
+
+    const violations: string[] = [];
+
+    try {
+      const report = JSON.parse(readFileSync(jsonFixturePath, "utf8")) as {
+        schemaVersion?: unknown;
+        summary?: unknown;
+        steps?: unknown;
+      };
+
+      if (report.schemaVersion !== 1) {
+        violations.push(`${jsonFixturePath}: schemaVersion must equal 1`);
+      }
+
+      if (typeof report.summary !== "object" || report.summary === null) {
+        violations.push(`${jsonFixturePath}: summary must be an object`);
+      }
+
+      if (!Array.isArray(report.steps)) {
+        violations.push(`${jsonFixturePath}: steps must be an array`);
+      }
+    } catch {
+      violations.push(`${jsonFixturePath}: invalid JSON`);
+    }
+
+    const markdown = readFileSync(markdownFixturePath, "utf8").trim();
+
+    if (markdown.length === 0) {
+      violations.push(`${markdownFixturePath}: fixture must not be empty`);
+    }
+
+    if (violations.length > 0) {
+      return fail(
+        EXECUTION_REPORT_GOLDEN_FIXTURES_RULE,
+        "Execution report golden fixtures are invalid.",
+        violations,
+        "Regenerate valid report.json and report.md fixtures with pnpm run reports:fixtures.",
+      );
+    }
+
+    return pass(
+      EXECUTION_REPORT_GOLDEN_FIXTURES_RULE,
+      "Execution report golden fixtures are present and structured.",
+      fixturePaths,
+    );
+  },
+};
+
+export const EXECUTION_REPORT_DETERMINISM_DOCUMENTATION_RULE: AuditRule = {
+  id: "AUDIT-072",
+  category: "architecture",
+  severity: "warning",
+  title: "Execution report determinism is documented",
+  description:
+    "The execution reporting contract should state that both formats derive from one model with stable step and detail ordering and controlled volatile data.",
+  check: () => {
+    const documentationPath = "docs/architecture/execution-reporting.md";
+
+    if (!existsSync(documentationPath)) {
+      return fail(
+        EXECUTION_REPORT_DETERMINISM_DOCUMENTATION_RULE,
+        "Execution reporting architecture documentation is missing.",
+        [documentationPath],
+        "Create the execution reporting architecture documentation and define deterministic output guarantees.",
+      );
+    }
+
+    const content = readFileSync(documentationPath, "utf8");
+    const expectedTerms = [
+      "même modèle de rapport",
+      "l’ordre des étapes doit être stable",
+      "l’ordre des détails doit être stable",
+      "donnée volatile",
+      "entrée déterministe",
+    ];
+
+    const missing = expectedTerms
+      .filter((term) => !content.includes(term))
+      .map((term) => `${documentationPath}: missing "${term}"`);
+
+    if (missing.length > 0) {
+      return fail(
+        EXECUTION_REPORT_DETERMINISM_DOCUMENTATION_RULE,
+        "Execution report determinism documentation is incomplete.",
+        missing,
+        "Document the shared report model, deterministic inputs, stable ordering, and control of volatile data.",
+      );
+    }
+
+    return pass(
+      EXECUTION_REPORT_DETERMINISM_DOCUMENTATION_RULE,
+      "Execution report determinism is documented.",
+      [documentationPath, ...expectedTerms],
+    );
+  },
+};
+
 export const CONTEXT_BUILDER_DEPENDENCY_DIRECTION_RULE: AuditRule = {
   id: "AUDIT-068",
   category: "architecture",
   severity: "warning",
   title: "Context builder dependencies stay unidirectional",
-  description: "src/context/ should never depend on src/commands/, src/loop/, or src/cli.ts, and src/policy/ and src/agents/ should never depend on src/context/.",
+  description:
+    "src/context/ should never depend on src/commands/, src/loop/, or src/cli.ts, and src/policy/ and src/agents/ should never depend on src/context/.",
   check: () => {
     const contextFiles = [
       "src/context/types.ts",
@@ -3171,8 +3625,17 @@ export const CONTEXT_BUILDER_DEPENDENCY_DIRECTION_RULE: AuditRule = {
       "src/context/context-cost-estimator.ts",
       "src/context/builder.ts",
     ];
-    const policyFiles = ["src/policy/types.ts", "src/policy/defaults.ts", "src/policy/resolver.ts"];
-    const agentFiles = ["src/agents/types.ts", "src/agents/registry.ts", "src/agents/selector.ts", "src/agents/escalation.ts"];
+    const policyFiles = [
+      "src/policy/types.ts",
+      "src/policy/defaults.ts",
+      "src/policy/resolver.ts",
+    ];
+    const agentFiles = [
+      "src/agents/types.ts",
+      "src/agents/registry.ts",
+      "src/agents/selector.ts",
+      "src/agents/escalation.ts",
+    ];
     const allFiles = [...contextFiles, ...policyFiles, ...agentFiles];
 
     const missingFiles = allFiles.filter((file) => !existsSync(file));
@@ -3192,10 +3655,16 @@ export const CONTEXT_BUILDER_DEPENDENCY_DIRECTION_RULE: AuditRule = {
 
     const violations = [
       ...contextFiles
-        .filter((file) => forbiddenInContext.test(readFileSync(file, "utf8")) || forbiddenCliInContext.test(readFileSync(file, "utf8")))
+        .filter(
+          (file) =>
+            forbiddenInContext.test(readFileSync(file, "utf8")) ||
+            forbiddenCliInContext.test(readFileSync(file, "utf8")),
+        )
         .map((file) => `${file}: imports commands/, loop/, or cli.js`),
       ...[...policyFiles, ...agentFiles]
-        .filter((file) => forbiddenContextInOthers.test(readFileSync(file, "utf8")))
+        .filter((file) =>
+          forbiddenContextInOthers.test(readFileSync(file, "utf8")),
+        )
         .map((file) => `${file}: imports context/`),
     ];
 

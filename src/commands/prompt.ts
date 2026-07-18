@@ -56,14 +56,20 @@ export function printProjectPrompt(project: ProjectConfig): void {
       console.log(`- Status : ${selectedCandidate.status}`);
       console.log(`- Priority : ${selectedCandidate.priority}`);
       console.log(`- Reason : ${selectedCandidate.reason}`);
-      console.log(`- Location : ${selectedCandidate.path}:${selectedCandidate.line}`);
+      console.log(
+        `- Location : ${selectedCandidate.path}:${selectedCandidate.line}`,
+      );
       console.log(`- Text : ${selectedCandidate.text}`);
 
       if (selectedCandidate.kind === "blocked") {
         console.log("- Attention : ne pas démarrer ce candidat directement.");
-        console.log("- Action recommandée : choisir un prérequis plus petit et réversible.");
+        console.log(
+          "- Action recommandée : choisir un prérequis plus petit et réversible.",
+        );
       } else if (selectedCandidate.kind === "warning") {
-        console.log("- Attention : candidat sensible, à cadrer avant implémentation.");
+        console.log(
+          "- Attention : candidat sensible, à cadrer avant implémentation.",
+        );
       }
     }
   }
@@ -80,43 +86,44 @@ export function printProjectPrompt(project: ProjectConfig): void {
 
   console.log("");
   console.log("## Consignes");
-  console.log("- Lire les sources listées avant toute intervention significative.");
+  console.log(
+    "- Lire les sources listées avant toute intervention significative.",
+  );
   console.log("- Respecter l'architecture et les conventions du projet.");
   console.log("- Travailler par micro-lots sûrs et réversibles.");
-  console.log("- Ne pas modifier de fichiers hors périmètre sans justification explicite.");
+  console.log(
+    "- Ne pas modifier de fichiers hors périmètre sans justification explicite.",
+  );
   console.log("- Ne pas ajouter de dépendance inutile.");
   console.log("- Lancer les validations configurées avant review ou commit.");
 }
-
 
 export function printProjectPromptJson(project: ProjectConfig): void {
   const snapshot = buildProjectSnapshot(project);
   const selectedCandidate = snapshot.roadmap.selectedCandidate;
 
   console.log(
-    JSON.stringify(
-      {
-        schemaVersion: 1,
-        project: snapshot.project,
-        git: snapshot.git,
-        docs: snapshot.docs,
-        roadmap: {
-          available: snapshot.roadmap.available,
-          paths: snapshot.roadmap.paths,
-          selectedCandidate,
-          stats: snapshot.roadmap.stats,
-          summary: snapshot.roadmap.summary,
-        },
-        validation: snapshot.validation,
-        instructions: [
-          "Lire les sources listées avant toute intervention significative.",
-          "Respecter l'architecture et les conventions du projet.",
-          "Travailler par micro-lots sûrs et réversibles.",
-          "Ne pas modifier de fichiers hors périmètre sans justification explicite.",
-          "Ne pas ajouter de dépendance inutile.",
-          "Lancer les validations configurées avant review ou commit.",
-        ],
+    JSON.stringify({
+      schemaVersion: 1,
+      project: snapshot.project,
+      git: snapshot.git,
+      docs: snapshot.docs,
+      roadmap: {
+        available: snapshot.roadmap.available,
+        paths: snapshot.roadmap.paths,
+        selectedCandidate,
+        stats: snapshot.roadmap.stats,
+        summary: snapshot.roadmap.summary,
       },
-    ),
+      validation: snapshot.validation,
+      instructions: [
+        "Lire les sources listées avant toute intervention significative.",
+        "Respecter l'architecture et les conventions du projet.",
+        "Travailler par micro-lots sûrs et réversibles.",
+        "Ne pas modifier de fichiers hors périmètre sans justification explicite.",
+        "Ne pas ajouter de dépendance inutile.",
+        "Lancer les validations configurées avant review ou commit.",
+      ],
+    }),
   );
 }

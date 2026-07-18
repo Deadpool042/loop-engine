@@ -9,7 +9,11 @@
 
 import type { AgentRegistry } from "../agents/registry.js";
 import { selectAgentProfile } from "../agents/selector.js";
-import { compareAgentEffort, type AgentCapability, type AgentPermission } from "../agents/types.js";
+import {
+  compareAgentEffort,
+  type AgentCapability,
+  type AgentPermission,
+} from "../agents/types.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import {
   getAllowedPermissionsForMode,
@@ -47,7 +51,9 @@ const VALIDATION_KEYWORDS = ["validation", "valider", "audit"];
 const ARCHITECTURE_KEYWORDS = ["architecture", "conception", "design"];
 const REVIEW_KEYWORDS = ["revue", "review"];
 
-export function classifyLoopTaskCategory(candidate: RoadmapCandidate | null): LoopTaskCategory {
+export function classifyLoopTaskCategory(
+  candidate: RoadmapCandidate | null,
+): LoopTaskCategory {
   if (!candidate) {
     return "none";
   }
@@ -77,7 +83,9 @@ export function classifyLoopTaskCategory(candidate: RoadmapCandidate | null): Lo
   return "code";
 }
 
-const CATEGORY_CAPABILITIES: Readonly<Record<LoopTaskCategory, readonly AgentCapability[]>> = {
+const CATEGORY_CAPABILITIES: Readonly<
+  Record<LoopTaskCategory, readonly AgentCapability[]>
+> = {
   documentation: ["code_edit"],
   code: ["code_edit", "shell_exec", "test_execution"],
   tests: ["code_edit", "test_execution"],
@@ -101,7 +109,9 @@ const CATEGORY_NEEDS_WRITE: Readonly<Record<LoopTaskCategory, boolean>> = {
   none: false,
 };
 
-const CATEGORY_MINIMUM_EFFORT: Readonly<Record<LoopTaskCategory, LoopTaskRequirements["minimumEffort"]>> = {
+const CATEGORY_MINIMUM_EFFORT: Readonly<
+  Record<LoopTaskCategory, LoopTaskRequirements["minimumEffort"]>
+> = {
   documentation: "low",
   code: "medium",
   tests: "medium",
@@ -200,13 +210,17 @@ function resolution(
 // budget_exhausted -> no_compatible_agent -> resolved. budget_exhausted is
 // checked before attempting selection (see the comment at that check) so an
 // exhausted budget is never misreported as an incompatible registry.
-export function resolvePolicy(input: ResolvePolicyInput): AgentPolicyResolution {
+export function resolvePolicy(
+  input: ResolvePolicyInput,
+): AgentPolicyResolution {
   const { policy, registry, candidate, mode, request = {} } = input;
 
   const requirements = deriveTaskRequirements(candidate, mode, policy);
 
   if (!policy.enabled) {
-    return resolution(policy, mode, requirements, "policy_disabled", [`policy "${policy.id}" is disabled`]);
+    return resolution(policy, mode, requirements, "policy_disabled", [
+      `policy "${policy.id}" is disabled`,
+    ]);
   }
 
   if (!candidate || requirements.category === "none") {
@@ -215,7 +229,10 @@ export function resolvePolicy(input: ResolvePolicyInput): AgentPolicyResolution 
     ]);
   }
 
-  const maximumEffort = restrictMaximumEffort(policy.maximumEffort, request.requestedMaxEffort);
+  const maximumEffort = restrictMaximumEffort(
+    policy.maximumEffort,
+    request.requestedMaxEffort,
+  );
 
   if (compareAgentEffort(requirements.minimumEffort, maximumEffort) > 0) {
     return resolution(policy, mode, requirements, "effort_not_supported", [
@@ -223,7 +240,10 @@ export function resolvePolicy(input: ResolvePolicyInput): AgentPolicyResolution 
     ]);
   }
 
-  const allowedProviders = mergeAllowedProviders(policy.allowedProviders, request.requestedProviders);
+  const allowedProviders = mergeAllowedProviders(
+    policy.allowedProviders,
+    request.requestedProviders,
+  );
 
   if (allowedProviders && allowedProviders.length === 0) {
     return resolution(policy, mode, requirements, "provider_not_allowed", [
@@ -231,7 +251,10 @@ export function resolvePolicy(input: ResolvePolicyInput): AgentPolicyResolution 
     ]);
   }
 
-  const allowedRuntimes = mergeAllowedRuntimes(policy.allowedRuntimes, request.requestedRuntimes);
+  const allowedRuntimes = mergeAllowedRuntimes(
+    policy.allowedRuntimes,
+    request.requestedRuntimes,
+  );
 
   if (allowedRuntimes && allowedRuntimes.length === 0) {
     return resolution(policy, mode, requirements, "runtime_not_allowed", [
@@ -256,7 +279,10 @@ export function resolvePolicy(input: ResolvePolicyInput): AgentPolicyResolution 
   // getForecastSelectionBudgetForMode in defaults.ts for why the forecast
   // preview must not gate on plan's own zero-call budget.
   const budget = mergeBudgetsRestrictively(
-    mergeBudgetsRestrictively(policy.defaultBudget, getForecastSelectionBudgetForMode(mode)),
+    mergeBudgetsRestrictively(
+      policy.defaultBudget,
+      getForecastSelectionBudgetForMode(mode),
+    ),
     toBudget(request.requestedBudget ?? {}),
   );
 
@@ -297,7 +323,10 @@ export function resolvePolicy(input: ResolvePolicyInput): AgentPolicyResolution 
       mode,
       requirements,
       "no_compatible_agent",
-      ["no registered agent profile satisfies the resolved requirements", ...selection.rejected.map((r) => `${r.profileId}: ${r.reason}`)],
+      [
+        "no registered agent profile satisfies the resolved requirements",
+        ...selection.rejected.map((r) => `${r.profileId}: ${r.reason}`),
+      ],
       selection,
       selectionRequest,
     );
@@ -310,5 +339,13 @@ export function resolvePolicy(input: ResolvePolicyInput): AgentPolicyResolution 
       : `merged budget allows ${String(budget.maxCalls)} call(s) in mode ${mode}`,
   ];
 
-  return resolution(policy, mode, requirements, "resolved", reasons, selection, selectionRequest);
+  return resolution(
+    policy,
+    mode,
+    requirements,
+    "resolved",
+    reasons,
+    selection,
+    selectionRequest,
+  );
 }

@@ -20,12 +20,12 @@ describe("execution json reporter", () => {
   });
 });
 
-  it("returns a deeply frozen report", () => {
-    const report = createExecutionJsonReport(executionFixture);
+it("returns a deeply frozen report", () => {
+  const report = createExecutionJsonReport(executionFixture);
 
-    assert.ok(Object.isFrozen(report));
-    assert.ok(Object.isFrozen(report.summary));
-    assert.ok(Object.isFrozen(report.steps));
-    assert.ok(Object.isFrozen(report.steps[0]));
-    assert.ok(Object.isFrozen(report.steps[0].details));
-  });
+  assert.ok(Object.isFrozen(report));
+  assert.ok(Object.isFrozen(report.summary));
+  assert.ok(Object.isFrozen(report.steps));
+  assert.ok(Object.isFrozen(report.steps[0]));
+  assert.ok(Object.isFrozen(report.steps[0].details));
+});

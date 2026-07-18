@@ -32,10 +32,7 @@ describe("execution session", () => {
 
   it("transitions running -> completed", () => {
     const session = startExecution(
-      createExecutionSession(
-        "session-1",
-        "2026-01-01T00:00:00.000Z",
-      ),
+      createExecutionSession("session-1", "2026-01-01T00:00:00.000Z"),
     );
 
     const completed = completeExecution(session);
@@ -45,10 +42,7 @@ describe("execution session", () => {
 
   it("transitions running -> failed", () => {
     const session = startExecution(
-      createExecutionSession(
-        "session-1",
-        "2026-01-01T00:00:00.000Z",
-      ),
+      createExecutionSession("session-1", "2026-01-01T00:00:00.000Z"),
     );
 
     const failed = failExecution(session);

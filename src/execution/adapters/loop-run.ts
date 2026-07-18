@@ -6,9 +6,7 @@ import type {
   ExecutionStepResult,
 } from "../types.js";
 
-function toExecutionStatus(
-  status: LoopRunStatus,
-): ExecutionStatus {
+function toExecutionStatus(status: LoopRunStatus): ExecutionStatus {
   switch (status) {
     case "completed":
       return "completed";
@@ -30,7 +28,9 @@ function toExecutionStatus(
   }
 }
 
-function toExecutionStep(step: LoopRunResult["steps"][number]): ExecutionStepResult {
+function toExecutionStep(
+  step: LoopRunResult["steps"][number],
+): ExecutionStepResult {
   return {
     name: step.name,
     startedAt: step.startedAt,
