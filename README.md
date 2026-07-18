@@ -145,6 +145,7 @@ Voir aussi :
 - `docs/architecture/capability-policy-engine.md`
 - `docs/architecture/authorization-configuration.md`
 - `docs/architecture/architecture-consolidation.md`
+- `docs/architecture/rfc-execution-architecture-v11.md`
 
 ## Audit et CI
 

@@ -120,6 +120,7 @@ When adjusting keyword lists, favor precision (avoid blocking ordinary work) ove
 - `docs/architecture/capability-policy-engine.md` — Capability & Policy Engine (`src/policy/`): default-deny theoretical authorization after transport intent and before any future transport boundary.
 - `docs/architecture/authorization-configuration.md` — Authorization Configuration (`src/authorization/`): inactive, review-required requirements after theoretical authorization and before any future execution review.
 - `docs/architecture/architecture-consolidation.md` — V10.9 consolidation: shared static-registry invariants without a new execution layer or public contract.
+- `docs/architecture/rfc-execution-architecture-v11.md` — V11 normative execution architecture RFC: future boundary, trust, security, lifecycle and review requirements; no implementation authorization.
 - `docs/architecture/commands.md` — layering rules for `cli.ts` / `commands/` / `core/` / `intelligence/` / `ui/`.
 - `docs/architecture/project-intelligence.md` — `ProjectSnapshot` contract and roadmap candidate classification.
 - `docs/architecture/roadmap-reader.md` — roadmap reader formats, states, and keyword refinement history.
