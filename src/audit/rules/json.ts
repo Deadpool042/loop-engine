@@ -4,6 +4,7 @@ import {
   PUBLIC_COMMANDS,
   PUBLIC_JSON_COMMAND_FILES,
 } from "../public-commands.js";
+import { sourceIncludesToken } from "../source.js";
 import type { AuditRule } from "../types.js";
 
 export const JSON_SCHEMA_VERSION_RULE: AuditRule = {
@@ -699,7 +700,9 @@ export const JSON_AUDIT_RECOMMENDATION_VALUE_ASSERTION_RULE: AuditRule = {
       'assertOneOf(recommendationPriority, "recommendation.priority", AUDIT_PRIORITIES)',
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -750,7 +753,9 @@ export const JSON_CHECK_ENUM_ASSERTION_HELPER_RULE: AuditRule = {
       'assertOneOf(recommendationPriority, "recommendation.priority", AUDIT_PRIORITIES)',
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -803,7 +808,9 @@ export const JSON_CHECK_ENUM_VALUE_CONSTANTS_RULE: AuditRule = {
       'assertOneOf(recommendationPriority, "recommendation.priority", AUDIT_PRIORITIES)',
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -904,7 +911,9 @@ export const JSON_AUDIT_SUMMARY_TOTAL_CONSISTENCY_RULE: AuditRule = {
       "summary.total must match summary count total",
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -949,7 +958,9 @@ export const JSON_AUDIT_SUMMARY_SCORE_CONSISTENCY_RULE: AuditRule = {
       "summary.score must match pass ratio",
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -994,7 +1005,9 @@ export const JSON_AUDIT_SUMMARY_STATUS_CONSISTENCY_RULE: AuditRule = {
       "summary.status must match finding counts",
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -1044,7 +1057,9 @@ export const JSON_AUDIT_SUMMARY_CATEGORY_COUNT_CONSISTENCY_RULE: AuditRule = {
       "summary.byCategory.${category} must match finding category count",
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -1094,7 +1109,9 @@ export const JSON_AUDIT_SUMMARY_PRIORITY_COUNT_CONSISTENCY_RULE: AuditRule = {
       "summary.byPriority.${priority} must match finding priority count",
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -1196,7 +1213,9 @@ export const JSON_AUDIT_EVERY_RECOMMENDATION_VALUE_ASSERTION_RULE: AuditRule = {
       'assertOneOf(recommendationPriorityValue, "recommendation.priority", AUDIT_PRIORITIES)',
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -1456,7 +1475,7 @@ export const JSON_AUDIT_NESTED_RECOMMENDATION_SUMMARY_CONTRACT_RULE: AuditRule =
       ];
 
       const missing = expectedTokens.filter(
-        (token) => !content.includes(token),
+        (token) => !sourceIncludesToken(content, token),
       );
 
       if (missing.length > 0) {

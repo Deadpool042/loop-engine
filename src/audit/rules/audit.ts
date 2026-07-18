@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fail, pass } from "../findings.js";
+import { sourceIncludesToken } from "../source.js";
 import type { AuditRule } from "../types.js";
 
 export const AUDIT_SCORE_EXPOSURE_RULE: AuditRule = {
@@ -1725,7 +1726,9 @@ export const AUDIT_PROFILE_DEFINITION_EXPOSURE_RULE: AuditRule = {
       "categories",
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -2398,7 +2401,9 @@ export const AUDIT_RECOMMENDATION_PRIORITY_COUNT_RULE: AuditRule = {
       "low: 1",
     ];
 
-    const missing = expectedTokens.filter((token) => !haystack.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(haystack, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -2728,7 +2733,9 @@ export const AUDIT_RECOMMENDATION_SUMMARY_SYNC_ASSERTION_RULE: AuditRule = {
       "summary.recommendations.byPriority.${priority} must match recommendation priority count",
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     if (missing.length > 0) {
       return fail(
@@ -2879,7 +2886,9 @@ export const AUDIT_POLICY_MODE_PERMISSION_CEILING_RULE: AuditRule = {
       "export function getAllowedPermissionsForMode",
     ];
 
-    const missing = expectedTokens.filter((token) => !content.includes(token));
+    const missing = expectedTokens.filter(
+      (token) => !sourceIncludesToken(content, token),
+    );
 
     const ceilingsStart = content.indexOf("const MODE_PERMISSION_CEILINGS");
     const ceilingsEnd = content.indexOf("};", ceilingsStart);
