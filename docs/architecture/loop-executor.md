@@ -20,13 +20,13 @@ Il prépare uniquement une session d'exécution.
 # Position dans l'architecture
 
 LoopRunner
-    ↓
+↓
 AgentPolicy
-    ↓
+↓
 MinimalContextBuilder
-    ↓
+↓
 LoopExecutor
-    ↓
+↓
 (futurs composants)
 Validator
 Repairer
@@ -80,7 +80,6 @@ Les couches supérieures consommeront LoopExecutor.
 
 Jamais l'inverse.
 
-
 ---
 
 # Contrat : ExecutionSession
@@ -133,7 +132,6 @@ Une ExecutionSession :
 - ne modifie jamais le dépôt Git ;
 - ne contacte jamais un agent.
 
-
 ---
 
 # Machine à états
@@ -141,19 +139,19 @@ Une ExecutionSession :
 L'ExecutionSession suit une machine à états stricte.
 
 created
-    │
-    ▼
+│
+▼
 prepared
-    │
-    ├──────────────► running
-    │                   │
-    │                   ├────────► completed
-    │                   │
-    │                   ├────────► failed
-    │                   │
-    │                   └────────► cancelled
-    │
-    └─────────────────────────────┘
+│
+├──────────────► running
+│ │
+│ ├────────► completed
+│ │
+│ ├────────► failed
+│ │
+│ └────────► cancelled
+│
+└─────────────────────────────┘
 
 Transitions interdites :
 
@@ -205,7 +203,6 @@ cancelled
 
 Chaque lot n'ajoute que les transitions nécessaires.
 
-
 ---
 
 # Règles d'architecture
@@ -232,14 +229,14 @@ Il ne produit rien d'autre.
 Autorisées
 
 intelligence/
-      │
-      ▼
+│
+▼
 policy/
-      │
-      ▼
+│
+▼
 context/
-      │
-      ▼
+│
+▼
 executor/
 
 Interdites
@@ -290,7 +287,6 @@ Au minimum :
 - ExecutionSession immuable
 - reproductibilité complète
 
-
 ---
 
 # Périmètre du lot V8.0
@@ -337,7 +333,6 @@ Les éléments suivants seront réalisés dans des lots ultérieurs :
 
 Tout ajout dépassant ce périmètre devra faire l'objet d'un nouveau lot de roadmap.
 
-
 ---
 
 # Structure du module
@@ -345,22 +340,22 @@ Tout ajout dépassant ce périmètre devra faire l'objet d'un nouveau lot de roa
 src/executor/
 
 types.ts
-    Types publics.
+Types publics.
 
 session.ts
-    Construction d'une ExecutionSession.
+Construction d'une ExecutionSession.
 
 state-machine.ts
-    Validation des transitions d'état.
+Validation des transitions d'état.
 
 planner.ts
-    Préparation de l'exécution.
+Préparation de l'exécution.
 
 validator.ts
-    Vérification des préconditions.
+Vérification des préconditions.
 
 index.ts
-    API publique.
+API publique.
 
 ---
 
@@ -411,4 +406,3 @@ V8.6
 - publisher
 
 Chaque lot enrichit le module sans casser l'API publique.
-

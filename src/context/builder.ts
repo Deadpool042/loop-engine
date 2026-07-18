@@ -156,7 +156,9 @@ export function buildMinimalContext(
     }
   }
 
-  if (omitted.some((omission) => BUDGET_OMISSION_REASONS.has(omission.reason))) {
+  if (
+    omitted.some((omission) => BUDGET_OMISSION_REASONS.has(omission.reason))
+  ) {
     truncated = true;
   }
 

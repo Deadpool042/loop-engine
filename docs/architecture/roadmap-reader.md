@@ -37,19 +37,22 @@ Exemples :
 ```md
 - [ ] Lot 12 — Ajouter une page admin
 - [x] Lot 11 — Terminé
+
 ## Prochain lot
+
 ### H2-L3 — Stabilisation catalogue
+
 ⏳ En cours
 
 États détectables
 
 V1.2 peut détecter :
 
-* candidat non commencé ;
-* candidat en cours ;
-* candidat terminé ;
-* candidat sensible ;
-* candidat bloqué.
+- candidat non commencé ;
+- candidat en cours ;
+- candidat terminé ;
+- candidat sensible ;
+- candidat bloqué.
 
 V1.2 ne doit pas encore essayer de résoudre toutes les dépendances entre lots.
 
@@ -59,9 +62,9 @@ Classification
 
 Les candidats restent classés en :
 
-* safe
-* warning
-* blocked
+- safe
+- warning
+- blocked
 
 safe signifie : candidat potentiellement compatible avec un micro-lot.
 
@@ -88,12 +91,12 @@ Limites V1.2
 
 Le Roadmap Reader ne doit pas :
 
-* modifier la roadmap ;
-* marquer un lot terminé ;
-* créer une tâche ;
-* appeler une IA ;
-* deviner une priorité métier non écrite ;
-* interpréter des dépendances complexes.
+- modifier la roadmap ;
+- marquer un lot terminé ;
+- créer une tâche ;
+- appeler une IA ;
+- deviner une priorité métier non écrite ;
+- interpréter des dépendances complexes.
 
 ⸻
 
@@ -101,19 +104,18 @@ Le Roadmap Reader ne doit pas :
 
 Évolutions possibles :
 
-* sections normalisées ;
-* frontmatter YAML ;
-* identifiants de lots ;
-* liens entre lots ;
-* priorités explicites ;
-* lecture de plusieurs roadmaps ;
-* export JSON plus riche ;
-* dashboard roadmap.
-    EOF
+- sections normalisées ;
+- frontmatter YAML ;
+- identifiants de lots ;
+- liens entre lots ;
+- priorités explicites ;
+- lecture de plusieurs roadmaps ;
+- export JSON plus riche ;
+- dashboard roadmap.
+  EOF
 
 pnpm run validate
 git status –short
-
 
 ## Sélection V1.2
 
@@ -144,7 +146,6 @@ Règles appliquées :
 
 Objectif : détecter les vrais risques sans bloquer des lots ordinaires comme une fiche produit.
 
-
 ## Candidat sélectionné
 
 Le candidat roadmap sélectionné est exposé dans le `ProjectSnapshot` via :
@@ -162,7 +163,6 @@ Objectif :
 - faciliter les sorties JSON et intégrations externes.
 
 `selectedCandidate` peut être `null` si aucun candidat actif n'est disponible.
-
 
 ## Synthèse roadmap
 
@@ -183,7 +183,6 @@ Définitions :
 Cette synthèse est calculée dans `intelligence/`, pas dans les commandes.
 
 Elle sert aux sorties JSON compactes, aux futurs dashboards et aux intégrations read-only.
-
 
 ## Priorité roadmap
 
@@ -207,4 +206,4 @@ Elle ne remplace pas :
 - `reason` pour l'explication.
 
 Les commandes `next` et `prompt` affichent la priorité du candidat sélectionné.
-
+```

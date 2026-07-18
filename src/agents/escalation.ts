@@ -28,19 +28,27 @@ export type AgentEscalationRequest = Readonly<{
 }>;
 
 export type AgentEscalationResult =
-  | Readonly<{ outcome: "escalated"; profile: AgentProfile; rejected: readonly AgentRejection[] }>
+  | Readonly<{
+      outcome: "escalated";
+      profile: AgentProfile;
+      rejected: readonly AgentRejection[];
+    }>
   | Readonly<{ outcome: "exhausted"; rejected: readonly AgentRejection[] }>;
 
 // Never invoked implicitly: escalation only happens when a caller supplies
 // a real previousProfileId and failureReason. There is no automatic retry
 // or background escalation anywhere in this module.
-export function escalateAgentProfile(input: AgentEscalationRequest): AgentEscalationResult {
+export function escalateAgentProfile(
+  input: AgentEscalationRequest,
+): AgentEscalationResult {
   const previousProfile = input.registry.profiles.find(
     (profile) => profile.id === input.previousProfileId,
   );
 
   if (!previousProfile) {
-    throw new Error(`Unknown previous agent profile: ${input.previousProfileId}`);
+    throw new Error(
+      `Unknown previous agent profile: ${input.previousProfileId}`,
+    );
   }
 
   const rejected: AgentRejection[] = [];

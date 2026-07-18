@@ -1,8 +1,5 @@
 import { createExecutionSummary } from "./summary.js";
-import type {
-  ExecutionResult,
-  ExecutionStepResult,
-} from "./types.js";
+import type { ExecutionResult, ExecutionStepResult } from "./types.js";
 
 export interface ExecutionJsonStep {
   readonly name: string;
@@ -27,9 +24,7 @@ export interface ExecutionJsonReport {
   readonly steps: readonly ExecutionJsonStep[];
 }
 
-function createExecutionJsonStep(
-  step: ExecutionStepResult,
-): ExecutionJsonStep {
+function createExecutionJsonStep(step: ExecutionStepResult): ExecutionJsonStep {
   return Object.freeze({
     name: step.name,
     status: step.success ? "success" : "failed",
@@ -52,8 +47,6 @@ export function createExecutionJsonReport(
   });
 }
 
-export function renderExecutionJson(
-  result: ExecutionResult,
-): string {
-  return JSON.stringify(createExecutionJsonReport(result), null, 2);
+export function renderExecutionJson(result: ExecutionResult): string {
+  return `${JSON.stringify(createExecutionJsonReport(result), null, 2)}\n`;
 }

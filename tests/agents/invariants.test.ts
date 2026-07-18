@@ -2,10 +2,21 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-import { createAgentRegistry, DEFAULT_AGENT_PROFILES, defaultAgentRegistry } from "../../src/agents/registry.js";
+import {
+  createAgentRegistry,
+  DEFAULT_AGENT_PROFILES,
+  defaultAgentRegistry,
+} from "../../src/agents/registry.js";
 import { escalateAgentProfile } from "../../src/agents/escalation.js";
-import { evaluateAgentProfile, selectAgentProfile } from "../../src/agents/selector.js";
-import { AGENT_EFFORTS, compareAgentEffort, type AgentProfile } from "../../src/agents/types.js";
+import {
+  evaluateAgentProfile,
+  selectAgentProfile,
+} from "../../src/agents/selector.js";
+import {
+  AGENT_EFFORTS,
+  compareAgentEffort,
+  type AgentProfile,
+} from "../../src/agents/types.js";
 
 function profile(overrides: Partial<AgentProfile> = {}): AgentProfile {
   return {
@@ -38,7 +49,10 @@ describe("invariant: src/agents/ has no dependency on loop/, commands/ or intell
   for (const file of files) {
     it(`${file} does not import loop/, commands/, intelligence/, or cli.ts`, () => {
       const content = readFileSync(file, "utf8");
-      assert.doesNotMatch(content, /from\s+["'].*\/(loop|commands|intelligence)\//);
+      assert.doesNotMatch(
+        content,
+        /from\s+["'].*\/(loop|commands|intelligence)\//,
+      );
       assert.doesNotMatch(content, /from\s+["'].*cli\.js["']/);
     });
   }
@@ -49,12 +63,17 @@ describe("invariant: default profiles never assert unverified third-party capabi
     for (const candidate of DEFAULT_AGENT_PROFILES) {
       assert.ok(Array.isArray(candidate.capabilities));
       assert.ok(Array.isArray(candidate.permissions));
-      assert.ok(typeof candidate.budget === "object" && candidate.budget !== null);
+      assert.ok(
+        typeof candidate.budget === "object" && candidate.budget !== null,
+      );
     }
   });
 
   it("the canonical doc marks default profiles as illustrative, not verified facts", () => {
-    const doc = readFileSync("docs/architecture/agent-orchestration.md", "utf8");
+    const doc = readFileSync(
+      "docs/architecture/agent-orchestration.md",
+      "utf8",
+    );
     assert.match(doc, /explicitement illustratifs/);
   });
 });
@@ -75,7 +94,9 @@ describe("invariant: provider, runtime, model, and effort are separate fields", 
   });
 
   it("model is a free-form string, not a fixed union of known identifiers", () => {
-    const candidate = profile({ model: "some-future-model-id-not-yet-released" });
+    const candidate = profile({
+      model: "some-future-model-id-not-yet-released",
+    });
     assert.equal(typeof candidate.model, "string");
   });
 });
@@ -83,13 +104,21 @@ describe("invariant: provider, runtime, model, and effort are separate fields", 
 describe("invariant: selector picks the smallest compatible profile deterministically", () => {
   it("always prefers the lowest effort among eligible profiles, in AGENT_EFFORTS order", () => {
     const registry = createAgentRegistry(
-      [...AGENT_EFFORTS].reverse().map((effort) => profile({ id: `p-${effort}`, effort })),
+      [...AGENT_EFFORTS]
+        .reverse()
+        .map((effort) => profile({ id: `p-${effort}`, effort })),
     );
 
-    const result = selectAgentProfile(registry, { requiredCapabilities: [], requiredPermissions: [] });
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: [],
+      requiredPermissions: [],
+    });
 
     assert.equal(result.outcome, "selected");
-    assert.equal(result.outcome === "selected" ? result.profile.effort : null, AGENT_EFFORTS[0]);
+    assert.equal(
+      result.outcome === "selected" ? result.profile.effort : null,
+      AGENT_EFFORTS[0],
+    );
   });
 
   it("is stable across repeated calls on the same registry (no randomness)", () => {
@@ -99,8 +128,12 @@ describe("invariant: selector picks the smallest compatible profile deterministi
     ]);
     const request = { requiredCapabilities: [], requiredPermissions: [] };
 
-    const runs = Array.from({ length: 5 }, () => selectAgentProfile(registry, request));
-    const ids = runs.map((run) => (run.outcome === "selected" ? run.profile.id : null));
+    const runs = Array.from({ length: 5 }, () =>
+      selectAgentProfile(registry, request),
+    );
+    const ids = runs.map((run) =>
+      run.outcome === "selected" ? run.profile.id : null,
+    );
 
     assert.deepEqual(new Set(ids), new Set(["a"]));
   });
@@ -118,13 +151,20 @@ describe("invariant: no preference bypasses capabilities, permissions, max effor
       requiredPermissions: [],
     });
 
-    assert.equal(result.outcome === "selected" ? result.profile.id : null, "capable");
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "capable",
+    );
   });
 
   it("a profile missing a required permission is never selected regardless of effort", () => {
     const registry = createAgentRegistry([
       profile({ id: "cheap-no-perm", effort: "low", permissions: [] }),
-      profile({ id: "has-perm", effort: "high", permissions: ["write_worktree"] }),
+      profile({
+        id: "has-perm",
+        effort: "high",
+        permissions: ["write_worktree"],
+      }),
     ]);
 
     const result = selectAgentProfile(registry, {
@@ -132,7 +172,10 @@ describe("invariant: no preference bypasses capabilities, permissions, max effor
       requiredPermissions: ["write_worktree"],
     });
 
-    assert.equal(result.outcome === "selected" ? result.profile.id : null, "has-perm");
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "has-perm",
+    );
   });
 
   it("effort ceiling is never bypassed even when the excluded profile would tie on capabilities", () => {
@@ -176,13 +219,22 @@ describe("invariant: no model pricing is hardcoded or invented", () => {
     const budgetFields = Object.keys(profile().budget);
     assert.deepEqual(
       budgetFields.sort(),
-      ["maxCalls", "maxCostUsd", "maxDurationMs", "maxRepairs", "maxTokens"].sort(),
+      [
+        "maxCalls",
+        "maxCostUsd",
+        "maxDurationMs",
+        "maxRepairs",
+        "maxTokens",
+      ].sort(),
     );
   });
 
   it("maxCostUsd is a caller-declared ceiling, never a computed price", () => {
     for (const candidate of DEFAULT_AGENT_PROFILES) {
-      assert.ok(candidate.budget.maxCostUsd === null || typeof candidate.budget.maxCostUsd === "number");
+      assert.ok(
+        candidate.budget.maxCostUsd === null ||
+          typeof candidate.budget.maxCostUsd === "number",
+      );
     }
   });
 });
@@ -207,7 +259,13 @@ describe("invariant: escalation requires an explicit failure, respects budgets, 
       profile({
         id: "high-over-budget",
         effort: "high",
-        budget: { maxTokens: 1_000_000, maxCostUsd: null, maxDurationMs: null, maxCalls: null, maxRepairs: null },
+        budget: {
+          maxTokens: 1_000_000,
+          maxCostUsd: null,
+          maxDurationMs: null,
+          maxCalls: null,
+          maxRepairs: null,
+        },
       }),
     ]);
 
@@ -227,7 +285,9 @@ describe("invariant: escalation requires an explicit failure, respects budgets, 
 
   it("terminates in a single hop on a finite registry — never loops (bounded by registry size)", () => {
     const registry = createAgentRegistry(
-      [...AGENT_EFFORTS].map((effort) => profile({ id: `p-${effort}`, effort })),
+      [...AGENT_EFFORTS].map((effort) =>
+        profile({ id: `p-${effort}`, effort }),
+      ),
     );
 
     let currentId = "p-low";
@@ -237,11 +297,17 @@ describe("invariant: escalation requires an explicit failure, respects budgets, 
 
     for (;;) {
       hops += 1;
-      assert.ok(hops <= maxHops, "escalation must terminate within a bounded number of hops");
+      assert.ok(
+        hops <= maxHops,
+        "escalation must terminate within a bounded number of hops",
+      );
 
       const result = escalateAgentProfile({
         registry,
-        request: { requiredCapabilities: ["code_edit"], requiredPermissions: [] },
+        request: {
+          requiredCapabilities: ["code_edit"],
+          requiredPermissions: [],
+        },
         previousProfileId: currentId,
         failureReason: "runtime_error",
       });

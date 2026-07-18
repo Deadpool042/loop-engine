@@ -62,7 +62,13 @@ interface ContextFile {
 
 interface ContextOmission {
   path: string;
-  reason: "duplicate" | "missing" | "outside_project" | "file_limit" | "character_limit" | "token_limit";
+  reason:
+    | "duplicate"
+    | "missing"
+    | "outside_project"
+    | "file_limit"
+    | "character_limit"
+    | "token_limit";
 }
 ```
 

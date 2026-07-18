@@ -11,13 +11,17 @@ import {
   type RoadmapCandidate,
 } from "../../src/intelligence/roadmap.js";
 
-function candidate(kind: RoadmapCandidate["kind"], text: string): RoadmapCandidate {
+function candidate(
+  kind: RoadmapCandidate["kind"],
+  text: string,
+): RoadmapCandidate {
   return {
     path: "roadmap.md",
     line: 1,
     text,
     kind,
-    reason: kind === "safe" ? "no sensitive keyword detected" : `contains "${text}"`,
+    reason:
+      kind === "safe" ? "no sensitive keyword detected" : `contains "${text}"`,
     status: "unknown",
     priority: "default",
   };
@@ -75,8 +79,6 @@ describe("selectRoadmapCandidate", () => {
 
     assert.equal(selected?.kind, "blocked");
   });
-
-
 
   it("prefers higher priority within the same kind", () => {
     const selected = selectRoadmapCandidate([
@@ -186,7 +188,6 @@ describe("findRoadmapCandidates", () => {
     }
   });
 
-
   it("does not block generic product wording", () => {
     const { project, projectPath, cleanup } = setupRoadmap(
       "- [ ] Ajouter une fiche produit simple",
@@ -292,7 +293,6 @@ describe("roadmap candidate status", () => {
   });
 });
 
-
 describe("roadmap candidate priority", () => {
   it("detects p1 priority", () => {
     const { project, projectPath, cleanup } = setupRoadmap(
@@ -350,4 +350,3 @@ describe("roadmap candidate priority", () => {
     }
   });
 });
-

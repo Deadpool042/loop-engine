@@ -53,7 +53,6 @@ Le fichier généré reste :
 
 Le `schemaVersion` devra être incrémenté si la structure change de manière incompatible.
 
-
 ## Implémentation
 
 L'index local RAG indexe désormais les sections Markdown.
@@ -72,4 +71,3 @@ Chaque entrée contient :
 - `contentHash`
 
 La recherche affiche aussi le titre de section via `rag-search`.
-

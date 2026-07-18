@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildAuditRecommendations, countAuditRecommendationsByPriority } from "../src/audit/recommendations.js";
+import {
+  buildAuditRecommendations,
+  countAuditRecommendationsByPriority,
+} from "../src/audit/recommendations.js";
 import type { AuditFinding } from "../src/audit/types.js";
 
 const baseFinding = {
@@ -49,7 +52,6 @@ test("buildAuditRecommendations returns an empty list when no findings are actio
   assert.deepEqual(buildAuditRecommendations(findings), []);
 });
 
-
 test("buildAuditRecommendations sorts recommendations by priority while keeping original order within equal priority", () => {
   const findings: readonly AuditFinding[] = [
     {
@@ -83,11 +85,12 @@ test("buildAuditRecommendations sorts recommendations by priority while keeping 
   ];
 
   assert.deepEqual(
-    buildAuditRecommendations(findings).map((recommendation) => recommendation.ruleId),
+    buildAuditRecommendations(findings).map(
+      (recommendation) => recommendation.ruleId,
+    ),
     ["AUDIT-994", "AUDIT-993", "AUDIT-992", "AUDIT-995"],
   );
 });
-
 
 test("countAuditRecommendationsByPriority counts recommendations by priority", () => {
   assert.deepEqual(

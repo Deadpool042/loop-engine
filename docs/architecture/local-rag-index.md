@@ -61,7 +61,6 @@ Aucune donnée métier importante ne doit exister uniquement dans l'index.
 - Pas d'écriture dans les projets inspectés.
 - Sources toujours traçables.
 
-
 ## Commande V1
 
 La commande disponible est :
@@ -73,7 +72,6 @@ Elle reconstruit :
 - `.loop-engine/rag-index.json`
 
 Le dossier `.loop-engine/` est local, reconstructible et ignoré par Git.
-
 
 ## Recherche V1
 
@@ -93,7 +91,6 @@ La recherche V1 est déterministe :
 - aucun embedding ;
 - aucun appel IA.
 
-
 ## Snippets de recherche
 
 `rag-search` affiche un court extrait pour chaque résultat.
@@ -107,7 +104,6 @@ Règles V1 :
 - aucun appel IA ;
 - aucune dépendance.
 
-
 ## Évolution section-level
 
 La prochaine évolution documentée est l'indexation par sections Markdown :
@@ -120,7 +116,6 @@ Objectif :
 - garder l'index local ;
 - rester sans embedding ;
 - rester sans dépendance externe.
-
 
 ## Sortie JSON de recherche
 
@@ -145,7 +140,6 @@ Chaque résultat contient :
 
 Cette sortie est incluse dans `json-check`.
 
-
 ## Limite de résultats
 
 `rag-search` supporte une limite de résultats :
@@ -158,7 +152,6 @@ Règles :
 - la limite doit être un entier positif ;
 - si aucune limite valide n'est fournie, la limite par défaut est `5` ;
 - la limite s'applique aux sorties humaines et JSON.
-
 
 ## Filtre par chemin
 
@@ -173,4 +166,3 @@ Règles :
 - le filtre utilise `startsWith` sur le chemin indexé ;
 - aucune lecture fichier supplémentaire ;
 - la sortie JSON expose `pathPrefix`.
-

@@ -1,15 +1,24 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { createAgentRegistry, defaultAgentRegistry } from "../../src/agents/registry.js";
+import {
+  createAgentRegistry,
+  defaultAgentRegistry,
+} from "../../src/agents/registry.js";
 import type { AgentProfile } from "../../src/agents/types.js";
 import type { RoadmapCandidate } from "../../src/intelligence/roadmap.js";
 import { DEFAULT_AGENT_POLICY } from "../../src/policy/defaults.js";
-import { classifyLoopTaskCategory, deriveRequiredPermissions, resolvePolicy } from "../../src/policy/resolver.js";
+import {
+  classifyLoopTaskCategory,
+  deriveRequiredPermissions,
+  resolvePolicy,
+} from "../../src/policy/resolver.js";
 import type { AgentPolicy } from "../../src/policy/types.js";
 import { AGENT_POLICY_MODES } from "../../src/policy/types.js";
 
-function candidate(overrides: Partial<RoadmapCandidate> = {}): RoadmapCandidate {
+function candidate(
+  overrides: Partial<RoadmapCandidate> = {},
+): RoadmapCandidate {
   return {
     path: "docs/roadmap/loop-engine.md",
     line: 1,
@@ -38,7 +47,13 @@ function profile(overrides: Partial<AgentProfile> = {}): AgentProfile {
     // below use a candidate that classifies as "code".
     capabilities: ["code_edit", "shell_exec", "test_execution"],
     permissions: ["read_only", "write_worktree", "shell_exec"],
-    budget: { maxTokens: null, maxCostUsd: null, maxDurationMs: null, maxCalls: 1, maxRepairs: 1 },
+    budget: {
+      maxTokens: null,
+      maxCostUsd: null,
+      maxDurationMs: null,
+      maxCalls: 1,
+      maxRepairs: 1,
+    },
     ...overrides,
   };
 }
@@ -46,32 +61,58 @@ function profile(overrides: Partial<AgentProfile> = {}): AgentProfile {
 describe("classifyLoopTaskCategory — deterministic keyword deduction", () => {
   it("deduces a documentation lot", () => {
     assert.equal(
-      classifyLoopTaskCategory(candidate({ text: "- [ ] Rédiger la documentation du module policy" })),
+      classifyLoopTaskCategory(
+        candidate({ text: "- [ ] Rédiger la documentation du module policy" }),
+      ),
       "documentation",
     );
   });
 
   it("deduces a code lot (no keyword match, default)", () => {
     assert.equal(
-      classifyLoopTaskCategory(candidate({ text: "- [ ] Lot V7.4 — Agent Policy Engine et intégration" })),
+      classifyLoopTaskCategory(
+        candidate({
+          text: "- [ ] Lot V7.4 — Agent Policy Engine et intégration",
+        }),
+      ),
       "code",
     );
   });
 
   it("deduces a tests lot", () => {
-    assert.equal(classifyLoopTaskCategory(candidate({ text: "- [ ] Add tests for the policy resolver" })), "tests");
+    assert.equal(
+      classifyLoopTaskCategory(
+        candidate({ text: "- [ ] Add tests for the policy resolver" }),
+      ),
+      "tests",
+    );
   });
 
   it("deduces a validation lot", () => {
-    assert.equal(classifyLoopTaskCategory(candidate({ text: "- [ ] Renforcer l'audit et la validation" })), "validation");
+    assert.equal(
+      classifyLoopTaskCategory(
+        candidate({ text: "- [ ] Renforcer l'audit et la validation" }),
+      ),
+      "validation",
+    );
   });
 
   it("deduces an architecture lot", () => {
-    assert.equal(classifyLoopTaskCategory(candidate({ text: "- [ ] Revoir l'architecture du runner" })), "architecture");
+    assert.equal(
+      classifyLoopTaskCategory(
+        candidate({ text: "- [ ] Revoir l'architecture du runner" }),
+      ),
+      "architecture",
+    );
   });
 
   it("deduces a review-only lot", () => {
-    assert.equal(classifyLoopTaskCategory(candidate({ text: "- [ ] Review the last release" })), "review");
+    assert.equal(
+      classifyLoopTaskCategory(
+        candidate({ text: "- [ ] Review the last release" }),
+      ),
+      "review",
+    );
   });
 
   it("deduces none when there is no candidate", () => {
@@ -83,7 +124,12 @@ describe("classifyLoopTaskCategory — deterministic keyword deduction", () => {
     // (docs/roadmap/loop-engine.md), which itself lives under docs/. If path
     // were inspected, every lot would be misclassified as documentation.
     assert.notEqual(
-      classifyLoopTaskCategory(candidate({ path: "docs/roadmap/loop-engine.md", text: "- [ ] Refactor the selector" })),
+      classifyLoopTaskCategory(
+        candidate({
+          path: "docs/roadmap/loop-engine.md",
+          text: "- [ ] Refactor the selector",
+        }),
+      ),
       "documentation",
     );
   });
@@ -91,7 +137,14 @@ describe("classifyLoopTaskCategory — deterministic keyword deduction", () => {
 
 describe("deriveRequiredPermissions — mode ceiling always wins over category needs", () => {
   it("no write capability in mode plan, regardless of category", () => {
-    for (const category of ["documentation", "code", "tests", "validation", "architecture", "review"] as const) {
+    for (const category of [
+      "documentation",
+      "code",
+      "tests",
+      "validation",
+      "architecture",
+      "review",
+    ] as const) {
       const permissions = deriveRequiredPermissions(category, "plan");
       assert.ok(!permissions.includes("write_worktree"));
       assert.deepEqual(permissions, ["read_only"]);
@@ -99,31 +152,58 @@ describe("deriveRequiredPermissions — mode ceiling always wins over category n
   });
 
   it("no commit permission in mode execute", () => {
-    assert.ok(!deriveRequiredPermissions("code", "execute").includes("git_commit"));
+    assert.ok(
+      !deriveRequiredPermissions("code", "execute").includes("git_commit"),
+    );
   });
 
   it("no push permission in mode commit", () => {
-    assert.ok(!deriveRequiredPermissions("code", "commit").includes("git_push"));
-    assert.ok(deriveRequiredPermissions("code", "commit").includes("git_commit"));
+    assert.ok(
+      !deriveRequiredPermissions("code", "commit").includes("git_push"),
+    );
+    assert.ok(
+      deriveRequiredPermissions("code", "commit").includes("git_commit"),
+    );
   });
 
   it("push is only ever requested in mode publish", () => {
     for (const mode of AGENT_POLICY_MODES) {
-      assert.equal(deriveRequiredPermissions("code", mode).includes("git_push"), mode === "publish");
+      assert.equal(
+        deriveRequiredPermissions("code", mode).includes("git_push"),
+        mode === "publish",
+      );
     }
   });
 
   it("git_tag is never derived from any category/mode combination — always separate, never implicit", () => {
-    for (const category of ["documentation", "code", "tests", "validation", "architecture", "review", "none"] as const) {
+    for (const category of [
+      "documentation",
+      "code",
+      "tests",
+      "validation",
+      "architecture",
+      "review",
+      "none",
+    ] as const) {
       for (const mode of AGENT_POLICY_MODES) {
-        assert.ok(!deriveRequiredPermissions(category, mode).includes("git_tag"));
+        assert.ok(
+          !deriveRequiredPermissions(category, mode).includes("git_tag"),
+        );
       }
     }
   });
 
   it("a review/validation lot never requests write_worktree, even in execute mode", () => {
-    assert.ok(!deriveRequiredPermissions("review", "execute").includes("write_worktree"));
-    assert.ok(!deriveRequiredPermissions("validation", "execute").includes("write_worktree"));
+    assert.ok(
+      !deriveRequiredPermissions("review", "execute").includes(
+        "write_worktree",
+      ),
+    );
+    assert.ok(
+      !deriveRequiredPermissions("validation", "execute").includes(
+        "write_worktree",
+      ),
+    );
   });
 });
 
@@ -155,7 +235,9 @@ describe("resolvePolicy — gates, in order", () => {
   it("effort maximum is never exceeded: a lot needing more than the policy allows is rejected", () => {
     const result = resolvePolicy({
       policy: policy({ maximumEffort: "low" }),
-      registry: createAgentRegistry([profile({ id: "p", effort: "max", capabilities: ["long_context"] })]),
+      registry: createAgentRegistry([
+        profile({ id: "p", effort: "max", capabilities: ["long_context"] }),
+      ]),
       candidate: candidate({ text: "- [ ] Revoir l'architecture globale" }), // category "architecture" -> minimumEffort "high"
       mode: "plan",
     });
@@ -188,7 +270,12 @@ describe("resolvePolicy — gates, in order", () => {
   });
 
   it("permission_denied when the policy explicitly denies a required permission, even though a capable profile exists", () => {
-    const registry = createAgentRegistry([profile({ id: "capable", permissions: ["read_only", "write_worktree", "shell_exec"] })]);
+    const registry = createAgentRegistry([
+      profile({
+        id: "capable",
+        permissions: ["read_only", "write_worktree", "shell_exec"],
+      }),
+    ]);
 
     const result = resolvePolicy({
       policy: policy({ deniedPermissions: ["write_worktree"] }),
@@ -243,7 +330,9 @@ describe("resolvePolicy — gates, in order", () => {
   });
 
   it("resolves with a forecast selection in mode plan — a compatible agent is found without being called", () => {
-    const registry = createAgentRegistry([profile({ id: "forecastable", effort: "medium" })]);
+    const registry = createAgentRegistry([
+      profile({ id: "forecastable", effort: "medium" }),
+    ]);
 
     const result = resolvePolicy({
       policy: policy(),
@@ -262,9 +351,24 @@ describe("resolvePolicy — gates, in order", () => {
 
   it("every resolution carries at least one human-readable reason", () => {
     const outcomes = [
-      resolvePolicy({ policy: policy({ enabled: false }), registry: defaultAgentRegistry, candidate: candidate(), mode: "plan" }),
-      resolvePolicy({ policy: policy(), registry: defaultAgentRegistry, candidate: null, mode: "plan" }),
-      resolvePolicy({ policy: policy(), registry: defaultAgentRegistry, candidate: candidate(), mode: "plan" }),
+      resolvePolicy({
+        policy: policy({ enabled: false }),
+        registry: defaultAgentRegistry,
+        candidate: candidate(),
+        mode: "plan",
+      }),
+      resolvePolicy({
+        policy: policy(),
+        registry: defaultAgentRegistry,
+        candidate: null,
+        mode: "plan",
+      }),
+      resolvePolicy({
+        policy: policy(),
+        registry: defaultAgentRegistry,
+        candidate: candidate(),
+        mode: "plan",
+      }),
     ];
 
     for (const outcome of outcomes) {
@@ -288,7 +392,9 @@ describe("resolvePolicy — gates, in order", () => {
       assert.equal(run.status, runs[0]!.status);
       assert.deepEqual(
         run.selection?.outcome === "selected" ? run.selection.profile.id : null,
-        runs[0]!.selection?.outcome === "selected" ? runs[0]!.selection.profile.id : null,
+        runs[0]!.selection?.outcome === "selected"
+          ? runs[0]!.selection.profile.id
+          : null,
       );
     }
   });

@@ -25,7 +25,8 @@ test("evaluateWorktreeStatus reports dirty for an untracked file", () => {
 });
 
 test("evaluateWorktreeStatus reports every offending line for a mixed status", () => {
-  const output = " M docs/audits/stable-tags.md\n?? scripts/audit-release-check.ts\n";
+  const output =
+    " M docs/audits/stable-tags.md\n?? scripts/audit-release-check.ts\n";
   const result = evaluateWorktreeStatus(output);
 
   assert.equal(result.clean, false);

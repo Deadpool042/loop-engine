@@ -5,23 +5,14 @@ import { isExecutionTransitionAllowed } from "../../src/executor/state-machine.j
 
 describe("Execution state machine", () => {
   it("allows created -> prepared", () => {
-    assert.equal(
-      isExecutionTransitionAllowed("created", "prepared"),
-      true,
-    );
+    assert.equal(isExecutionTransitionAllowed("created", "prepared"), true);
   });
 
   it("rejects prepared -> created", () => {
-    assert.equal(
-      isExecutionTransitionAllowed("prepared", "created"),
-      false,
-    );
+    assert.equal(isExecutionTransitionAllowed("prepared", "created"), false);
   });
 
   it("rejects prepared -> prepared", () => {
-    assert.equal(
-      isExecutionTransitionAllowed("prepared", "prepared"),
-      false,
-    );
+    assert.equal(isExecutionTransitionAllowed("prepared", "prepared"), false);
   });
 });

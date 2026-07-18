@@ -34,7 +34,15 @@ const PROFILE_EXPECTATIONS: readonly ProfileExpectation[] = [
 const FAILURE_EXPECTATIONS: readonly CommandFailureExpectation[] = [
   {
     name: "invalid profile",
-    args: ["exec", "tsx", "src/cli.ts", "audit", "--json", "--profile", "unknown"],
+    args: [
+      "exec",
+      "tsx",
+      "src/cli.ts",
+      "audit",
+      "--json",
+      "--profile",
+      "unknown",
+    ],
     expectedOutput: "Invalid audit profile",
   },
   {
@@ -98,8 +106,14 @@ function assertExpectedCategories(
 function assertProfile(expectation: ProfileExpectation): void {
   const report = runAuditProfileCommand(expectation.profile);
 
-  assert(report.summary.total === report.findings.length, `${expectation.profile}: total should match findings length`);
-  assert(report.findings.length > 0, `${expectation.profile}: should return at least one finding`);
+  assert(
+    report.summary.total === report.findings.length,
+    `${expectation.profile}: total should match findings length`,
+  );
+  assert(
+    report.findings.length > 0,
+    `${expectation.profile}: should return at least one finding`,
+  );
 
   assertExpectedCategories(expectation, report);
 }
@@ -108,7 +122,10 @@ function assertCommandFails(expectation: CommandFailureExpectation): void {
   const result = spawnSync("pnpm", expectation.args, { encoding: "utf8" });
   const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
 
-  assert(result.status !== 0, `${expectation.name} should exit with a non-zero status`);
+  assert(
+    result.status !== 0,
+    `${expectation.name} should exit with a non-zero status`,
+  );
   assert(
     output.includes(expectation.expectedOutput),
     `${expectation.name} should print ${expectation.expectedOutput}`,
@@ -116,16 +133,26 @@ function assertCommandFails(expectation: CommandFailureExpectation): void {
 }
 
 function assertInvalidProfileFails(): void {
-  const expectation = FAILURE_EXPECTATIONS.find(({ name }) => name === "invalid profile");
+  const expectation = FAILURE_EXPECTATIONS.find(
+    ({ name }) => name === "invalid profile",
+  );
 
-  assert(expectation !== undefined, "invalid profile failure expectation should exist");
+  assert(
+    expectation !== undefined,
+    "invalid profile failure expectation should exist",
+  );
   assertCommandFails(expectation);
 }
 
 function assertMissingProfileValueFails(): void {
-  const expectation = FAILURE_EXPECTATIONS.find(({ name }) => name === "missing profile value");
+  const expectation = FAILURE_EXPECTATIONS.find(
+    ({ name }) => name === "missing profile value",
+  );
 
-  assert(expectation !== undefined, "missing profile value failure expectation should exist");
+  assert(
+    expectation !== undefined,
+    "missing profile value failure expectation should exist",
+  );
   assertCommandFails(expectation);
 }
 

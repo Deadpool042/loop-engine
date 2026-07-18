@@ -1,12 +1,7 @@
 import { createExecutionSummary } from "./summary.js";
-import type {
-  ExecutionResult,
-  ExecutionStepResult,
-} from "./types.js";
+import type { ExecutionResult, ExecutionStepResult } from "./types.js";
 
-function renderExecutionStep(
-  step: ExecutionStepResult,
-): readonly string[] {
+function renderExecutionStep(step: ExecutionStepResult): readonly string[] {
   return [
     `- ${step.name}`,
     `  Status: ${step.success ? "success" : "failed"}`,
@@ -16,9 +11,7 @@ function renderExecutionStep(
   ];
 }
 
-export function renderExecutionText(
-  result: ExecutionResult,
-): string {
+export function renderExecutionText(result: ExecutionResult): string {
   const summary = createExecutionSummary(result);
 
   const lines = [

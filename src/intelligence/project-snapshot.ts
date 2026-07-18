@@ -2,13 +2,16 @@ import { resolve } from "node:path";
 
 import { type ProjectConfig } from "../core/config.js";
 import { docExists } from "../core/docs.js";
-import { getGitBranch, getGitState, getGitStatusText, getLastCommit } from "../core/git.js";
+import {
+  getGitBranch,
+  getGitState,
+  getGitStatusText,
+  getLastCommit,
+} from "../core/git.js";
 import { findRoadmapCandidates, selectRoadmapCandidate } from "./roadmap.js";
 import { type ProjectSnapshot } from "./snapshot.js";
 
-export function buildProjectSnapshot(
-  project: ProjectConfig,
-): ProjectSnapshot {
+export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
   const projectPath = resolve(project.path);
 
   const missingDocs = project.required_docs.filter(
@@ -21,19 +24,13 @@ export function buildProjectSnapshot(
       : getGitState(projectPath) === "clean";
 
   const branch =
-    project.requires_git === false
-      ? "n/a"
-      : getGitBranch(projectPath);
+    project.requires_git === false ? "n/a" : getGitBranch(projectPath);
 
   const statusText =
-    project.requires_git === false
-      ? ""
-      : getGitStatusText(projectPath);
+    project.requires_git === false ? "" : getGitStatusText(projectPath);
 
   const lastCommit =
-    project.requires_git === false
-      ? null
-      : getLastCommit(projectPath);
+    project.requires_git === false ? null : getLastCommit(projectPath);
 
   const roadmapPaths = project.roadmap ?? [];
 
@@ -44,15 +41,18 @@ export function buildProjectSnapshot(
 
   const roadmapStats = {
     total: roadmapCandidates.length,
-    todo: roadmapCandidates.filter((candidate) => candidate.status === "todo").length,
+    todo: roadmapCandidates.filter((candidate) => candidate.status === "todo")
+      .length,
     inProgress: roadmapCandidates.filter(
       (candidate) => candidate.status === "in_progress",
     ).length,
-    done: roadmapCandidates.filter((candidate) => candidate.status === "done").length,
+    done: roadmapCandidates.filter((candidate) => candidate.status === "done")
+      .length,
     unknown: roadmapCandidates.filter(
       (candidate) => candidate.status === "unknown",
     ).length,
-    safe: roadmapCandidates.filter((candidate) => candidate.kind === "safe").length,
+    safe: roadmapCandidates.filter((candidate) => candidate.kind === "safe")
+      .length,
     warning: roadmapCandidates.filter(
       (candidate) => candidate.kind === "warning",
     ).length,
@@ -64,7 +64,9 @@ export function buildProjectSnapshot(
   const roadmapSummary = {
     active: roadmapStats.total - roadmapStats.done,
     done: roadmapStats.done,
-    selectable: roadmapCandidates.filter((candidate) => candidate.status !== "done").length,
+    selectable: roadmapCandidates.filter(
+      (candidate) => candidate.status !== "done",
+    ).length,
     hasBlocked: roadmapStats.blocked > 0,
   };
 

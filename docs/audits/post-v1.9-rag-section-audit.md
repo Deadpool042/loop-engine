@@ -58,4 +58,3 @@ Raison :
 - reste read-only ;
 - testable via `json-check` ou tests dédiés ;
 - ne nécessite aucune dépendance.
-

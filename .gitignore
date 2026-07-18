@@ -5,3 +5,4 @@ dist/
 .loop-engine/
 loop-engine.zip
 *.zip
+coverage/

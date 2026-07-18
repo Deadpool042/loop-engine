@@ -52,7 +52,10 @@ export function planLoopCycle(project: ProjectConfig): LoopPlan {
   return {
     outcome: "ready",
     candidate,
-    plannedSteps: [`Select roadmap candidate: ${candidate.text}`, ...PLANNED_STEPS_AFTER_CANDIDATE],
+    plannedSteps: [
+      `Select roadmap candidate: ${candidate.text}`,
+      ...PLANNED_STEPS_AFTER_CANDIDATE,
+    ],
     snapshot,
   };
 }

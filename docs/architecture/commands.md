@@ -108,7 +108,6 @@ Avant d'ajouter une nouvelle commande :
 4. garder la commande courte et lisible ;
 5. ajouter une validation ou un test si la commande influence une décision.
 
-
 ## Sorties JSON
 
 Certaines commandes exposent une sortie JSON destinée aux scripts, OpenClaw, n8n ou un futur dashboard.
@@ -131,7 +130,6 @@ Règles :
 - documenter toute évolution de contrat
 - tester les sorties JSON critiques avant intégration externe
 
-
 ## Tests des contrats JSON
 
 Les sorties JSON critiques doivent être couvertes par des tests.
@@ -151,7 +149,6 @@ Ces tests protègent les intégrations futures :
 - dashboard web.
 
 Toute nouvelle sortie JSON publique doit être ajoutée aux tests de contrat.
-
 
 ## Roadmap JSON compact
 
@@ -179,4 +176,3 @@ Structure publique recommandée :
 - `roadmap.stats.blocked`
 
 La liste complète `roadmap.candidates` peut rester disponible dans le `ProjectSnapshot` interne, mais elle ne doit pas être exposée dans les sorties JSON publiques sans option explicite dédiée.
-

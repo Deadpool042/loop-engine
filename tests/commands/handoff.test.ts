@@ -18,11 +18,14 @@ describe("handoff command", () => {
   });
 
   it("prints json handoff when requested", () => {
-    const output = execSync("pnpm exec tsx src/cli.ts handoff loop-engine --json", {
-      cwd: process.cwd(),
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const output = execSync(
+      "pnpm exec tsx src/cli.ts handoff loop-engine --json",
+      {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
 
     const json = JSON.parse(output) as {
       schemaVersion?: unknown;

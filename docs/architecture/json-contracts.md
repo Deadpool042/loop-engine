@@ -55,8 +55,8 @@ Les erreurs doivent être sérialisables.
 Exemple :
 
 {
-  "schemaVersion": 1,
-  "error": "missing_project"
+"schemaVersion": 1,
+"error": "missing_project"
 }
 
 ## Interdictions
@@ -73,7 +73,6 @@ Les sorties JSON ne doivent jamais contenir :
 Toutes les commandes JSON doivent être couvertes par :
 
 pnpm exec tsx src/cli.ts json-check
-
 
 ## Validation structurelle
 
@@ -93,7 +92,6 @@ Cette validation reste volontairement légère.
 
 Elle sert à détecter les régressions de contrat sans introduire de schéma formel.
 
-
 ## Erreurs JSON normalisées
 
 En mode `--json`, les erreurs publiques doivent rester parsables.
@@ -110,4 +108,3 @@ Exemple :
 - `unknown_project`
 
 Les commandes ne doivent pas sortir de texte terminal brut lorsqu'elles sont appelées avec `--json`.
-

@@ -24,7 +24,9 @@ describe("json outputs", () => {
   });
 
   it("context --json exposes schemaVersion and docs", () => {
-    const json = runJson("pnpm exec tsx src/cli.ts context loop-engine --json") as {
+    const json = runJson(
+      "pnpm exec tsx src/cli.ts context loop-engine --json",
+    ) as {
       schemaVersion?: unknown;
       docs?: unknown;
     };
@@ -34,7 +36,9 @@ describe("json outputs", () => {
   });
 
   it("next --json exposes schemaVersion and selected candidate field", () => {
-    const json = runJson("pnpm exec tsx src/cli.ts next loop-engine --json") as {
+    const json = runJson(
+      "pnpm exec tsx src/cli.ts next loop-engine --json",
+    ) as {
       schemaVersion?: unknown;
       roadmap?: {
         selectedCandidate?: {
@@ -52,9 +56,10 @@ describe("json outputs", () => {
     }
   });
 
-
   it("review --json exposes schemaVersion and diffStat", () => {
-    const json = runJson("pnpm exec tsx src/cli.ts review loop-engine --json") as {
+    const json = runJson(
+      "pnpm exec tsx src/cli.ts review loop-engine --json",
+    ) as {
       schemaVersion?: unknown;
       diffStat?: unknown;
     };
@@ -64,7 +69,9 @@ describe("json outputs", () => {
   });
 
   it("prompt --json exposes schemaVersion and instructions", () => {
-    const json = runJson("pnpm exec tsx src/cli.ts prompt loop-engine --json") as {
+    const json = runJson(
+      "pnpm exec tsx src/cli.ts prompt loop-engine --json",
+    ) as {
       schemaVersion?: unknown;
       instructions?: unknown;
     };
@@ -74,7 +81,9 @@ describe("json outputs", () => {
   });
 
   it("run --mode plan --json exposes a LoopRunResult and touches nothing", () => {
-    const json = runJson("pnpm exec tsx src/cli.ts run loop-engine --mode plan --json") as {
+    const json = runJson(
+      "pnpm exec tsx src/cli.ts run loop-engine --mode plan --json",
+    ) as {
       schemaVersion?: unknown;
       mode?: unknown;
       status?: unknown;
@@ -84,7 +93,10 @@ describe("json outputs", () => {
       agentPolicy?: {
         mode?: unknown;
         status?: unknown;
-        requirements?: { executionBudget?: { maxCalls?: unknown }; contextBudget?: unknown };
+        requirements?: {
+          executionBudget?: { maxCalls?: unknown };
+          contextBudget?: unknown;
+        };
       } | null;
       contextPackage?: {
         project?: unknown;
@@ -123,7 +135,10 @@ describe("json outputs", () => {
       assert.ok(typeof json.contextPackage.totalCharacters === "number");
       assert.ok(typeof json.contextPackage.estimatedTokens === "number");
       assert.ok(typeof json.contextPackage.truncated === "boolean");
-      assert.deepEqual(json.contextPackage.budget, json.agentPolicy?.requirements?.contextBudget);
+      assert.deepEqual(
+        json.contextPackage.budget,
+        json.agentPolicy?.requirements?.contextBudget,
+      );
     }
   });
 

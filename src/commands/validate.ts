@@ -85,5 +85,7 @@ export async function validateProject(project: ProjectConfig): Promise<void> {
   }
 
   terminal.section("Result");
-  terminal.success(`Validation passed for ${project.name} (${formatDuration(startedAt)}).`);
+  terminal.success(
+    `Validation passed for ${project.name} (${formatDuration(startedAt)}).`,
+  );
 }

@@ -154,7 +154,6 @@ Toute évolution de l'Audit Engine doit passer :
 - `pnpm run validate`
 - `pnpm exec tsx src/cli.ts json-check`
 
-
 ## Commande V1
 
 La commande disponible est :
@@ -169,7 +168,6 @@ La première règle active est :
 - `JSON-001`
 
 La sortie JSON de `audit` est incluse dans `json-check`.
-
 
 ## Profils d'audit
 
@@ -195,7 +193,6 @@ Les profils disponibles sont :
 
 Chaque profil sélectionne un sous-ensemble de règles selon leurs catégories. Le rapport conserve le même contrat de sortie, y compris en JSON.
 
-
 ## Contrôle CI des profils
 
 Le script `pnpm run audit:profiles` exécute `scripts/audit-profile-check.ts`.
@@ -203,7 +200,6 @@ Le script `pnpm run audit:profiles` exécute `scripts/audit-profile-check.ts`.
 Il vérifie explicitement que les profils `quick`, `strict`, `release`, `json`, `docs` et `architecture` ne retournent que les catégories attendues.
 
 Ce contrôle complète `audit --json --strict` dans `pnpm run ci`.
-
 
 ## Erreurs de profils d'audit
 
@@ -213,7 +209,6 @@ Le parsing de `--profile` distingue deux erreurs publiques :
 - profil manquant : `Invalid audit profile: <missing>`.
 
 Dans les deux cas, le CLI retourne un code de sortie non nul.
-
 
 ## Structure du contrôle des profils d'audit
 

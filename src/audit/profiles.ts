@@ -5,7 +5,10 @@ export type AuditProfileDefinition = {
   readonly categories: readonly AuditCategory[];
 };
 
-export const AUDIT_PROFILE_DEFINITIONS: Record<AuditProfile, AuditProfileDefinition> = {
+export const AUDIT_PROFILE_DEFINITIONS: Record<
+  AuditProfile,
+  AuditProfileDefinition
+> = {
   quick: {
     profile: "quick",
     categories: ["architecture", "cli"],
@@ -36,7 +39,9 @@ export function isAuditProfile(value: string): value is AuditProfile {
   return value in AUDIT_PROFILE_DEFINITIONS;
 }
 
-export function getAuditProfileDefinition(profile: AuditProfile): AuditProfileDefinition {
+export function getAuditProfileDefinition(
+  profile: AuditProfile,
+): AuditProfileDefinition {
   return AUDIT_PROFILE_DEFINITIONS[profile];
 }
 
@@ -47,4 +52,3 @@ export function selectAuditRulesForProfile(
   const definition = getAuditProfileDefinition(profile);
   return rules.filter((rule) => definition.categories.includes(rule.category));
 }
-

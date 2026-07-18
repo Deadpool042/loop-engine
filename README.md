@@ -71,7 +71,6 @@ Automatiser le déterministe.
 Limiter l'IA au jugement.  
 Garder l'humain sur les décisions.
 
-
 ### Lecture du summary
 
 La commande `pnpm loop summary` affiche une vue compacte du workspace.
@@ -105,7 +104,6 @@ Cette boucle reste déterministe :
 - aucun appel IA automatique ;
 - aucune modification automatique ;
 - aucune validation implicite hors des commandes configurées.
-
 
 ## Structure du projet
 
@@ -182,7 +180,6 @@ Le rapport JSON d'audit expose un contrat stable pour les recommandations action
 
 - [Audit Engine V3 — Rapport final](docs/audits/audit-engine-v3-final.md)
 
-
 ### Profils d'audit
 
 La commande `audit` accepte un profil optionnel avec `--profile`.
@@ -207,7 +204,6 @@ Profils disponibles :
 
 Les profils filtrent les règles exécutées par catégorie, sans modifier le format du rapport.
 
-
 ### Contrôle CI des profils d'audit
 
 Le script `pnpm run audit:profiles` exécute `scripts/audit-profile-check.ts`.
@@ -216,7 +212,6 @@ Il vérifie que les profils `quick`, `strict`, `release`, `json`, `docs` et `arc
 
 Ce contrôle est inclus dans `pnpm run ci`.
 
-
 ### Erreurs de profils d'audit
 
 Si `--profile` reçoit un profil inconnu, la commande échoue avec `Invalid audit profile`.
@@ -224,3 +219,55 @@ Si `--profile` reçoit un profil inconnu, la commande échoue avec `Invalid audi
 Si `--profile` est fourni sans valeur, la commande échoue avec `Invalid audit profile: <missing>`.
 
 Ces erreurs retournent un code de sortie non nul.
+
+## Rapports d’exécution
+
+Loop Engine produit deux formats complémentaires de rapport d’exécution.
+
+```text
+report.json
+report.md
+```
+
+### Rapport JSON
+
+Le fichier `report.json` constitue le contrat public destiné aux outils et aux intégrations.
+
+Il expose notamment :
+
+- `schemaVersion`
+- `summary`
+- `steps`
+
+Les consommateurs doivent ignorer les champs inconnus afin de permettre des extensions additives.
+
+### Rapport Markdown
+
+Le fichier `report.md` constitue la représentation destinée aux humains.
+
+Il reprend les mêmes informations que le rapport JSON dans un format lisible.
+
+Les deux rapports sont générés à partir du même modèle d'exécution et doivent rester cohérents.
+
+### Golden fixtures
+
+Les fixtures de référence sont conservées dans :
+
+```text
+tests/fixtures/reports/report.json
+tests/fixtures/reports/report.md
+```
+
+Elles peuvent être régénérées avec :
+
+```bash
+pnpm run reports:fixtures
+```
+
+Toute évolution volontaire du contrat doit être visible dans le diff Git.
+
+La documentation complète du contrat est disponible dans :
+
+```text
+docs/architecture/execution-reporting.md
+```

@@ -27,7 +27,6 @@ export function getGitState(path: string): "clean" | "dirty" {
   return status.length === 0 ? "clean" : "dirty";
 }
 
-
 export type GitLastCommit = Readonly<{
   hash: string;
   message: string;

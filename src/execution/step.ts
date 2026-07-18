@@ -1,7 +1,4 @@
-import type {
-  ExecutionStep,
-  ExecutionStepResult,
-} from "./types.js";
+import type { ExecutionStep, ExecutionStepResult } from "./types.js";
 import type { ExecutionClock } from "./clock.js";
 
 export function executeStep(

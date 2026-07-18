@@ -11,10 +11,7 @@ describe("executor → execution integration", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
     });
 
-    const result = executePlan(
-      plan,
-      () => "2026-01-01T00:00:00.000Z",
-    );
+    const result = executePlan(plan, () => "2026-01-01T00:00:00.000Z");
 
     assert.equal(result.status, "completed");
     assert.equal(result.failure, null);

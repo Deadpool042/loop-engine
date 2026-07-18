@@ -14,7 +14,13 @@ export const AGENT_RUNTIMES = [
 
 export type AgentRuntime = (typeof AGENT_RUNTIMES)[number];
 
-export const AGENT_PROVIDERS = ["anthropic", "openai", "google", "github", "local"] as const;
+export const AGENT_PROVIDERS = [
+  "anthropic",
+  "openai",
+  "google",
+  "github",
+  "local",
+] as const;
 
 export type AgentProvider = (typeof AGENT_PROVIDERS)[number];
 

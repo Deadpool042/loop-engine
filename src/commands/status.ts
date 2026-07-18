@@ -3,7 +3,6 @@ import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printStatus(config: Config): void {
-
   terminal.header("Status");
 
   for (const project of config.projects) {

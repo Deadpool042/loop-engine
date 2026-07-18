@@ -9,7 +9,10 @@ import {
 } from "./types.js";
 
 export type AgentBudgetCeiling = Partial<
-  Pick<AgentBudget, "maxTokens" | "maxCostUsd" | "maxDurationMs" | "maxCalls" | "maxRepairs">
+  Pick<
+    AgentBudget,
+    "maxTokens" | "maxCostUsd" | "maxDurationMs" | "maxCalls" | "maxRepairs"
+  >
 >;
 
 export type AgentSelectionRequest = Readonly<{
@@ -26,12 +29,25 @@ export type AgentRejection = Readonly<{
 }>;
 
 export type AgentSelectionResult =
-  | Readonly<{ outcome: "selected"; profile: AgentProfile; rejected: readonly AgentRejection[] }>
+  | Readonly<{
+      outcome: "selected";
+      profile: AgentProfile;
+      rejected: readonly AgentRejection[];
+    }>
   | Readonly<{ outcome: "no_match"; rejected: readonly AgentRejection[] }>;
 
-const BUDGET_DIMENSIONS = ["maxTokens", "maxCostUsd", "maxDurationMs", "maxCalls", "maxRepairs"] as const;
+const BUDGET_DIMENSIONS = [
+  "maxTokens",
+  "maxCostUsd",
+  "maxDurationMs",
+  "maxCalls",
+  "maxRepairs",
+] as const;
 
-function findBudgetViolation(budget: AgentBudget, ceiling: AgentBudgetCeiling): string | null {
+function findBudgetViolation(
+  budget: AgentBudget,
+  ceiling: AgentBudgetCeiling,
+): string | null {
   for (const dimension of BUDGET_DIMENSIONS) {
     const ceilingValue = ceiling[dimension];
 
@@ -62,7 +78,10 @@ export function evaluateAgentProfile(
   );
 
   if (missingCapabilities.length > 0) {
-    return { ok: false, reason: `missing capabilities: ${missingCapabilities.join(", ")}` };
+    return {
+      ok: false,
+      reason: `missing capabilities: ${missingCapabilities.join(", ")}`,
+    };
   }
 
   const missingPermissions = request.requiredPermissions.filter(
@@ -70,17 +89,26 @@ export function evaluateAgentProfile(
   );
 
   if (missingPermissions.length > 0) {
-    return { ok: false, reason: `missing permissions: ${missingPermissions.join(", ")}` };
+    return {
+      ok: false,
+      reason: `missing permissions: ${missingPermissions.join(", ")}`,
+    };
   }
 
-  if (request.minEffort && compareAgentEffort(profile.effort, request.minEffort) < 0) {
+  if (
+    request.minEffort &&
+    compareAgentEffort(profile.effort, request.minEffort) < 0
+  ) {
     return {
       ok: false,
       reason: `effort ${profile.effort} is below min effort ${request.minEffort}`,
     };
   }
 
-  if (request.maxEffort && compareAgentEffort(profile.effort, request.maxEffort) > 0) {
+  if (
+    request.maxEffort &&
+    compareAgentEffort(profile.effort, request.maxEffort) > 0
+  ) {
     return {
       ok: false,
       reason: `effort ${profile.effort} exceeds max effort ${request.maxEffort}`,
@@ -88,7 +116,10 @@ export function evaluateAgentProfile(
   }
 
   if (request.budgetCeiling) {
-    const violation = findBudgetViolation(profile.budget, request.budgetCeiling);
+    const violation = findBudgetViolation(
+      profile.budget,
+      request.budgetCeiling,
+    );
 
     if (violation) {
       return { ok: false, reason: violation };
@@ -98,14 +129,17 @@ export function evaluateAgentProfile(
   return { ok: true };
 }
 
-export function pickSmallestCapable(profiles: readonly AgentProfile[]): AgentProfile | null {
+export function pickSmallestCapable(
+  profiles: readonly AgentProfile[],
+): AgentProfile | null {
   if (profiles.length === 0) {
     return null;
   }
 
   return (
     [...profiles].sort(
-      (a, b) => compareAgentEffort(a.effort, b.effort) || a.id.localeCompare(b.id),
+      (a, b) =>
+        compareAgentEffort(a.effort, b.effort) || a.id.localeCompare(b.id),
     )[0] ?? null
   );
 }

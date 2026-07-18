@@ -54,7 +54,6 @@ Ajouter dans `next` une section courte `Roadmap summary` affichant :
 
 Cette information existe déjà dans `snapshot.roadmap.summary`.
 
-
 ## Amélioration appliquée
 
 La commande `next` affiche désormais une section `Roadmap summary`.
@@ -68,7 +67,6 @@ Elle expose :
 
 Cette information utilise `snapshot.roadmap.summary` et ne recalcule rien dans la commande.
 
-
 ## Amélioration appliquée — Decision hint
 
 La commande `next` affiche désormais une section `Decision hint`.
@@ -80,4 +78,3 @@ Elle indique explicitement :
 - si un candidat `blocked` ne doit pas être démarré directement.
 
 Cette section clarifie la différence entre information roadmap et recommandation d'action.
-

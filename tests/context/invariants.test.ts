@@ -21,8 +21,17 @@ describe("invariant: src/context/ never depends on src/commands/, src/loop/, or 
 });
 
 describe("invariant: src/policy/ and src/agents/ never depend on src/context/", () => {
-  const policyFiles = ["src/policy/types.ts", "src/policy/defaults.ts", "src/policy/resolver.ts"];
-  const agentFiles = ["src/agents/types.ts", "src/agents/registry.ts", "src/agents/selector.ts", "src/agents/escalation.ts"];
+  const policyFiles = [
+    "src/policy/types.ts",
+    "src/policy/defaults.ts",
+    "src/policy/resolver.ts",
+  ];
+  const agentFiles = [
+    "src/agents/types.ts",
+    "src/agents/registry.ts",
+    "src/agents/selector.ts",
+    "src/agents/escalation.ts",
+  ];
 
   for (const file of [...policyFiles, ...agentFiles]) {
     it(`${file} does not import context/`, () => {
@@ -46,7 +55,10 @@ describe("invariant: no network call, SDK, or agent/child process is introduced 
 describe("invariant: the context builder never writes to disk", () => {
   it("src/context/builder.ts only reads files (statSync/readFileSync), never writes", () => {
     const content = readFileSync("src/context/builder.ts", "utf8");
-    assert.doesNotMatch(content, /writeFileSync|appendFileSync|createWriteStream|unlinkSync|rmSync/);
+    assert.doesNotMatch(
+      content,
+      /writeFileSync|appendFileSync|createWriteStream|unlinkSync|rmSync/,
+    );
     assert.match(content, /readFileSync/);
     assert.match(content, /statSync/);
   });
@@ -55,6 +67,9 @@ describe("invariant: the context builder never writes to disk", () => {
 describe("invariant: MinimalContextPackage reuses ContextBudget from src/policy/types.ts", () => {
   it("src/context/types.ts imports ContextBudget rather than redeclaring it", () => {
     const content = readFileSync("src/context/types.ts", "utf8");
-    assert.match(content, /import type\s*\{\s*ContextBudget\s*\}\s*from\s+["']\.\.\/policy\/types\.js["']/);
+    assert.match(
+      content,
+      /import type\s*\{\s*ContextBudget\s*\}\s*from\s+["']\.\.\/policy\/types\.js["']/,
+    );
   });
 });

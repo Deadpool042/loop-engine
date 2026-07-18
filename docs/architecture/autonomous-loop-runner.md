@@ -201,7 +201,7 @@ Une fois le cycle `ready`, `runLoopPlan` calcule une résolution de politique pr
 Règles strictes de ce lot :
 
 - aucun agent n'est appelé, aucun réseau, aucun SDK fournisseur, aucun processus externe ;
-- le mode `plan` ne fait jamais d'appel réel (`DEFAULT_MODE_BUDGETS.plan.maxCalls` vaut `0`) ; la sélection prévisionnelle utilise un budget de capacité distinct (simulant le mode `execute`) uniquement pour évaluer quel profil *serait* sélectionné, jamais pour en appeler un ;
+- le mode `plan` ne fait jamais d'appel réel (`DEFAULT_MODE_BUDGETS.plan.maxCalls` vaut `0`) ; la sélection prévisionnelle utilise un budget de capacité distinct (simulant le mode `execute`) uniquement pour évaluer quel profil _serait_ sélectionné, jamais pour en appeler un ;
 - aucune permission d'écriture n'est jamais requise en mode `plan`, quelle que soit la catégorie du lot (`getAllowedPermissionsForMode("plan")` ne contient que `read_only`) ;
 - `LoopExecutor`, `LoopValidator`, `LoopRepairer`, `LoopCommitter` et `LoopPublisher` restent non implémentés, inchangé depuis V7.2 ;
 - aucun commit, push ou tag automatique.

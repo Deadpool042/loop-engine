@@ -56,7 +56,10 @@ describe("escalateAgentProfile", () => {
     });
 
     assert.equal(result.outcome, "escalated");
-    assert.equal(result.outcome === "escalated" ? result.profile.id : null, "medium");
+    assert.equal(
+      result.outcome === "escalated" ? result.profile.id : null,
+      "medium",
+    );
   });
 
   it("never selects a profile at or below the failed profile's effort", () => {
@@ -74,7 +77,10 @@ describe("escalateAgentProfile", () => {
     });
 
     assert.equal(result.outcome, "escalated");
-    assert.equal(result.outcome === "escalated" ? result.profile.id : null, "higher-effort");
+    assert.equal(
+      result.outcome === "escalated" ? result.profile.id : null,
+      "higher-effort",
+    );
     assert.deepEqual(
       result.rejected.map((rejection) => rejection.profileId).sort(),
       ["lower-effort", "same-effort"],
@@ -82,7 +88,9 @@ describe("escalateAgentProfile", () => {
   });
 
   it("returns exhausted when no higher-effort profile is eligible", () => {
-    const registry = createAgentRegistry([profile({ id: "only", effort: "max" })]);
+    const registry = createAgentRegistry([
+      profile({ id: "only", effort: "max" }),
+    ]);
 
     const result = escalateAgentProfile({
       registry,
@@ -109,7 +117,9 @@ describe("escalateAgentProfile", () => {
     });
 
     assert.equal(result.outcome, "exhausted");
-    const rejection = result.rejected.find((entry) => entry.profileId === "high-missing-cap");
+    const rejection = result.rejected.find(
+      (entry) => entry.profileId === "high-missing-cap",
+    );
     assert.match(rejection?.reason ?? "", /missing capabilities: code_edit/);
   });
 
@@ -123,7 +133,10 @@ describe("escalateAgentProfile", () => {
     const runOnce = () =>
       escalateAgentProfile({
         registry,
-        request: { requiredCapabilities: ["code_edit"], requiredPermissions: [] },
+        request: {
+          requiredCapabilities: ["code_edit"],
+          requiredPermissions: [],
+        },
         previousProfileId: "low",
         failureReason: "runtime_error",
       });
@@ -132,6 +145,9 @@ describe("escalateAgentProfile", () => {
     const second = runOnce();
 
     assert.deepEqual(first, second);
-    assert.equal(first.outcome === "escalated" ? first.profile.id : null, "medium-a");
+    assert.equal(
+      first.outcome === "escalated" ? first.profile.id : null,
+      "medium-a",
+    );
   });
 });

@@ -16,13 +16,21 @@ import type {
   AgentProvider,
   AgentRuntime,
 } from "../agents/types.js";
-import type { AgentSelectionRequest, AgentSelectionResult } from "../agents/selector.js";
+import type {
+  AgentSelectionRequest,
+  AgentSelectionResult,
+} from "../agents/selector.js";
 
 // Mirrors LoopRunMode (src/loop/types.ts) structurally without importing it,
 // so src/policy/ stays independent of src/loop/. Both unions must be kept in
 // sync by hand; a mismatch would surface immediately as a type error at the
 // single call site in src/loop/runner.ts.
-export const AGENT_POLICY_MODES = ["plan", "execute", "commit", "publish"] as const;
+export const AGENT_POLICY_MODES = [
+  "plan",
+  "execute",
+  "commit",
+  "publish",
+] as const;
 
 export type AgentPolicyMode = (typeof AGENT_POLICY_MODES)[number];
 

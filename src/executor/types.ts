@@ -7,9 +7,7 @@
  * It contains no execution logic.
  */
 
-export type ExecutionState =
-  | "created"
-  | "prepared";
+export type ExecutionState = "created" | "prepared";
 
 export type ExecutionMode = "plan";
 
@@ -20,7 +18,6 @@ export interface ExecutionSession {
   readonly executionMode: ExecutionMode;
   readonly executionState: ExecutionState;
 }
-
 
 export interface ExecutionPlanStep {
   readonly name: string;

@@ -1,9 +1,6 @@
 import { createExecutionClock } from "./clock.js";
 import { executeStep } from "./step.js";
-import {
-  createExecutionEventRecorder,
-  emitExecutionEvent,
-} from "./events.js";
+import { createExecutionEventRecorder, emitExecutionEvent } from "./events.js";
 import {
   completeExecution,
   createExecutionSession,

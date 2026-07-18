@@ -17,27 +17,21 @@ export function createExecutionSession(
   };
 }
 
-export function startExecution(
-  session: ExecutionSession,
-): ExecutionSession {
+export function startExecution(session: ExecutionSession): ExecutionSession {
   return {
     ...session,
     status: "running",
   };
 }
 
-export function completeExecution(
-  session: ExecutionSession,
-): ExecutionSession {
+export function completeExecution(session: ExecutionSession): ExecutionSession {
   return {
     ...session,
     status: "completed",
   };
 }
 
-export function failExecution(
-  session: ExecutionSession,
-): ExecutionSession {
+export function failExecution(session: ExecutionSession): ExecutionSession {
   return {
     ...session,
     status: "failed",

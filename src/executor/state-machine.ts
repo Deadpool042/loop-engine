@@ -1,9 +1,10 @@
 import type { ExecutionSession, ExecutionState } from "./types.js";
 
-const transitions: Readonly<Record<ExecutionState, readonly ExecutionState[]>> = {
-  created: ["prepared"],
-  prepared: [],
-};
+const transitions: Readonly<Record<ExecutionState, readonly ExecutionState[]>> =
+  {
+    created: ["prepared"],
+    prepared: [],
+  };
 
 export function isExecutionTransitionAllowed(
   from: ExecutionState,

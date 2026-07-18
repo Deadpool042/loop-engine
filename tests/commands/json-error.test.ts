@@ -16,11 +16,7 @@ function runFailingCommand(args: string[]): string {
 
 describe("json errors", () => {
   it("prints a json error for unknown project in json mode", () => {
-    const output = runFailingCommand([
-      "context",
-      "unknown-project",
-      "--json",
-    ]);
+    const output = runFailingCommand(["context", "unknown-project", "--json"]);
 
     const json = JSON.parse(output) as {
       schemaVersion?: unknown;
@@ -56,7 +52,13 @@ describe("json errors", () => {
   });
 
   it("rejects mode execute for the run command", () => {
-    const output = runFailingCommand(["run", "loop-engine", "--mode", "execute", "--json"]);
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "execute",
+      "--json",
+    ]);
 
     const json = JSON.parse(output) as {
       schemaVersion?: unknown;
@@ -71,21 +73,39 @@ describe("json errors", () => {
   });
 
   it("rejects mode commit for the run command", () => {
-    const output = runFailingCommand(["run", "loop-engine", "--mode", "commit", "--json"]);
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "commit",
+      "--json",
+    ]);
     const json = JSON.parse(output) as { error?: { code?: unknown } };
 
     assert.equal(json.error?.code, "mode_not_implemented");
   });
 
   it("rejects mode publish for the run command", () => {
-    const output = runFailingCommand(["run", "loop-engine", "--mode", "publish", "--json"]);
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "publish",
+      "--json",
+    ]);
     const json = JSON.parse(output) as { error?: { code?: unknown } };
 
     assert.equal(json.error?.code, "mode_not_implemented");
   });
 
   it("rejects an unrecognized --mode value distinctly from a known but unimplemented mode", () => {
-    const output = runFailingCommand(["run", "loop-engine", "--mode", "banana", "--json"]);
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "banana",
+      "--json",
+    ]);
     const json = JSON.parse(output) as {
       error?: { code?: unknown; message?: unknown };
     };
@@ -95,7 +115,12 @@ describe("json errors", () => {
   });
 
   it("rejects --mode with no value (--mode is the last argument)", () => {
-    const output = runFailingCommand(["run", "loop-engine", "--json", "--mode"]);
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--json",
+      "--mode",
+    ]);
     const json = JSON.parse(output) as {
       error?: { code?: unknown; message?: unknown };
     };
@@ -105,7 +130,12 @@ describe("json errors", () => {
   });
 
   it("rejects --mode immediately followed by another flag", () => {
-    const output = runFailingCommand(["run", "loop-engine", "--mode", "--json"]);
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "--json",
+    ]);
     const json = JSON.parse(output) as {
       error?: { code?: unknown; message?: unknown };
     };

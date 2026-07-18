@@ -4,7 +4,9 @@ export type AgentRegistry = Readonly<{
   profiles: readonly AgentProfile[];
 }>;
 
-export function createAgentRegistry(profiles: readonly AgentProfile[]): AgentRegistry {
+export function createAgentRegistry(
+  profiles: readonly AgentProfile[],
+): AgentRegistry {
   const seen = new Set<string>();
 
   for (const profile of profiles) {
@@ -18,7 +20,10 @@ export function createAgentRegistry(profiles: readonly AgentProfile[]): AgentReg
   return { profiles };
 }
 
-export function findAgentProfile(registry: AgentRegistry, id: string): AgentProfile | null {
+export function findAgentProfile(
+  registry: AgentRegistry,
+  id: string,
+): AgentProfile | null {
   return registry.profiles.find((profile) => profile.id === id) ?? null;
 }
 
@@ -37,7 +42,13 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     effort: "low",
     capabilities: ["code_edit", "shell_exec", "test_execution"],
     permissions: ["read_only", "write_worktree", "shell_exec"],
-    budget: { maxTokens: 50_000, maxCostUsd: 1, maxDurationMs: 120_000, maxCalls: 1, maxRepairs: 0 },
+    budget: {
+      maxTokens: 50_000,
+      maxCostUsd: 1,
+      maxDurationMs: 120_000,
+      maxCalls: 1,
+      maxRepairs: 0,
+    },
   },
   {
     id: "claude_code.high",
@@ -53,7 +64,13 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
       "long_context",
     ],
     permissions: ["read_only", "write_worktree", "shell_exec", "git_commit"],
-    budget: { maxTokens: 400_000, maxCostUsd: 10, maxDurationMs: 900_000, maxCalls: 3, maxRepairs: 2 },
+    budget: {
+      maxTokens: 400_000,
+      maxCostUsd: 10,
+      maxDurationMs: 900_000,
+      maxCalls: 3,
+      maxRepairs: 2,
+    },
   },
   {
     id: "codex.medium",
@@ -63,7 +80,13 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     effort: "medium",
     capabilities: ["code_edit", "shell_exec", "test_execution"],
     permissions: ["read_only", "write_worktree", "shell_exec"],
-    budget: { maxTokens: 150_000, maxCostUsd: 4, maxDurationMs: 300_000, maxCalls: 1, maxRepairs: 1 },
+    budget: {
+      maxTokens: 150_000,
+      maxCostUsd: 4,
+      maxDurationMs: 300_000,
+      maxCalls: 1,
+      maxRepairs: 1,
+    },
   },
   {
     id: "openclaw.medium",
@@ -73,7 +96,13 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     effort: "medium",
     capabilities: ["code_edit", "shell_exec"],
     permissions: ["read_only", "write_worktree", "shell_exec"],
-    budget: { maxTokens: null, maxCostUsd: null, maxDurationMs: 300_000, maxCalls: 2, maxRepairs: 1 },
+    budget: {
+      maxTokens: null,
+      maxCostUsd: null,
+      maxDurationMs: 300_000,
+      maxCalls: 2,
+      maxRepairs: 1,
+    },
   },
   {
     id: "copilot.low",
@@ -83,7 +112,13 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     effort: "low",
     capabilities: ["code_edit"],
     permissions: ["read_only", "write_worktree"],
-    budget: { maxTokens: 40_000, maxCostUsd: 1, maxDurationMs: 120_000, maxCalls: 1, maxRepairs: 0 },
+    budget: {
+      maxTokens: 40_000,
+      maxCostUsd: 1,
+      maxDurationMs: 120_000,
+      maxCalls: 1,
+      maxRepairs: 0,
+    },
   },
   {
     id: "gemini_cli.medium",
@@ -93,8 +128,16 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     effort: "medium",
     capabilities: ["code_edit", "long_context", "web_search"],
     permissions: ["read_only", "write_worktree"],
-    budget: { maxTokens: 200_000, maxCostUsd: 3, maxDurationMs: 300_000, maxCalls: 2, maxRepairs: 1 },
+    budget: {
+      maxTokens: 200_000,
+      maxCostUsd: 3,
+      maxDurationMs: 300_000,
+      maxCalls: 2,
+      maxRepairs: 1,
+    },
   },
 ];
 
-export const defaultAgentRegistry: AgentRegistry = createAgentRegistry(DEFAULT_AGENT_PROFILES);
+export const defaultAgentRegistry: AgentRegistry = createAgentRegistry(
+  DEFAULT_AGENT_PROFILES,
+);

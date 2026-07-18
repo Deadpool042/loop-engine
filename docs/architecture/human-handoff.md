@@ -61,7 +61,6 @@ Créer une commande `handoff <project>` qui affiche :
 - validations ;
 - résultats RAG autour du texte du candidat.
 
-
 ## Sortie JSON
 
 La commande `handoff` expose une sortie JSON publique :
@@ -79,4 +78,3 @@ Le payload contient :
 - `instructions`
 
 Cette sortie est incluse dans `json-check`.
-

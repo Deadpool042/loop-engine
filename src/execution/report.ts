@@ -3,10 +3,7 @@ import { renderExecutionMarkdown } from "./markdown-reporter.js";
 import { renderExecutionText } from "./reporter.js";
 import type { ExecutionResult } from "./types.js";
 
-export type ExecutionReportFormat =
-  | "text"
-  | "markdown"
-  | "json";
+export type ExecutionReportFormat = "text" | "markdown" | "json";
 
 export interface RenderExecutionReportOptions {
   readonly format: ExecutionReportFormat;

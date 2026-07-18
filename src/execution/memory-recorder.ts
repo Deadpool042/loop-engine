@@ -1,10 +1,6 @@
-import type {
-  ExecutionEvent,
-  ExecutionEventRecorder,
-} from "./events.js";
+import type { ExecutionEvent, ExecutionEventRecorder } from "./events.js";
 
-export interface MemoryExecutionEventRecorder
-  extends ExecutionEventRecorder {
+export interface MemoryExecutionEventRecorder extends ExecutionEventRecorder {
   readonly events: readonly ExecutionEvent[];
 }
 

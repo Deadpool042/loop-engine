@@ -21,10 +21,7 @@ describe("MemoryExecutionEventRecorder", () => {
 
     assert.deepEqual(
       recorder.events.map((event) => event.type),
-      [
-        "execution.started",
-        "execution.completed",
-      ],
+      ["execution.started", "execution.completed"],
     );
   });
 });
