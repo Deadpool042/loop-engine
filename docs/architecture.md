@@ -68,3 +68,9 @@ V11.3 ajoute `ExecutionReviewGate`, unique mécanisme supporté pour produire un
 `AuthorizationConfiguration`. La requête revue reste non approuvée, non
 dispatchable et non exécutable. Voir
 `docs/architecture/execution-review-gate.md`.
+
+V11.4 ajoute `ApprovalProvenance`, contrat immuable décrivant les preuves de
+revue associées à une `ReviewedTransportRequest` : identifiant abstrait,
+périmètre, statut et versions revues. La provenance reste une preuve
+descriptive, jamais une autorisation d'exécuter. Voir
+`docs/architecture/approval-provenance.md`.

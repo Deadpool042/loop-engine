@@ -149,6 +149,7 @@ Voir aussi :
 - `docs/architecture/transport-request.md`
 - `docs/architecture/transport-request-builder.md`
 - `docs/architecture/execution-review-gate.md`
+- `docs/architecture/approval-provenance.md`
 
 ## Audit et CI
 

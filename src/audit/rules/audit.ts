@@ -924,7 +924,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("transportRequestBuilderRule(") ||
             ruleSource.includes("noTransportRequestBuilderSurfaceRule(") ||
             ruleSource.includes("executionReviewRule(") ||
-            ruleSource.includes("noExecutionReviewSurfaceRule(");
+            ruleSource.includes("noExecutionReviewSurfaceRule(") ||
+            ruleSource.includes("approvalProvenanceRule(") ||
+            ruleSource.includes("noApprovalProvenanceSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -7877,5 +7879,221 @@ export const EXECUTION_REVIEW_GATE_IMMUTABLE_OUTPUT_RULE: AuditRule =
           "handoffAllowed: false",
         ],
         "ExecutionReviewGate produces immutable ReviewedTransportRequest output.",
+      ),
+  );
+
+const APPROVAL_PROVENANCE_FILES = [
+  "types.ts",
+  "errors.ts",
+  "validation.ts",
+  "provenance.ts",
+  "support.ts",
+  "index.ts",
+].map((file) => `src/provenance/${file}`);
+
+const APPROVAL_PROVENANCE_AUDIT_METADATA = {
+  introducedIn: "V11.4",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function approvalProvenanceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...APPROVAL_PROVENANCE_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function noApprovalProvenanceSurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return approvalProvenanceRule(id, title, description, dependsOn, (rule) => {
+    const files = APPROVAL_PROVENANCE_FILES.concat("src/core/provenance.ts");
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(transportRequestSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep ApprovalProvenance descriptive and disconnected from execution.",
+        );
+  });
+}
+
+export const APPROVAL_PROVENANCE_MODULE_RULE: AuditRule =
+  approvalProvenanceRule(
+    "AUDIT-226",
+    "ApprovalProvenance module exists",
+    "V11.4 must expose immutable approval provenance contracts and Core integration.",
+    ["AUDIT-225"],
+    (rule) => {
+      const files = APPROVAL_PROVENANCE_FILES.concat("src/core/provenance.ts");
+      const missing = files.filter((path) => !existsSync(path));
+      if (missing.length > 0) {
+        return fail(
+          rule,
+          "ApprovalProvenance module is incomplete.",
+          missing,
+          "Restore all V11.4 provenance files.",
+        );
+      }
+      return pass(rule, "ApprovalProvenance module exists.", files);
+    },
+  );
+
+export const APPROVAL_PROVENANCE_IMMUTABLE_CONTRACT_RULE: AuditRule =
+  approvalProvenanceRule(
+    "AUDIT-227",
+    "ApprovalProvenance contracts are immutable",
+    "ApprovalProvenance must expose stable readonly contracts for evidence, scope, versions, summary, validation, result, and errors.",
+    ["AUDIT-226"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/provenance/types.ts",
+        [
+          "ApprovalProvenanceId",
+          "ApprovalProvenance",
+          "ApprovalProvenanceStatus",
+          "ApprovalProvenanceMetadata",
+          "ApprovalEvidence",
+          "ApprovalScope",
+          "ApprovalVersionSet",
+          "ApprovalSummary",
+          "ApprovalValidation",
+          "ApprovalResult",
+          "ApprovalError",
+          "ApprovalErrorCode",
+          "Readonly",
+          "executionStarted: false",
+        ],
+        "ApprovalProvenance contracts are immutable.",
+      ),
+  );
+
+export const APPROVAL_PROVENANCE_NO_EXECUTION_RULE: AuditRule =
+  noApprovalProvenanceSurfaceRule(
+    "AUDIT-228",
+    "ApprovalProvenance has no execution",
+    "Approval provenance may not create adapter requests, runtime requests, dispatch payloads, or executable metadata.",
+    ["AUDIT-227"],
+    [
+      /TransportAdapterRequest/,
+      /createTransportAdapterRequest/,
+      /RuntimeRequest/,
+      /executeTransport/,
+      /executeProviderPlan/,
+      /executeRuntime/,
+      /\bdispatch\s*:/,
+      /\bexecute\s*:/,
+    ],
+  );
+
+export const APPROVAL_PROVENANCE_NO_PROCESS_RULE: AuditRule =
+  noApprovalProvenanceSurfaceRule(
+    "AUDIT-229",
+    "ApprovalProvenance has no process APIs",
+    "Approval provenance may not import process APIs or read environment state.",
+    ["AUDIT-228"],
+    [
+      /child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+      /LocalProcessRuntime/,
+    ],
+  );
+
+export const APPROVAL_PROVENANCE_NO_COMMAND_RULE: AuditRule =
+  noApprovalProvenanceSurfaceRule(
+    "AUDIT-230",
+    "ApprovalProvenance has no commands",
+    "Approval provenance may not describe commands, arguments, binaries, credentials, or process options.",
+    ["AUDIT-229"],
+    [
+      /\bcommand\s*:/,
+      /\bargs\s*:/,
+      /\bargv\s*:/,
+      /\bstdin\s*:/,
+      /\bstdout\s*:/,
+      /\bstderr\s*:/,
+      /environment\s*:/,
+      /credentials?\s*:/,
+      /workingDirectory/,
+      /\bcwd\s*:/,
+      /timeoutMs/,
+      /executablePath/,
+      /binaryPath/,
+      /LocalProcessCommand/,
+      /LocalProcessExecutionPolicy/,
+    ],
+  );
+
+export const APPROVAL_PROVENANCE_NO_FILESYSTEM_RULE: AuditRule =
+  noApprovalProvenanceSurfaceRule(
+    "AUDIT-231",
+    "ApprovalProvenance has no filesystem",
+    "Approval provenance may not access files or perform discovery.",
+    ["AUDIT-230"],
+    [
+      /node:fs/,
+      /readFileSync/,
+      /readdirSync/,
+      /realpathSync/,
+      /existsSync/,
+      /statSync/,
+    ],
+  );
+
+export const APPROVAL_PROVENANCE_NO_NETWORK_RULE: AuditRule =
+  noApprovalProvenanceSurfaceRule(
+    "AUDIT-232",
+    "ApprovalProvenance has no network",
+    "Approval provenance may not access network APIs.",
+    ["AUDIT-231"],
+    [/\bfetch\s*\(/, /node:(http|https|net|tls)/],
+  );
+
+export const APPROVAL_PROVENANCE_REFERENCE_ONLY_RULE: AuditRule =
+  approvalProvenanceRule(
+    "AUDIT-233",
+    "ApprovalProvenance is reference-only",
+    "Approval provenance must remain pending, not approved, evidence-only, and tied to RFC version evidence.",
+    ["AUDIT-232"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/provenance/support.ts",
+        [
+          "OpenClawApprovalProvenanceFixture",
+          "reviewPending",
+          "approved: false",
+          "executionStarted: false",
+          "rfc-execution-architecture-v11",
+          "evidenceOnly",
+        ],
+        "ApprovalProvenance is reference-only.",
       ),
   );

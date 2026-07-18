@@ -94,6 +94,10 @@ not mean execution is approved.
 Future approval work MUST be a separate reviewed lot and MUST NOT infer
 approval from the existence of a reviewed request.
 
+As of V11.4, `ApprovalProvenance` records descriptive review evidence for a
+`ReviewedTransportRequest`. It remains evidence only and does not authorize
+execution. See `docs/architecture/approval-provenance.md`.
+
 ## Relationship with TransportRequest
 
 `TransportRequest` is the immutable declarative request produced by the sole
