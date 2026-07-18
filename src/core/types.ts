@@ -7,6 +7,11 @@ import type {
   RuntimeRequest,
   RuntimeResult,
 } from "../runtime/types.js";
+import type {
+  ProviderExecutionPlan,
+  ProviderRequest,
+  ProviderResult,
+} from "../providers/types.js";
 
 /** Stable options accepted by the public Core audit API. */
 export type CoreAuditOptions = Readonly<{
@@ -23,6 +28,9 @@ export type CoreProjectReport = ProjectSnapshot;
 export type CoreRuntimeRequest = RuntimeRequest;
 export type CoreRuntimeResult = RuntimeResult;
 export type CoreRuntimeExecution = RuntimeExecution;
+export type CoreProviderRequest = ProviderRequest;
+export type CoreProviderExecutionPlan = ProviderExecutionPlan;
+export type CoreProviderResult = ProviderResult;
 
 export type {
   AuditProfile,
@@ -33,4 +41,7 @@ export type {
   RuntimeRequest,
   RuntimeResult,
   RuntimeExecution,
+  ProviderRequest,
+  ProviderExecutionPlan,
+  ProviderResult,
 };

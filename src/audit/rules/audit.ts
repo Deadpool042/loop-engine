@@ -4264,3 +4264,409 @@ export const RUNTIME_LOCAL_PROCESS_NO_NETWORK_RULE: AuditRule = {
         );
   },
 };
+
+function providerSource(path: string): string | null {
+  return existsSync(path) ? readFileSync(path, "utf8") : null;
+}
+
+function verifyProviderSource(
+  rule: AuditRule,
+  path: string,
+  expectedTokens: readonly string[],
+  message: string,
+  recommendation: string,
+): ReturnType<typeof pass> {
+  const source = providerSource(path);
+  const missing = source
+    ? expectedTokens.filter((token) => !source.includes(token))
+    : [path];
+
+  return missing.length === 0
+    ? pass(rule, message, [path, ...expectedTokens])
+    : fail(rule, message, missing, recommendation);
+}
+
+const PROVIDER_AUDIT_METADATA = {
+  introducedIn: "V10.2",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+export const PROVIDER_MODULE_PRESENCE_RULE: AuditRule = {
+  id: "AUDIT-091",
+  category: "architecture",
+  severity: "error",
+  title: "Provider adapter module is present",
+  description:
+    "The V10.2 provider contracts, static registry, selector, errors, and three stubs must be present.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-090"] },
+  check: () => {
+    const files = [
+      "src/providers/types.ts",
+      "src/providers/errors.ts",
+      "src/providers/registry.ts",
+      "src/providers/selector.ts",
+      "src/providers/openclaw.ts",
+      "src/providers/claude-code.ts",
+      "src/providers/codex.ts",
+    ];
+    const missing = files.filter((path) => !existsSync(path));
+    return missing.length === 0
+      ? pass(
+          PROVIDER_MODULE_PRESENCE_RULE,
+          "Provider adapter module is present.",
+          files,
+        )
+      : fail(
+          PROVIDER_MODULE_PRESENCE_RULE,
+          "Provider adapter module is incomplete.",
+          missing,
+          "Restore the V10.2 provider contract, registry, selector, errors, and stub files.",
+        );
+  },
+};
+
+export const PROVIDER_STATIC_REGISTRY_RULE: AuditRule = {
+  id: "AUDIT-092",
+  category: "architecture",
+  severity: "error",
+  title: "Provider registry is static and deterministic",
+  description:
+    "Provider registration must retain a fixed declaration order and reject duplicate ids without discovery or dynamic loading.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-091"] },
+  check: () =>
+    verifyProviderSource(
+      PROVIDER_STATIC_REGISTRY_RULE,
+      "src/providers/registry.ts",
+      [
+        "createProviderRegistry",
+        "Duplicate provider adapter id",
+        "OpenClawProviderAdapter",
+        "ClaudeCodeProviderAdapter",
+        "CodexProviderAdapter",
+      ],
+      "Provider registry is static and deterministic.",
+      "Keep provider registration static, ordered, and duplicate-safe.",
+    ),
+};
+
+export const PROVIDER_DETERMINISTIC_SELECTION_RULE: AuditRule = {
+  id: "AUDIT-093",
+  category: "architecture",
+  severity: "error",
+  title: "Provider selection is pure and deterministic",
+  description:
+    "Provider resolution must use explicit selection before fixed registry order without scoring, pricing, or randomness.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-092"] },
+  check: () =>
+    verifyProviderSource(
+      PROVIDER_DETERMINISTIC_SELECTION_RULE,
+      "src/providers/selector.ts",
+      [
+        "export function selectProvider",
+        "request.requestedProvider",
+        "PROVIDER_REGISTRY.adapters.find",
+      ],
+      "Provider selection is pure and deterministic.",
+      "Resolve explicit providers first and otherwise use the static registry order only.",
+    ),
+};
+
+export const PROVIDER_POLICY_RESTRICTION_RULE: AuditRule = {
+  id: "AUDIT-094",
+  category: "architecture",
+  severity: "error",
+  title: "Provider adapters enforce restrictive policy boundaries",
+  description:
+    "Provider selection must reject adapters outside existing provider/runtime policy restrictions and preserve resolved policy status.",
+  metadata: {
+    ...PROVIDER_AUDIT_METADATA,
+    tags: ["architecture", "execution", "policy"],
+    dependsOn: ["AUDIT-093"],
+  },
+  check: () =>
+    verifyProviderSource(
+      PROVIDER_POLICY_RESTRICTION_RULE,
+      "src/providers/support.ts",
+      [
+        "isProviderAllowed",
+        "allowedProviders",
+        "allowedRuntimes",
+        'status === "resolved"',
+      ],
+      "Provider adapters enforce restrictive policy boundaries.",
+      "Require the resolved policy plus all provider/runtime allow-lists before a provider is selected.",
+    ),
+};
+
+export const PROVIDER_STUBS_INERT_RULE: AuditRule = {
+  id: "AUDIT-095",
+  category: "architecture",
+  severity: "error",
+  title: "Provider adapters remain inert stubs",
+  description:
+    "OpenClaw, Claude Code, and Codex adapters must only construct not-implemented plans in V10.2.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-091"] },
+  check: () => {
+    const files = [
+      "src/providers/openclaw.ts",
+      "src/providers/claude-code.ts",
+      "src/providers/codex.ts",
+    ];
+    const missing = files.filter(
+      (path) =>
+        !providerSource(path)?.includes("createNotImplementedProviderPlan"),
+    );
+    return missing.length === 0
+      ? pass(
+          PROVIDER_STUBS_INERT_RULE,
+          "Provider adapters remain inert stubs.",
+          files,
+        )
+      : fail(
+          PROVIDER_STUBS_INERT_RULE,
+          "Some provider adapters are not inert stubs.",
+          missing,
+          "Keep all V10.2 provider adapters limited to not-implemented execution plans.",
+        );
+  },
+};
+
+export const PROVIDER_NO_PROCESS_RULE: AuditRule = {
+  id: "AUDIT-096",
+  category: "architecture",
+  severity: "error",
+  title: "Provider module cannot spawn or execute processes",
+  description:
+    "Only a guarded transport may eventually spawn; provider adapters must contain no child_process, spawn, or exec APIs.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-095"] },
+  check: () => {
+    const files = [
+      "src/providers/types.ts",
+      "src/providers/errors.ts",
+      "src/providers/support.ts",
+      "src/providers/registry.ts",
+      "src/providers/selector.ts",
+      "src/providers/openclaw.ts",
+      "src/providers/claude-code.ts",
+      "src/providers/codex.ts",
+    ];
+    const forbidden = [
+      /child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+    ];
+    const violations = files.flatMap((path) => {
+      const source = providerSource(path) ?? "";
+      return forbidden
+        .filter((pattern) => pattern.test(source))
+        .map((pattern) => `${path}: ${pattern.source}`);
+    });
+    return violations.length === 0
+      ? pass(
+          PROVIDER_NO_PROCESS_RULE,
+          "Provider module contains no process execution API.",
+          files,
+        )
+      : fail(
+          PROVIDER_NO_PROCESS_RULE,
+          "Provider module contains a process execution API.",
+          violations,
+          "Keep process management exclusively in guarded transport modules.",
+        );
+  },
+};
+
+export const PROVIDER_NO_NETWORK_RULE: AuditRule = {
+  id: "AUDIT-097",
+  category: "architecture",
+  severity: "error",
+  title: "Provider module has no network integration",
+  description:
+    "Provider adapters must not make network calls or import network transports in V10.2.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-095"] },
+  check: () => {
+    const files = [
+      "src/providers/types.ts",
+      "src/providers/errors.ts",
+      "src/providers/support.ts",
+      "src/providers/registry.ts",
+      "src/providers/selector.ts",
+      "src/providers/openclaw.ts",
+      "src/providers/claude-code.ts",
+      "src/providers/codex.ts",
+    ];
+    const violations = files.filter((path) => {
+      const source = providerSource(path) ?? "";
+      return (
+        /\bfetch\s*\(/.test(source) || /node:(http|https|net|tls)/.test(source)
+      );
+    });
+    return violations.length === 0
+      ? pass(
+          PROVIDER_NO_NETWORK_RULE,
+          "Provider module has no network integration.",
+          files,
+        )
+      : fail(
+          PROVIDER_NO_NETWORK_RULE,
+          "Provider module contains a network integration pattern.",
+          violations,
+          "Keep provider adapters free of network modules and fetch calls.",
+        );
+  },
+};
+
+export const PROVIDER_NO_SECRET_LOADING_RULE: AuditRule = {
+  id: "AUDIT-098",
+  category: "architecture",
+  severity: "error",
+  title: "Provider module does not load credentials or environment",
+  description:
+    "Provider requests and adapters must not read process.env, credentials, or raw environment variables.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-095"] },
+  check: () => {
+    const files = [
+      "src/providers/types.ts",
+      "src/providers/errors.ts",
+      "src/providers/support.ts",
+      "src/providers/registry.ts",
+      "src/providers/selector.ts",
+      "src/providers/openclaw.ts",
+      "src/providers/claude-code.ts",
+      "src/providers/codex.ts",
+    ];
+    const violations = files.filter((path) =>
+      /process\.env|readFileSync\([^)]*\.env|load(?:Secret|Credential|ApiKey)/.test(
+        providerSource(path) ?? "",
+      ),
+    );
+    return violations.length === 0
+      ? pass(
+          PROVIDER_NO_SECRET_LOADING_RULE,
+          "Provider module does not load credentials or environment.",
+          files,
+        )
+      : fail(
+          PROVIDER_NO_SECRET_LOADING_RULE,
+          "Provider module may load credentials or environment.",
+          violations,
+          "Keep credentials and raw environment access outside V10.2 provider adapters.",
+        );
+  },
+};
+
+export const PROVIDER_TRANSPORT_SEPARATION_RULE: AuditRule = {
+  id: "AUDIT-099",
+  category: "architecture",
+  severity: "error",
+  title: "local-process remains provider-agnostic",
+  description:
+    "The guarded local-process transport must not import or reference provider-specific adapters.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-096"] },
+  check: () => {
+    const source = providerSource("src/runtime/local-process.ts") ?? "";
+    return !/providers\/|ProviderAdapter|OpenClawProvider|ClaudeCodeProvider|CodexProvider/.test(
+      source,
+    )
+      ? pass(
+          PROVIDER_TRANSPORT_SEPARATION_RULE,
+          "local-process remains provider-agnostic.",
+          ["src/runtime/local-process.ts"],
+        )
+      : fail(
+          PROVIDER_TRANSPORT_SEPARATION_RULE,
+          "local-process references provider-specific code.",
+          ["src/runtime/local-process.ts"],
+          "Keep local-process a generic guarded transport primitive.",
+        );
+  },
+};
+
+export const PROVIDER_NO_PUBLIC_EXPOSURE_RULE: AuditRule = {
+  id: "AUDIT-100",
+  category: "architecture",
+  severity: "error",
+  title: "Provider adapters remain absent from CLI and LoopRunner",
+  description:
+    "Provider planning is Core-only and must not create a CLI execution path or LoopRunner integration.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-091"] },
+  check: () => {
+    const files = ["src/cli.ts", "src/loop/runner.ts"];
+    const violations = files.filter((path) =>
+      /providers\//.test(providerSource(path) ?? ""),
+    );
+    return violations.length === 0
+      ? pass(
+          PROVIDER_NO_PUBLIC_EXPOSURE_RULE,
+          "Provider adapters are absent from CLI and LoopRunner.",
+          files,
+        )
+      : fail(
+          PROVIDER_NO_PUBLIC_EXPOSURE_RULE,
+          "Provider adapters leaked into a public execution path.",
+          violations,
+          "Keep provider resolution available only through Core helpers.",
+        );
+  },
+};
+
+export const PROVIDER_STRUCTURED_ERRORS_RULE: AuditRule = {
+  id: "AUDIT-101",
+  category: "architecture",
+  severity: "error",
+  title: "Provider errors are structured and stable",
+  description:
+    "Provider failures must expose stable codes, non-sensitive details, and an execution-started indicator.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-091"] },
+  check: () =>
+    verifyProviderSource(
+      PROVIDER_STRUCTURED_ERRORS_RULE,
+      "src/providers/types.ts",
+      [
+        "PROVIDER_ERROR_CODES",
+        "executionStarted: boolean",
+        '"provider_not_implemented"',
+      ],
+      "Provider errors are structured and stable.",
+      "Keep ProviderError codes typed, non-sensitive, and explicit about whether execution started.",
+    ),
+};
+
+export const PROVIDER_DEPENDENCY_DIRECTION_RULE: AuditRule = {
+  id: "AUDIT-102",
+  category: "architecture",
+  severity: "error",
+  title: "Provider dependencies remain unidirectional",
+  description:
+    "Provider modules may consume runtime/policy/context types but must not depend on CLI, commands, LoopRunner, Core orchestration, reports, or audit runner.",
+  metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-091"] },
+  check: () => {
+    const files = [
+      "src/providers/types.ts",
+      "src/providers/errors.ts",
+      "src/providers/support.ts",
+      "src/providers/registry.ts",
+      "src/providers/selector.ts",
+      "src/providers/openclaw.ts",
+      "src/providers/claude-code.ts",
+      "src/providers/codex.ts",
+    ];
+    const forbidden = /from\s+["'].*\/(commands|loop|core|audit|reports)\//;
+    const violations = files.filter((path) =>
+      forbidden.test(providerSource(path) ?? ""),
+    );
+    return violations.length === 0
+      ? pass(
+          PROVIDER_DEPENDENCY_DIRECTION_RULE,
+          "Provider dependencies remain unidirectional.",
+          files,
+        )
+      : fail(
+          PROVIDER_DEPENDENCY_DIRECTION_RULE,
+          "Provider module imports an upper orchestration layer.",
+          violations,
+          "Keep providers independent of CLI, commands, LoopRunner, Core orchestration, reports, and audit runner.",
+        );
+  },
+};
