@@ -156,6 +156,7 @@ Voir aussi :
 - `docs/architecture/dispatch-descriptor.md`
 - `docs/architecture/boundary-handoff.md`
 - `docs/architecture/execution-boundary-rfc.md`
+- `docs/architecture/execution-architecture-rfc.md`
 
 ## Audit et CI
 

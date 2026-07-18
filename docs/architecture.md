@@ -113,3 +113,9 @@ considéré pour une frontière opérationnelle. Il reste un catalogue de
 contraintes et de preuves : aucun `TransportAdapterRequest`, aucune exécution
 et aucun dispatch ne sont créés. Voir
 `docs/architecture/execution-boundary-rfc.md`.
+
+V13.0 gèle la chaîne déclarative dans un RFC d'architecture unique :
+responsabilités, propriété des contrats, frontière d'exécution, machine à états,
+invariants, modèle de menace, garanties de sécurité et évolution future. Il ne
+crée ni Bridge, ni exécution, ni interaction Runtime ou Transport. Voir
+`docs/architecture/execution-architecture-rfc.md`.

@@ -935,7 +935,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("boundaryHandoffRule(") ||
             ruleSource.includes("noBoundaryHandoffSurfaceRule(") ||
             ruleSource.includes("executionBoundaryRfcRule(") ||
-            ruleSource.includes("noExecutionBoundaryRfcSurfaceRule(");
+            ruleSource.includes("noExecutionBoundaryRfcSurfaceRule(") ||
+            ruleSource.includes("executionArchitectureRfcRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9387,4 +9388,198 @@ export const EXECUTION_BOUNDARY_RFC_INVARIANT_FAMILIES_RULE: AuditRule =
         ],
         "ExecutionBoundaryRFC invariant families are complete.",
       ),
+  );
+
+const EXECUTION_ARCHITECTURE_RFC_PATH =
+  "docs/architecture/execution-architecture-rfc.md";
+
+const EXECUTION_ARCHITECTURE_RFC_AUDIT_METADATA = {
+  introducedIn: "V13.0",
+  tags: ["architecture", "documentation", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function executionArchitectureRfcRule(
+  id: string,
+  category: AuditRule["category"],
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  expectedTokens: readonly string[],
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category,
+    severity: "error",
+    title,
+    description,
+    metadata: { ...EXECUTION_ARCHITECTURE_RFC_AUDIT_METADATA, dependsOn },
+    check: () => {
+      if (!existsSync(EXECUTION_ARCHITECTURE_RFC_PATH)) {
+        return fail(
+          rule,
+          "Execution architecture RFC is missing.",
+          [EXECUTION_ARCHITECTURE_RFC_PATH],
+          "Restore the V13.0 normative execution architecture RFC.",
+        );
+      }
+
+      const content = readFileSync(EXECUTION_ARCHITECTURE_RFC_PATH, "utf8");
+      const missing = expectedTokens.filter((token) => !content.includes(token));
+      return missing.length === 0
+        ? pass(rule, title + ".", expectedTokens)
+        : fail(
+            rule,
+            title + " is incomplete.",
+            missing,
+            "Document the required V13.0 execution architecture RFC content.",
+          );
+    },
+  };
+  return rule;
+}
+
+export const EXECUTION_ARCHITECTURE_RFC_EXISTS_RULE: AuditRule =
+  executionArchitectureRfcRule(
+    "AUDIT-286",
+    "architecture",
+    "Execution architecture RFC exists",
+    "V13.0 must publish the normative execution architecture RFC.",
+    ["AUDIT-285"],
+    ["# Execution Architecture RFC", "## Status and normative language"],
+  );
+
+export const EXECUTION_ARCHITECTURE_RFC_LAYERS_RULE: AuditRule =
+  executionArchitectureRfcRule(
+    "AUDIT-287",
+    "docs",
+    "Execution architecture RFC documents all layers",
+    "The RFC must describe every implemented declarative layer and every future execution layer.",
+    ["AUDIT-286"],
+    [
+      "Eligibility",
+      "ExecutionAuthority",
+      "DispatchDescriptor",
+      "BoundaryHandoff",
+      "ExecutionBoundaryRFC",
+      "Future Bridge",
+      "Future Runtime",
+      "Future Transport",
+    ],
+  );
+
+export const EXECUTION_ARCHITECTURE_RFC_RESPONSIBILITY_RULE: AuditRule =
+  executionArchitectureRfcRule(
+    "AUDIT-288",
+    "architecture",
+    "Execution architecture RFC defines responsibility and ownership",
+    "The RFC must define responsibility and ownership matrices for every layer.",
+    ["AUDIT-287"],
+    [
+      "## 2. Responsibility matrix",
+      "## 3. Ownership",
+      "Inputs",
+      "Outputs",
+      "Allowed dependencies",
+      "Forbidden dependencies",
+    ],
+  );
+
+export const EXECUTION_ARCHITECTURE_RFC_BOUNDARY_RULE: AuditRule =
+  executionArchitectureRfcRule(
+    "AUDIT-289",
+    "architecture",
+    "Execution architecture RFC defines the execution boundary",
+    "The RFC must identify what may cross the future boundary and who owns and validates that crossing.",
+    ["AUDIT-288"],
+    [
+      "## 4. Execution boundary",
+      "MAY cross",
+      "MUST NOT cross",
+      "future Bridge owns the crossing",
+      "Core MUST validate the crossing",
+    ],
+  );
+
+export const EXECUTION_ARCHITECTURE_RFC_STATE_MACHINE_RULE: AuditRule =
+  executionArchitectureRfcRule(
+    "AUDIT-290",
+    "docs",
+    "Execution architecture RFC defines the state machine",
+    "The RFC must document declarative, future operational, rejected, and cancelled lifecycle states.",
+    ["AUDIT-289"],
+    [
+      "## 5. State machine",
+      "Declared",
+      "Validated",
+      "Approved",
+      "BoundaryReady",
+      "Crossed",
+      "Executed",
+      "Completed",
+      "Rejected",
+      "Cancelled",
+    ],
+  );
+
+export const EXECUTION_ARCHITECTURE_RFC_INVARIANTS_RULE: AuditRule =
+  executionArchitectureRfcRule(
+    "AUDIT-291",
+    "architecture",
+    "Execution architecture RFC catalogues invariants",
+    "The RFC must classify the V10 through V12.4 invariants by layer.",
+    ["AUDIT-290"],
+    [
+      "## 6. Invariant catalogue",
+      "Provider, mapping and intent",
+      "Policy and authorization",
+      "Transport request and review",
+      "Provenance and eligibility",
+      "Boundary RFC",
+    ],
+  );
+
+export const EXECUTION_ARCHITECTURE_RFC_THREAT_SECURITY_RULE: AuditRule =
+  executionArchitectureRfcRule(
+    "AUDIT-292",
+    "docs",
+    "Execution architecture RFC defines threat and security models",
+    "The RFC must document the threat model and default-deny security model.",
+    ["AUDIT-291"],
+    [
+      "## 7. Threat model",
+      "Accidental execution",
+      "Privilege escalation",
+      "Runtime bypass",
+      "Transport bypass",
+      "Provider bypass",
+      "Descriptor forgery",
+      "Authority forgery",
+      "Boundary forgery",
+      "Review bypass",
+      "## 8. Security model",
+      "default-deny",
+    ],
+  );
+
+export const EXECUTION_ARCHITECTURE_RFC_ROADMAP_NON_GOALS_RULE: AuditRule =
+  executionArchitectureRfcRule(
+    "AUDIT-293",
+    "docs",
+    "Execution architecture RFC documents roadmap and non-goals",
+    "The RFC must separate delivered architecture, future RFC work, future implementation, and explicit non-goals.",
+    ["AUDIT-292"],
+    [
+      "## 9. Operational roadmap",
+      "Already implemented",
+      "Future RFC",
+      "Future implementation",
+      "## 10. Explicit non-goals",
+      "`RuntimeRequest`",
+      "`TransportRequest`",
+      "execution;",
+      "a Bridge;",
+      "adapter payloads;",
+      "provider invocation;",
+    ],
   );
