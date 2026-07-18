@@ -3,6 +3,7 @@ export * from "./audit.js";
 export * from "./loop.js";
 export * from "./runtime.js";
 export * from "./providers.js";
+export * from "./mapping.js";
 export * from "./transports.js";
 export * from "./reports.js";
 export * from "./types.js";

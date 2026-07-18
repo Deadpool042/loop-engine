@@ -910,7 +910,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
           const ruleSource = content.slice(start, nextStart);
           const isFactoryRule =
             ruleSource.includes("openClawProtocolRule(") ||
-            ruleSource.includes("noOpenClawProtocolIoRule(");
+            ruleSource.includes("noOpenClawProtocolIoRule(") ||
+            ruleSource.includes("executableMappingRule(") ||
+            ruleSource.includes("noExecutableMappingIoRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -5810,6 +5812,360 @@ export const OPENCLAW_PROTOCOL_NO_PUBLIC_REPORT_RULE: AuditRule =
             "OpenClaw protocol leaked into public reports.",
             violations,
             "Keep protocol details internal to Provider planning.",
+          );
+    },
+  );
+
+function executableMappingSource(path: string): string {
+  return existsSync(path) ? readFileSync(path, "utf8") : "";
+}
+
+const EXECUTABLE_MAPPING_AUDIT_METADATA = {
+  introducedIn: "V10.5",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function executableMappingRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...EXECUTABLE_MAPPING_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function mappingContains(
+  rule: AuditRule,
+  path: string,
+  tokens: readonly string[],
+  message: string,
+): ReturnType<typeof pass> {
+  const source = executableMappingSource(path);
+  const missing = tokens.filter((token) => !source.includes(token));
+  return missing.length === 0
+    ? pass(rule, message, [path, ...tokens])
+    : fail(
+        rule,
+        message,
+        missing,
+        "Restore the deterministic mapping contract.",
+      );
+}
+
+export const EXECUTABLE_MAPPING_MODULE_RULE: AuditRule = executableMappingRule(
+  "AUDIT-146",
+  "Executable mapping module is present",
+  "V10.5 must expose the deterministic mapping contracts and Core integration helper.",
+  ["AUDIT-145"],
+  (rule) => {
+    const files = [
+      "src/providers/mapping/types.ts",
+      "src/providers/mapping/errors.ts",
+      "src/providers/mapping/registry.ts",
+      "src/providers/mapping/selector.ts",
+      "src/providers/mapping/validation.ts",
+      "src/providers/mapping/support.ts",
+      "src/providers/mapping/index.ts",
+      "src/providers/mapping/index.ts",
+      "src/core/mapping.ts",
+    ];
+    const missing = files.filter((path) => !existsSync(path));
+    return missing.length === 0
+      ? pass(rule, "Executable mapping module is present.", files)
+      : fail(
+          rule,
+          "Executable mapping module is incomplete.",
+          missing,
+          "Restore all V10.5 mapping modules.",
+        );
+  },
+);
+
+export const EXECUTABLE_MAPPING_REGISTRY_RULE: AuditRule =
+  executableMappingRule(
+    "AUDIT-147",
+    "Executable mapping registry is static and deterministic",
+    "Mapping registration must retain fixed declaration order without discovery or plugins.",
+    ["AUDIT-146"],
+    (rule) =>
+      mappingContains(
+        rule,
+        "src/providers/mapping/registry.ts",
+        [
+          "createExecutableMappingRegistry",
+          "EXECUTABLE_MAPPING_REGISTRY",
+          "OpenClawExecutableMapping",
+        ],
+        "Executable mapping registry is static and deterministic.",
+      ),
+  );
+
+export const EXECUTABLE_MAPPING_UNIQUENESS_RULE: AuditRule =
+  executableMappingRule(
+    "AUDIT-148",
+    "Executable mapping registry enforces unique identifiers",
+    "Mappings must be uniquely declared in the static registry.",
+    ["AUDIT-147"],
+    (rule) =>
+      mappingContains(
+        rule,
+        "src/providers/mapping/registry.ts",
+        ["new Set", "Duplicate executable mapping id"],
+        "Executable mapping registry enforces unique identifiers.",
+      ),
+  );
+
+export const EXECUTABLE_MAPPING_VALIDATION_RULE: AuditRule =
+  executableMappingRule(
+    "AUDIT-149",
+    "Executable mapping validation is explicit and structured",
+    "Validation must distinguish protocol, mapping, compatibility, and policy gates without execution.",
+    ["AUDIT-148"],
+    (rule) =>
+      mappingContains(
+        rule,
+        "src/providers/mapping/validation.ts",
+        [
+          "validateExecutableMapping",
+          "mapping_disabled",
+          "mapping_policy_denied",
+          "mapping_not_configured",
+        ],
+        "Executable mapping validation is explicit and structured.",
+      ),
+  );
+
+export const EXECUTABLE_MAPPING_DISABLED_DEFAULT_RULE: AuditRule =
+  executableMappingRule(
+    "AUDIT-150",
+    "Executable mappings are disabled by default",
+    "Registered mappings may not become enabled or configured implicitly.",
+    ["AUDIT-149"],
+    (rule) =>
+      mappingContains(
+        rule,
+        "src/providers/mapping/registry.ts",
+        ["enabled: false", "configured: false"],
+        "Executable mappings are disabled by default.",
+      ),
+  );
+
+function noExecutableMappingIoRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return executableMappingRule(id, title, description, dependsOn, (rule) => {
+    const files = [
+      "src/providers/mapping/types.ts",
+      "src/providers/mapping/errors.ts",
+      "src/providers/mapping/registry.ts",
+      "src/providers/mapping/selector.ts",
+      "src/providers/mapping/validation.ts",
+      "src/providers/mapping/support.ts",
+    ];
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(executableMappingSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep executable mapping local, declarative, and non-executing.",
+        );
+  });
+}
+
+export const EXECUTABLE_MAPPING_NO_EXECUTION_RULE: AuditRule =
+  noExecutableMappingIoRule(
+    "AUDIT-151",
+    "Executable mapping never invokes a transport",
+    "Mapping code may not construct, resolve, or invoke a transport execution path.",
+    ["AUDIT-150"],
+    [
+      /createTransportRequest\s*\(/,
+      /resolveTransport\s*\(/,
+      /executeTransport\s*\(/,
+      /executeProviderPlan\s*\(/,
+      /\.execute\s*\(/,
+    ],
+  );
+export const EXECUTABLE_MAPPING_NO_PROCESS_RULE: AuditRule =
+  noExecutableMappingIoRule(
+    "AUDIT-152",
+    "Executable mapping has no process API",
+    "Mapping code may not import child_process or invoke process APIs.",
+    ["AUDIT-151"],
+    [/child_process/, /\bspawn\s*\(/, /\bexec(?:File|Sync)?\s*\(/],
+  );
+export const EXECUTABLE_MAPPING_NO_NETWORK_RULE: AuditRule =
+  noExecutableMappingIoRule(
+    "AUDIT-153",
+    "Executable mapping has no network integration",
+    "Mapping code may not call network APIs or import network modules.",
+    ["AUDIT-152"],
+    [/\bfetch\s*\(/, /node:(http|https|net|tls)/],
+  );
+export const EXECUTABLE_MAPPING_NO_COMMAND_RULE: AuditRule =
+  noExecutableMappingIoRule(
+    "AUDIT-154",
+    "Executable mapping contains no command metadata",
+    "Mapping contracts may not encode executable paths, command lines, flags, or arguments.",
+    ["AUDIT-153"],
+    [
+      /executablePath/,
+      /binaryPath/,
+      /commandLine/,
+      /\bcommand\s*:/,
+      /\bargs\s*:/,
+      /\bflags\s*:/,
+    ],
+  );
+
+export const EXECUTABLE_MAPPING_CLI_BOUNDARY_RULE: AuditRule =
+  executableMappingRule(
+    "AUDIT-155",
+    "CLI does not expose executable mapping",
+    "No public CLI command may import or resolve the mapping layer.",
+    ["AUDIT-154"],
+    (rule) => {
+      const source = executableMappingSource("src/cli.ts");
+      return !/providers\/mapping|ExecutableMapping|resolveExecutableMapping/.test(
+        source,
+      )
+        ? pass(rule, "CLI does not expose executable mapping.", ["src/cli.ts"])
+        : fail(
+            rule,
+            "CLI exposes executable mapping.",
+            ["src/cli.ts"],
+            "Keep mapping Core-only.",
+          );
+    },
+  );
+export const EXECUTABLE_MAPPING_LOOP_BOUNDARY_RULE: AuditRule =
+  executableMappingRule(
+    "AUDIT-156",
+    "LoopRunner does not expose executable mapping",
+    "LoopRunner planning may not import or resolve the mapping layer.",
+    ["AUDIT-155"],
+    (rule) => {
+      const source = executableMappingSource("src/loop/runner.ts");
+      return !/providers\/mapping|ExecutableMapping|resolveExecutableMapping/.test(
+        source,
+      )
+        ? pass(rule, "LoopRunner does not expose executable mapping.", [
+            "src/loop/runner.ts",
+          ])
+        : fail(
+            rule,
+            "LoopRunner exposes executable mapping.",
+            ["src/loop/runner.ts"],
+            "Keep mapping out of LoopRunner.",
+          );
+    },
+  );
+export const EXECUTABLE_MAPPING_OPENCLAW_RULE: AuditRule =
+  executableMappingRule(
+    "AUDIT-157",
+    "OpenClaw executable mapping exists",
+    "The static registry must declare exactly the documented OpenClaw protocol compatibility.",
+    ["AUDIT-156"],
+    (rule) =>
+      mappingContains(
+        rule,
+        "src/providers/mapping/registry.ts",
+        [
+          "OpenClawExecutableMapping",
+          "loop-engine-openclaw-planning/v1",
+          'operation: "plan"',
+        ],
+        "OpenClaw executable mapping exists.",
+      ),
+  );
+export const EXECUTABLE_MAPPING_OPENCLAW_DISABLED_RULE: AuditRule =
+  executableMappingRule(
+    "AUDIT-158",
+    "OpenClaw executable mapping remains disabled",
+    "OpenClaw mapping must remain non-executable and unconfigured in V10.5.",
+    ["AUDIT-157"],
+    (rule) =>
+      mappingContains(
+        rule,
+        "src/providers/mapping/registry.ts",
+        ["enabled: false", "configured: false"],
+        "OpenClaw executable mapping remains disabled.",
+      ),
+  );
+export const EXECUTABLE_MAPPING_OTHER_PROVIDERS_RULE: AuditRule =
+  executableMappingRule(
+    "AUDIT-159",
+    "Claude Code and Codex remain unmapped",
+    "The V10.5 mapping registry must not register Claude Code or Codex mappings.",
+    ["AUDIT-158"],
+    (rule) => {
+      const source = executableMappingSource(
+        "src/providers/mapping/registry.ts",
+      );
+      return !/Claude|Codex|claude-code|codex/.test(source)
+        ? pass(rule, "Claude Code and Codex remain unmapped.", [
+            "src/providers/mapping/registry.ts",
+          ])
+        : fail(
+            rule,
+            "Another provider was added to executable mapping.",
+            ["src/providers/mapping/registry.ts"],
+            "Keep Claude Code and Codex unmapped.",
+          );
+    },
+  );
+export const EXECUTABLE_MAPPING_DEPENDENCY_RULE: AuditRule =
+  executableMappingRule(
+    "AUDIT-160",
+    "Executable mapping dependencies remain unidirectional",
+    "Mapping modules may use Provider, protocol, policy, and transport contracts only; they must not import upper layers or implementations.",
+    ["AUDIT-159"],
+    (rule) => {
+      const files = [
+        "types.ts",
+        "errors.ts",
+        "registry.ts",
+        "selector.ts",
+        "validation.ts",
+        "support.ts",
+      ].map((file) => `src/providers/mapping/${file}`);
+      const violations = files.filter((path) =>
+        /from\s+["'][^"']*\/(core|cli|commands|loop)\/|from\s+["'][^"']*\/transports\/(local-process|registry|selector)/.test(
+          executableMappingSource(path),
+        ),
+      );
+      return violations.length === 0
+        ? pass(
+            rule,
+            "Executable mapping dependencies remain unidirectional.",
+            files,
+          )
+        : fail(
+            rule,
+            "Executable mapping imports an upper layer or implementation.",
+            violations,
+            "Keep mapping below Provider and above Transport contracts only.",
           );
     },
   );

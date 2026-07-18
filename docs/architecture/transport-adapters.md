@@ -87,3 +87,8 @@ tokens.
 V10.4 définit seulement un protocole Provider OpenClaw interne. Les plans issus
 de ce protocole restent non exécutables et n’atteignent pas cette couche. Voir
 `openclaw-provider-protocol.md`.
+
+V10.5 intercale un mapping exécutable déclaratif entre protocole et plan
+Provider. Ce mapping est désactivé et ne crée aucune requête Transport ; la
+frontière Transport et son comportement restent donc inchangés. Voir
+`executable-mapping.md`.

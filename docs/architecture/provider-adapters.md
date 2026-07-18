@@ -83,3 +83,8 @@ unique opération abstraite `plan` est validée de façon pure puis reste
 `valid_non_executable`, faute de mapping exécutable documenté. L’adaptateur
 OpenClaw garde donc son plan Provider `not_implemented`, sans `transportIntent`.
 Voir `openclaw-provider-protocol.md`.
+
+V10.5 ajoute un registre de mapping séparé : il déclare seulement une
+compatibilité OpenClaw potentielle, désactivée et non configurée. Il ne modifie
+pas les adaptateurs Provider ni leurs plans inertes. Voir
+`executable-mapping.md`.

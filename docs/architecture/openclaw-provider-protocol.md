@@ -18,6 +18,7 @@ exécutable dans ce lot.
 ProviderRequest
   -> OpenClaw protocol normalization and validation
   -> OpenClawProtocolPlan (valid_non_executable)
+  -> ExecutableMapping (V10.5, disabled and not configured)
   -> ProviderExecutionPlan (not_implemented)
 
 ProviderExecutionPlan (future ready plan only)
@@ -41,6 +42,11 @@ Un plan peut être valide et pourtant non exécutable. V10.4 produit alors
 retourne toujours un `ProviderExecutionPlan` `not_implemented`, sans
 `transportIntent`. Un plan invalide reste `unsupported`. Aucun de ces états ne
 peut atteindre la résolution Transport.
+
+V10.5 enregistre séparément une déclaration de compatibilité OpenClaw,
+`OpenClawExecutableMapping`, mais celle-ci est désactivée et non configurée.
+Elle ne change pas le contrat V10.4 : le protocole ne dispose toujours d'aucun
+mapping exécutable configuré. Voir `executable-mapping.md`.
 
 ## Requête et diagnostics
 
