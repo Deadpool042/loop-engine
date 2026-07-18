@@ -310,3 +310,4 @@ La documentation complète du contrat est disponible dans :
 ```text
 docs/architecture/execution-reporting.md
 ```
+ - [Authority Verification RFC](docs/architecture/authority-verification-rfc.md) — V13.2 declarative verification of authority and approval evidence; verification is not execution authority.

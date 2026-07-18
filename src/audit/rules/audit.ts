@@ -939,7 +939,10 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("executionArchitectureRfcRule(") ||
             ruleSource.includes("operatorApprovalRfcRule(") ||
             ruleSource.includes("operatorApprovalRfcDocumentRule(") ||
-            ruleSource.includes("noOperatorApprovalRfcSurfaceRule(");
+            ruleSource.includes("noOperatorApprovalRfcSurfaceRule(") ||
+            ruleSource.includes("authorityVerificationRfcRule(") ||
+            ruleSource.includes("authorityVerificationRfcDocumentRule(") ||
+            ruleSource.includes("noAuthorityVerificationRfcSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9800,3 +9803,33 @@ export const OPERATOR_APPROVAL_RFC_NO_EXECUTION_RULE: AuditRule =
       /from\s+["'][^"']*\/(cli|commands|loop|runtime|transports|providers)\//,
     ],
   );
+
+const AUTHORITY_VERIFICATION_RFC_DOCUMENT_PATH = "docs/architecture/authority-verification-rfc.md";
+const AUTHORITY_VERIFICATION_RFC_FILES = ["types.ts", "errors.ts", "validation.ts", "evaluation.ts", "support.ts", "index.ts"].map((file) => `src/authority/verification/${file}`);
+const AUTHORITY_VERIFICATION_RFC_AUDIT_METADATA = { introducedIn: "V13.2", tags: ["architecture", "documentation", "contract"] as const, stability: "stable" as const };
+function authorityVerificationRfcRule(id: string, category: AuditRule["category"], title: string, description: string, dependsOn: readonly string[], check: (rule: AuditRule) => ReturnType<typeof pass>): AuditRule {
+  const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { ...AUTHORITY_VERIFICATION_RFC_AUDIT_METADATA, dependsOn }, check: () => check(rule) }; return rule;
+}
+function authorityVerificationRfcDocumentRule(id: string, title: string, dependsOn: readonly string[], tokens: readonly string[]): AuditRule {
+  return authorityVerificationRfcRule(id, "docs", title, "The authority verification RFC must document its declarative guarantees.", dependsOn, (rule) => {
+    const content = existsSync(AUTHORITY_VERIFICATION_RFC_DOCUMENT_PATH) ? readFileSync(AUTHORITY_VERIFICATION_RFC_DOCUMENT_PATH, "utf8") : "";
+    const missing = tokens.filter((token) => !content.includes(token));
+    return missing.length === 0 ? pass(rule, title + ".", tokens) : fail(rule, title + ".", missing.length ? missing : [AUTHORITY_VERIFICATION_RFC_DOCUMENT_PATH], "Restore the required authority verification RFC documentation.");
+  });
+}
+function noAuthorityVerificationRfcSurfaceRule(id: string, title: string, dependsOn: readonly string[]): AuditRule {
+  return authorityVerificationRfcRule(id, "architecture", title, "Authority verification must remain isolated from every operational surface.", dependsOn, (rule) => {
+    const files = AUTHORITY_VERIFICATION_RFC_FILES.concat("src/core/authority-verification.ts");
+    const patterns = [/Date\.now|new Date\s*\(|performance\.now/, /RuntimeRequest|TransportRequest|TransportAdapterRequest/, /child_process|node:child_process|process\.env/, /node:fs|readFileSync|writeFileSync|node:(http|https|net|tls)|\bfetch\s*\(/, /\bspawn\s*\(|\bexec(?:File|Sync)?\s*\(|\bfork\s*\(/, /from\s+["'][^"']*\/(cli|commands|loop|runtime|transports|providers|boundary)\//];
+    const violations = files.flatMap((path) => patterns.filter((pattern) => pattern.test(transportRequestSource(path))).map((pattern) => `${path}: ${pattern.source}`));
+    return violations.length === 0 ? pass(rule, title + ".", files) : fail(rule, title + ".", violations, "Keep verification pure, declarative, and implementation-isolated.");
+  });
+}
+export const AUTHORITY_VERIFICATION_RFC_MODULE_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-302", "architecture", "Authority Verification RFC module exists", "V13.2 must expose verification contracts and the Core integration point.", ["AUDIT-301"], (rule) => { const files = AUTHORITY_VERIFICATION_RFC_FILES.concat("src/core/authority-verification.ts"); const missing = files.filter((path) => !existsSync(path)); return missing.length === 0 ? pass(rule, "Authority Verification RFC module exists.", files) : fail(rule, "Authority Verification RFC module files are missing.", missing, "Restore the V13.2 verification contracts."); });
+export const AUTHORITY_VERIFICATION_RFC_DOCUMENT_RULE: AuditRule = authorityVerificationRfcDocumentRule("AUDIT-303", "Authority Verification RFC documents purpose, lifecycle, and default deny", ["AUDIT-302"], ["# Authority Verification RFC", "## 1. Purpose", "## 5. Lifecycle", "## 9. Default deny and security guarantees", "Verification is consistency assessment"]);
+export const AUTHORITY_VERIFICATION_RFC_CONTRACT_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-304", "architecture", "Authority verification contracts are immutable and deterministic", "Contracts must expose immutable verification state, context, subject, checks, evidence, result and denied execution flags.", ["AUDIT-303"], (rule) => transportRequestContains(rule, "src/authority/verification/types.ts", ["AuthorityVerificationRFC", "AuthorityVerificationContext", "AuthorityVerificationSubject", "AuthorityVerificationCheck", "AuthorityVerificationEvidence", "AuthorityVerificationResult", "executionAllowed: false", "executionStarted: false"], "Authority verification contracts are immutable and deterministic."));
+export const AUTHORITY_VERIFICATION_RFC_CHECKS_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-305", "architecture", "Authority verification evaluates complete governance checks", "Checks must cover authority, approval, scope, versions, references, capabilities, policy, evidence, validity, revocation and supersession.", ["AUDIT-304"], (rule) => transportRequestContains(rule, "src/authority/verification/evaluation.ts", ["authority_active", "approval_lifecycle_state", "approval_scope_consistent", "authority_version_consistent", "approval_version_consistent", "provider_consistent", "protocol_consistent", "mapping_consistent", "intent_consistent", "runtime_capability_consistent", "transport_capability_consistent", "policy_consistent", "evidence_complete", "valid_from_enforced", "expiry_enforced", "revocation_enforced", "supersession_enforced"], "Authority verification evaluates complete governance checks."));
+export const AUTHORITY_VERIFICATION_RFC_TIME_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-306", "architecture", "Authority verification uses explicit time only", "Verification must consume supplied time and never read an ambient clock.", ["AUDIT-305"], (rule) => transportRequestContains(rule, "src/authority/verification/types.ts", ["verificationAt: string", "validFrom?: string", "expiresAt?: string", "revokedAt?: string"], "Authority verification uses explicit time only."));
+export const AUTHORITY_VERIFICATION_RFC_DIAGNOSTICS_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-307", "architecture", "Authority verification emits safe deterministic diagnostics", "Errors must be stable, safe, and non-starting.", ["AUDIT-306"], (rule) => transportRequestContains(rule, "src/authority/verification/types.ts", ["AuthorityVerificationErrorCode", "verification_input_missing", "verification_unsupported", "executionAllowed: false", "executionStarted: false"], "Authority verification emits safe deterministic diagnostics."));
+export const AUTHORITY_VERIFICATION_RFC_DEFAULT_DENY_RULE: AuditRule = authorityVerificationRfcDocumentRule("AUDIT-308", "Authority verification documents non-authorizing default deny", ["AUDIT-307"], ["not verified", "MUST NOT be considered authorization", "executionAllowed: false", "executionStarted: false"]);
+export const AUTHORITY_VERIFICATION_RFC_NO_EXECUTION_RULE: AuditRule = noAuthorityVerificationRfcSurfaceRule("AUDIT-309", "Authority Verification RFC has no operational surface", ["AUDIT-308"]);

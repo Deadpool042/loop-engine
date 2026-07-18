@@ -124,3 +124,4 @@ V13.1 ajoute le RFC d'approbation opérateur et ses contrats déclaratifs :
 cycle de vie explicite, traçabilité de revue, portée, version, expiration et
 révocation. Une approbation reste une preuve et ne crée ni Bridge ni exécution.
 Voir `docs/architecture/operator-approval-rfc.md`.
+ - [Authority Verification RFC](architecture/authority-verification-rfc.md) — V13.2 deterministic consistency assessment for authority and operator-approval evidence; it never authorizes execution.
