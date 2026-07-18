@@ -224,3 +224,38 @@ Les helpers internes séparent les responsabilités :
 - `assertCommandFails` vérifie les scénarios d'erreur avec code de sortie non nul.
 
 Cette structure permet d'ajouter un profil ou un cas d'erreur sans dupliquer la logique d'exécution.
+
+## Registre de règles V8.0
+
+`AUDIT_RULES` reste la source de vérité unique. Le registre typé en mémoire
+normalise et valide les métadonnées de chaque règle, sans plugin, chargement
+dynamique, fichier de configuration ni découverte à l'exécution.
+
+Chaque règle expose `introducedIn`, `tags`, `stability` et `dependsOn`.
+Les règles historiques utilisent `introducedIn: null` tant qu'une version
+documentée ne permet pas de l'affirmer. Leur stabilité par défaut est
+`stable`. Les dépendances sont déclaratives : elles sont validées, mais ne
+modifient ni l'ordre ni l'exécution des checks.
+
+Les tags sont fermés et typés : `contract`, `self-audit`, `documentation`,
+`ci`, `json`, `architecture`, `cli`, `execution`, `policy`, `context`.
+
+### Filtres et manifeste
+
+Les profils existants restent inchangés. Des filtres répétables s'ajoutent :
+
+```bash
+pnpm loop audit --rule AUDIT-016
+pnpm loop audit --tag self-audit
+pnpm loop audit --stability stable
+pnpm loop audit --profile strict --tag json
+pnpm loop audit --manifest
+```
+
+Les valeurs répétées d'un même filtre sont réunies; les dimensions différentes
+sont intersectées. Une sélection vide est une erreur explicite : elle ne
+produit jamais un rapport vide à 100.
+
+`audit --manifest` renvoie un contrat JSON distinct de `AuditReport`, avec
+`schemaVersion: 1`, sans timestamp, dans l'ordre du registre. Il n'altère pas
+le contrat `AuditReport` existant, qui reste en `schemaVersion: 1`.
