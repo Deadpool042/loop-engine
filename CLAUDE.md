@@ -77,6 +77,7 @@ Layering is strict and one-directional: `cli.ts` → `commands/` → `loop/` →
 - **`src/providers/mapping/`** — Executable Mapping contracts (V10.5, Core-only): immutable compatibility declarations between a validated Provider protocol and a future transport-neutral intent. The sole OpenClaw declaration is disabled and unconfigured; mappings have no commands, executable metadata, transport invocation, process/network/environment access, CLI, or LoopRunner exposure. See `docs/architecture/executable-mapping.md`.
 - **`src/providers/intent/`** — Transport Intent contracts (V10.6, Core-only): immutable desired-transport declarations with Provider/Runtime/Mapping/policy requirements. The sole OpenClaw intent is inactive and unconfigured; it creates no TransportRequest and is not consumed by the TransportAdapter, CLI, or LoopRunner. See `docs/architecture/transport-intent.md`.
 - **`src/policy/`** — Capability & Policy Engine (V10.7, Core-only): extends the existing forecast policy module with immutable capability, policy, and authorization-decision contracts for transport intents. Its static `default-deny` rule evaluates compatibility only; it creates no TransportRequest and invokes no Provider, Runtime, or Transport. See `docs/architecture/capability-policy-engine.md`.
+- **`src/authorization/`** — Authorization Configuration contracts (V10.8, Core-only): immutable reviewable requirements after an AuthorizationDecision. The sole OpenClaw configuration is inactive, unapproved and review-required; it creates no TransportRequest or RuntimeRequest and invokes no Provider, Runtime, or Transport. See `docs/architecture/authorization-configuration.md`.
 - **`src/ui/terminal.ts`** — the only place that formats terminal output; commands call `terminal.*` rather than inlining styling.
 
 Before adding a new command: check whether the data already exists on `ProjectSnapshot`; if not, extend `intelligence/` rather than computing it ad hoc inside the command.
@@ -117,6 +118,7 @@ When adjusting keyword lists, favor precision (avoid blocking ordinary work) ove
 - `docs/architecture/executable-mapping.md` — Executable mapping contracts (`src/providers/mapping/`): disabled capability declarations, policy gates and transport separation.
 - `docs/architecture/transport-intent.md` — Transport intent contracts (`src/providers/intent/`): inactive declarations and the intentional Adapter boundary.
 - `docs/architecture/capability-policy-engine.md` — Capability & Policy Engine (`src/policy/`): default-deny theoretical authorization after transport intent and before any future transport boundary.
+- `docs/architecture/authorization-configuration.md` — Authorization Configuration (`src/authorization/`): inactive, review-required requirements after theoretical authorization and before any future execution review.
 - `docs/architecture/commands.md` — layering rules for `cli.ts` / `commands/` / `core/` / `intelligence/` / `ui/`.
 - `docs/architecture/project-intelligence.md` — `ProjectSnapshot` contract and roadmap candidate classification.
 - `docs/architecture/roadmap-reader.md` — roadmap reader formats, states, and keyword refinement history.

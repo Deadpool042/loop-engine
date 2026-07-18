@@ -96,3 +96,7 @@ V10.7 ajoute après l'intention une évaluation de capacité et de politique. El
 ne modifie pas l'état désactivé du mapping : un mapping OpenClaw désactivé
 produit toujours une décision `not_authorized`, sans TransportRequest ni appel
 de transport. Voir `capability-policy-engine.md`.
+
+V10.8 sépare encore la configuration de revue de l'évaluation : la présence
+d'une configuration inactive ne modifie jamais l'état désactivé du mapping ni
+ne produit une requête Transport. Voir `authorization-configuration.md`.

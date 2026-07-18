@@ -96,3 +96,7 @@ adaptateur. Voir `transport-intent.md`.
 V10.7 évalue ensuite, de façon théorique et default-deny, les capacités et la
 politique d'une intention. Cette décision ne revient pas au Provider et ne
 prépare aucun plan ou payload exécutable. Voir `capability-policy-engine.md`.
+
+V10.8 ajoute une configuration d'autorisation review-required après cette
+décision. Elle reste sans effet sur les adaptateurs Provider et leurs plans
+inertes. Voir `authorization-configuration.md`.

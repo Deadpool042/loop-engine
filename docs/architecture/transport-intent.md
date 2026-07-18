@@ -70,3 +70,7 @@ distincts : V10.6 ne les anticipe pas.
 V10.7 ajoute l'évaluation théorique de ces capacités et politiques après
 l'intention. Elle reste default-deny et ne relie toujours pas l'intention au
 `TransportAdapter`. Voir `capability-policy-engine.md`.
+
+V10.8 ajoute ensuite une configuration d'autorisation déclarative et
+review-required. Elle ne rend pas l'intention active et ne produit aucune
+requête Transport. Voir `authorization-configuration.md`.

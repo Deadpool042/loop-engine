@@ -916,7 +916,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("transportIntentRule(") ||
             ruleSource.includes("noTransportIntentSurfaceRule(") ||
             ruleSource.includes("capabilityPolicyRule(") ||
-            ruleSource.includes("noCapabilityPolicySurfaceRule(");
+            ruleSource.includes("noCapabilityPolicySurfaceRule(") ||
+            ruleSource.includes("authorizationConfigurationRule(") ||
+            ruleSource.includes("noAuthorizationConfigurationSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -6849,6 +6851,327 @@ export const CAPABILITY_POLICY_DEPENDENCY_RULE: AuditRule =
             "Capability policy imports an upper layer or implementation.",
             violations,
             "Keep policy below intent and above future transport execution.",
+          );
+    },
+  );
+
+function authorizationConfigurationSource(path: string): string {
+  return existsSync(path) ? readFileSync(path, "utf8") : "";
+}
+
+const AUTHORIZATION_CONFIGURATION_AUDIT_METADATA = {
+  introducedIn: "V10.8",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function authorizationConfigurationRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...AUTHORIZATION_CONFIGURATION_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function authorizationConfigurationContains(
+  rule: AuditRule,
+  path: string,
+  tokens: readonly string[],
+  message: string,
+): ReturnType<typeof pass> {
+  const missing = tokens.filter(
+    (token) => !authorizationConfigurationSource(path).includes(token),
+  );
+  return missing.length === 0
+    ? pass(rule, message, [path, ...tokens])
+    : fail(
+        rule,
+        message,
+        missing,
+        "Restore the deterministic authorization configuration contract.",
+      );
+}
+
+const AUTHORIZATION_CONFIGURATION_FILES = [
+  "types.ts",
+  "errors.ts",
+  "registry.ts",
+  "selector.ts",
+  "validation.ts",
+  "configuration.ts",
+  "support.ts",
+  "index.ts",
+].map((file) => `src/authorization/${file}`);
+
+export const AUTHORIZATION_CONFIGURATION_MODULE_RULE: AuditRule =
+  authorizationConfigurationRule(
+    "AUDIT-191",
+    "Authorization configuration module is present",
+    "V10.8 must expose declarative configuration contracts and Core-only helpers.",
+    ["AUDIT-190"],
+    (rule) => {
+      const files = AUTHORIZATION_CONFIGURATION_FILES.concat(
+        "src/core/authorization.ts",
+      );
+      const missing = files.filter((path) => !existsSync(path));
+      return missing.length === 0
+        ? pass(rule, "Authorization configuration module is present.", files)
+        : fail(
+            rule,
+            "Authorization configuration module is incomplete.",
+            missing,
+            "Restore all V10.8 authorization configuration modules.",
+          );
+    },
+  );
+
+export const AUTHORIZATION_CONFIGURATION_REGISTRY_RULE: AuditRule =
+  authorizationConfigurationRule(
+    "AUDIT-192",
+    "Authorization configuration registry is static and deterministic",
+    "Configuration registration must use a fixed declaration order and unique identifiers.",
+    ["AUDIT-191"],
+    (rule) =>
+      authorizationConfigurationContains(
+        rule,
+        "src/authorization/registry.ts",
+        [
+          "OpenClawAuthorizationConfiguration",
+          "createAuthorizationConfigurationRegistry",
+          "AUTHORIZATION_CONFIGURATION_REGISTRY",
+          "Duplicate authorization configuration id",
+        ],
+        "Authorization configuration registry is static and deterministic.",
+      ),
+  );
+
+export const AUTHORIZATION_CONFIGURATION_CONTRACT_RULE: AuditRule =
+  authorizationConfigurationRule(
+    "AUDIT-193",
+    "Authorization configuration contracts are typed and immutable",
+    "Configuration contracts must describe reviewable identity and version requirements only.",
+    ["AUDIT-192"],
+    (rule) =>
+      authorizationConfigurationContains(
+        rule,
+        "src/authorization/types.ts",
+        [
+          "AuthorizationConfigurationId",
+          "AuthorizationConfiguration",
+          "AuthorizationConfigurationStatus",
+          "AuthorizationConfigurationMetadata",
+          "AuthorizationConfigurationRegistry",
+          "AuthorizationConfigurationSelection",
+          "AuthorizationConfigurationResolution",
+          "AuthorizationConfigurationValidation",
+          "AuthorizationConfigurationResult",
+          "AuthorizationConfigurationSummary",
+          "AuthorizationConfigurationRequirement",
+          "AuthorizationConfigurationPolicy",
+          "executionStarted: false",
+        ],
+        "Authorization configuration contracts are typed and immutable.",
+      ),
+  );
+
+export const AUTHORIZATION_CONFIGURATION_VALIDATION_RULE: AuditRule =
+  authorizationConfigurationRule(
+    "AUDIT-194",
+    "Authorization configuration validation is explicit",
+    "Validation must check decision, activation, policy, approval, and review without execution.",
+    ["AUDIT-193"],
+    (rule) =>
+      authorizationConfigurationContains(
+        rule,
+        "src/authorization/validation.ts",
+        [
+          "validateAuthorizationConfiguration",
+          "configuration_not_authorized",
+          "configuration_inactive",
+          "configuration_unapproved",
+          "configuration_review_required",
+        ],
+        "Authorization configuration validation is explicit.",
+      ),
+  );
+
+export const AUTHORIZATION_CONFIGURATION_DEFAULT_DENY_RULE: AuditRule =
+  authorizationConfigurationRule(
+    "AUDIT-195",
+    "Authorization configurations default to deny",
+    "The OpenClaw declaration must remain inactive, unapproved, and unconfigured.",
+    ["AUDIT-194"],
+    (rule) =>
+      authorizationConfigurationContains(
+        rule,
+        "src/authorization/registry.ts",
+        ["active: false", "approved: false", "configured: false"],
+        "Authorization configurations default to deny.",
+      ),
+  );
+
+export const AUTHORIZATION_CONFIGURATION_REVIEW_REQUIRED_RULE: AuditRule =
+  authorizationConfigurationRule(
+    "AUDIT-196",
+    "Authorization configuration requires review",
+    "The shipped configuration must require an explicit future review.",
+    ["AUDIT-195"],
+    (rule) =>
+      authorizationConfigurationContains(
+        rule,
+        "src/authorization/registry.ts",
+        ["reviewRequired: true"],
+        "Authorization configuration requires review.",
+      ),
+  );
+
+export const AUTHORIZATION_CONFIGURATION_OPENCLAW_RULE: AuditRule =
+  authorizationConfigurationRule(
+    "AUDIT-197",
+    "OpenClaw authorization configuration exists",
+    "The sole V10.8 configuration must describe OpenClaw review requirements only.",
+    ["AUDIT-196"],
+    (rule) =>
+      authorizationConfigurationContains(
+        rule,
+        "src/authorization/registry.ts",
+        [
+          "OpenClawAuthorizationConfiguration",
+          'id: "openclaw-plan-review"',
+          'mappingId: "openclaw-planning"',
+          'intentId: "openclaw-plan"',
+        ],
+        "OpenClaw authorization configuration exists.",
+      ),
+  );
+
+function noAuthorizationConfigurationSurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return authorizationConfigurationRule(
+    id,
+    title,
+    description,
+    dependsOn,
+    (rule) => {
+      const violations = AUTHORIZATION_CONFIGURATION_FILES.flatMap((path) =>
+        patterns
+          .filter((pattern) =>
+            pattern.test(authorizationConfigurationSource(path)),
+          )
+          .map((pattern) => `${path}: ${pattern.source}`),
+      );
+      return violations.length === 0
+        ? pass(rule, title + ".", AUTHORIZATION_CONFIGURATION_FILES)
+        : fail(
+            rule,
+            title + ".",
+            violations,
+            "Keep authorization configuration declarative and non-executing.",
+          );
+    },
+  );
+}
+
+export const AUTHORIZATION_CONFIGURATION_NO_COMMAND_RULE: AuditRule =
+  noAuthorizationConfigurationSurfaceRule(
+    "AUDIT-198",
+    "Authorization configuration has no command strings",
+    "Configuration code may not carry commands, arguments, flags, environments, or process options.",
+    ["AUDIT-197"],
+    [
+      /\bcommand\s*:/,
+      /\bargs\s*:/,
+      /\bflags\s*:/,
+      /environment\s*:/,
+      /workingDirectory\s*:/,
+      /processOptions\s*:/,
+    ],
+  );
+
+export const AUTHORIZATION_CONFIGURATION_NO_PATH_RULE: AuditRule =
+  noAuthorizationConfigurationSurfaceRule(
+    "AUDIT-199",
+    "Authorization configuration has no binary paths",
+    "Configuration code may not encode binary paths or filesystem discovery.",
+    ["AUDIT-198"],
+    [/executablePath/, /binaryPath/, /which\s*\(/, /realpathSync/],
+  );
+
+export const AUTHORIZATION_CONFIGURATION_NO_EXECUTION_RULE: AuditRule =
+  noAuthorizationConfigurationSurfaceRule(
+    "AUDIT-200",
+    "Authorization configuration has no execution boundary",
+    "Configuration code may not create transport or runtime requests, resolve adapters, or execute providers.",
+    ["AUDIT-199"],
+    [
+      /TransportRequest/,
+      /RuntimeRequest/,
+      /createTransportRequest\s*\(/,
+      /resolveTransport\s*\(/,
+      /executeTransport\s*\(/,
+      /resolveRuntime\s*\(/,
+      /executeRuntime\s*\(/,
+      /prepareProvider\s*\(/,
+      /executeProvider\s*\(/,
+    ],
+  );
+
+export const AUTHORIZATION_CONFIGURATION_NO_PROCESS_RULE: AuditRule =
+  noAuthorizationConfigurationSurfaceRule(
+    "AUDIT-201",
+    "Authorization configuration has no process APIs",
+    "Configuration code may not import process APIs, read environment, or access the network.",
+    ["AUDIT-200"],
+    [
+      /child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+      /\bfetch\s*\(/,
+      /node:(http|https|net|tls)/,
+    ],
+  );
+
+export const AUTHORIZATION_CONFIGURATION_DEPENDENCY_RULE: AuditRule =
+  authorizationConfigurationRule(
+    "AUDIT-202",
+    "Authorization configuration dependencies remain unidirectional",
+    "Configuration modules may consume contracts only, never upper layers or concrete Runtime or Transport implementations.",
+    ["AUDIT-201"],
+    (rule) => {
+      const violations = AUTHORIZATION_CONFIGURATION_FILES.filter((path) =>
+        /from\s+["'][^"']*\/(core|cli|commands|loop)\/|from\s+["'][^"']*\/(runtime|transports)\/(local-process|registry|selector)/.test(
+          authorizationConfigurationSource(path),
+        ),
+      );
+      return violations.length === 0
+        ? pass(
+            rule,
+            "Authorization configuration dependencies remain unidirectional.",
+            AUTHORIZATION_CONFIGURATION_FILES,
+          )
+        : fail(
+            rule,
+            "Authorization configuration imports an upper layer or implementation.",
+            violations,
+            "Keep configuration below authorization evaluation and above any future review boundary.",
           );
     },
   );

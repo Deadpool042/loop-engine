@@ -143,6 +143,7 @@ Voir aussi :
 - `docs/architecture/executable-mapping.md`
 - `docs/architecture/transport-intent.md`
 - `docs/architecture/capability-policy-engine.md`
+- `docs/architecture/authorization-configuration.md`
 
 ## Audit et CI
 
