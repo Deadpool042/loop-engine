@@ -100,3 +100,9 @@ transport juste avant la frontière d'exécution. Il accepte uniquement
 `HandoffEligibilityResult` et `ExecutionAuthority`, produit un descriptor
 immuable, non dispatchable et non exécutable, et ne crée aucun
 `TransportAdapterRequest`. Voir `docs/architecture/dispatch-descriptor.md`.
+
+V12.3 ajoute `BoundaryHandoff`, contrat immuable qui enveloppe le
+`DispatchDescriptor` pour représenter l'objet déclaratif pouvant être examiné
+avant une future frontière d'exécution. Il reste inactif, non accepté, non
+dispatchable et non exécutable, sans Runtime, Transport, Provider ni payload
+opérationnel. Voir `docs/architecture/boundary-handoff.md`.

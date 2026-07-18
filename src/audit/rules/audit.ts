@@ -931,7 +931,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("noHandoffEligibilitySurfaceRule(") ||
             ruleSource.includes("v11ConsolidationRule(") ||
             ruleSource.includes("dispatchDescriptorRule(") ||
-            ruleSource.includes("noDispatchDescriptorSurfaceRule(");
+            ruleSource.includes("noDispatchDescriptorSurfaceRule(") ||
+            ruleSource.includes("boundaryHandoffRule(") ||
+            ruleSource.includes("noBoundaryHandoffSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -8855,4 +8857,255 @@ export const DISPATCH_DESCRIPTOR_NO_DISPATCH_RULE: AuditRule =
       /executeRuntime/,
       /executeProvider/,
     ],
+  );
+
+const BOUNDARY_HANDOFF_FILES = [
+  "types.ts",
+  "errors.ts",
+  "registry.ts",
+  "selector.ts",
+  "validation.ts",
+  "handoff.ts",
+  "support.ts",
+  "index.ts",
+].map((file) => `src/boundary/${file}`);
+
+const BOUNDARY_HANDOFF_AUDIT_METADATA = {
+  introducedIn: "V12.3",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function boundaryHandoffRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...BOUNDARY_HANDOFF_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function noBoundaryHandoffSurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return boundaryHandoffRule(id, title, description, dependsOn, (rule) => {
+    const files = BOUNDARY_HANDOFF_FILES.concat("src/core/boundary.ts");
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(transportRequestSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep BoundaryHandoff declarative, inert, and disconnected from executable layers.",
+        );
+  });
+}
+
+export const BOUNDARY_HANDOFF_MODULE_RULE: AuditRule = boundaryHandoffRule(
+  "AUDIT-263",
+  "BoundaryHandoff module exists",
+  "V12.3 must expose a dedicated boundary handoff module and Core integration point.",
+  ["AUDIT-262"],
+  (rule) => {
+    const files = BOUNDARY_HANDOFF_FILES.concat("src/core/boundary.ts");
+    const missing = files.filter((path) => !existsSync(path));
+    return missing.length === 0
+      ? pass(rule, "BoundaryHandoff module exists.", files)
+      : fail(
+          rule,
+          "BoundaryHandoff module files are missing.",
+          missing,
+          "Restore the V12.3 boundary handoff contracts and Core integration.",
+        );
+  },
+);
+
+export const BOUNDARY_HANDOFF_IMMUTABLE_CONTRACT_RULE: AuditRule =
+  boundaryHandoffRule(
+    "AUDIT-264",
+    "BoundaryHandoff contracts are immutable",
+    "BoundaryHandoff must expose readonly contracts for handoff, evidence, validation, summary, result, registry, selector, resolver, errors, and builder.",
+    ["AUDIT-263"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/boundary/types.ts",
+        [
+          "BoundaryHandoffId",
+          "BoundaryHandoff",
+          "BoundaryHandoffStatus",
+          "BoundaryHandoffMetadata",
+          "BoundaryHandoffEvidence",
+          "BoundaryHandoffValidation",
+          "BoundaryHandoffSummary",
+          "BoundaryHandoffResult",
+          "BoundaryHandoffSelection",
+          "BoundaryHandoffResolution",
+          "BoundaryHandoffRegistry",
+          "BoundaryHandoffBuilder",
+          "BoundaryHandoffError",
+          "BoundaryHandoffErrorCode",
+          "Readonly",
+          "executionStarted: false",
+        ],
+        "BoundaryHandoff contracts are immutable.",
+      ),
+  );
+
+export const BOUNDARY_HANDOFF_PURE_BUILDER_RULE: AuditRule =
+  boundaryHandoffRule(
+    "AUDIT-265",
+    "BoundaryHandoff builder is pure",
+    "The boundary handoff builder must be a deterministic function over DispatchDescriptorResult only.",
+    ["AUDIT-264"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/boundary/handoff.ts",
+        [
+          "BoundaryHandoffBuilder",
+          "export const createBoundaryHandoff",
+          "DispatchDescriptorResult",
+        ],
+        "BoundaryHandoff builder is pure.",
+      ),
+  );
+
+export const BOUNDARY_HANDOFF_NO_RUNTIME_RULE: AuditRule =
+  noBoundaryHandoffSurfaceRule(
+    "AUDIT-266",
+    "BoundaryHandoff has no Runtime dependency",
+    "BoundaryHandoff may reference reviewed runtime contract versions but must not consume Runtime implementations.",
+    ["AUDIT-265"],
+    [
+      /RuntimeAdapter/,
+      /LocalProcessRuntime/,
+      /executeRuntime/,
+      /resolveRuntime/,
+      /from\s+["'][^"']*\/runtime\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const BOUNDARY_HANDOFF_NO_TRANSPORT_RULE: AuditRule =
+  noBoundaryHandoffSurfaceRule(
+    "AUDIT-267",
+    "BoundaryHandoff has no Transport dependency",
+    "BoundaryHandoff must not consume Transport adapters or implementations.",
+    ["AUDIT-266"],
+    [
+      /TransportAdapter/,
+      /TransportResult/,
+      /executeTransport/,
+      /selectTransport/,
+      /resolveTransport/,
+      /from\s+["'][^"']*\/transports\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const BOUNDARY_HANDOFF_NO_RUNTIME_REQUEST_RULE: AuditRule =
+  noBoundaryHandoffSurfaceRule(
+    "AUDIT-268",
+    "BoundaryHandoff creates no RuntimeRequest",
+    "BoundaryHandoff must not materialize a runtime request.",
+    ["AUDIT-267"],
+    [/RuntimeRequest/, /createRuntimeRequest/],
+  );
+
+export const BOUNDARY_HANDOFF_NO_TRANSPORT_REQUEST_RULE: AuditRule =
+  noBoundaryHandoffSurfaceRule(
+    "AUDIT-269",
+    "BoundaryHandoff creates no TransportRequest",
+    "BoundaryHandoff must not materialize a transport request.",
+    ["AUDIT-268"],
+    [/TransportRequest/, /createTransportRequest/],
+  );
+
+export const BOUNDARY_HANDOFF_NO_ADAPTER_REQUEST_RULE: AuditRule =
+  noBoundaryHandoffSurfaceRule(
+    "AUDIT-270",
+    "BoundaryHandoff creates no TransportAdapterRequest",
+    "BoundaryHandoff must not materialize an adapter request.",
+    ["AUDIT-269"],
+    [/TransportAdapterRequest/, /createTransportAdapterRequest/],
+  );
+
+export const BOUNDARY_HANDOFF_NO_EXECUTION_RULE: AuditRule =
+  noBoundaryHandoffSurfaceRule(
+    "AUDIT-271",
+    "BoundaryHandoff has no execution",
+    "BoundaryHandoff must not execute, spawn processes, access process state, read filesystem state, or access the network.",
+    ["AUDIT-270"],
+    [
+      /child_process/,
+      /node:child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+      /node:fs/,
+      /readFileSync/,
+      /writeFileSync/,
+      /\bfetch\s*\(/,
+      /node:(http|https|net|tls)/,
+    ],
+  );
+
+export const BOUNDARY_HANDOFF_NO_DISPATCH_RULE: AuditRule =
+  noBoundaryHandoffSurfaceRule(
+    "AUDIT-272",
+    "BoundaryHandoff performs no dispatch",
+    "BoundaryHandoff must remain not ready, not accepted, not dispatchable, and not executable.",
+    ["AUDIT-271"],
+    [
+      /ready:\s*true/,
+      /accepted:\s*true/,
+      /dispatchable:\s*true/,
+      /executable:\s*true/,
+      /executeTransport/,
+      /executeRuntime/,
+      /executeProvider/,
+    ],
+  );
+
+export const BOUNDARY_HANDOFF_DEFAULT_DENY_RULE: AuditRule =
+  boundaryHandoffRule(
+    "AUDIT-273",
+    "BoundaryHandoff defaults to deny",
+    "Every BoundaryHandoff must remain not ready, not accepted, not dispatchable, not executable, and execution-not-started.",
+    ["AUDIT-272"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/boundary/support.ts",
+        [
+          "OpenClawBoundaryHandoffFixture",
+          "ClaudeBoundaryHandoffFixture",
+          "CodexBoundaryHandoffFixture",
+          "ready: false",
+          "accepted: false",
+          "dispatchable: false",
+          "executable: false",
+          "executionStarted: false",
+        ],
+        "BoundaryHandoff defaults to deny.",
+      ),
   );

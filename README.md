@@ -154,6 +154,7 @@ Voir aussi :
 - `docs/architecture/v11-consolidation.md`
 - `docs/architecture/rfc-execution-boundary-v12.md`
 - `docs/architecture/dispatch-descriptor.md`
+- `docs/architecture/boundary-handoff.md`
 
 ## Audit et CI
 

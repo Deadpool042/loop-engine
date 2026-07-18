@@ -13,6 +13,7 @@ export * from "./review.js";
 export * from "./provenance.js";
 export * from "./handoff-eligibility.js";
 export * from "./dispatch.js";
+export * from "./boundary.js";
 export * from "./transports.js";
 export * from "./reports.js";
 export * from "./types.js";
