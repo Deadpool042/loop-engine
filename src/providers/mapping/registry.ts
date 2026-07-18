@@ -1,4 +1,8 @@
 import { supportsExecutableMapping } from "./support.js";
+import {
+  createStaticRegistryEntries,
+  findStaticRegistryEntry,
+} from "../../registry.js";
 import type {
   ExecutableMapping,
   ExecutableMappingId,
@@ -27,14 +31,13 @@ export const OpenClawExecutableMapping: ExecutableMapping = Object.freeze({
 export function createExecutableMappingRegistry(
   mappings: readonly ExecutableMapping[],
 ): ExecutableMappingRegistry {
-  const ids = new Set<string>();
-  for (const mapping of mappings) {
-    if (ids.has(mapping.id)) {
-      throw new Error(`Duplicate executable mapping id: ${mapping.id}`);
-    }
-    ids.add(mapping.id);
-  }
-  return Object.freeze({ mappings: Object.freeze([...mappings]) });
+  return Object.freeze({
+    mappings: createStaticRegistryEntries(
+      mappings,
+      (mapping) => mapping.id,
+      (id) => `Duplicate executable mapping id: ${id}`,
+    ),
+  });
 }
 
 // Fixed declaration order only: no discovery, plugins, dynamic imports,
@@ -47,5 +50,9 @@ export function getExecutableMapping(
   id: ExecutableMappingId,
   registry: ExecutableMappingRegistry = EXECUTABLE_MAPPING_REGISTRY,
 ): ExecutableMapping | null {
-  return registry.mappings.find((mapping) => mapping.id === id) ?? null;
+  return findStaticRegistryEntry(
+    registry.mappings,
+    id,
+    (mapping) => mapping.id,
+  );
 }

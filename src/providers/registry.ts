@@ -1,6 +1,10 @@
 import { ClaudeCodeProviderAdapter } from "./claude-code.js";
 import { CodexProviderAdapter } from "./codex.js";
 import { OpenClawProviderAdapter } from "./openclaw.js";
+import {
+  createStaticRegistryEntries,
+  findStaticRegistryEntry,
+} from "../registry.js";
 import type { ProviderAdapter, ProviderId } from "./types.js";
 
 export type ProviderRegistry = Readonly<{
@@ -10,15 +14,13 @@ export type ProviderRegistry = Readonly<{
 export function createProviderRegistry(
   adapters: readonly ProviderAdapter[],
 ): ProviderRegistry {
-  const ids = new Set<string>();
-  for (const adapter of adapters) {
-    if (ids.has(adapter.id)) {
-      throw new Error(`Duplicate provider adapter id: ${adapter.id}`);
-    }
-    ids.add(adapter.id);
-  }
-
-  return Object.freeze({ adapters: Object.freeze([...adapters]) });
+  return Object.freeze({
+    adapters: createStaticRegistryEntries(
+      adapters,
+      (adapter) => adapter.id,
+      (id) => `Duplicate provider adapter id: ${id}`,
+    ),
+  });
 }
 
 // Declaration order is the deterministic fallback order. No dynamic loading,
@@ -32,8 +34,9 @@ export const PROVIDER_REGISTRY = createProviderRegistry([
 export function getProviderAdapter(
   providerId: ProviderId,
 ): ProviderAdapter | null {
-  return (
-    PROVIDER_REGISTRY.adapters.find((adapter) => adapter.id === providerId) ??
-    null
+  return findStaticRegistryEntry(
+    PROVIDER_REGISTRY.adapters,
+    providerId,
+    (adapter) => adapter.id,
   );
 }

@@ -1,4 +1,8 @@
 import { AGENT_CAPABILITIES } from "../agents/types.js";
+import {
+  createStaticRegistryEntries,
+  findStaticRegistryEntry,
+} from "../registry.js";
 import type {
   CapabilityRegistry,
   PolicyRegistry,
@@ -29,12 +33,13 @@ export const DEFAULT_DENY_POLICY: PolicyRule = Object.freeze({
 export function createPolicyRegistry(
   rules: readonly PolicyRule[],
 ): PolicyRegistry {
-  const ids = new Set<string>();
-  for (const rule of rules) {
-    if (ids.has(rule.id)) throw new Error(`Duplicate policy id: ${rule.id}`);
-    ids.add(rule.id);
-  }
-  return Object.freeze({ rules: Object.freeze([...rules]) });
+  return Object.freeze({
+    rules: createStaticRegistryEntries(
+      rules,
+      (rule) => rule.id,
+      (id) => `Duplicate policy id: ${id}`,
+    ),
+  });
 }
 
 // Fixed declaration order only: no discovery, plugins, dynamic imports,
@@ -45,5 +50,5 @@ export function getPolicyRule(
   id: string,
   registry: PolicyRegistry = POLICY_REGISTRY,
 ): PolicyRule | null {
-  return registry.rules.find((rule) => rule.id === id) ?? null;
+  return findStaticRegistryEntry(registry.rules, id, (rule) => rule.id);
 }

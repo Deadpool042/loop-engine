@@ -4778,7 +4778,7 @@ export const TRANSPORT_ID_UNIQUENESS_RULE: AuditRule = {
     verifyTransportSource(
       TRANSPORT_ID_UNIQUENESS_RULE,
       "src/transports/registry.ts",
-      ["const ids = new Set<string>()", "ids.has(adapter.id)"],
+      ["createStaticRegistryEntries", "Duplicate transport adapter id"],
       "Transport registry enforces unique identifiers.",
       "Retain duplicate-id detection in the static transport registry.",
     ),
@@ -5927,7 +5927,7 @@ export const EXECUTABLE_MAPPING_UNIQUENESS_RULE: AuditRule =
       mappingContains(
         rule,
         "src/providers/mapping/registry.ts",
-        ["new Set", "Duplicate executable mapping id"],
+        ["createStaticRegistryEntries", "Duplicate executable mapping id"],
         "Executable mapping registry enforces unique identifiers.",
       ),
   );
@@ -6300,7 +6300,7 @@ export const TRANSPORT_INTENT_UNIQUENESS_RULE: AuditRule = transportIntentRule(
     intentContains(
       rule,
       "src/providers/intent/registry.ts",
-      ["new Set", "Duplicate transport intent id"],
+      ["createStaticRegistryEntries", "Duplicate transport intent id"],
       "Transport intent registry enforces unique identifiers.",
     ),
 );

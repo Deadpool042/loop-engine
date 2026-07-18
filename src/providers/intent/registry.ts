@@ -1,4 +1,8 @@
 import { supportsTransportIntent } from "./support.js";
+import {
+  createStaticRegistryEntries,
+  findStaticRegistryEntry,
+} from "../../registry.js";
 import type {
   TransportIntent,
   TransportIntentId,
@@ -25,13 +29,13 @@ export const OpenClawTransportIntent: TransportIntent = Object.freeze({
 export function createTransportIntentRegistry(
   intents: readonly TransportIntent[],
 ): TransportIntentRegistry {
-  const ids = new Set<string>();
-  for (const intent of intents) {
-    if (ids.has(intent.id))
-      throw new Error(`Duplicate transport intent id: ${intent.id}`);
-    ids.add(intent.id);
-  }
-  return Object.freeze({ intents: Object.freeze([...intents]) });
+  return Object.freeze({
+    intents: createStaticRegistryEntries(
+      intents,
+      (intent) => intent.id,
+      (id) => `Duplicate transport intent id: ${id}`,
+    ),
+  });
 }
 
 // Fixed declaration order only: no discovery, plugins, dynamic imports,
@@ -44,5 +48,5 @@ export function getTransportIntent(
   id: TransportIntentId,
   registry: TransportIntentRegistry = TRANSPORT_INTENT_REGISTRY,
 ): TransportIntent | null {
-  return registry.intents.find((intent) => intent.id === id) ?? null;
+  return findStaticRegistryEntry(registry.intents, id, (intent) => intent.id);
 }

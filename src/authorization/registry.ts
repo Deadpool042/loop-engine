@@ -1,4 +1,8 @@
 import { supportsAuthorizationConfiguration } from "./support.js";
+import {
+  createStaticRegistryEntries,
+  findStaticRegistryEntry,
+} from "../registry.js";
 import type {
   AuthorizationConfiguration,
   AuthorizationConfigurationId,
@@ -37,16 +41,13 @@ export const OpenClawAuthorizationConfiguration: AuthorizationConfiguration =
 export function createAuthorizationConfigurationRegistry(
   configurations: readonly AuthorizationConfiguration[],
 ): AuthorizationConfigurationRegistry {
-  const ids = new Set<string>();
-  for (const configuration of configurations) {
-    if (ids.has(configuration.id)) {
-      throw new Error(
-        `Duplicate authorization configuration id: ${configuration.id}`,
-      );
-    }
-    ids.add(configuration.id);
-  }
-  return Object.freeze({ configurations: Object.freeze([...configurations]) });
+  return Object.freeze({
+    configurations: createStaticRegistryEntries(
+      configurations,
+      (configuration) => configuration.id,
+      (id) => `Duplicate authorization configuration id: ${id}`,
+    ),
+  });
 }
 
 // Fixed declaration order only: no discovery, plugins, dynamic imports,
@@ -60,8 +61,9 @@ export function getAuthorizationConfiguration(
   id: AuthorizationConfigurationId,
   registry: AuthorizationConfigurationRegistry = AUTHORIZATION_CONFIGURATION_REGISTRY,
 ): AuthorizationConfiguration | null {
-  return (
-    registry.configurations.find((configuration) => configuration.id === id) ??
-    null
+  return findStaticRegistryEntry(
+    registry.configurations,
+    id,
+    (configuration) => configuration.id,
   );
 }

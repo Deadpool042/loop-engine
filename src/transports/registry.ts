@@ -1,4 +1,8 @@
 import { LocalProcessTransport } from "./local-process.js";
+import {
+  createStaticRegistryEntries,
+  findStaticRegistryEntry,
+} from "../registry.js";
 import type {
   TransportAdapter,
   TransportId,
@@ -8,15 +12,13 @@ import type {
 export function createTransportRegistry(
   adapters: readonly TransportAdapter[],
 ): TransportRegistry {
-  const ids = new Set<string>();
-  for (const adapter of adapters) {
-    if (ids.has(adapter.id)) {
-      throw new Error(`Duplicate transport adapter id: ${adapter.id}`);
-    }
-    ids.add(adapter.id);
-  }
-
-  return Object.freeze({ adapters: Object.freeze([...adapters]) });
+  return Object.freeze({
+    adapters: createStaticRegistryEntries(
+      adapters,
+      (adapter) => adapter.id,
+      (id) => `Duplicate transport adapter id: ${id}`,
+    ),
+  });
 }
 
 // Declaration order is the only fallback order. There is no discovery,
@@ -28,8 +30,9 @@ export const TRANSPORT_REGISTRY = createTransportRegistry([
 export function getTransportAdapter(
   transportId: TransportId,
 ): TransportAdapter | null {
-  return (
-    TRANSPORT_REGISTRY.adapters.find((adapter) => adapter.id === transportId) ??
-    null
+  return findStaticRegistryEntry(
+    TRANSPORT_REGISTRY.adapters,
+    transportId,
+    (adapter) => adapter.id,
   );
 }

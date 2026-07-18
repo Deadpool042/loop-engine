@@ -144,6 +144,7 @@ Voir aussi :
 - `docs/architecture/transport-intent.md`
 - `docs/architecture/capability-policy-engine.md`
 - `docs/architecture/authorization-configuration.md`
+- `docs/architecture/architecture-consolidation.md`
 
 ## Audit et CI
 
