@@ -1,25 +1,9 @@
-import { execSync } from "node:child_process";
-
-import { type ProjectConfig } from "../core/config.js";
-import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
+import {
+  generateProjectReport,
+  generateReviewReport,
+  type ProjectConfig,
+} from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
-
-function run(command: string, cwd: string): string {
-  try {
-    return execSync(command, {
-      cwd,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      maxBuffer: 1024 * 1024 * 20,
-    }).trim();
-  } catch (error) {
-    if (error instanceof Error) {
-      return error.message;
-    }
-
-    return "Command failed.";
-  }
-}
 
 function printBlock(title: string, content: string): void {
   terminal.section(title);
@@ -33,7 +17,8 @@ function printBlock(title: string, content: string): void {
 }
 
 export function printReviewContext(project: ProjectConfig): void {
-  const snapshot = buildProjectSnapshot(project);
+  const snapshot = generateProjectReport(project);
+  const report = generateReviewReport(project);
 
   terminal.header(`Review • ${snapshot.project.name}`);
   terminal.info(`Project: ${snapshot.project.name}`);
@@ -42,9 +27,9 @@ export function printReviewContext(project: ProjectConfig): void {
   if (!snapshot.git.requiresGit) {
     terminal.warning("Git repository not required.");
   } else {
-    printBlock("Git status", run("git status --short", snapshot.project.path));
-    printBlock("Diff stat", run("git diff --stat", snapshot.project.path));
-    printBlock("Diff", run("git diff", snapshot.project.path));
+    printBlock("Git status", report.gitStatus);
+    printBlock("Diff stat", report.diffStat);
+    printBlock("Diff", report.diff);
   }
 
   terminal.section("Validation");
@@ -65,25 +50,7 @@ export function printReviewContext(project: ProjectConfig): void {
 }
 
 export function printReviewContextJson(project: ProjectConfig): void {
-  const snapshot = buildProjectSnapshot(project);
-
-  const gitStatus = snapshot.git.requiresGit
-    ? run("git status --short", snapshot.project.path)
-    : "";
-
-  const diffStat = snapshot.git.requiresGit
-    ? run("git diff --stat", snapshot.project.path)
-    : "";
-
-  console.log(
-    JSON.stringify({
-      schemaVersion: 1,
-      project: snapshot.project,
-      git: snapshot.git,
-      gitStatus,
-      diffStat,
-      validation: snapshot.validation,
-      health: snapshot.health,
-    }),
-  );
+  const { diff, ...report } = generateReviewReport(project);
+  void diff;
+  console.log(JSON.stringify(report));
 }

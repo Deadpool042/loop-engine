@@ -35,8 +35,11 @@ import {
   printAuditRuleManifest,
 } from "./commands/audit.js";
 import { isLoopRunMode, runLoopRunCommand } from "./commands/run.js";
-import { loadConfig } from "./core/config.js";
-import { findProject, getRequiredProjectName } from "./core/project.js";
+import {
+  findProject,
+  getRequiredProjectName,
+  loadConfig,
+} from "./core/index.js";
 import { terminal } from "./ui/terminal.js";
 import { printJsonError } from "./commands/json-error.js";
 
@@ -130,14 +133,14 @@ if (command === "help" || command === "--help" || command === "-h") {
     printAuditRuleManifest();
     process.exitCode = 0;
   } else {
-  const strict = process.argv.includes("--strict");
-  const report = process.argv.includes("--json")
-    ? printAuditReportJson()
-    : printAuditReport();
+    const strict = process.argv.includes("--strict");
+    const report = process.argv.includes("--json")
+      ? printAuditReportJson()
+      : printAuditReport();
 
-  if (strict && report.summary.status !== "pass") {
-    process.exitCode = 1;
-  }
+    if (strict && report.summary.status !== "pass") {
+      process.exitCode = 1;
+    }
   }
 } else if (command === "handoff") {
   const project = resolveProjectOrExit("handoff");

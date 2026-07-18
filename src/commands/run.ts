@@ -1,10 +1,11 @@
-import type { ProjectConfig } from "../core/config.js";
-import { runLoopPlan } from "../loop/runner.js";
 import {
+  generateExecutionReport,
   LOOP_RUN_MODES,
+  runLoopPlan,
   type LoopRunMode,
   type LoopRunResult,
-} from "../loop/types.js";
+  type ProjectConfig,
+} from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
 import { printJsonError } from "./json-error.js";
 
@@ -76,26 +77,7 @@ function printLoopRunResult(result: LoopRunResult): void {
 }
 
 function printLoopRunResultJson(result: LoopRunResult): void {
-  console.log(
-    JSON.stringify({
-      schemaVersion: 1,
-      runId: result.runId,
-      project: result.project,
-      mode: result.mode,
-      status: result.status,
-      startedAt: result.startedAt,
-      completedAt: result.completedAt,
-      candidate: result.candidate,
-      steps: result.steps,
-      validation: result.validation,
-      modifiedFiles: result.modifiedFiles,
-      commit: result.commit,
-      publication: result.publication,
-      failure: result.failure,
-      agentPolicy: result.agentPolicy,
-      contextPackage: result.contextPackage,
-    }),
-  );
+  console.log(JSON.stringify(generateExecutionReport(result)));
 }
 
 export function runLoopRunCommand(

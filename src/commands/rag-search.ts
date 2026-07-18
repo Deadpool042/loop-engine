@@ -1,64 +1,14 @@
-import { existsSync, readFileSync } from "node:fs";
-
-const INDEX_PATH = ".loop-engine/rag-index.json";
-
-type RagDocument = Readonly<{
-  id: string;
-  path: string;
-  title: string;
-  sectionTitle?: string;
-  headingLevel?: number;
-  content: string;
-  contentHash: string;
-}>;
-
-type RagIndex = Readonly<{
-  schemaVersion: number;
-  documents: readonly RagDocument[];
-}>;
-
-function countOccurrences(content: string, query: string): number {
-  const normalizedContent = content.toLowerCase();
-  const normalizedQuery = query.toLowerCase();
-
-  if (normalizedQuery.length === 0) {
-    return 0;
-  }
-
-  return normalizedContent.split(normalizedQuery).length - 1;
-}
-
-function buildSnippet(content: string, query: string): string {
-  const normalizedContent = content.toLowerCase();
-  const normalizedQuery = query.toLowerCase();
-  const matchIndex = normalizedContent.indexOf(normalizedQuery);
-
-  if (matchIndex === -1) {
-    return "";
-  }
-
-  const start = Math.max(0, matchIndex - 80);
-  const end = Math.min(content.length, matchIndex + query.length + 80);
-  const prefix = start > 0 ? "... " : "";
-  const suffix = end < content.length ? " ..." : "";
-
-  return `${prefix}${content.slice(start, end).replace(/\s+/g, " ").trim()}${suffix}`;
-}
+import { generateRagSearchReport } from "../core/index.js";
 
 export function runRagSearch(
   query: string | undefined,
   options?: { json?: boolean; limit?: number; pathPrefix?: string },
 ): void {
-  if (!query || query.trim().length === 0) {
+  const report = generateRagSearchReport(query, options);
+
+  if (report.error === "missing_query") {
     if (options?.json) {
-      console.log(
-        JSON.stringify({
-          schemaVersion: 1,
-          query: query ?? "",
-          results: [],
-          error: "missing_query",
-        }),
-      );
+      console.log(JSON.stringify(report));
     } else {
       console.error("Usage: pnpm exec tsx src/cli.ts rag-search <query>");
     }
@@ -66,89 +16,34 @@ export function runRagSearch(
     return;
   }
 
-  if (!existsSync(INDEX_PATH)) {
+  if (report.error === "missing_index") {
     if (options?.json) {
-      console.log(
-        JSON.stringify({
-          schemaVersion: 1,
-          query,
-          results: [],
-          error: "missing_index",
-        }),
-      );
+      console.log(JSON.stringify(report));
     } else {
-      console.error(`Missing ${INDEX_PATH}. Run pnpm run rag-index first.`);
+      console.error(
+        "Missing .loop-engine/rag-index.json. Run pnpm run rag-index first.",
+      );
     }
     process.exitCode = 1;
     return;
   }
 
-  const index = JSON.parse(readFileSync(INDEX_PATH, "utf8")) as RagIndex;
-  const normalizedQuery = query.trim();
-
-  const limit = options?.limit && options.limit > 0 ? options.limit : 5;
-
-  const documents = options?.pathPrefix
-    ? index.documents.filter((document) =>
-        document.path.startsWith(options.pathPrefix ?? ""),
-      )
-    : index.documents;
-
-  const results = documents
-    .map((document) => ({
-      document,
-      score:
-        countOccurrences(document.title, normalizedQuery) * 3 +
-        countOccurrences(document.path, normalizedQuery) * 2 +
-        countOccurrences(document.content, normalizedQuery),
-    }))
-    .filter((result) => result.score > 0)
-    .sort((left, right) => {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-
-      return left.document.path.localeCompare(right.document.path);
-    })
-    .slice(0, limit);
-
   if (options?.json) {
-    console.log(
-      JSON.stringify({
-        schemaVersion: 1,
-        query: normalizedQuery,
-        pathPrefix: options?.pathPrefix ?? null,
-        results: results.map((result) => ({
-          path: result.document.path,
-          title: result.document.title,
-          sectionTitle: result.document.sectionTitle ?? null,
-          headingLevel: result.document.headingLevel ?? null,
-          score: result.score,
-          snippet: buildSnippet(result.document.content, normalizedQuery),
-        })),
-      }),
-    );
+    console.log(JSON.stringify(report));
     return;
   }
 
-  if (results.length === 0) {
-    console.log(`No result for "${normalizedQuery}".`);
+  if (report.results.length === 0) {
+    console.log(`No result for "${report.query}".`);
     return;
   }
 
-  console.log(`Results for "${normalizedQuery}":`);
-
-  for (const result of results) {
-    const sectionLabel = result.document.sectionTitle
-      ? ` — ${result.document.sectionTitle}`
-      : "";
-
+  console.log(`Results for "${report.query}":`);
+  for (const result of report.results) {
+    const sectionLabel = result.sectionTitle ? ` — ${result.sectionTitle}` : "";
     console.log(
-      `- ${result.document.path} — ${result.document.title}${sectionLabel} — score ${result.score}`,
+      `- ${result.path} — ${result.title}${sectionLabel} — score ${result.score}`,
     );
-    const snippet = buildSnippet(result.document.content, normalizedQuery);
-    if (snippet) {
-      console.log(`  ${snippet}`);
-    }
+    if (result.snippet) console.log(`  ${result.snippet}`);
   }
 }

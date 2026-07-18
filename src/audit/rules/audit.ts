@@ -1940,7 +1940,7 @@ export const AUDIT_CLI_PROFILE_PARSING_RULE: AuditRule = {
       "Invalid audit profile",
       "const profile = parseAuditProfileOption(args)",
       "const options = parseAuditCommandOptions(process.argv)",
-      "runAudit(options)",
+      "generateAuditReport(options)",
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
@@ -1950,7 +1950,7 @@ export const AUDIT_CLI_PROFILE_PARSING_RULE: AuditRule = {
         AUDIT_CLI_PROFILE_PARSING_RULE,
         "Audit CLI profile parsing is incomplete.",
         missing,
-        "Parse --profile in the audit command and pass the validated profile to runAudit.",
+        "Parse --profile in the audit command and pass the validated profile to the Core audit report generator.",
       );
     }
 
@@ -3013,7 +3013,7 @@ export const AUDIT_POLICY_FORECAST_INTEGRATION_RULE: AuditRule = {
         token: 'import { resolvePolicy } from "../policy/resolver.js";',
       },
       { file: "src/loop/runner.ts", token: 'mode: "plan",' },
-      { file: "src/commands/run.ts", token: "agentPolicy: result.agentPolicy" },
+      { file: "src/core/loop.ts", token: "agentPolicy: result.agentPolicy" },
     ];
 
     const missing = expectations
@@ -3028,7 +3028,7 @@ export const AUDIT_POLICY_FORECAST_INTEGRATION_RULE: AuditRule = {
         AUDIT_POLICY_FORECAST_INTEGRATION_RULE,
         "The forecast-only agent policy integration is incomplete.",
         missing,
-        "Ensure LoopRunResult exposes agentPolicy, runLoopPlan resolves it in mode plan via resolvePolicy, and the run command exposes it in JSON output.",
+        "Ensure LoopRunResult exposes agentPolicy, runLoopPlan resolves it in mode plan via resolvePolicy, and the Core execution report exposes it in JSON output.",
       );
     }
 
@@ -3396,7 +3396,7 @@ export const CONTEXT_BUILDER_LOOP_INTEGRATION_RULE: AuditRule = {
         token: "agentPolicy.requirements.contextBudget",
       },
       {
-        file: "src/commands/run.ts",
+        file: "src/core/loop.ts",
         token: "contextPackage: result.contextPackage",
       },
     ];
@@ -3413,7 +3413,7 @@ export const CONTEXT_BUILDER_LOOP_INTEGRATION_RULE: AuditRule = {
         CONTEXT_BUILDER_LOOP_INTEGRATION_RULE,
         "The Minimal Context Package integration is incomplete.",
         missing,
-        "Ensure LoopRunResult exposes contextPackage, LoopPlan's ready outcome carries a snapshot, runLoopPlan builds the package via buildMinimalContext(snapshot, agentPolicy.requirements.contextBudget), and the run command exposes it in JSON output.",
+        "Ensure LoopRunResult exposes contextPackage, LoopPlan's ready outcome carries a snapshot, runLoopPlan builds the package via buildMinimalContext(snapshot, agentPolicy.requirements.contextBudget), and the Core execution report exposes it in JSON output.",
       );
     }
 
@@ -3800,8 +3800,7 @@ export const AUDIT_RULE_STABILITY_VALIDITY_V8_RULE: AuditRule = {
         "Invalid stability metadata",
       ],
       {
-        pass:
-          "Audit rule stability is validated against the typed stability registry.",
+        pass: "Audit rule stability is validated against the typed stability registry.",
         fail: "Audit rule stability validation is incomplete.",
         recommendation:
           "Restore validation that rejects stability values outside AUDIT_RULE_STABILITIES.",
@@ -3851,10 +3850,7 @@ export const AUDIT_RULE_NO_SELF_DEPENDENCY_V8_RULE: AuditRule = {
   check: () =>
     verifyRegistryContract(
       AUDIT_RULE_NO_SELF_DEPENDENCY_V8_RULE,
-      [
-        "dependency === rule.id",
-        "Audit rule must not depend on itself",
-      ],
+      ["dependency === rule.id", "Audit rule must not depend on itself"],
       {
         pass: "Audit rules cannot declare self-dependencies.",
         fail: "Audit rule self-dependency validation is incomplete.",

@@ -1,9 +1,12 @@
-import { type ProjectConfig } from "../core/config.js";
-import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
+import {
+  generateProjectPromptReport,
+  generateProjectReport,
+  type ProjectConfig,
+} from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printProjectPrompt(project: ProjectConfig): void {
-  const snapshot = buildProjectSnapshot(project);
+  const snapshot = generateProjectReport(project);
 
   terminal.header(`Prompt • ${snapshot.project.name}`);
 
@@ -99,31 +102,5 @@ export function printProjectPrompt(project: ProjectConfig): void {
 }
 
 export function printProjectPromptJson(project: ProjectConfig): void {
-  const snapshot = buildProjectSnapshot(project);
-  const selectedCandidate = snapshot.roadmap.selectedCandidate;
-
-  console.log(
-    JSON.stringify({
-      schemaVersion: 1,
-      project: snapshot.project,
-      git: snapshot.git,
-      docs: snapshot.docs,
-      roadmap: {
-        available: snapshot.roadmap.available,
-        paths: snapshot.roadmap.paths,
-        selectedCandidate,
-        stats: snapshot.roadmap.stats,
-        summary: snapshot.roadmap.summary,
-      },
-      validation: snapshot.validation,
-      instructions: [
-        "Lire les sources listées avant toute intervention significative.",
-        "Respecter l'architecture et les conventions du projet.",
-        "Travailler par micro-lots sûrs et réversibles.",
-        "Ne pas modifier de fichiers hors périmètre sans justification explicite.",
-        "Ne pas ajouter de dépendance inutile.",
-        "Lancer les validations configurées avant review ou commit.",
-      ],
-    }),
-  );
+  console.log(JSON.stringify(generateProjectPromptReport(project)));
 }
