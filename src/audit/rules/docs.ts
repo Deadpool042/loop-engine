@@ -168,7 +168,7 @@ export const AUDIT_FINAL_REPORT_README_CHECKS_RULE: AuditRule = {
   severity: "warning",
   title: "Final audit report documents README checks",
   description:
-    "The final audit report should mention the README audit rules and current rule count.",
+    "The historical V1 final report should mention its README audit rules and commands without depending on the current registry size.",
   check: () => {
     const reportPath = "docs/audits/audit-engine-v1-final.md";
 
@@ -182,38 +182,7 @@ export const AUDIT_FINAL_REPORT_README_CHECKS_RULE: AuditRule = {
     }
 
     const content = readFileSync(reportPath, "utf8");
-    const registryPath = "src/audit/rules.ts";
-
-    if (!existsSync(registryPath)) {
-      return fail(
-        AUDIT_FINAL_REPORT_README_CHECKS_RULE,
-        "Audit rule registry is missing.",
-        [registryPath],
-        "Restore src/audit/rules.ts so the documented rule count can be verified.",
-      );
-    }
-
-    const registryContent = readFileSync(registryPath, "utf8");
-    const registryStart = registryContent.indexOf("export const AUDIT_RULES");
-    const registryEnd = registryContent.indexOf("];", registryStart);
-
-    if (registryStart < 0 || registryEnd < 0) {
-      return fail(
-        AUDIT_FINAL_REPORT_README_CHECKS_RULE,
-        "Audit rule registry cannot be parsed.",
-        ["export const AUDIT_RULES"],
-        "Keep AUDIT_RULES declared as a static array in src/audit/rules.ts.",
-      );
-    }
-
-    const registry = registryContent.slice(registryStart, registryEnd);
-    const documentedRuleCount = Array.from(
-      registry.matchAll(/\b[A-Z0-9_]+_RULE\b/g),
-    ).length;
-    const expectedRuleCount = `${documentedRuleCount} règles`;
-
     const expectedTokens = [
-      expectedRuleCount,
       "`DOCS-002`",
       "`DOCS-003`",
       "Couverture README",
@@ -230,7 +199,7 @@ export const AUDIT_FINAL_REPORT_README_CHECKS_RULE: AuditRule = {
         AUDIT_FINAL_REPORT_README_CHECKS_RULE,
         "Final audit report does not document all README audit checks.",
         missing,
-        "Document DOCS-002, DOCS-003, the README audit commands, and the current rule count in the final audit report.",
+        "Document DOCS-002, DOCS-003, and the README audit commands in the V1 final audit report.",
       );
     }
 
