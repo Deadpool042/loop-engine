@@ -40,6 +40,11 @@ As of V11.2, `TransportRequestBuilder` is the sole supported factory for
 creating a `TransportRequest` from a `ProviderExecutionPlan`. See
 `docs/architecture/transport-request-builder.md`.
 
+As of V11.3, `ExecutionReviewGate` is the sole supported review mechanism for a
+`TransportRequest` before any future handoff. It produces only a
+`ReviewedTransportRequest`, which remains non-approved, non-dispatchable, and
+non-executable. See `docs/architecture/execution-review-gate.md`.
+
 ## References
 
 The request contains references only:

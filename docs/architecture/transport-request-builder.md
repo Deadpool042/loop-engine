@@ -30,6 +30,11 @@ The builder is still before the execution boundary defined by the V11 RFC.
 Producing a `TransportRequest` is not dispatch. A built request remains
 inactive, not dispatchable, not executable, and validation-required.
 
+As of V11.3, a built request must pass through `ExecutionReviewGate` before any
+future handoff can be considered. The reviewed request remains non-approved,
+non-dispatchable, and non-executable. See
+`docs/architecture/execution-review-gate.md`.
+
 ## Invariants
 
 The builder MUST:

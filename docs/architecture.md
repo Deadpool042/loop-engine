@@ -62,3 +62,9 @@ une `TransportRequest` depuis un `ProviderExecutionPlan` et une
 `AuthorizationConfiguration`. Le builder reste pur, déterministe, sans Runtime,
 sans Transport et sans payload exécutable. Voir
 `docs/architecture/transport-request-builder.md`.
+
+V11.3 ajoute `ExecutionReviewGate`, unique mécanisme supporté pour produire une
+`ReviewedTransportRequest` déclarative depuis une `TransportRequest` et une
+`AuthorizationConfiguration`. La requête revue reste non approuvée, non
+dispatchable et non exécutable. Voir
+`docs/architecture/execution-review-gate.md`.

@@ -148,6 +148,7 @@ Voir aussi :
 - `docs/architecture/rfc-execution-architecture-v11.md`
 - `docs/architecture/transport-request.md`
 - `docs/architecture/transport-request-builder.md`
+- `docs/architecture/execution-review-gate.md`
 
 ## Audit et CI
 

@@ -9,6 +9,7 @@ export * from "./policy.js";
 export * from "./authorization.js";
 export * from "./transport-request.js";
 export * from "./transport-request-builder.js";
+export * from "./review.js";
 export * from "./transports.js";
 export * from "./reports.js";
 export * from "./types.js";

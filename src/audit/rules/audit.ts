@@ -922,7 +922,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("transportRequestRule(") ||
             ruleSource.includes("noTransportRequestSurfaceRule(") ||
             ruleSource.includes("transportRequestBuilderRule(") ||
-            ruleSource.includes("noTransportRequestBuilderSurfaceRule(");
+            ruleSource.includes("noTransportRequestBuilderSurfaceRule(") ||
+            ruleSource.includes("executionReviewRule(") ||
+            ruleSource.includes("noExecutionReviewSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -7242,7 +7244,9 @@ export const TRANSPORT_REQUEST_MODULE_RULE: AuditRule = transportRequestRule(
   "V11.1 must expose declarative TransportRequest contracts and Core-only helpers.",
   ["AUDIT-202"],
   (rule) => {
-    const files = TRANSPORT_REQUEST_FILES.concat("src/core/transport-request.ts");
+    const files = TRANSPORT_REQUEST_FILES.concat(
+      "src/core/transport-request.ts",
+    );
     const missing = files.filter((path) => !existsSync(path));
     return missing.length === 0
       ? pass(rule, "TransportRequest module is present.", files)
@@ -7297,7 +7301,9 @@ function noTransportRequestSurfaceRule(
   patterns: readonly RegExp[],
 ): AuditRule {
   return transportRequestRule(id, title, description, dependsOn, (rule) => {
-    const files = TRANSPORT_REQUEST_FILES.concat("src/core/transport-request.ts");
+    const files = TRANSPORT_REQUEST_FILES.concat(
+      "src/core/transport-request.ts",
+    );
     const violations = files.flatMap((path) =>
       patterns
         .filter((pattern) => pattern.test(transportRequestSource(path)))
@@ -7638,5 +7644,238 @@ export const TRANSPORT_REQUEST_BUILDER_IMMUTABLE_OUTPUT_RULE: AuditRule =
           "validationRequired: true",
         ],
         "TransportRequestBuilder returns immutable TransportRequest output.",
+      ),
+  );
+
+const EXECUTION_REVIEW_FILES = [
+  "types.ts",
+  "errors.ts",
+  "validation.ts",
+  "review.ts",
+  "support.ts",
+  "index.ts",
+].map((file) => `src/review/${file}`);
+
+const EXECUTION_REVIEW_AUDIT_METADATA = {
+  introducedIn: "V11.3",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function executionReviewRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...EXECUTION_REVIEW_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function noExecutionReviewSurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return executionReviewRule(id, title, description, dependsOn, (rule) => {
+    const files = EXECUTION_REVIEW_FILES.concat("src/core/review.ts");
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(transportRequestSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep ExecutionReviewGate declarative and disconnected from execution.",
+        );
+  });
+}
+
+export const EXECUTION_REVIEW_GATE_SINGLE_RULE: AuditRule = executionReviewRule(
+  "AUDIT-218",
+  "Single ExecutionReviewGate exists",
+  "V11.3 must expose one review gate module as the supported TransportRequest review mechanism.",
+  ["AUDIT-217"],
+  (rule) => {
+    const files = EXECUTION_REVIEW_FILES.concat("src/core/review.ts");
+    const missing = files.filter((path) => !existsSync(path));
+    if (missing.length > 0) {
+      return fail(
+        rule,
+        "ExecutionReviewGate module is incomplete.",
+        missing,
+        "Restore all V11.3 review files.",
+      );
+    }
+    return transportRequestContains(
+      rule,
+      "src/review/review.ts",
+      [
+        "ExecutionReviewGate",
+        "reviewTransportRequest",
+        "ReviewedTransportRequest",
+        "TransportRequest",
+        "AuthorizationConfiguration",
+      ],
+      "Single ExecutionReviewGate exists.",
+    );
+  },
+);
+
+export const EXECUTION_REVIEW_GATE_PURE_RULE: AuditRule = executionReviewRule(
+  "AUDIT-219",
+  "ExecutionReviewGate is pure and deterministic",
+  "The review gate must validate references and return structured data without resolving registries or invoking adapters.",
+  ["AUDIT-218"],
+  (rule) =>
+    transportRequestContains(
+      rule,
+      "src/review/validation.ts",
+      [
+        "validateTransportReview",
+        "review_missing",
+        "review_required",
+        "review_incomplete",
+        "review_not_approved",
+        "review_version_mismatch",
+        "review_configuration_mismatch",
+        "review_policy_mismatch",
+      ],
+      "ExecutionReviewGate validation is pure and deterministic.",
+    ),
+);
+
+export const EXECUTION_REVIEW_GATE_NO_RUNTIME_RULE: AuditRule =
+  noExecutionReviewSurfaceRule(
+    "AUDIT-220",
+    "ExecutionReviewGate has no Runtime dependency",
+    "Review code may reference Runtime identities through contracts only and must not consume RuntimeRequest or implementations.",
+    ["AUDIT-219"],
+    [
+      /RuntimeRequest/,
+      /RuntimeAdapter/,
+      /RuntimeExecution/,
+      /LocalProcessRuntime/,
+      /resolveRuntime/,
+      /executeRuntime/,
+      /from\s+["'][^"']*\/runtime\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const EXECUTION_REVIEW_GATE_NO_TRANSPORT_RULE: AuditRule =
+  noExecutionReviewSurfaceRule(
+    "AUDIT-221",
+    "ExecutionReviewGate has no Transport dependency",
+    "Review code may reference Transport identity contracts only and must not consume adapters, selectors, results, or adapter requests.",
+    ["AUDIT-220"],
+    [
+      /TransportAdapterRequest/,
+      /TransportAdapter/,
+      /TransportResult/,
+      /TransportExecution/,
+      /selectTransport/,
+      /resolveTransport\s*\(/,
+      /executeTransport/,
+      /from\s+["'][^"']*\/transports\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const EXECUTION_REVIEW_GATE_NO_PROCESS_RULE: AuditRule =
+  noExecutionReviewSurfaceRule(
+    "AUDIT-222",
+    "ExecutionReviewGate has no process APIs",
+    "Review code may not import process APIs, read environment, touch filesystem, or access the network.",
+    ["AUDIT-221"],
+    [
+      /child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+      /\bfetch\s*\(/,
+      /node:(http|https|net|tls|fs)/,
+      /readFileSync/,
+      /readdirSync/,
+      /realpathSync/,
+    ],
+  );
+
+export const EXECUTION_REVIEW_GATE_NO_COMMAND_RULE: AuditRule =
+  noExecutionReviewSurfaceRule(
+    "AUDIT-223",
+    "ExecutionReviewGate has no commands",
+    "Review code may not create commands, arguments, binary paths, environments, credentials, or execution options.",
+    ["AUDIT-222"],
+    [
+      /\bcommand\s*:/,
+      /\bargs\s*:/,
+      /\bargv\s*:/,
+      /\bstdin\s*:/,
+      /\bstdout\s*:/,
+      /\bstderr\s*:/,
+      /environment\s*:/,
+      /credentials?\s*:/,
+      /workingDirectory/,
+      /\bcwd\s*:/,
+      /timeoutMs/,
+      /executablePath/,
+      /binaryPath/,
+      /LocalProcessCommand/,
+      /LocalProcessExecutionPolicy/,
+    ],
+  );
+
+export const EXECUTION_REVIEW_GATE_NO_EXECUTION_RULE: AuditRule =
+  noExecutionReviewSurfaceRule(
+    "AUDIT-224",
+    "ExecutionReviewGate has no execution",
+    "Review code may not create adapter requests, dispatch requests, or cross the execution boundary.",
+    ["AUDIT-223"],
+    [
+      /TransportAdapterRequest/,
+      /createTransportAdapterRequest/,
+      /RuntimeRequest/,
+      /executeTransport/,
+      /executeProviderPlan/,
+      /executeRuntime/,
+      /\bdispatch\s*:/,
+      /\bexecute\s*:/,
+    ],
+  );
+
+export const EXECUTION_REVIEW_GATE_IMMUTABLE_OUTPUT_RULE: AuditRule =
+  executionReviewRule(
+    "AUDIT-225",
+    "ExecutionReviewGate produces immutable ReviewedTransportRequest output",
+    "The review gate must recursively freeze ReviewedTransportRequest and preserve non-execution status.",
+    ["AUDIT-224"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/review/support.ts",
+        [
+          "freezeReviewValue",
+          'status: "not_approved"',
+          "approved: false",
+          "dispatchable: false",
+          "executable: false",
+          "handoffAllowed: false",
+        ],
+        "ExecutionReviewGate produces immutable ReviewedTransportRequest output.",
       ),
   );
