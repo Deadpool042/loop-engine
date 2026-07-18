@@ -1913,8 +1913,9 @@ export const AUDIT_CLI_PROFILE_PARSING_RULE: AuditRule = {
       'args.indexOf("--profile")',
       "isAuditProfile(value)",
       "Invalid audit profile",
-      "const profile = parseAuditProfileOption(process.argv)",
-      "runAudit({ profile })",
+      "const profile = parseAuditProfileOption(args)",
+      "const options = parseAuditCommandOptions(process.argv)",
+      "runAudit(options)",
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));

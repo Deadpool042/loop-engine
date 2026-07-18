@@ -2,19 +2,30 @@ import type { AuditProfile, AuditReport } from "./types.js";
 import { AUDIT_RULES } from "./rules.js";
 import { selectAuditRulesForProfile } from "./profiles.js";
 import {
+  selectAuditRules,
+  type AuditRuleSelection,
+} from "./registry.js";
+import {
   buildAuditRecommendations,
   countAuditRecommendationsByPriority,
 } from "./recommendations.js";
 
 export type AuditRunOptions = {
   readonly profile?: AuditProfile | undefined;
+  readonly selection?: AuditRuleSelection | undefined;
 };
 
 export function runAudit(options: AuditRunOptions = {}): AuditReport {
-  const rules =
+  const profileRules =
     options.profile === undefined
       ? AUDIT_RULES
       : selectAuditRulesForProfile(options.profile, AUDIT_RULES);
+  const rules = selectAuditRules(profileRules, options.selection);
+
+  if (rules.length === 0) {
+    throw new Error("No audit rules match the selected filters.");
+  }
+
   const findings = rules.map((rule) => rule.check());
 
   const total = findings.length;

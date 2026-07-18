@@ -1,5 +1,14 @@
 import { runAudit } from "../audit/runner.js";
 import { isAuditProfile } from "../audit/profiles.js";
+import {
+  createAuditRuleManifest,
+  isAuditRuleStability,
+  isAuditRuleTag,
+  selectAuditRules,
+  type AuditRuleSelection,
+} from "../audit/registry.js";
+import { AUDIT_RULES } from "../audit/rules.js";
+import { selectAuditRulesForProfile } from "../audit/profiles.js";
 import type { AuditProfile, AuditReport } from "../audit/types.js";
 import { terminal } from "../ui/terminal.js";
 
@@ -21,9 +30,82 @@ export function parseAuditProfileOption(
   return value;
 }
 
+function parseRepeatedOption(
+  args: readonly string[],
+  option: string,
+): readonly string[] {
+  const values: string[] = [];
+
+  for (let index = 0; index < args.length; index++) {
+    if (args[index] !== option) {
+      continue;
+    }
+
+    const value = args[index + 1];
+    if (value === undefined || value.startsWith("--")) {
+      throw new Error(`Invalid audit ${option.slice(2)}: ${value ?? "<missing>"}`);
+    }
+    values.push(value);
+  }
+
+  return values;
+}
+
+export type AuditCommandOptions = Readonly<{
+  profile?: AuditProfile;
+  selection: AuditRuleSelection;
+}>;
+
+export function parseAuditCommandOptions(
+  args: readonly string[],
+): AuditCommandOptions {
+  const profile = parseAuditProfileOption(args);
+  const ruleIds = parseRepeatedOption(args, "--rule");
+  const tags = parseRepeatedOption(args, "--tag");
+  const stabilities = parseRepeatedOption(args, "--stability");
+
+  const validTags = tags.map((tag) => {
+    if (!isAuditRuleTag(tag)) {
+      throw new Error(`Invalid audit tag: ${tag}`);
+    }
+    return tag;
+  });
+  const validStabilities = stabilities.map((stability) => {
+    if (!isAuditRuleStability(stability)) {
+      throw new Error(`Invalid audit stability: ${stability}`);
+    }
+    return stability;
+  });
+
+  return {
+    ...(profile === undefined ? {} : { profile }),
+    selection: {
+      ...(ruleIds.length === 0 ? {} : { ruleIds }),
+      ...(validTags.length === 0 ? {} : { tags: validTags }),
+      ...(validStabilities.length === 0
+        ? {}
+        : { stabilities: validStabilities }),
+    },
+  };
+}
+
+function selectRulesForOptions(options: AuditCommandOptions) {
+  const profileRules =
+    options.profile === undefined
+      ? AUDIT_RULES
+      : selectAuditRulesForProfile(options.profile, AUDIT_RULES);
+  const rules = selectAuditRules(profileRules, options.selection);
+
+  if (rules.length === 0) {
+    throw new Error("No audit rules match the selected filters.");
+  }
+
+  return rules;
+}
+
 export function printAuditReport(): AuditReport {
-  const profile = parseAuditProfileOption(process.argv);
-  const report = runAudit({ profile });
+  const options = parseAuditCommandOptions(process.argv);
+  const report = runAudit(options);
 
   terminal.header("Audit");
 
@@ -98,8 +180,13 @@ export function printAuditReport(): AuditReport {
 }
 
 export function printAuditReportJson(): AuditReport {
-  const profile = parseAuditProfileOption(process.argv);
-  const report = runAudit({ profile });
+  const options = parseAuditCommandOptions(process.argv);
+  const report = runAudit(options);
   console.log(JSON.stringify(report));
   return report;
+}
+
+export function printAuditRuleManifest(): void {
+  const options = parseAuditCommandOptions(process.argv);
+  console.log(JSON.stringify(createAuditRuleManifest(selectRulesForOptions(options))));
 }
