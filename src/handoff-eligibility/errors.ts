@@ -8,36 +8,40 @@ import type {
   HandoffEligibilityValidation,
   HandoffEligibility,
 } from "./types.js";
+import {
+  createReviewArchitectureError,
+  createReviewArchitectureValidation,
+  diagnosticFromReviewArchitectureError,
+  freezeReviewArchitectureValue,
+} from "../review-architecture/shared.js";
 
 export function createHandoffEligibilityError(
   code: HandoffEligibilityErrorCode,
   message: string,
   details: HandoffEligibilityMetadata = {},
 ): HandoffEligibilityError {
-  return Object.freeze({ code, message, details, executionStarted: false });
+  return createReviewArchitectureError(
+    code,
+    message,
+    details,
+  ) as HandoffEligibilityError;
 }
 
 export function diagnosticFromHandoffEligibilityError(
   error: HandoffEligibilityError,
 ): HandoffEligibilityDiagnostic {
-  return Object.freeze({
-    code: error.code,
-    message: error.message,
-    details: error.details,
-  });
+  return diagnosticFromReviewArchitectureError(
+    error,
+  ) as HandoffEligibilityDiagnostic;
 }
 
 export function createHandoffEligibilityValidation(
   error?: HandoffEligibilityError,
 ): HandoffEligibilityValidation {
-  const diagnostics = error
-    ? Object.freeze([diagnosticFromHandoffEligibilityError(error)])
-    : Object.freeze([]);
-  return Object.freeze({
-    valid: !error,
-    diagnostics,
-    ...(error ? { error } : {}),
-  });
+  return createReviewArchitectureValidation(
+    error,
+    diagnosticFromHandoffEligibilityError,
+  ) as HandoffEligibilityValidation;
 }
 
 export function createHandoffEligibilityResult(
@@ -46,14 +50,14 @@ export function createHandoffEligibilityResult(
   validation: HandoffEligibilityValidation,
   error?: HandoffEligibilityError,
 ): HandoffEligibilityResult {
-  return Object.freeze({
+  return freezeReviewArchitectureValue({
     status: eligibility.status,
     decision: eligibility.decision,
     eligibility,
     summary,
     validation,
     diagnostics: validation.diagnostics,
-    metadata: Object.freeze({ ...eligibility.metadata }),
+    metadata: freezeReviewArchitectureValue({ ...eligibility.metadata }),
     ...(error ? { error } : {}),
     handoffAllowed: false,
     dispatchable: false,

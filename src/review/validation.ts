@@ -1,4 +1,5 @@
 import type { AuthorizationConfiguration } from "../authorization/types.js";
+import { reviewArchitectureMetadataVersionMismatch } from "../review-architecture/shared.js";
 import type { TransportRequest } from "../transport-request/types.js";
 import {
   createExecutionReviewError,
@@ -16,15 +17,6 @@ function invalid(
   return createExecutionReviewValidation(
     createExecutionReviewError(code, message),
   );
-}
-
-function metadataVersionMismatch(
-  request: TransportRequest,
-  key: string,
-  expected: string,
-): boolean {
-  const value = request.metadata[key];
-  return typeof value === "string" && value.length > 0 && value !== expected;
 }
 
 /** Pure reference validation. It never resolves adapters or crosses a boundary. */
@@ -70,28 +62,28 @@ export function validateTransportReview(
     );
   }
   if (
-    metadataVersionMismatch(
-      request,
+    reviewArchitectureMetadataVersionMismatch(
+      request.metadata,
       "policyVersion",
       authorization.requirement.policyVersion,
     ) ||
-    metadataVersionMismatch(
-      request,
+    reviewArchitectureMetadataVersionMismatch(
+      request.metadata,
       "protocolVersion",
       authorization.requirement.protocolVersion,
     ) ||
-    metadataVersionMismatch(
-      request,
+    reviewArchitectureMetadataVersionMismatch(
+      request.metadata,
       "mappingVersion",
       authorization.requirement.mappingVersion,
     ) ||
-    metadataVersionMismatch(
-      request,
+    reviewArchitectureMetadataVersionMismatch(
+      request.metadata,
       "runtimeVersion",
       authorization.requirement.runtimeVersion,
     ) ||
-    metadataVersionMismatch(
-      request,
+    reviewArchitectureMetadataVersionMismatch(
+      request.metadata,
       "transportVersion",
       authorization.requirement.transportVersion,
     )

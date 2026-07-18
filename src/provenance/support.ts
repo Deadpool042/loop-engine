@@ -1,4 +1,8 @@
 import type { AuthorizationConfiguration } from "../authorization/types.js";
+import {
+  freezeReviewArchitectureValue,
+  readReviewArchitectureMetadataString,
+} from "../review-architecture/shared.js";
 import type { ReviewedTransportRequest } from "../review/types.js";
 import type {
   ApprovalProvenance,
@@ -44,19 +48,14 @@ export const OpenClawApprovalProvenanceFixture: ApprovalProvenance =
   });
 
 export function freezeApprovalValue<T>(value: T): T {
-  if (value === null || typeof value !== "object") return value;
-  for (const child of Object.values(value as Record<string, unknown>)) {
-    freezeApprovalValue(child);
-  }
-  return Object.freeze(value);
+  return freezeReviewArchitectureValue(value);
 }
 
 function metadataString(
   metadata: Readonly<Record<string, unknown>>,
   key: string,
 ): string | null {
-  const value = metadata[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
+  return readReviewArchitectureMetadataString(metadata, key);
 }
 
 export function configurationVersionFor(

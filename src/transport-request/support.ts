@@ -1,4 +1,8 @@
 import type { TransportRequest, TransportRequestSummary } from "./types.js";
+import {
+  freezeReviewArchitectureValue,
+  readReviewArchitectureMetadataString,
+} from "../review-architecture/shared.js";
 
 export const OpenClawTransportRequestFixture: TransportRequest = Object.freeze({
   id: "transport-request.openclaw.plan",
@@ -32,19 +36,14 @@ export const OpenClawTransportRequestFixture: TransportRequest = Object.freeze({
 });
 
 export function freezeTransportRequestValue<T>(value: T): T {
-  if (value === null || typeof value !== "object") return value;
-  for (const child of Object.values(value as Record<string, unknown>)) {
-    freezeTransportRequestValue(child);
-  }
-  return Object.freeze(value);
+  return freezeReviewArchitectureValue(value);
 }
 
 export function readTransportRequestMetadataString(
   metadata: Readonly<Record<string, unknown>>,
   key: string,
 ): string | null {
-  const value = metadata[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
+  return readReviewArchitectureMetadataString(metadata, key);
 }
 
 export function summarizeTransportRequest(

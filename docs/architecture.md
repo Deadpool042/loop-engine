@@ -80,3 +80,10 @@ cohérence entre `ReviewedTransportRequest` et `ApprovalProvenance`. Le résulta
 reste une appréciation locale : aucune autorisation, aucun handoff, aucun
 `TransportAdapterRequest` et aucune exécution ne sont créés. Voir
 `docs/architecture/handoff-eligibility.md`.
+
+V11.6 consolide les couches déclaratives V11 sans changer leurs contrats :
+`TransportRequest`, `TransportRequestBuilder`, `ExecutionReviewGate`,
+`ApprovalProvenance` et `HandoffEligibility` conservent leurs responsabilités,
+mais partagent désormais les helpers techniques d'immuabilité, métadonnées,
+validation, diagnostics et résumés. Voir
+`docs/architecture/v11-consolidation.md`.

@@ -928,7 +928,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("approvalProvenanceRule(") ||
             ruleSource.includes("noApprovalProvenanceSurfaceRule(") ||
             ruleSource.includes("handoffEligibilityRule(") ||
-            ruleSource.includes("noHandoffEligibilitySurfaceRule(");
+            ruleSource.includes("noHandoffEligibilitySurfaceRule(") ||
+            ruleSource.includes("v11ConsolidationRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -8458,4 +8459,183 @@ export const HANDOFF_ELIGIBILITY_NO_EXECUTION_DISPATCH_RULE: AuditRule =
       /dispatchable:\s*true/,
       /executable:\s*true/,
     ],
+  );
+
+const V11_CONSOLIDATION_FILES = [
+  "src/transport-request/support.ts",
+  "src/transport-request/errors.ts",
+  "src/transport-request/builder-errors.ts",
+  "src/review/support.ts",
+  "src/review/errors.ts",
+  "src/review/validation.ts",
+  "src/provenance/support.ts",
+  "src/provenance/errors.ts",
+  "src/handoff-eligibility/support.ts",
+  "src/handoff-eligibility/errors.ts",
+  "src/review-architecture/shared.ts",
+];
+
+const V11_CONSOLIDATION_AUDIT_METADATA = {
+  introducedIn: "V11.6",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function v11ConsolidationRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...V11_CONSOLIDATION_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+export const V11_CONSOLIDATION_SHARED_HELPERS_RULE: AuditRule =
+  v11ConsolidationRule(
+    "AUDIT-251",
+    "V11 declarative layers share technical helpers",
+    "TransportRequest, review, provenance, and eligibility modules should centralize duplicated immutable, metadata, diagnostic, validation, and summary mechanics.",
+    ["AUDIT-250"],
+    (rule) => {
+      const source = transportRequestSource(
+        "src/review-architecture/shared.ts",
+      );
+      const expectations = [
+        "freezeReviewArchitectureValue",
+        "readReviewArchitectureMetadataString",
+        "reviewArchitectureMetadataVersionCompatible",
+        "reviewArchitectureMetadataVersionMismatch",
+        "countReviewArchitectureItems",
+        "createReviewArchitectureError",
+        "diagnosticFromReviewArchitectureError",
+        "createReviewArchitectureValidation",
+      ];
+      const missing = expectations.filter((token) => !source.includes(token));
+      const consumers = V11_CONSOLIDATION_FILES.filter(
+        (path) =>
+          path !== "src/review-architecture/shared.ts" &&
+          !transportRequestSource(path).includes(
+            "../review-architecture/shared.js",
+          ),
+      );
+      const violations = missing
+        .map((token) => `src/review-architecture/shared.ts -> ${token}`)
+        .concat(consumers.map((path) => `${path} -> shared helper import`));
+      return violations.length === 0
+        ? pass(
+            rule,
+            "V11 declarative layers share technical helpers.",
+            V11_CONSOLIDATION_FILES,
+          )
+        : fail(
+            rule,
+            "V11 declarative helper consolidation is incomplete.",
+            violations,
+            "Keep common immutable, metadata, diagnostic, validation, and summary mechanics in src/review-architecture/shared.ts.",
+          );
+    },
+  );
+
+export const V11_CONSOLIDATION_DEPENDENCY_DIRECTION_RULE: AuditRule =
+  v11ConsolidationRule(
+    "AUDIT-252",
+    "V11 consolidation preserves dependency direction",
+    "Consolidated review architecture helpers and declarative modules must not import CLI, LoopRunner, Runtime, Transport, or Provider implementations.",
+    ["AUDIT-251"],
+    (rule) => {
+      const patterns = [
+        /from\s+["'][^"']*\/cli/,
+        /from\s+["'][^"']*\/commands\//,
+        /from\s+["'][^"']*\/loop\//,
+        /from\s+["'][^"']*\/runtime\/(local-process|registry|selector)/,
+        /from\s+["'][^"']*\/transports\/(local-process|registry|selector)/,
+        /from\s+["'][^"']*\/providers\/(openclaw|claude-code|codex|registry|selector)/,
+        /child_process/,
+        /node:child_process/,
+        /process\.env/,
+      ];
+      const violations = V11_CONSOLIDATION_FILES.flatMap((path) =>
+        patterns
+          .filter((pattern) => pattern.test(transportRequestSource(path)))
+          .map((pattern) => `${path}: ${pattern.source}`),
+      );
+      return violations.length === 0
+        ? pass(
+            rule,
+            "V11 consolidation preserves dependency direction.",
+            V11_CONSOLIDATION_FILES,
+          )
+        : fail(
+            rule,
+            "V11 consolidation imports an upper layer or concrete implementation.",
+            violations,
+            "Keep consolidated helpers and declarative modules below Core and away from concrete Runtime, Transport, and Provider implementations.",
+          );
+    },
+  );
+
+export const V11_CONSOLIDATION_MODULE_ISOLATION_RULE: AuditRule =
+  v11ConsolidationRule(
+    "AUDIT-253",
+    "V11 consolidation helper remains domain-neutral",
+    "The shared review architecture helper must remain a technical module and must not absorb TransportRequest, review, provenance, or eligibility responsibilities.",
+    ["AUDIT-252"],
+    (rule) => {
+      const shared = transportRequestSource(
+        "src/review-architecture/shared.ts",
+      );
+      const forbidden = [
+        /TransportRequest/,
+        /ExecutionReview/,
+        /ApprovalProvenance/,
+        /HandoffEligibility/,
+        /AuthorizationConfiguration/,
+        /ProviderExecutionPlan/,
+        /TransportAdapter/,
+        /RuntimeAdapter/,
+      ].filter((pattern) => pattern.test(shared));
+      const docs = transportRequestSource(
+        "docs/architecture/v11-consolidation.md",
+      );
+      const docTokens = [
+        "Responsibility matrix",
+        "Dependency matrix",
+        "Validation matrix",
+        "Ownership matrix",
+        "Security boundary",
+        "Execution boundary",
+        "Review boundary",
+      ];
+      const missingDocs = docTokens.filter((token) => !docs.includes(token));
+      const violations = forbidden
+        .map(
+          (pattern) => `src/review-architecture/shared.ts: ${pattern.source}`,
+        )
+        .concat(
+          missingDocs.map(
+            (token) => `docs/architecture/v11-consolidation.md -> ${token}`,
+          ),
+        );
+      return violations.length === 0
+        ? pass(rule, "V11 consolidation helper remains domain-neutral.", [
+            "src/review-architecture/shared.ts",
+            "docs/architecture/v11-consolidation.md",
+          ])
+        : fail(
+            rule,
+            "V11 consolidation helper absorbed domain responsibilities or docs are incomplete.",
+            violations,
+            "Keep shared helpers technical and document the V11 ownership boundaries.",
+          );
+    },
   );

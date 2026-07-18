@@ -7,40 +7,40 @@ import type {
   TransportRequestBuilderValidation,
 } from "./builder.js";
 import type { TransportRequest, TransportRequestMetadata } from "./types.js";
+import {
+  createReviewArchitectureError,
+  createReviewArchitectureValidation,
+  diagnosticFromReviewArchitectureError,
+  freezeReviewArchitectureValue,
+} from "../review-architecture/shared.js";
 
 export function createTransportRequestBuilderError(
   code: TransportRequestBuilderErrorCode,
   message: string,
   details: TransportRequestMetadata = {},
 ): TransportRequestBuilderError {
-  return Object.freeze({ code, message, details, executionStarted: false });
+  return createReviewArchitectureError(
+    code,
+    message,
+    details,
+  ) as TransportRequestBuilderError;
 }
 
 export function diagnosticFromTransportRequestBuilderError(
   error: TransportRequestBuilderError,
 ): TransportRequestBuilderDiagnostic {
-  return Object.freeze({
-    code: error.code,
-    message: error.message,
-    details: error.details,
-  });
+  return diagnosticFromReviewArchitectureError(
+    error,
+  ) as TransportRequestBuilderDiagnostic;
 }
 
 export function createTransportRequestBuilderValidation(
   error?: TransportRequestBuilderError,
 ): TransportRequestBuilderValidation {
-  if (error === undefined) {
-    return Object.freeze({
-      valid: true,
-      diagnostics: Object.freeze([]),
-    });
-  }
-  const diagnostic = diagnosticFromTransportRequestBuilderError(error);
-  return Object.freeze({
-    valid: false,
-    diagnostics: Object.freeze([diagnostic]),
+  return createReviewArchitectureValidation(
     error,
-  });
+    diagnosticFromTransportRequestBuilderError,
+  ) as TransportRequestBuilderValidation;
 }
 
 export function createTransportRequestBuilderResult(
@@ -50,13 +50,13 @@ export function createTransportRequestBuilderResult(
   error: TransportRequestBuilderError | undefined,
   metadata: TransportRequestMetadata,
 ): TransportRequestBuilderResult {
-  return Object.freeze({
+  return freezeReviewArchitectureValue({
     status: request === null ? "rejected" : "built",
     request,
-    summary: Object.freeze({ ...summary }),
+    summary: freezeReviewArchitectureValue({ ...summary }),
     validation,
     diagnostics: validation.diagnostics,
-    metadata: Object.freeze({ ...metadata }),
+    metadata: freezeReviewArchitectureValue({ ...metadata }),
     ...(error === undefined ? {} : { error }),
     executionStarted: false,
   });

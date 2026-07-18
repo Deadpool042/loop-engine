@@ -1,4 +1,9 @@
 import type { AuthorizationConfiguration } from "../authorization/types.js";
+import {
+  freezeReviewArchitectureValue,
+  readReviewArchitectureMetadataString,
+  reviewArchitectureMetadataVersionCompatible,
+} from "../review-architecture/shared.js";
 import type { TransportRequest } from "../transport-request/types.js";
 import type {
   ExecutionReview,
@@ -59,19 +64,14 @@ export const OpenClawReviewedTransportRequestFixture: ReviewedTransportRequest =
   });
 
 export function freezeReviewValue<T>(value: T): T {
-  if (value === null || typeof value !== "object") return value;
-  for (const child of Object.values(value as Record<string, unknown>)) {
-    freezeReviewValue(child);
-  }
-  return Object.freeze(value);
+  return freezeReviewArchitectureValue(value);
 }
 
 function metadataString(
   metadata: Readonly<Record<string, unknown>>,
   key: string,
 ): string | null {
-  const value = metadata[key];
-  return typeof value === "string" && value.length > 0 ? value : null;
+  return readReviewArchitectureMetadataString(metadata, key);
 }
 
 export function executionReviewIdFor(request: TransportRequest): string {
@@ -143,8 +143,11 @@ export function summarizeTransportReview(
   reviewed: ReviewedTransportRequest | null,
 ): ExecutionReviewSummary {
   const metadataVersion = (key: string, expected: string) => {
-    const declared = metadataString(request.metadata, key);
-    return declared === null || declared === expected;
+    return reviewArchitectureMetadataVersionCompatible(
+      request.metadata,
+      key,
+      expected,
+    );
   };
   return freezeReviewValue({
     requestReferenced: request.id.length > 0,

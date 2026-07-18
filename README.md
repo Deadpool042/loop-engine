@@ -151,6 +151,7 @@ Voir aussi :
 - `docs/architecture/execution-review-gate.md`
 - `docs/architecture/approval-provenance.md`
 - `docs/architecture/handoff-eligibility.md`
+- `docs/architecture/v11-consolidation.md`
 
 ## Audit et CI
 

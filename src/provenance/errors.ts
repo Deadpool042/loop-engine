@@ -8,36 +8,34 @@ import type {
   ApprovalSummary,
   ApprovalValidation,
 } from "./types.js";
+import {
+  createReviewArchitectureError,
+  createReviewArchitectureValidation,
+  diagnosticFromReviewArchitectureError,
+  freezeReviewArchitectureValue,
+} from "../review-architecture/shared.js";
 
 export function createApprovalError(
   code: ApprovalErrorCode,
   message: string,
   details: ApprovalProvenanceMetadata = {},
 ): ApprovalError {
-  return Object.freeze({ code, message, details, executionStarted: false });
+  return createReviewArchitectureError(code, message, details) as ApprovalError;
 }
 
 export function diagnosticFromApprovalError(
   error: ApprovalError,
 ): ApprovalDiagnostic {
-  return Object.freeze({
-    code: error.code,
-    message: error.message,
-    details: error.details,
-  });
+  return diagnosticFromReviewArchitectureError(error) as ApprovalDiagnostic;
 }
 
 export function createApprovalValidation(
   error?: ApprovalError,
 ): ApprovalValidation {
-  const diagnostics = error
-    ? Object.freeze([diagnosticFromApprovalError(error)])
-    : Object.freeze([]);
-  return Object.freeze({
-    valid: !error,
-    diagnostics,
-    ...(error ? { error } : {}),
-  });
+  return createReviewArchitectureValidation(
+    error,
+    diagnosticFromApprovalError,
+  ) as ApprovalValidation;
 }
 
 export function createApprovalResult(
@@ -46,13 +44,13 @@ export function createApprovalResult(
   validation: ApprovalValidation,
   error?: ApprovalError,
 ): ApprovalResult {
-  return Object.freeze({
+  return freezeReviewArchitectureValue({
     status: error ? "invalid" : provenance.status,
     provenance,
     summary,
     validation,
     diagnostics: validation.diagnostics,
-    metadata: Object.freeze({ ...provenance.metadata }),
+    metadata: freezeReviewArchitectureValue({ ...provenance.metadata }),
     ...(error ? { error } : {}),
     executionStarted: false,
   });

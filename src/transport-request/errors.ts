@@ -8,23 +8,30 @@ import type {
   TransportRequestStatus,
   TransportRequestSummary,
 } from "./types.js";
+import {
+  createReviewArchitectureError,
+  diagnosticFromReviewArchitectureError,
+  freezeReviewArchitectureValue,
+} from "../review-architecture/shared.js";
 
 export function createTransportRequestError(
   code: TransportRequestErrorCode,
   message: string,
   details: TransportRequestMetadata = {},
 ): TransportRequestError {
-  return Object.freeze({ code, message, details, executionStarted: false });
+  return createReviewArchitectureError(
+    code,
+    message,
+    details,
+  ) as TransportRequestError;
 }
 
 export function diagnosticFromTransportRequestError(
   error: TransportRequestError,
 ): TransportRequestDiagnostic {
-  return Object.freeze({
-    code: error.code,
-    message: error.message,
-    details: error.details,
-  });
+  return diagnosticFromReviewArchitectureError(
+    error,
+  ) as TransportRequestDiagnostic;
 }
 
 export function createTransportRequestResult(
@@ -34,17 +41,17 @@ export function createTransportRequestResult(
   summary: TransportRequestSummary,
 ): TransportRequestResult {
   const diagnostic = diagnosticFromTransportRequestError(error);
-  return Object.freeze({
+  return freezeReviewArchitectureValue({
     status,
     request,
-    summary: Object.freeze({ ...summary }),
-    validation: Object.freeze({
+    summary: freezeReviewArchitectureValue({ ...summary }),
+    validation: freezeReviewArchitectureValue({
       valid: false,
-      diagnostics: Object.freeze([diagnostic]),
+      diagnostics: freezeReviewArchitectureValue([diagnostic]),
       error,
     }),
-    diagnostics: Object.freeze([diagnostic]),
-    metadata: Object.freeze({ ...request.metadata }),
+    diagnostics: freezeReviewArchitectureValue([diagnostic]),
+    metadata: freezeReviewArchitectureValue({ ...request.metadata }),
     error,
     executionStarted: false,
   });

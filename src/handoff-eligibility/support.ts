@@ -1,5 +1,9 @@
 import type { ApprovalProvenance } from "../provenance/types.js";
 import { EXECUTION_ARCHITECTURE_RFC_VERSION } from "../provenance/support.js";
+import {
+  countReviewArchitectureItems,
+  freezeReviewArchitectureValue,
+} from "../review-architecture/shared.js";
 import type { ReviewedTransportRequest } from "../review/types.js";
 import type {
   HandoffEligibility,
@@ -47,11 +51,7 @@ export const OpenClawHandoffEligibilityFixture: HandoffEligibility =
   });
 
 export function freezeHandoffEligibilityValue<T>(value: T): T {
-  if (value === null || typeof value !== "object") return value;
-  for (const child of Object.values(value as Record<string, unknown>)) {
-    freezeHandoffEligibilityValue(child);
-  }
-  return Object.freeze(value);
+  return freezeReviewArchitectureValue(value);
 }
 
 export function requirement(
@@ -288,15 +288,18 @@ export function buildHandoffEligibility(
 export function summarizeHandoffEligibility(
   eligibility: HandoffEligibility,
 ): HandoffEligibilitySummary {
-  const passedRequirements = eligibility.requirements.filter(
+  const passedRequirements = countReviewArchitectureItems(
+    eligibility.requirements,
     (item) => item.outcome === "pass",
-  ).length;
-  const failedRequirements = eligibility.requirements.filter(
+  );
+  const failedRequirements = countReviewArchitectureItems(
+    eligibility.requirements,
     (item) => item.outcome === "fail",
-  ).length;
-  const unknownRequirements = eligibility.requirements.filter(
+  );
+  const unknownRequirements = countReviewArchitectureItems(
+    eligibility.requirements,
     (item) => item.outcome === "unknown",
-  ).length;
+  );
   return freezeHandoffEligibilityValue({
     totalRequirements: eligibility.requirements.length,
     passedRequirements,

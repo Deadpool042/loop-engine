@@ -9,36 +9,40 @@ import type {
   ExecutionReviewValidation,
   ReviewedTransportRequest,
 } from "./types.js";
+import {
+  createReviewArchitectureError,
+  createReviewArchitectureValidation,
+  diagnosticFromReviewArchitectureError,
+  freezeReviewArchitectureValue,
+} from "../review-architecture/shared.js";
 
 export function createExecutionReviewError(
   code: ExecutionReviewErrorCode,
   message: string,
   details: ExecutionReviewMetadata = {},
 ): ExecutionReviewError {
-  return Object.freeze({ code, message, details, executionStarted: false });
+  return createReviewArchitectureError(
+    code,
+    message,
+    details,
+  ) as ExecutionReviewError;
 }
 
 export function diagnosticFromExecutionReviewError(
   error: ExecutionReviewError,
 ): ExecutionReviewDiagnostic {
-  return Object.freeze({
-    code: error.code,
-    message: error.message,
-    details: error.details,
-  });
+  return diagnosticFromReviewArchitectureError(
+    error,
+  ) as ExecutionReviewDiagnostic;
 }
 
 export function createExecutionReviewValidation(
   error?: ExecutionReviewError,
 ): ExecutionReviewValidation {
-  const diagnostics = error
-    ? Object.freeze([diagnosticFromExecutionReviewError(error)])
-    : Object.freeze([]);
-  return Object.freeze({
-    valid: !error,
-    diagnostics,
-    ...(error ? { error } : {}),
-  });
+  return createReviewArchitectureValidation(
+    error,
+    diagnosticFromExecutionReviewError,
+  ) as ExecutionReviewValidation;
 }
 
 export function createExecutionReviewResult(
@@ -48,14 +52,14 @@ export function createExecutionReviewResult(
   validation: ExecutionReviewValidation,
   error?: ExecutionReviewError,
 ): ExecutionReviewResult {
-  return Object.freeze({
+  return freezeReviewArchitectureValue({
     status: request ? "reviewed" : "rejected",
     review,
     request,
     summary,
     validation,
     diagnostics: validation.diagnostics,
-    metadata: Object.freeze({ ...review.metadata }),
+    metadata: freezeReviewArchitectureValue({ ...review.metadata }),
     ...(error ? { error } : {}),
     executionStarted: false,
   });
