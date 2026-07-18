@@ -929,7 +929,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("noApprovalProvenanceSurfaceRule(") ||
             ruleSource.includes("handoffEligibilityRule(") ||
             ruleSource.includes("noHandoffEligibilitySurfaceRule(") ||
-            ruleSource.includes("v11ConsolidationRule(");
+            ruleSource.includes("v11ConsolidationRule(") ||
+            ruleSource.includes("dispatchDescriptorRule(") ||
+            ruleSource.includes("noDispatchDescriptorSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -8638,4 +8640,219 @@ export const V11_CONSOLIDATION_MODULE_ISOLATION_RULE: AuditRule =
             "Keep shared helpers technical and document the V11 ownership boundaries.",
           );
     },
+  );
+
+const DISPATCH_DESCRIPTOR_FILES = [
+  "types.ts",
+  "errors.ts",
+  "validation.ts",
+  "descriptor.ts",
+  "support.ts",
+  "index.ts",
+].map((file) => `src/dispatch/${file}`);
+
+const DISPATCH_DESCRIPTOR_AUDIT_METADATA = {
+  introducedIn: "V12.1",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function dispatchDescriptorRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...DISPATCH_DESCRIPTOR_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function noDispatchDescriptorSurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return dispatchDescriptorRule(id, title, description, dependsOn, (rule) => {
+    const files = DISPATCH_DESCRIPTOR_FILES.concat("src/core/dispatch.ts");
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(transportRequestSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep DispatchDescriptor transport-independent, declarative, and below the execution boundary.",
+        );
+  });
+}
+
+export const DISPATCH_DESCRIPTOR_MODULE_RULE: AuditRule =
+  dispatchDescriptorRule(
+    "AUDIT-254",
+    "DispatchDescriptor module exists",
+    "V12.1 must expose a dedicated dispatch descriptor module and Core integration point.",
+    ["AUDIT-253"],
+    (rule) => {
+      const files = DISPATCH_DESCRIPTOR_FILES.concat("src/core/dispatch.ts");
+      const missing = files.filter((path) => !existsSync(path));
+      return missing.length === 0
+        ? pass(rule, "DispatchDescriptor module exists.", files)
+        : fail(
+            rule,
+            "DispatchDescriptor module files are missing.",
+            missing,
+            "Restore the V12.1 dispatch descriptor contracts and Core integration.",
+          );
+    },
+  );
+
+export const DISPATCH_DESCRIPTOR_IMMUTABLE_CONTRACT_RULE: AuditRule =
+  dispatchDescriptorRule(
+    "AUDIT-255",
+    "DispatchDescriptor contracts are immutable",
+    "DispatchDescriptor must expose readonly contracts for descriptor, evidence, validation, summary, result, errors, and builder.",
+    ["AUDIT-254"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/dispatch/types.ts",
+        [
+          "DispatchDescriptorId",
+          "DispatchDescriptor",
+          "DispatchDescriptorStatus",
+          "DispatchDescriptorMetadata",
+          "DispatchDescriptorEvidence",
+          "DispatchDescriptorValidation",
+          "DispatchDescriptorSummary",
+          "DispatchDescriptorResult",
+          "DispatchDescriptorError",
+          "DispatchDescriptorErrorCode",
+          "DispatchDescriptorBuilder",
+          "Readonly",
+          "executionStarted: false",
+        ],
+        "DispatchDescriptor contracts are immutable.",
+      ),
+  );
+
+export const DISPATCH_DESCRIPTOR_PURE_BUILDER_RULE: AuditRule =
+  dispatchDescriptorRule(
+    "AUDIT-256",
+    "DispatchDescriptor builder is pure",
+    "The descriptor builder must be a deterministic function over HandoffEligibilityResult and ExecutionAuthority only.",
+    ["AUDIT-255"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/dispatch/descriptor.ts",
+        [
+          "DispatchDescriptorBuilder",
+          "export const createDispatchDescriptor",
+          "HandoffEligibilityResult",
+          "ExecutionAuthority",
+        ],
+        "DispatchDescriptor builder is pure.",
+      ),
+  );
+
+export const DISPATCH_DESCRIPTOR_NO_RUNTIME_RULE: AuditRule =
+  noDispatchDescriptorSurfaceRule(
+    "AUDIT-257",
+    "DispatchDescriptor has no Runtime dependency",
+    "DispatchDescriptor may reference reviewed runtime contract versions but must not consume Runtime implementations.",
+    ["AUDIT-256"],
+    [
+      /RuntimeAdapter/,
+      /LocalProcessRuntime/,
+      /executeRuntime/,
+      /resolveRuntime/,
+      /from\s+["'][^"']*\/runtime\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const DISPATCH_DESCRIPTOR_NO_TRANSPORT_RULE: AuditRule =
+  noDispatchDescriptorSurfaceRule(
+    "AUDIT-258",
+    "DispatchDescriptor has no Transport dependency",
+    "DispatchDescriptor must remain transport-independent and must not consume Transport adapters or implementations.",
+    ["AUDIT-257"],
+    [
+      /TransportAdapter/,
+      /TransportResult/,
+      /executeTransport/,
+      /selectTransport/,
+      /resolveTransport/,
+      /from\s+["'][^"']*\/transports\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const DISPATCH_DESCRIPTOR_NO_TRANSPORT_ADAPTER_REQUEST_RULE: AuditRule =
+  noDispatchDescriptorSurfaceRule(
+    "AUDIT-259",
+    "DispatchDescriptor creates no TransportAdapterRequest",
+    "DispatchDescriptor must not materialize a transport adapter payload.",
+    ["AUDIT-258"],
+    [/TransportAdapterRequest/, /createTransportAdapterRequest/],
+  );
+
+export const DISPATCH_DESCRIPTOR_NO_RUNTIME_REQUEST_RULE: AuditRule =
+  noDispatchDescriptorSurfaceRule(
+    "AUDIT-260",
+    "DispatchDescriptor creates no RuntimeRequest",
+    "DispatchDescriptor must not materialize a runtime request.",
+    ["AUDIT-259"],
+    [/RuntimeRequest/, /createRuntimeRequest/],
+  );
+
+export const DISPATCH_DESCRIPTOR_NO_EXECUTION_RULE: AuditRule =
+  noDispatchDescriptorSurfaceRule(
+    "AUDIT-261",
+    "DispatchDescriptor has no execution",
+    "DispatchDescriptor must not execute, spawn processes, access process state, read filesystem state, or access the network.",
+    ["AUDIT-260"],
+    [
+      /child_process/,
+      /node:child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+      /node:fs/,
+      /readFileSync/,
+      /writeFileSync/,
+      /\bfetch\s*\(/,
+      /node:(http|https|net|tls)/,
+    ],
+  );
+
+export const DISPATCH_DESCRIPTOR_NO_DISPATCH_RULE: AuditRule =
+  noDispatchDescriptorSurfaceRule(
+    "AUDIT-262",
+    "DispatchDescriptor performs no dispatch",
+    "DispatchDescriptor must remain non-dispatchable and must not cross the execution boundary.",
+    ["AUDIT-261"],
+    [
+      /readyForBoundary:\s*true/,
+      /dispatchable:\s*true/,
+      /executable:\s*true/,
+      /handoffAllowed:\s*true/,
+      /executeTransport/,
+      /executeRuntime/,
+      /executeProvider/,
+    ],
   );

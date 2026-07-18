@@ -94,3 +94,9 @@ l'autorité d'exécution future, le dispatch futur, les cycles Transport/Runtime
 futurs, l'observabilité et les non-objectifs. Il reste documentaire et
 n'introduit aucune exécution. Voir
 `docs/architecture/rfc-execution-boundary-v12.md`.
+
+V12.1 ajoute `DispatchDescriptor`, artefact déclaratif et indépendant du
+transport juste avant la frontière d'exécution. Il accepte uniquement
+`HandoffEligibilityResult` et `ExecutionAuthority`, produit un descriptor
+immuable, non dispatchable et non exécutable, et ne crée aucun
+`TransportAdapterRequest`. Voir `docs/architecture/dispatch-descriptor.md`.

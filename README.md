@@ -153,6 +153,7 @@ Voir aussi :
 - `docs/architecture/handoff-eligibility.md`
 - `docs/architecture/v11-consolidation.md`
 - `docs/architecture/rfc-execution-boundary-v12.md`
+- `docs/architecture/dispatch-descriptor.md`
 
 ## Audit et CI
 
