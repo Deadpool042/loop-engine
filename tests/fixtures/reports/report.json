@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "summary": {
+    "sessionId": "session-1",
+    "status": "completed",
+    "startedAt": "2026-01-01T10:00:00Z",
+    "completedAt": "2026-01-01T10:01:00Z",
+    "stepCount": 1,
+    "succeeded": 1,
+    "failed": 0
+  },
+  "steps": [
+    {
+      "name": "plan",
+      "status": "success",
+      "startedAt": "2026-01-01T10:00:00Z",
+      "completedAt": "2026-01-01T10:00:10Z",
+      "detailCount": 2,
+      "details": [
+        "candidate selected",
+        "roadmap generated"
+      ]
+    }
+  ]
+}
