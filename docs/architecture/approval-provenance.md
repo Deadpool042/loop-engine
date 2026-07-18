@@ -80,6 +80,11 @@ configuration.
 Future execution work MUST introduce a separate reviewed decision boundary.
 That boundary MUST NOT infer approval from the existence of provenance alone.
 
+As of V11.5, `HandoffEligibility` can assess whether a
+`ReviewedTransportRequest` and `ApprovalProvenance` are internally consistent.
+This remains an assessment only: it does not authorize execution and does not
+perform handoff. See `docs/architecture/handoff-eligibility.md`.
+
 ## Security guarantees
 
 The module MUST remain:

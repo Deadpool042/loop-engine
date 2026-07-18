@@ -926,7 +926,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("executionReviewRule(") ||
             ruleSource.includes("noExecutionReviewSurfaceRule(") ||
             ruleSource.includes("approvalProvenanceRule(") ||
-            ruleSource.includes("noApprovalProvenanceSurfaceRule(");
+            ruleSource.includes("noApprovalProvenanceSurfaceRule(") ||
+            ruleSource.includes("handoffEligibilityRule(") ||
+            ruleSource.includes("noHandoffEligibilitySurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -8096,4 +8098,364 @@ export const APPROVAL_PROVENANCE_REFERENCE_ONLY_RULE: AuditRule =
         ],
         "ApprovalProvenance is reference-only.",
       ),
+  );
+
+const HANDOFF_ELIGIBILITY_FILES = [
+  "types.ts",
+  "errors.ts",
+  "validation.ts",
+  "evaluation.ts",
+  "support.ts",
+  "index.ts",
+].map((file) => `src/handoff-eligibility/${file}`);
+
+const HANDOFF_ELIGIBILITY_AUDIT_METADATA = {
+  introducedIn: "V11.5",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function handoffEligibilityRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...HANDOFF_ELIGIBILITY_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function noHandoffEligibilitySurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return handoffEligibilityRule(id, title, description, dependsOn, (rule) => {
+    const files = HANDOFF_ELIGIBILITY_FILES.concat(
+      "src/core/handoff-eligibility.ts",
+    );
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(transportRequestSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep HandoffEligibility declarative and disconnected from execution.",
+        );
+  });
+}
+
+export const HANDOFF_ELIGIBILITY_MODULE_RULE: AuditRule =
+  handoffEligibilityRule(
+    "AUDIT-234",
+    "HandoffEligibility module exists",
+    "V11.5 must expose immutable handoff eligibility contracts and Core integration.",
+    ["AUDIT-233"],
+    (rule) => {
+      const files = HANDOFF_ELIGIBILITY_FILES.concat(
+        "src/core/handoff-eligibility.ts",
+      );
+      const missing = files.filter((path) => !existsSync(path));
+      if (missing.length > 0) {
+        return fail(
+          rule,
+          "HandoffEligibility module is incomplete.",
+          missing,
+          "Restore all V11.5 handoff eligibility files.",
+        );
+      }
+      return pass(rule, "HandoffEligibility module exists.", files);
+    },
+  );
+
+export const HANDOFF_ELIGIBILITY_SINGLE_EVALUATOR_RULE: AuditRule =
+  handoffEligibilityRule(
+    "AUDIT-235",
+    "Single HandoffEligibilityEvaluator exists",
+    "Handoff eligibility must be produced through one exported pure evaluator function.",
+    ["AUDIT-234"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/handoff-eligibility/evaluation.ts",
+        [
+          "HandoffEligibilityEvaluator",
+          "export const evaluateHandoffEligibility",
+          "ReviewedTransportRequest",
+          "ApprovalProvenance",
+        ],
+        "Single HandoffEligibilityEvaluator exists.",
+      ),
+  );
+
+export const HANDOFF_ELIGIBILITY_PURE_RULE: AuditRule = handoffEligibilityRule(
+  "AUDIT-236",
+  "HandoffEligibilityEvaluator is pure",
+  "The evaluator must validate declarative evidence and return structured results without classes, dependency injection, registries, or implementations.",
+  ["AUDIT-235"],
+  (rule) => {
+    const source = transportRequestSource(
+      "src/handoff-eligibility/evaluation.ts",
+    );
+    const violations = [
+      /\bclass\s+/,
+      /new\s+[A-Z]/,
+      /registry/i,
+      /selector/i,
+    ].filter((pattern) => pattern.test(source));
+    return violations.length === 0
+      ? pass(rule, "HandoffEligibilityEvaluator is pure.", [
+          "src/handoff-eligibility/evaluation.ts",
+        ])
+      : fail(
+          rule,
+          "HandoffEligibilityEvaluator has mutable or injectable shape.",
+          violations.map((pattern) => pattern.source),
+          "Keep evaluator as a deterministic function over explicit inputs.",
+        );
+  },
+);
+
+export const HANDOFF_ELIGIBILITY_IMMUTABLE_CONTRACT_RULE: AuditRule =
+  handoffEligibilityRule(
+    "AUDIT-237",
+    "HandoffEligibility contracts are immutable",
+    "Handoff eligibility must expose readonly contracts for requirements, evidence, validation, summary, result, and errors.",
+    ["AUDIT-236"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/handoff-eligibility/types.ts",
+        [
+          "HandoffEligibilityId",
+          "HandoffEligibility",
+          "HandoffEligibilityStatus",
+          "HandoffEligibilityDecision",
+          "HandoffEligibilityReason",
+          "HandoffEligibilityRequirement",
+          "HandoffEligibilityEvidence",
+          "HandoffEligibilityMetadata",
+          "HandoffEligibilityValidation",
+          "HandoffEligibilitySummary",
+          "HandoffEligibilityResult",
+          "HandoffEligibilityError",
+          "HandoffEligibilityErrorCode",
+          "HandoffEligibilityEvaluator",
+          "Readonly",
+          "executionStarted: false",
+        ],
+        "HandoffEligibility contracts are immutable.",
+      ),
+  );
+
+export const HANDOFF_ELIGIBILITY_DEFAULT_DENY_RULE: AuditRule =
+  handoffEligibilityRule(
+    "AUDIT-238",
+    "HandoffEligibility defaults to not_eligible",
+    "Default eligibility must be pending, not eligible, not allowed, not dispatchable, and not executable.",
+    ["AUDIT-237"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/handoff-eligibility/support.ts",
+        [
+          "OpenClawHandoffEligibilityFixture",
+          'status: "pending"',
+          'decision: "not_eligible"',
+          "handoffAllowed: false",
+          "dispatchable: false",
+          "executable: false",
+          "executionStarted: false",
+        ],
+        "HandoffEligibility defaults to not_eligible.",
+      ),
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_INFERRED_ELIGIBILITY_RULE: AuditRule =
+  handoffEligibilityRule(
+    "AUDIT-239",
+    "HandoffEligibility is never inferred from missing evidence",
+    "Missing or incomplete evidence must produce not_eligible or indeterminate, never eligible.",
+    ["AUDIT-238"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/handoff-eligibility/support.ts",
+        ["evidence_incomplete", "indeterminate", "unknown", "approval_absent"],
+        "HandoffEligibility is never inferred from missing evidence.",
+      ),
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_RUNTIME_IMPL_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-240",
+    "HandoffEligibility has no Runtime implementation dependency",
+    "Handoff eligibility may reference reviewed runtime identity only and must not consume Runtime implementations.",
+    ["AUDIT-239"],
+    [
+      /RuntimeRequest/,
+      /RuntimeAdapter/,
+      /LocalProcessRuntime/,
+      /executeRuntime/,
+      /resolveRuntime/,
+      /from\s+["'][^"']*\/runtime\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_TRANSPORT_IMPL_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-241",
+    "HandoffEligibility has no Transport implementation dependency",
+    "Handoff eligibility must not consume Transport adapters, selectors, results, or implementation modules.",
+    ["AUDIT-240"],
+    [
+      /TransportAdapter/,
+      /TransportResult/,
+      /executeTransport/,
+      /selectTransport/,
+      /resolveTransport/,
+      /from\s+["'][^"']*\/transports\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_PROVIDER_IMPL_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-242",
+    "HandoffEligibility has no Provider implementation dependency",
+    "Handoff eligibility must not consume provider adapters or implementations.",
+    ["AUDIT-241"],
+    [
+      /ProviderAdapter/,
+      /executeProvider/,
+      /prepareProvider/,
+      /from\s+["'][^"']*\/providers\/(openclaw|claude-code|codex|registry|selector)/,
+    ],
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_ADAPTER_REQUEST_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-243",
+    "HandoffEligibility creates no TransportAdapterRequest",
+    "Handoff eligibility must not materialize adapter requests.",
+    ["AUDIT-242"],
+    [/TransportAdapterRequest/, /createTransportAdapterRequest/],
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_RUNTIME_REQUEST_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-244",
+    "HandoffEligibility creates no RuntimeRequest",
+    "Handoff eligibility must not materialize runtime requests.",
+    ["AUDIT-243"],
+    [/RuntimeRequest/, /createRuntimeRequest/],
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_PROCESS_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-245",
+    "HandoffEligibility has no process APIs",
+    "Handoff eligibility may not import process APIs or read environment state.",
+    ["AUDIT-244"],
+    [
+      /child_process/,
+      /node:child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+    ],
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_COMMAND_ARGUMENT_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-246",
+    "HandoffEligibility has no commands or arguments",
+    "Handoff eligibility may not create commands, argument arrays, binaries, credentials, or execution options.",
+    ["AUDIT-245"],
+    [
+      /\bcommand\s*:/,
+      /\bcommands\s*:/,
+      /\bargs\s*:/,
+      /\barguments\s*:/,
+      /\bargv\s*:/,
+      /\bstdin\s*:/,
+      /\bstdout\s*:/,
+      /\bstderr\s*:/,
+      /environment\s*:/,
+      /credentials?\s*:/,
+      /workingDirectory/,
+      /\bcwd\s*:/,
+      /timeoutMs/,
+      /executablePath/,
+      /binaryPath/,
+    ],
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_FILESYSTEM_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-247",
+    "HandoffEligibility has no filesystem access",
+    "Handoff eligibility may not read, write, or discover filesystem state.",
+    ["AUDIT-246"],
+    [
+      /node:fs/,
+      /readFileSync/,
+      /writeFileSync/,
+      /readdirSync/,
+      /realpathSync/,
+      /existsSync/,
+      /statSync/,
+    ],
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_NETWORK_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-248",
+    "HandoffEligibility has no network access",
+    "Handoff eligibility may not access network APIs.",
+    ["AUDIT-247"],
+    [/\bfetch\s*\(/, /node:(http|https|net|tls)/],
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_PROCESS_ENV_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-249",
+    "HandoffEligibility has no process.env access",
+    "Handoff eligibility may not read process environment variables.",
+    ["AUDIT-248"],
+    [/process\.env/],
+  );
+
+export const HANDOFF_ELIGIBILITY_NO_EXECUTION_DISPATCH_RULE: AuditRule =
+  noHandoffEligibilitySurfaceRule(
+    "AUDIT-250",
+    "HandoffEligibility has no execution or dispatch",
+    "Handoff eligibility must remain an assessment and must not execute, dispatch, or perform handoff.",
+    ["AUDIT-249"],
+    [
+      /executeTransport/,
+      /executeRuntime/,
+      /executeProvider/,
+      /\bexecute\s*:/,
+      /\bdispatch\s*:/,
+      /handoffAllowed:\s*true/,
+      /dispatchable:\s*true/,
+      /executable:\s*true/,
+    ],
   );

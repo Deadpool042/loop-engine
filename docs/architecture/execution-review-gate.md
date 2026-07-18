@@ -98,6 +98,10 @@ As of V11.4, `ApprovalProvenance` records descriptive review evidence for a
 `ReviewedTransportRequest`. It remains evidence only and does not authorize
 execution. See `docs/architecture/approval-provenance.md`.
 
+As of V11.5, `HandoffEligibility` may assess the reviewed request and approval
+provenance together. The eligibility result remains declarative and creates no
+transport adapter request. See `docs/architecture/handoff-eligibility.md`.
+
 ## Relationship with TransportRequest
 
 `TransportRequest` is the immutable declarative request produced by the sole

@@ -74,3 +74,9 @@ revue associées à une `ReviewedTransportRequest` : identifiant abstrait,
 périmètre, statut et versions revues. La provenance reste une preuve
 descriptive, jamais une autorisation d'exécuter. Voir
 `docs/architecture/approval-provenance.md`.
+
+V11.5 ajoute `HandoffEligibility`, évaluation déclarative et immuable de la
+cohérence entre `ReviewedTransportRequest` et `ApprovalProvenance`. Le résultat
+reste une appréciation locale : aucune autorisation, aucun handoff, aucun
+`TransportAdapterRequest` et aucune exécution ne sont créés. Voir
+`docs/architecture/handoff-eligibility.md`.

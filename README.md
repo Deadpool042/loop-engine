@@ -150,6 +150,7 @@ Voir aussi :
 - `docs/architecture/transport-request-builder.md`
 - `docs/architecture/execution-review-gate.md`
 - `docs/architecture/approval-provenance.md`
+- `docs/architecture/handoff-eligibility.md`
 
 ## Audit et CI
 
