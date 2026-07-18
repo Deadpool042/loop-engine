@@ -6,6 +6,11 @@ import type { AuditRuleDefinition as AuditRule } from "../types.js";
 function verifyRegistryContract(
   rule: AuditRule,
   expectedTokens: readonly string[],
+  messages: {
+    readonly pass: string;
+    readonly fail: string;
+    readonly recommendation: string;
+  },
 ): ReturnType<typeof pass> {
   const registryPath = "src/audit/registry.ts";
   const content = existsSync(registryPath)
@@ -14,12 +19,12 @@ function verifyRegistryContract(
   const missing = expectedTokens.filter((token) => !content.includes(token));
 
   return missing.length === 0
-    ? pass(rule, "Audit rule registry contract is verified.", expectedTokens)
+    ? pass(rule, messages.pass, expectedTokens)
     : fail(
         rule,
-        "Audit rule registry contract is incomplete.",
+        messages.fail,
         missing.length > 0 ? missing : [registryPath],
-        "Restore the typed audit rule registry validation and manifest contract.",
+        messages.recommendation,
       );
 }
 
@@ -3729,13 +3734,22 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_V8_RULE: AuditRule = {
     dependsOn: [],
   },
   check: () =>
-    verifyRegistryContract(AUDIT_RULE_METADATA_COMPLETENESS_V8_RULE, [
-      "function normalizeMetadata",
-      "introducedIn:",
-      "tags:",
-      "stability:",
-      "dependsOn:",
-    ]),
+    verifyRegistryContract(
+      AUDIT_RULE_METADATA_COMPLETENESS_V8_RULE,
+      [
+        "function normalizeMetadata",
+        "introducedIn:",
+        "tags:",
+        "stability:",
+        "dependsOn:",
+      ],
+      {
+        pass: "Audit rule metadata is complete and normalized.",
+        fail: "Audit rule metadata normalization is incomplete.",
+        recommendation:
+          "Restore normalization for introducedIn, tags, stability, and dependsOn metadata.",
+      },
+    ),
 };
 
 export const AUDIT_RULE_TAG_VALIDITY_V8_RULE: AuditRule = {
@@ -3752,11 +3766,16 @@ export const AUDIT_RULE_TAG_VALIDITY_V8_RULE: AuditRule = {
     dependsOn: ["AUDIT-073"],
   },
   check: () =>
-    verifyRegistryContract(AUDIT_RULE_TAG_VALIDITY_V8_RULE, [
-      "AUDIT_RULE_TAGS",
-      "isAuditRuleTag",
-      "Invalid tags metadata",
-    ]),
+    verifyRegistryContract(
+      AUDIT_RULE_TAG_VALIDITY_V8_RULE,
+      ["AUDIT_RULE_TAGS", "isAuditRuleTag", "Invalid tags metadata"],
+      {
+        pass: "Audit rule tags are validated against the typed tag registry.",
+        fail: "Audit rule tag validation is incomplete.",
+        recommendation:
+          "Restore validation that rejects tags outside AUDIT_RULE_TAGS.",
+      },
+    ),
 };
 
 export const AUDIT_RULE_STABILITY_VALIDITY_V8_RULE: AuditRule = {
@@ -3773,11 +3792,21 @@ export const AUDIT_RULE_STABILITY_VALIDITY_V8_RULE: AuditRule = {
     dependsOn: ["AUDIT-073"],
   },
   check: () =>
-    verifyRegistryContract(AUDIT_RULE_STABILITY_VALIDITY_V8_RULE, [
-      "AUDIT_RULE_STABILITIES",
-      "isAuditRuleStability",
-      "Invalid stability metadata",
-    ]),
+    verifyRegistryContract(
+      AUDIT_RULE_STABILITY_VALIDITY_V8_RULE,
+      [
+        "AUDIT_RULE_STABILITIES",
+        "isAuditRuleStability",
+        "Invalid stability metadata",
+      ],
+      {
+        pass:
+          "Audit rule stability is validated against the typed stability registry.",
+        fail: "Audit rule stability validation is incomplete.",
+        recommendation:
+          "Restore validation that rejects stability values outside AUDIT_RULE_STABILITIES.",
+      },
+    ),
 };
 
 export const AUDIT_RULE_DEPENDENCY_VALIDITY_V8_RULE: AuditRule = {
@@ -3794,10 +3823,16 @@ export const AUDIT_RULE_DEPENDENCY_VALIDITY_V8_RULE: AuditRule = {
     dependsOn: ["AUDIT-073"],
   },
   check: () =>
-    verifyRegistryContract(AUDIT_RULE_DEPENDENCY_VALIDITY_V8_RULE, [
-      "Audit rule dependency does not exist",
-      "ids.has(dependency)",
-    ]),
+    verifyRegistryContract(
+      AUDIT_RULE_DEPENDENCY_VALIDITY_V8_RULE,
+      ["Audit rule dependency does not exist", "ids.has(dependency)"],
+      {
+        pass: "Audit rule dependencies reference registered rules.",
+        fail: "Audit rule dependency validation is incomplete.",
+        recommendation:
+          "Restore validation that rejects dependencies absent from AUDIT_RULES.",
+      },
+    ),
 };
 
 export const AUDIT_RULE_NO_SELF_DEPENDENCY_V8_RULE: AuditRule = {
@@ -3814,10 +3849,19 @@ export const AUDIT_RULE_NO_SELF_DEPENDENCY_V8_RULE: AuditRule = {
     dependsOn: ["AUDIT-073"],
   },
   check: () =>
-    verifyRegistryContract(AUDIT_RULE_NO_SELF_DEPENDENCY_V8_RULE, [
-      "dependency === rule.id",
-      "Audit rule must not depend on itself",
-    ]),
+    verifyRegistryContract(
+      AUDIT_RULE_NO_SELF_DEPENDENCY_V8_RULE,
+      [
+        "dependency === rule.id",
+        "Audit rule must not depend on itself",
+      ],
+      {
+        pass: "Audit rules cannot declare self-dependencies.",
+        fail: "Audit rule self-dependency validation is incomplete.",
+        recommendation:
+          "Restore validation that rejects a dependency matching its own rule id.",
+      },
+    ),
 };
 
 export const AUDIT_RULE_MANIFEST_CONSISTENCY_V8_RULE: AuditRule = {
@@ -3834,10 +3878,19 @@ export const AUDIT_RULE_MANIFEST_CONSISTENCY_V8_RULE: AuditRule = {
     dependsOn: ["AUDIT-073"],
   },
   check: () =>
-    verifyRegistryContract(AUDIT_RULE_MANIFEST_CONSISTENCY_V8_RULE, [
-      "export function createAuditRuleManifest",
-      "rules.map((rule)",
-      "schemaVersion: 1",
-      "introducedIn: rule.metadata.introducedIn",
-    ]),
+    verifyRegistryContract(
+      AUDIT_RULE_MANIFEST_CONSISTENCY_V8_RULE,
+      [
+        "export function createAuditRuleManifest",
+        "rules.map((rule)",
+        "schemaVersion: 1",
+        "introducedIn: rule.metadata.introducedIn",
+      ],
+      {
+        pass: "Audit rule manifest follows registry order and metadata.",
+        fail: "Audit rule manifest consistency validation is incomplete.",
+        recommendation:
+          "Restore manifest generation from registry order with normalized rule metadata.",
+      },
+    ),
 };

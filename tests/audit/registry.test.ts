@@ -6,6 +6,14 @@ import {
   createAuditRuleRegistry,
   selectAuditRules,
 } from "../../src/audit/registry.js";
+import {
+  AUDIT_RULE_DEPENDENCY_VALIDITY_V8_RULE,
+  AUDIT_RULE_MANIFEST_CONSISTENCY_V8_RULE,
+  AUDIT_RULE_METADATA_COMPLETENESS_V8_RULE,
+  AUDIT_RULE_NO_SELF_DEPENDENCY_V8_RULE,
+  AUDIT_RULE_STABILITY_VALIDITY_V8_RULE,
+  AUDIT_RULE_TAG_VALIDITY_V8_RULE,
+} from "../../src/audit/rules/audit.js";
 import { AUDIT_RULES } from "../../src/audit/rules.js";
 import type { AuditRuleDefinition } from "../../src/audit/types.js";
 
@@ -69,5 +77,29 @@ describe("audit rule registry", () => {
       manifest.rules.map((rule) => rule.id),
       AUDIT_RULES.map((rule) => rule.id),
     );
+  });
+
+  it("emits distinct stable diagnostics for V8 registry self-audit rules", () => {
+    const findings = [
+      AUDIT_RULE_METADATA_COMPLETENESS_V8_RULE,
+      AUDIT_RULE_TAG_VALIDITY_V8_RULE,
+      AUDIT_RULE_STABILITY_VALIDITY_V8_RULE,
+      AUDIT_RULE_DEPENDENCY_VALIDITY_V8_RULE,
+      AUDIT_RULE_NO_SELF_DEPENDENCY_V8_RULE,
+      AUDIT_RULE_MANIFEST_CONSISTENCY_V8_RULE,
+    ].map((rule) => rule.check());
+
+    const messages = findings.map((finding) => finding.message);
+
+    assert.ok(findings.every((finding) => finding.status === "pass"));
+    assert.deepEqual(messages, [
+      "Audit rule metadata is complete and normalized.",
+      "Audit rule tags are validated against the typed tag registry.",
+      "Audit rule stability is validated against the typed stability registry.",
+      "Audit rule dependencies reference registered rules.",
+      "Audit rules cannot declare self-dependencies.",
+      "Audit rule manifest follows registry order and metadata.",
+    ]);
+    assert.equal(new Set(messages).size, messages.length);
   });
 });
