@@ -138,6 +138,7 @@ Voir aussi :
 - `docs/architecture/minimal-context-builder.md`
 - `docs/architecture/runtime-abstraction.md`
 - `docs/architecture/provider-adapters.md`
+- `docs/architecture/transport-adapters.md`
 
 ## Audit et CI
 

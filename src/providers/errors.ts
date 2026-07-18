@@ -85,6 +85,7 @@ export function normalizeProviderResult(
     startedAt: result.startedAt,
     completedAt: result.completedAt,
     metadata: result.metadata,
+    ...(result.error === undefined ? {} : { error: result.error }),
     ...(result.exitCode === undefined ? {} : { exitCode: result.exitCode }),
     ...(result.signal === undefined ? {} : { signal: result.signal }),
   };

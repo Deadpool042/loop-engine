@@ -94,8 +94,10 @@ réel `local-process` reste accessible seulement par un appel Core explicite et
 gardé ; il n'est relié ni au routeur CLI ni au LoopRunner.
 
 Depuis V10.2, les helpers Provider du Core préparent uniquement des plans
-inertes. Ils restent absents du CLI et du LoopRunner, tout comme tout futur
-transport Provider.
+inertes. Depuis V10.3, les helpers Transport du Core peuvent explicitement
+valider, résoudre et déléguer un plan exécutable au backend gardé. Ils restent
+absents du CLI et du LoopRunner : aucun transport ne crée un mode public
+d’exécution.
 
 ---
 
