@@ -66,3 +66,7 @@ Avant toute activation future, une revue doit confirmer une source officielle
 pour le mapping, une politique restrictive explicite, une configuration
 auditable et un payload Transport séparé. Ces revues resteront des lots
 distincts : V10.6 ne les anticipe pas.
+
+V10.7 ajoute l'évaluation théorique de ces capacités et politiques après
+l'intention. Elle reste default-deny et ne relie toujours pas l'intention au
+`TransportAdapter`. Voir `capability-policy-engine.md`.

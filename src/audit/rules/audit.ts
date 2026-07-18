@@ -914,7 +914,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("executableMappingRule(") ||
             ruleSource.includes("noExecutableMappingIoRule(") ||
             ruleSource.includes("transportIntentRule(") ||
-            ruleSource.includes("noTransportIntentSurfaceRule(");
+            ruleSource.includes("noTransportIntentSurfaceRule(") ||
+            ruleSource.includes("capabilityPolicyRule(") ||
+            ruleSource.includes("noCapabilityPolicySurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -6529,3 +6531,324 @@ export const TRANSPORT_INTENT_DEPENDENCY_RULE: AuditRule = transportIntentRule(
         );
   },
 );
+
+function capabilityPolicySource(path: string): string {
+  return existsSync(path) ? readFileSync(path, "utf8") : "";
+}
+
+const CAPABILITY_POLICY_AUDIT_METADATA = {
+  introducedIn: "V10.7",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function capabilityPolicyRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...CAPABILITY_POLICY_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function policyContains(
+  rule: AuditRule,
+  path: string,
+  tokens: readonly string[],
+  message: string,
+): ReturnType<typeof pass> {
+  const missing = tokens.filter(
+    (token) => !capabilityPolicySource(path).includes(token),
+  );
+  return missing.length === 0
+    ? pass(rule, message, [path, ...tokens])
+    : fail(
+        rule,
+        message,
+        missing,
+        "Restore the deterministic capability and policy contract.",
+      );
+}
+
+const CAPABILITY_POLICY_FILES = [
+  "types.ts",
+  "errors.ts",
+  "registry.ts",
+  "selector.ts",
+  "validation.ts",
+  "evaluation.ts",
+  "support.ts",
+  "index.ts",
+].map((file) => `src/policy/${file}`);
+
+export const CAPABILITY_POLICY_MODULE_RULE: AuditRule = capabilityPolicyRule(
+  "AUDIT-177",
+  "Capability policy module is present",
+  "V10.7 must expose deterministic capability, policy, and authorization contracts with Core helpers.",
+  ["AUDIT-176"],
+  (rule) => {
+    const files = CAPABILITY_POLICY_FILES.concat("src/core/policy.ts");
+    const missing = files.filter((path) => !existsSync(path));
+    return missing.length === 0
+      ? pass(rule, "Capability policy module is present.", files)
+      : fail(
+          rule,
+          "Capability policy module is incomplete.",
+          missing,
+          "Restore all V10.7 policy modules.",
+        );
+  },
+);
+
+export const CAPABILITY_POLICY_CAPABILITY_REGISTRY_RULE: AuditRule =
+  capabilityPolicyRule(
+    "AUDIT-178",
+    "Capability registry is static and deterministic",
+    "Capability identifiers must come from a fixed immutable registry.",
+    ["AUDIT-177"],
+    (rule) =>
+      policyContains(
+        rule,
+        "src/policy/registry.ts",
+        ["CAPABILITY_REGISTRY", "AGENT_CAPABILITIES"],
+        "Capability registry is static and deterministic.",
+      ),
+  );
+
+export const CAPABILITY_POLICY_POLICY_REGISTRY_RULE: AuditRule =
+  capabilityPolicyRule(
+    "AUDIT-179",
+    "Policy registry is static and deterministic",
+    "Policy rules must use fixed declaration order and reject duplicate identifiers.",
+    ["AUDIT-178"],
+    (rule) =>
+      policyContains(
+        rule,
+        "src/policy/registry.ts",
+        [
+          "DEFAULT_DENY_POLICY",
+          "createPolicyRegistry",
+          "POLICY_REGISTRY",
+          "Duplicate policy id",
+        ],
+        "Policy registry is static and deterministic.",
+      ),
+  );
+
+export const CAPABILITY_POLICY_CONTRACT_RULE: AuditRule = capabilityPolicyRule(
+  "AUDIT-180",
+  "Authorization contracts are typed and immutable",
+  "Capability, policy, and authorization contracts must model a non-executing decision only.",
+  ["AUDIT-179"],
+  (rule) =>
+    policyContains(
+      rule,
+      "src/policy/types.ts",
+      [
+        "CapabilityId",
+        "CapabilityRequirement",
+        "CapabilitySet",
+        "CapabilityEvaluation",
+        "PolicyId",
+        "PolicyRule",
+        "PolicyDecision",
+        "AuthorizationDecision",
+        "AuthorizationStatus",
+        "AuthorizationSummary",
+        "executionStarted: false",
+      ],
+      "Authorization contracts are typed and immutable.",
+    ),
+);
+
+export const CAPABILITY_POLICY_EVALUATION_RULE: AuditRule =
+  capabilityPolicyRule(
+    "AUDIT-181",
+    "Authorization evaluation is explicit and deterministic",
+    "Evaluation must check compatibility, capabilities, permissions, activation, configuration, and policy without execution.",
+    ["AUDIT-180"],
+    (rule) =>
+      policyContains(
+        rule,
+        "src/policy/evaluation.ts",
+        [
+          "evaluateCapabilities",
+          "evaluatePolicies",
+          "evaluateAuthorization",
+          "mapping_disabled",
+          "intent_inactive",
+          "policy_denied",
+        ],
+        "Authorization evaluation is explicit and deterministic.",
+      ),
+  );
+
+export const CAPABILITY_POLICY_DEFAULT_DENY_RULE: AuditRule =
+  capabilityPolicyRule(
+    "AUDIT-182",
+    "Capability policy defaults to deny",
+    "The shipped policy rule must be disabled with empty allow-lists.",
+    ["AUDIT-181"],
+    (rule) =>
+      policyContains(
+        rule,
+        "src/policy/registry.ts",
+        [
+          "enabled: false",
+          "allowedProviders: Object.freeze([])",
+          "allowedTransports: Object.freeze([])",
+        ],
+        "Capability policy defaults to deny.",
+      ),
+  );
+
+export const CAPABILITY_POLICY_OPENCLAW_RULE: AuditRule = capabilityPolicyRule(
+  "AUDIT-183",
+  "OpenClaw remains not authorized",
+  "The disabled OpenClaw executable mapping must result in a non-authorized decision.",
+  ["AUDIT-182"],
+  (rule) =>
+    policyContains(
+      rule,
+      "src/policy/evaluation.ts",
+      ["not_authorized", "mapping_disabled"],
+      "OpenClaw remains not authorized.",
+    ),
+);
+
+function noCapabilityPolicySurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return capabilityPolicyRule(id, title, description, dependsOn, (rule) => {
+    const violations = CAPABILITY_POLICY_FILES.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(capabilityPolicySource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", CAPABILITY_POLICY_FILES)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep the policy engine deterministic and non-executing.",
+        );
+  });
+}
+
+export const CAPABILITY_POLICY_NO_TRANSPORT_REQUEST_RULE: AuditRule =
+  noCapabilityPolicySurfaceRule(
+    "AUDIT-184",
+    "Capability policy has no transport request",
+    "Policy code may not create, resolve, or execute a transport request.",
+    ["AUDIT-183"],
+    [
+      /TransportRequest/,
+      /createTransportRequest\s*\(/,
+      /resolveTransport\s*\(/,
+      /executeTransport\s*\(/,
+    ],
+  );
+
+export const CAPABILITY_POLICY_NO_RUNTIME_EXECUTION_RULE: AuditRule =
+  noCapabilityPolicySurfaceRule(
+    "AUDIT-185",
+    "Capability policy has no runtime execution",
+    "Policy code may not resolve or invoke a Runtime adapter.",
+    ["AUDIT-184"],
+    [/resolveRuntime\s*\(/, /executeRuntime\s*\(/, /\.runtime\.execute\s*\(/],
+  );
+
+export const CAPABILITY_POLICY_NO_PROVIDER_EXECUTION_RULE: AuditRule =
+  noCapabilityPolicySurfaceRule(
+    "AUDIT-186",
+    "Capability policy has no provider execution",
+    "Policy code may not prepare or invoke a Provider adapter.",
+    ["AUDIT-185"],
+    [
+      /prepareProvider\s*\(/,
+      /executeProvider\s*\(/,
+      /\.provider\.prepare\s*\(/,
+    ],
+  );
+
+export const CAPABILITY_POLICY_NO_PROCESS_RULE: AuditRule =
+  noCapabilityPolicySurfaceRule(
+    "AUDIT-187",
+    "Capability policy has no process APIs",
+    "Policy code may not import process APIs or read process environment.",
+    ["AUDIT-186"],
+    [
+      /child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+    ],
+  );
+
+export const CAPABILITY_POLICY_NO_PATH_RULE: AuditRule =
+  noCapabilityPolicySurfaceRule(
+    "AUDIT-188",
+    "Capability policy has no executable paths",
+    "Policy code may not declare binary paths or filesystem discovery.",
+    ["AUDIT-187"],
+    [/executablePath/, /binaryPath/, /which\s*\(/, /realpathSync/],
+  );
+
+export const CAPABILITY_POLICY_NO_COMMAND_RULE: AuditRule =
+  noCapabilityPolicySurfaceRule(
+    "AUDIT-189",
+    "Capability policy has no command strings",
+    "Policy code may not carry commands, arguments, flags, or process options.",
+    ["AUDIT-188"],
+    [
+      /\bcommand\s*:/,
+      /\bargs\s*:/,
+      /\bflags\s*:/,
+      /environment\s*:/,
+      /workingDirectory\s*:/,
+      /processOptions\s*:/,
+    ],
+  );
+
+export const CAPABILITY_POLICY_DEPENDENCY_RULE: AuditRule =
+  capabilityPolicyRule(
+    "AUDIT-190",
+    "Capability policy dependencies remain unidirectional",
+    "Policy modules may consume contracts only, never upper layers or concrete Runtime or Transport implementations.",
+    ["AUDIT-189"],
+    (rule) => {
+      const violations = CAPABILITY_POLICY_FILES.filter((path) =>
+        /from\s+["'][^"']*\/(core|cli|commands|loop)\/|from\s+["'][^"']*\/(runtime|transports)\/(local-process|registry|selector)/.test(
+          capabilityPolicySource(path),
+        ),
+      );
+      return violations.length === 0
+        ? pass(
+            rule,
+            "Capability policy dependencies remain unidirectional.",
+            CAPABILITY_POLICY_FILES,
+          )
+        : fail(
+            rule,
+            "Capability policy imports an upper layer or implementation.",
+            violations,
+            "Keep policy below intent and above future transport execution.",
+          );
+    },
+  );

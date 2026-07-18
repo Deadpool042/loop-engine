@@ -91,3 +91,8 @@ intention comme contrat déclaratif, inactif et non connecté au Transport
 Adapter. Il devra garder la séparation entre protocole, mapping et transport,
 puis passer les garde-fous
 V10.1 à V10.3 avant toute possibilité d'exécution.
+
+V10.7 ajoute après l'intention une évaluation de capacité et de politique. Elle
+ne modifie pas l'état désactivé du mapping : un mapping OpenClaw désactivé
+produit toujours une décision `not_authorized`, sans TransportRequest ni appel
+de transport. Voir `capability-policy-engine.md`.

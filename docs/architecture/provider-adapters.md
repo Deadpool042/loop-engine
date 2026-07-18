@@ -92,3 +92,7 @@ pas les adaptateurs Provider ni leurs plans inertes. Voir
 V10.6 distingue aussi une intention de transport déclarative, inactive et non
 connectée au `TransportAdapter`. Elle ne modifie aucun plan Provider ni aucun
 adaptateur. Voir `transport-intent.md`.
+
+V10.7 évalue ensuite, de façon théorique et default-deny, les capacités et la
+politique d'une intention. Cette décision ne revient pas au Provider et ne
+prépare aucun plan ou payload exécutable. Voir `capability-policy-engine.md`.

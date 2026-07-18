@@ -96,3 +96,8 @@ frontière Transport et son comportement restent donc inchangés. Voir
 V10.6 ajoute une `TransportIntent` déclarative après le mapping. Elle s'arrête
 avant cette couche : aucun intent n'est converti en requête Transport et aucun
 adaptateur ne la consomme. Voir `transport-intent.md`.
+
+V10.7 ajoute une décision de capacité et de politique en amont de cette
+frontière. Le `TransportAdapter` reste totalement inconscient de ce moteur :
+aucune décision ne devient une requête ou une exécution Transport. Voir
+`capability-policy-engine.md`.

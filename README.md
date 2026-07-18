@@ -142,6 +142,7 @@ Voir aussi :
 - `docs/architecture/openclaw-provider-protocol.md`
 - `docs/architecture/executable-mapping.md`
 - `docs/architecture/transport-intent.md`
+- `docs/architecture/capability-policy-engine.md`
 
 ## Audit et CI
 

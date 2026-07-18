@@ -17,6 +17,23 @@ import type {
   AgentRuntime,
 } from "../agents/types.js";
 import type {
+  ExecutableMappingId,
+  ExecutableMappingResult,
+} from "../providers/mapping/types.js";
+import type {
+  ProviderExecutionPlan,
+  ProviderId,
+  ProviderMetadata,
+} from "../providers/types.js";
+import type { OpenClawProtocolPlan } from "../providers/openclaw/types.js";
+import type {
+  TransportIntent,
+  TransportIntentId,
+  TransportIntentResult,
+} from "../providers/intent/types.js";
+import type { RuntimeId } from "../runtime/types.js";
+import type { TransportId } from "../transports/types.js";
+import type {
   AgentSelectionRequest,
   AgentSelectionResult,
 } from "../agents/selector.js";
@@ -121,4 +138,188 @@ export type AgentPolicyResolution = Readonly<{
   // docs/architecture/agent-policy-engine.md. Never used to invoke an agent.
   selection: AgentSelectionResult | null;
   reasons: readonly string[];
+}>;
+
+// Capability & Policy Engine (V10.7). These contracts are a separate,
+// default-deny decision boundary for declarative transport intents. They do
+// not create a transport payload and are not connected to any adapter.
+export type CapabilityId = AgentCapability;
+export type CapabilityEvaluationMetadata = ProviderMetadata;
+
+export type CapabilityRequirement = Readonly<{
+  id: CapabilityId;
+  required: true;
+}>;
+
+export type CapabilitySet = Readonly<{
+  capabilities: readonly CapabilityId[];
+  permissions: readonly AgentPermission[];
+}>;
+
+export const CAPABILITY_EVALUATION_STATUSES = [
+  "supported",
+  "unsupported",
+  "not_configured",
+] as const;
+
+export type CapabilityEvaluationStatus =
+  (typeof CAPABILITY_EVALUATION_STATUSES)[number];
+
+export type CapabilityEvaluation = Readonly<{
+  requirement: CapabilityRequirement;
+  status: CapabilityEvaluationStatus;
+  reason: string;
+}>;
+
+export type CapabilityEvaluationResult = Readonly<{
+  status: CapabilityEvaluationStatus;
+  evaluations: readonly CapabilityEvaluation[];
+  metadata: CapabilityEvaluationMetadata;
+}>;
+
+export type CapabilityRegistry = Readonly<{
+  capabilityIds: readonly CapabilityId[];
+}>;
+
+export type CapabilitySelection =
+  | Readonly<{
+      outcome: "selected";
+      requirements: readonly CapabilityRequirement[];
+    }>
+  | Readonly<{ outcome: "rejected"; reason: string }>;
+
+export type CapabilityResolution = Readonly<{
+  selection: CapabilitySelection;
+  result: CapabilityEvaluationResult;
+}>;
+
+export type PolicyId = string;
+export type PolicyMetadata = ProviderMetadata;
+
+/**
+ * Static policy input for a theoretical authorization. Empty allow-lists and
+ * a disabled rule are intentional default-deny values.
+ */
+export type PolicyRule = Readonly<{
+  id: PolicyId;
+  enabled: boolean;
+  allowedProviders: readonly ProviderId[];
+  allowedRuntimes: readonly RuntimeId[];
+  allowedMappings: readonly ExecutableMappingId[];
+  allowedIntents: readonly TransportIntentId[];
+  allowedTransports: readonly TransportId[];
+  supportedProtocolVersions: readonly string[];
+  supportedMappingVersions: readonly string[];
+  capabilitySet: CapabilitySet;
+}>;
+
+export const POLICY_DECISION_STATUSES = ["allowed", "denied"] as const;
+export type PolicyDecisionStatus = (typeof POLICY_DECISION_STATUSES)[number];
+
+export const POLICY_DECISION_REASONS = [
+  "policy_allowed",
+  "policy_disabled",
+  "provider_not_allowed",
+  "runtime_not_allowed",
+  "mapping_not_allowed",
+  "intent_not_allowed",
+  "transport_not_allowed",
+  "protocol_not_supported",
+  "mapping_version_not_supported",
+  "capability_not_supported",
+  "permission_not_allowed",
+] as const;
+
+export type PolicyDecisionReason = (typeof POLICY_DECISION_REASONS)[number];
+
+export type PolicyEvaluation = Readonly<{
+  policyId: PolicyId;
+  status: PolicyDecisionStatus;
+  reason: PolicyDecisionReason;
+}>;
+
+export type PolicyDecision = Readonly<{
+  status: PolicyDecisionStatus;
+  evaluations: readonly PolicyEvaluation[];
+  reason: PolicyDecisionReason;
+  metadata: PolicyMetadata;
+}>;
+
+export type PolicyEvaluationResult = PolicyDecision;
+
+export type PolicyRegistry = Readonly<{
+  rules: readonly PolicyRule[];
+}>;
+
+export const AUTHORIZATION_STATUSES = [
+  "authorized",
+  "not_authorized",
+  "unsupported",
+  "inactive",
+  "disabled",
+  "policy_denied",
+  "configuration_missing",
+] as const;
+
+export type AuthorizationStatus = (typeof AUTHORIZATION_STATUSES)[number];
+
+export const AUTHORIZATION_REASONS = [
+  "theoretical_authorization",
+  "provider_mismatch",
+  "runtime_mismatch",
+  "mapping_mismatch",
+  "intent_mismatch",
+  "transport_unsupported",
+  "protocol_unsupported",
+  "mapping_version_unsupported",
+  "capability_unsupported",
+  "permission_unsupported",
+  "mapping_disabled",
+  "intent_inactive",
+  "configuration_missing",
+  "policy_denied",
+] as const;
+
+export type AuthorizationReason = (typeof AUTHORIZATION_REASONS)[number];
+
+export type AuthorizationEvaluation = Readonly<{
+  providerPlan: ProviderExecutionPlan;
+  mappingResult: ExecutableMappingResult;
+  intentResult: TransportIntentResult;
+  protocolPlan?: OpenClawProtocolPlan;
+  mappingVersion?: string;
+  policy: PolicyRule;
+  metadata: PolicyMetadata;
+  mapping?: Readonly<{
+    id: ExecutableMappingId;
+    providerId: ProviderId;
+    runtimeId: RuntimeId;
+    protocolVersion: string;
+    enabled: boolean;
+    configured: boolean;
+    requiredTransportCapabilities: readonly CapabilityId[];
+  }>;
+  intent?: TransportIntent;
+}>;
+
+export type AuthorizationSummary = Readonly<{
+  providerCompatible: boolean;
+  runtimeCompatible: boolean;
+  mappingCompatible: boolean;
+  intentCompatible: boolean;
+  transportCompatible: boolean;
+  capabilitiesSupported: boolean;
+  permissionsSupported: boolean;
+  policyAllowed: boolean;
+}>;
+
+export type AuthorizationDecision = Readonly<{
+  status: AuthorizationStatus;
+  reason: AuthorizationReason;
+  evaluation: AuthorizationEvaluation;
+  summary: AuthorizationSummary;
+  capabilityResult: CapabilityEvaluationResult;
+  policyDecision: PolicyDecision;
+  diagnostics: readonly string[];
+  executionStarted: false;
 }>;
