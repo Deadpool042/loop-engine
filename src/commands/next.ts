@@ -1,9 +1,12 @@
-import { type ProjectConfig } from "../core/config.js";
-import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
+import {
+  generateNextProjectActionReport,
+  generateProjectReport,
+  type ProjectConfig,
+} from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printNextProjectAction(project: ProjectConfig): void {
-  const snapshot = buildProjectSnapshot(project);
+  const snapshot = generateProjectReport(project);
 
   terminal.header(`Next • ${snapshot.project.name}`);
 
@@ -131,23 +134,5 @@ export function printNextProjectAction(project: ProjectConfig): void {
 }
 
 export function printNextProjectActionJson(project: ProjectConfig): void {
-  const snapshot = buildProjectSnapshot(project);
-  const selectedCandidate = snapshot.roadmap.selectedCandidate;
-
-  console.log(
-    JSON.stringify({
-      schemaVersion: 1,
-      project: snapshot.project,
-      git: snapshot.git,
-      roadmap: {
-        available: snapshot.roadmap.available,
-        paths: snapshot.roadmap.paths,
-        selectedCandidate,
-        stats: snapshot.roadmap.stats,
-        summary: snapshot.roadmap.summary,
-      },
-      validation: snapshot.validation,
-      health: snapshot.health,
-    }),
-  );
+  console.log(JSON.stringify(generateNextProjectActionReport(project)));
 }

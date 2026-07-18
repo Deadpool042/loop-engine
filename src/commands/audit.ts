@@ -1,15 +1,13 @@
-import { runAudit } from "../audit/runner.js";
-import { isAuditProfile } from "../audit/profiles.js";
 import {
-  createAuditRuleManifest,
+  generateAuditReport,
+  generateAuditRuleManifest,
   isAuditRuleStability,
   isAuditRuleTag,
-  selectAuditRules,
+  isAuditProfile,
+  type AuditProfile,
+  type AuditReport,
   type AuditRuleSelection,
-} from "../audit/registry.js";
-import { AUDIT_RULES } from "../audit/rules.js";
-import { selectAuditRulesForProfile } from "../audit/profiles.js";
-import type { AuditProfile, AuditReport } from "../audit/types.js";
+} from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
 
 export function parseAuditProfileOption(
@@ -43,7 +41,9 @@ function parseRepeatedOption(
 
     const value = args[index + 1];
     if (value === undefined || value.startsWith("--")) {
-      throw new Error(`Invalid audit ${option.slice(2)}: ${value ?? "<missing>"}`);
+      throw new Error(
+        `Invalid audit ${option.slice(2)}: ${value ?? "<missing>"}`,
+      );
     }
     values.push(value);
   }
@@ -89,23 +89,9 @@ export function parseAuditCommandOptions(
   };
 }
 
-function selectRulesForOptions(options: AuditCommandOptions) {
-  const profileRules =
-    options.profile === undefined
-      ? AUDIT_RULES
-      : selectAuditRulesForProfile(options.profile, AUDIT_RULES);
-  const rules = selectAuditRules(profileRules, options.selection);
-
-  if (rules.length === 0) {
-    throw new Error("No audit rules match the selected filters.");
-  }
-
-  return rules;
-}
-
 export function printAuditReport(): AuditReport {
   const options = parseAuditCommandOptions(process.argv);
-  const report = runAudit(options);
+  const report = generateAuditReport(options);
 
   terminal.header("Audit");
 
@@ -181,12 +167,12 @@ export function printAuditReport(): AuditReport {
 
 export function printAuditReportJson(): AuditReport {
   const options = parseAuditCommandOptions(process.argv);
-  const report = runAudit(options);
+  const report = generateAuditReport(options);
   console.log(JSON.stringify(report));
   return report;
 }
 
 export function printAuditRuleManifest(): void {
   const options = parseAuditCommandOptions(process.argv);
-  console.log(JSON.stringify(createAuditRuleManifest(selectRulesForOptions(options))));
+  console.log(JSON.stringify(generateAuditRuleManifest(options)));
 }

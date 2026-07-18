@@ -1,9 +1,12 @@
-import type { ProjectConfig } from "../core/config.js";
-import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
+import {
+  generateProjectHandoffReport,
+  generateProjectReport,
+  type ProjectConfig,
+} from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printProjectHandoff(project: ProjectConfig): void {
-  const snapshot = buildProjectSnapshot(project);
+  const snapshot = generateProjectReport(project);
   const selectedCandidate = snapshot.roadmap.selectedCandidate;
 
   terminal.header(`Handoff • ${snapshot.project.name}`);
@@ -51,26 +54,5 @@ export function printProjectHandoff(project: ProjectConfig): void {
 }
 
 export function printProjectHandoffJson(project: ProjectConfig): void {
-  const snapshot = buildProjectSnapshot(project);
-
-  console.log(
-    JSON.stringify({
-      schemaVersion: 1,
-      project: snapshot.project,
-      git: snapshot.git,
-      roadmap: {
-        available: snapshot.roadmap.available,
-        paths: snapshot.roadmap.paths,
-        selectedCandidate: snapshot.roadmap.selectedCandidate,
-        summary: snapshot.roadmap.summary,
-        stats: snapshot.roadmap.stats,
-      },
-      validation: snapshot.validation,
-      health: snapshot.health,
-      instructions: [
-        "Use this handoff as context for a human-supervised assistant session.",
-        "Do not start implementation without explicit human confirmation.",
-      ],
-    }),
-  );
+  console.log(JSON.stringify(generateProjectHandoffReport(project)));
 }

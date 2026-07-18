@@ -1,13 +1,14 @@
-import { type Config } from "../core/config.js";
-import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
+import {
+  generateWorkspaceReports,
+  generateWorkspaceSummaryReport,
+  type Config,
+} from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printWorkspaceSummary(config: Config): void {
   terminal.header("Summary");
 
-  for (const project of config.projects) {
-    const snapshot = buildProjectSnapshot(project);
-
+  for (const snapshot of generateWorkspaceReports(config)) {
     const git = snapshot.git.requiresGit
       ? snapshot.git.clean
         ? "clean"
@@ -39,19 +40,5 @@ export function printWorkspaceSummary(config: Config): void {
 }
 
 export function printWorkspaceSummaryJson(config: Config): void {
-  const projects = config.projects.map((project) => {
-    const snapshot = buildProjectSnapshot(project);
-
-    return {
-      ...snapshot,
-      roadmap: {
-        available: snapshot.roadmap.available,
-        paths: snapshot.roadmap.paths,
-        selectedCandidate: snapshot.roadmap.selectedCandidate,
-        stats: snapshot.roadmap.stats,
-      },
-    };
-  });
-
-  console.log(JSON.stringify({ schemaVersion: 1, projects }));
+  console.log(JSON.stringify(generateWorkspaceSummaryReport(config)));
 }

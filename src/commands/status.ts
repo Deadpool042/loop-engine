@@ -1,12 +1,11 @@
-import { type Config } from "../core/config.js";
-import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
+import { generateWorkspaceReports, type Config } from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printStatus(config: Config): void {
   terminal.header("Status");
 
-  for (const project of config.projects) {
-    const snapshot = buildProjectSnapshot(project);
+  for (const [index, snapshot] of generateWorkspaceReports(config).entries()) {
+    const project = config.projects[index]!;
 
     terminal.section(snapshot.project.name);
     terminal.info(`Path: ${snapshot.project.path}`);

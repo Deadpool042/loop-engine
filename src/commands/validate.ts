@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
-
-import { type ProjectConfig } from "../core/config.js";
+import {
+  generateProjectValidationReport,
+  runConfiguredValidations,
+  type ProjectConfig,
+} from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
 
 function formatDuration(startedAt: number): string {
@@ -61,12 +63,12 @@ function runValidationCommand(command: string, cwd: string): Promise<number> {
 }
 
 export async function validateProject(project: ProjectConfig): Promise<void> {
-  const projectPath = resolve(project.path);
   const startedAt = Date.now();
+  const report = generateProjectValidationReport(project);
 
   terminal.header("Validate");
   terminal.info(`Project: ${project.name}`);
-  terminal.info(`Path: ${projectPath}`);
+  terminal.info(`Path: ${report.projectPath}`);
 
   if (project.validation.length === 0) {
     terminal.warning(`No validation command configured for ${project.name}.`);
@@ -75,13 +77,10 @@ export async function validateProject(project: ProjectConfig): Promise<void> {
 
   terminal.section("Validation");
 
-  for (const command of project.validation) {
-    const code = await runValidationCommand(command, projectPath);
-
-    if (code !== 0) {
-      terminal.error(`Validation failed: ${command}`);
-      process.exit(code);
-    }
+  const result = await runConfiguredValidations(project, runValidationCommand);
+  if (result.failedCommand) {
+    terminal.error(`Validation failed: ${result.failedCommand}`);
+    process.exit(result.exitCode);
   }
 
   terminal.section("Result");

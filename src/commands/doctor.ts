@@ -1,25 +1,24 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import { type Config } from "../core/config.js";
-import { docExists } from "../core/docs.js";
-import { isGitRepository } from "../core/git.js";
+import { generateDoctorReport, type Config } from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printDoctor(config: Config): void {
-  let hasError = false;
+  const report = generateDoctorReport(config);
 
   terminal.header("Doctor");
 
-  for (const project of config.projects) {
-    const projectPath = resolve(project.path);
-    const projectExists = existsSync(projectPath);
-    const gitDirExists = isGitRepository(projectPath);
+  for (const entry of report.projects) {
+    const {
+      project,
+      path: projectPath,
+      exists: projectExists,
+      isGitRepository: gitDirExists,
+      missingRequiredDocs,
+    } = entry;
 
     terminal.section(project.name);
     terminal.info(`Path: ${projectPath}`);
 
     if (!projectExists) {
-      hasError = true;
       terminal.error("Project path does not exist");
       continue;
     }
@@ -27,19 +26,17 @@ export function printDoctor(config: Config): void {
     if (project.requires_git === false) {
       terminal.warning("Git repository not required");
     } else if (!gitDirExists) {
-      hasError = true;
       terminal.error("Project is not a Git repository");
     } else {
       terminal.success("Git repository detected");
     }
 
     for (const doc of project.required_docs) {
-      const exists = docExists(projectPath, doc);
+      const exists = !missingRequiredDocs.includes(doc);
       if (!exists) {
         if (project.optional === true) {
           terminal.warning(`${doc} missing`);
         } else {
-          hasError = true;
           terminal.error(`${doc} missing`);
         }
       } else {
@@ -56,7 +53,7 @@ export function printDoctor(config: Config): void {
     }
   }
 
-  if (hasError) {
+  if (report.hasError) {
     process.exitCode = 1;
   }
 }

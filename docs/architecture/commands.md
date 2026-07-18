@@ -69,7 +69,15 @@ Une commande ne doit pas :
 
 ## Rôle de `core/`
 
-`core/` contient les primitives bas niveau :
+`core/index.ts` est le point d'entrée interne stable entre les adaptateurs et le moteur.
+
+Les commandes CLI importent uniquement ce façcade pour déclencher les opérations
+de domaine et obtenir les rapports : audit, planification LoopRunner, snapshots,
+rapports JSON, RAG et validations configurées. Elles conservent seulement le
+parsing des arguments, le rendu terminal et les codes de sortie.
+
+Les implémentations restent réparties dans les couches spécialisées. `core/`
+contient également les primitives bas niveau :
 
 - lecture de configuration ;
 - helpers Git ;
@@ -77,6 +85,9 @@ Une commande ne doit pas :
 - résolution de projet.
 
 Ces modules restent petits et déterministes.
+
+Les adaptateurs futurs doivent consommer `core/index.ts`, sans importer
+directement `audit/`, `loop/`, `intelligence/`, `policy/` ou `context/`.
 
 ---
 

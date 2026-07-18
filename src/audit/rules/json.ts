@@ -16,13 +16,28 @@ export const JSON_SCHEMA_VERSION_RULE: AuditRule = {
     "Every documented public JSON command should expose schemaVersion.",
   check: () => {
     const files = PUBLIC_JSON_COMMAND_FILES;
+    const reportsPath = "src/core/reports.ts";
+    const loopPath = "src/core/loop.ts";
+    const reportsSource = existsSync(reportsPath)
+      ? readFileSync(reportsPath, "utf8")
+      : "";
+    const loopSource = existsSync(loopPath)
+      ? readFileSync(loopPath, "utf8")
+      : "";
 
     const missing = files.filter((file) => {
       if (!existsSync(file)) {
         return true;
       }
 
-      return !readFileSync(file, "utf8").includes("schemaVersion");
+      const commandSource = readFileSync(file, "utf8");
+      const coreSource =
+        file === "src/commands/run.ts" ? loopSource : reportsSource;
+
+      return (
+        !commandSource.includes("../core/index.js") ||
+        !coreSource.includes("schemaVersion")
+      );
     });
 
     if (missing.length > 0) {
@@ -36,7 +51,7 @@ export const JSON_SCHEMA_VERSION_RULE: AuditRule = {
 
     return pass(
       JSON_SCHEMA_VERSION_RULE,
-      "All public JSON command files expose schemaVersion.",
+      "All public JSON command adapters delegate to Core reports exposing schemaVersion.",
       files,
     );
   },

@@ -1,9 +1,12 @@
-import { type ProjectConfig } from "../core/config.js";
-import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
+import {
+  generateProjectContextReport,
+  generateProjectReport,
+  type ProjectConfig,
+} from "../core/index.js";
 import { terminal } from "../ui/terminal.js";
 
 export function printProjectContext(project: ProjectConfig): void {
-  const snapshot = buildProjectSnapshot(project);
+  const snapshot = generateProjectReport(project);
 
   terminal.header(`Context • ${snapshot.project.name}`);
   terminal.info(`Project: ${snapshot.project.name}`);
@@ -53,23 +56,5 @@ export function printProjectContext(project: ProjectConfig): void {
 }
 
 export function printProjectContextJson(project: ProjectConfig): void {
-  const snapshot = buildProjectSnapshot(project);
-
-  console.log(
-    JSON.stringify({
-      schemaVersion: 1,
-      project: snapshot.project,
-      git: snapshot.git,
-      docs: snapshot.docs,
-      roadmap: {
-        available: snapshot.roadmap.available,
-        paths: snapshot.roadmap.paths,
-        selectedCandidate: snapshot.roadmap.selectedCandidate,
-        stats: snapshot.roadmap.stats,
-        summary: snapshot.roadmap.summary,
-      },
-      validation: snapshot.validation,
-      health: snapshot.health,
-    }),
-  );
+  console.log(JSON.stringify(generateProjectContextReport(project)));
 }
