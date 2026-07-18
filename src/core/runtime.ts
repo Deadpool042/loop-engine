@@ -2,17 +2,20 @@ import {
   createUnsupportedRuntimeResult,
   selectRuntime,
   type RuntimeRequest,
+  type RuntimeExecution,
   type RuntimeResult,
   type RuntimeSelectionResult,
+  type LocalProcessRuntimeRequest,
+  type RuntimeId,
 } from "../runtime/index.js";
-import type { AgentRuntime } from "../agents/types.js";
 import type { AgentProvider } from "../agents/types.js";
 import type { LoopRunResult } from "../loop/types.js";
 
 export type CreateRuntimeRequestOptions = Readonly<{
-  requestedRuntime?: AgentRuntime;
+  requestedRuntime?: RuntimeId;
   allowedProviders?: readonly AgentProvider[];
-  allowedRuntimes?: readonly AgentRuntime[];
+  allowedRuntimes?: readonly RuntimeId[];
+  localProcess?: LocalProcessRuntimeRequest;
 }>;
 
 /**
@@ -54,6 +57,9 @@ export function createRuntimeRequest(
     ...(options.allowedRuntimes === undefined
       ? {}
       : { allowedRuntimes: options.allowedRuntimes }),
+    ...(options.localProcess === undefined
+      ? {}
+      : { localProcess: options.localProcess }),
   };
 }
 
@@ -68,7 +74,7 @@ export function resolveRuntime(
  * Invokes the selected adapter. V10 adapters are deterministic stubs, so this
  * function performs no real execution, I/O, process spawn, or network call.
  */
-export function executeRuntime(request: RuntimeRequest): RuntimeResult {
+export function executeRuntime(request: RuntimeRequest): RuntimeExecution {
   const selection = resolveRuntime(request);
   return selection.outcome === "selected"
     ? selection.adapter.execute(request)

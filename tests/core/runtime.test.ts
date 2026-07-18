@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
@@ -98,7 +101,7 @@ function completedLoopResult(): LoopRunResult {
 }
 
 describe("Core runtime integration", () => {
-  it("resolves and invokes only a deterministic stub without changing the loop result", () => {
+  it("resolves and invokes only a deterministic stub without changing the loop result", async () => {
     const result = completedLoopResult();
     const before = JSON.stringify(result);
     const request = createRuntimeRequest(result);
@@ -109,7 +112,7 @@ describe("Core runtime integration", () => {
     const selection = resolveRuntime(request);
     assert.equal(selection.outcome, "selected");
 
-    const runtimeResult = executeRuntime(request);
+    const runtimeResult = await executeRuntime(request);
     assert.equal(runtimeResult.status, "not_implemented");
     assert.equal(runtimeResult.output, null);
     assert.equal(runtimeResult.startedAt, request.requestedAt);
@@ -120,5 +123,71 @@ describe("Core runtime integration", () => {
   it("does not create a runtime request for blocked or failed loop results", () => {
     const result = runLoopPlan("unknown-project");
     assert.equal(createRuntimeRequest(result), null);
+  });
+
+  it("delegates an explicit guarded local-process request without changing LoopRunResult", async () => {
+    const root = realpathSync(
+      mkdtempSync(join(tmpdir(), "loop-core-runtime-")),
+    );
+    const result = completedLoopResult();
+    const localResult: LoopRunResult = {
+      ...result,
+      mode: "execute",
+      agentPolicy: {
+        ...result.agentPolicy!,
+        mode: "execute",
+        requirements: {
+          ...result.agentPolicy!.requirements,
+          mode: "execute",
+          requiredCapabilities: ["shell_exec"],
+          requiredPermissions: ["shell_exec"],
+        },
+        selection: {
+          outcome: "selected",
+          profile: {
+            ...result.agentPolicy!.selection!.profile,
+            runtime: "custom",
+            provider: "local",
+            capabilities: ["shell_exec"],
+            permissions: ["shell_exec"],
+          },
+          rejected: [],
+        },
+      },
+    };
+    const before = JSON.stringify(localResult);
+
+    try {
+      const request = createRuntimeRequest(localResult, {
+        requestedRuntime: "local-process",
+        localProcess: {
+          command: {
+            executable: process.execPath,
+            args: ["-e", "process.stdout.write('core')"],
+            cwd: root,
+          },
+          executionPolicy: {
+            enabled: true,
+            projectRoot: root,
+            allowedExecutables: [process.execPath],
+            allowedEnvironmentKeys: [],
+            timeoutMs: 2_000,
+            maxStdoutBytes: 128,
+            maxStderrBytes: 128,
+          },
+        },
+      });
+
+      assert.ok(request);
+      if (!request) return;
+      assert.equal(resolveRuntime(request).outcome, "selected");
+
+      const runtimeResult = await executeRuntime(request);
+      assert.equal(runtimeResult.status, "completed");
+      assert.equal(runtimeResult.stdout, "core");
+      assert.equal(JSON.stringify(localResult), before);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

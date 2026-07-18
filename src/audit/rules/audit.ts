@@ -3890,3 +3890,377 @@ export const AUDIT_RULE_MANIFEST_CONSISTENCY_V8_RULE: AuditRule = {
       },
     ),
 };
+
+function localProcessRuntimeSource(): string | null {
+  const path = "src/runtime/local-process.ts";
+  return existsSync(path) ? readFileSync(path, "utf8") : null;
+}
+
+function verifyLocalProcessRuntime(
+  rule: AuditRule,
+  expectedTokens: readonly string[],
+  message: string,
+  recommendation: string,
+): ReturnType<typeof pass> {
+  const source = localProcessRuntimeSource();
+  const missing = source
+    ? expectedTokens.filter((token) => !source.includes(token))
+    : ["src/runtime/local-process.ts"];
+
+  return missing.length === 0
+    ? pass(rule, message, expectedTokens)
+    : fail(rule, message, missing, recommendation);
+}
+
+export const RUNTIME_LOCAL_PROCESS_MODULE_RULE: AuditRule = {
+  id: "AUDIT-079",
+  category: "architecture",
+  severity: "error",
+  title: "Guarded local-process runtime is registered",
+  description:
+    "The V10.1 local-process adapter must exist and be reachable through the static runtime registry.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution"],
+    stability: "stable",
+    dependsOn: ["AUDIT-078"],
+  },
+  check: () => {
+    const registry = existsSync("src/runtime/registry.ts")
+      ? readFileSync("src/runtime/registry.ts", "utf8")
+      : "";
+    return verifyLocalProcessRuntime(
+      RUNTIME_LOCAL_PROCESS_MODULE_RULE,
+      ["LOCAL_PROCESS_RUNTIME_ID", "export const LocalProcessRuntime"],
+      "Guarded local-process runtime is present.",
+      "Restore src/runtime/local-process.ts and register LocalProcessRuntime statically.",
+    ).status === "pass" && registry.includes("LocalProcessRuntime")
+      ? pass(
+          RUNTIME_LOCAL_PROCESS_MODULE_RULE,
+          "Guarded local-process runtime is present and registered.",
+          ["src/runtime/local-process.ts", "src/runtime/registry.ts"],
+        )
+      : fail(
+          RUNTIME_LOCAL_PROCESS_MODULE_RULE,
+          "Guarded local-process runtime is missing or not registered.",
+          ["src/runtime/local-process.ts", "src/runtime/registry.ts"],
+          "Restore the local-process module and its static registry entry.",
+        );
+  },
+};
+
+export const RUNTIME_LOCAL_PROCESS_NO_SHELL_RULE: AuditRule = {
+  id: "AUDIT-080",
+  category: "architecture",
+  severity: "error",
+  title: "local-process never enables a shell",
+  description:
+    "The local process adapter must invoke spawn with shell: false and never enable shell interpretation.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution"],
+    stability: "stable",
+    dependsOn: ["AUDIT-079"],
+  },
+  check: () => {
+    const source = localProcessRuntimeSource();
+    return source?.includes("shell: false") && !source.includes("shell: true")
+      ? pass(
+          RUNTIME_LOCAL_PROCESS_NO_SHELL_RULE,
+          "local-process disables shell interpretation.",
+          ["shell: false"],
+        )
+      : fail(
+          RUNTIME_LOCAL_PROCESS_NO_SHELL_RULE,
+          "local-process shell safety cannot be verified.",
+          ["src/runtime/local-process.ts"],
+          "Use spawn with shell: false and never enable shell execution.",
+        );
+  },
+};
+
+export const RUNTIME_LOCAL_PROCESS_NO_TEXT_EXEC_RULE: AuditRule = {
+  id: "AUDIT-081",
+  category: "architecture",
+  severity: "error",
+  title: "local-process does not use textual exec APIs",
+  description:
+    "The adapter must use spawn with structured arguments rather than exec-style command strings.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution"],
+    stability: "stable",
+    dependsOn: ["AUDIT-080"],
+  },
+  check: () => {
+    const source = localProcessRuntimeSource();
+    const unsafe = source ? /\bexec(?:File|Sync)?\s*\(/.test(source) : true;
+    return source !== null && /spawn\s*\(\s*executable/.test(source) && !unsafe
+      ? pass(
+          RUNTIME_LOCAL_PROCESS_NO_TEXT_EXEC_RULE,
+          "local-process uses structured spawn arguments only.",
+          ["spawn(executable, args, options)"],
+        )
+      : fail(
+          RUNTIME_LOCAL_PROCESS_NO_TEXT_EXEC_RULE,
+          "local-process may use a textual execution API.",
+          ["src/runtime/local-process.ts"],
+          "Keep command arguments structured and invoke only spawn without a shell.",
+        );
+  },
+};
+
+export const RUNTIME_LOCAL_PROCESS_PERMISSION_RULE: AuditRule = {
+  id: "AUDIT-082",
+  category: "architecture",
+  severity: "error",
+  title: "local-process requires explicit shell_exec authorization",
+  description:
+    "A resolved policy and selected profile must both authorize shell_exec before a process can start.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution", "policy"],
+    stability: "stable",
+    dependsOn: ["AUDIT-079"],
+  },
+  check: () =>
+    verifyLocalProcessRuntime(
+      RUNTIME_LOCAL_PROCESS_PERMISSION_RULE,
+      [
+        "policyAllowsShellExecution",
+        'includes("shell_exec")',
+        '"permission_denied"',
+      ],
+      "local-process checks explicit shell_exec authorization.",
+      "Validate shell_exec from the resolved policy before spawn.",
+    ),
+};
+
+export const RUNTIME_LOCAL_PROCESS_DISABLED_BY_DEFAULT_RULE: AuditRule = {
+  id: "AUDIT-083",
+  category: "architecture",
+  severity: "error",
+  title: "local-process rejects disabled execution",
+  description:
+    "The local process policy must contain an enabled flag and reject false before process creation.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution"],
+    stability: "stable",
+    dependsOn: ["AUDIT-082"],
+  },
+  check: () =>
+    verifyLocalProcessRuntime(
+      RUNTIME_LOCAL_PROCESS_DISABLED_BY_DEFAULT_RULE,
+      ["!policy.enabled", '"runtime_disabled"'],
+      "local-process rejects disabled execution.",
+      "Require an explicit enabled policy flag before spawn.",
+    ),
+};
+
+export const RUNTIME_LOCAL_PROCESS_ALLOWLIST_RULE: AuditRule = {
+  id: "AUDIT-084",
+  category: "architecture",
+  severity: "error",
+  title: "local-process uses a closed executable allow-list",
+  description:
+    "Only canonical executable paths declared by policy may be spawned.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution"],
+    stability: "stable",
+    dependsOn: ["AUDIT-079"],
+  },
+  check: () =>
+    verifyLocalProcessRuntime(
+      RUNTIME_LOCAL_PROCESS_ALLOWLIST_RULE,
+      ["allowedExecutables", "canonicalPath", '"executable_not_allowed"'],
+      "local-process checks its executable allow-list.",
+      "Canonicalize and compare executables against the explicit policy allow-list.",
+    ),
+};
+
+export const RUNTIME_LOCAL_PROCESS_CWD_CONFINEMENT_RULE: AuditRule = {
+  id: "AUDIT-085",
+  category: "architecture",
+  severity: "error",
+  title: "local-process canonically confines working directories",
+  description:
+    "Canonical project and cwd paths must be compared so traversal and symlink escapes are refused.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution"],
+    stability: "stable",
+    dependsOn: ["AUDIT-084"],
+  },
+  check: () =>
+    verifyLocalProcessRuntime(
+      RUNTIME_LOCAL_PROCESS_CWD_CONFINEMENT_RULE,
+      [
+        "realpathSync",
+        "isWithinProject",
+        '"working_directory_outside_project"',
+      ],
+      "local-process confines canonical working directories.",
+      "Resolve projectRoot and cwd canonically before testing containment.",
+    ),
+};
+
+export const RUNTIME_LOCAL_PROCESS_LIMITS_RULE: AuditRule = {
+  id: "AUDIT-086",
+  category: "architecture",
+  severity: "error",
+  title: "local-process enforces duration and separate output limits",
+  description:
+    "Execution requires positive timeout, stdout, and stderr limits and terminates a process when a limit is exceeded.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution"],
+    stability: "stable",
+    dependsOn: ["AUDIT-079"],
+  },
+  check: () =>
+    verifyLocalProcessRuntime(
+      RUNTIME_LOCAL_PROCESS_LIMITS_RULE,
+      [
+        "timeoutMs",
+        "maxStdoutBytes",
+        "maxStderrBytes",
+        "setTimeout",
+        '"stdout_limit_exceeded"',
+        '"stderr_limit_exceeded"',
+      ],
+      "local-process enforces independent resource limits.",
+      "Require valid limits and terminate the child process when any limit is exceeded.",
+    ),
+};
+
+export const RUNTIME_LOCAL_PROCESS_ERROR_CONTRACT_RULE: AuditRule = {
+  id: "AUDIT-087",
+  category: "architecture",
+  severity: "error",
+  title: "local-process exposes structured stable errors",
+  description:
+    "Runtime errors must carry a stable code, non-sensitive details, and whether a process started.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution", "contract"],
+    stability: "stable",
+    dependsOn: ["AUDIT-079"],
+  },
+  check: () => {
+    const types = existsSync("src/runtime/types.ts")
+      ? readFileSync("src/runtime/types.ts", "utf8")
+      : "";
+    return types.includes("RUNTIME_ERROR_CODES") &&
+      types.includes("processStarted: boolean")
+      ? pass(
+          RUNTIME_LOCAL_PROCESS_ERROR_CONTRACT_RULE,
+          "local-process error contract is structured and stable.",
+          ["src/runtime/types.ts"],
+        )
+      : fail(
+          RUNTIME_LOCAL_PROCESS_ERROR_CONTRACT_RULE,
+          "local-process error contract is incomplete.",
+          ["src/runtime/types.ts"],
+          "Define stable RuntimeExecutionError codes with processStarted metadata.",
+        );
+  },
+};
+
+export const RUNTIME_LOCAL_PROCESS_EVENTS_RULE: AuditRule = {
+  id: "AUDIT-088",
+  category: "architecture",
+  severity: "warning",
+  title: "local-process emits ordered structured events",
+  description:
+    "Runtime observations must have stable types and monotonically increasing sequence numbers without secret payloads.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution", "contract"],
+    stability: "stable",
+    dependsOn: ["AUDIT-087"],
+  },
+  check: () =>
+    verifyLocalProcessRuntime(
+      RUNTIME_LOCAL_PROCESS_EVENTS_RULE,
+      [
+        "sequence += 1",
+        'event("request_validated")',
+        'event("process_started"',
+        'event("process_completed"',
+      ],
+      "local-process emits ordered structured events.",
+      "Record each observation with a monotonic sequence and minimal non-sensitive data.",
+    ),
+};
+
+export const RUNTIME_LOCAL_PROCESS_NO_PUBLIC_INTEGRATION_RULE: AuditRule = {
+  id: "AUDIT-089",
+  category: "architecture",
+  severity: "error",
+  title: "local-process remains absent from CLI and LoopRunner",
+  description:
+    "The guarded backend is Core-only and must not be wired into public CLI routing or runLoopPlan.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "cli", "execution"],
+    stability: "stable",
+    dependsOn: ["AUDIT-079"],
+  },
+  check: () => {
+    const publicFiles = ["src/cli.ts", "src/loop/runner.ts"];
+    const violations = publicFiles.filter(
+      (path) =>
+        existsSync(path) &&
+        readFileSync(path, "utf8").includes("local-process"),
+    );
+    return violations.length === 0
+      ? pass(
+          RUNTIME_LOCAL_PROCESS_NO_PUBLIC_INTEGRATION_RULE,
+          "local-process is not exposed by CLI or LoopRunner.",
+          publicFiles,
+        )
+      : fail(
+          RUNTIME_LOCAL_PROCESS_NO_PUBLIC_INTEGRATION_RULE,
+          "local-process leaked into a public execution path.",
+          violations,
+          "Keep local-process reachable only through the explicit Core runtime API.",
+        );
+  },
+};
+
+export const RUNTIME_LOCAL_PROCESS_NO_NETWORK_RULE: AuditRule = {
+  id: "AUDIT-090",
+  category: "architecture",
+  severity: "error",
+  title: "local-process contains no network integration",
+  description:
+    "The local backend must remain free of network modules and fetch calls.",
+  metadata: {
+    introducedIn: "V10.1",
+    tags: ["architecture", "execution"],
+    stability: "stable",
+    dependsOn: ["AUDIT-079"],
+  },
+  check: () => {
+    const source = localProcessRuntimeSource();
+    const violations = source
+      ? [/\bfetch\(/, /node:(http|https|net|tls)/, /\bWebSocket\b/]
+          .filter((pattern) => pattern.test(source))
+          .map((pattern) => pattern.source)
+      : ["src/runtime/local-process.ts"];
+    return violations.length === 0
+      ? pass(
+          RUNTIME_LOCAL_PROCESS_NO_NETWORK_RULE,
+          "local-process has no network integration.",
+          ["src/runtime/local-process.ts"],
+        )
+      : fail(
+          RUNTIME_LOCAL_PROCESS_NO_NETWORK_RULE,
+          "local-process contains a network integration pattern.",
+          violations,
+          "Keep the local process backend free of network calls and network modules.",
+        );
+  },
+};

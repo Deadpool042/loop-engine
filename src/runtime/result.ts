@@ -3,14 +3,14 @@ import type {
   RuntimeRequest,
   RuntimeResult,
 } from "./types.js";
-import type { AgentRuntime } from "../agents/types.js";
+import type { RuntimeId } from "./types.js";
 
 function resultMetadata(request: RuntimeRequest): RuntimeMetadata {
   return request.metadata;
 }
 
 export function createNotImplementedRuntimeResult(
-  runtimeId: AgentRuntime,
+  runtimeId: RuntimeId,
   request: RuntimeRequest,
 ): RuntimeResult {
   return {

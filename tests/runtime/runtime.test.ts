@@ -128,7 +128,7 @@ describe("runtime registry and selector", () => {
   it("has static deterministic declaration order", () => {
     assert.deepEqual(
       RUNTIME_REGISTRY.adapters.map((adapter) => adapter.runtimeId),
-      ["openclaw", "claude_code", "codex"],
+      ["openclaw", "claude_code", "codex", "local-process"],
     );
   });
 

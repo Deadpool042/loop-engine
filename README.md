@@ -136,6 +136,7 @@ Voir aussi :
 - `docs/architecture/agent-orchestration.md`
 - `docs/architecture/agent-policy-engine.md`
 - `docs/architecture/minimal-context-builder.md`
+- `docs/architecture/runtime-abstraction.md`
 
 ## Audit et CI
 
