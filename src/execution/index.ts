@@ -12,3 +12,4 @@ export * from "./summary.js";
 export * from "./markdown-reporter.js";
 export * from "./json-reporter.js";
 export * from "./report.js";
+export * from "./adapters/loop-run.js";
