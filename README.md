@@ -146,6 +146,7 @@ Voir aussi :
 - `docs/architecture/authorization-configuration.md`
 - `docs/architecture/architecture-consolidation.md`
 - `docs/architecture/rfc-execution-architecture-v11.md`
+- `docs/architecture/transport-request.md`
 
 ## Audit et CI
 

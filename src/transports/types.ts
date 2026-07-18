@@ -28,7 +28,7 @@ export type TransportExecutionPolicy = Readonly<{
  * executable plus argument vector; a shell command string and unfiltered
  * environments are not represented by this contract.
  */
-export type TransportRequest = Readonly<{
+export type TransportAdapterRequest = Readonly<{
   transportId: TransportId;
   providerId: string;
   provider: AgentProvider;
@@ -105,8 +105,8 @@ export type TransportExecution = TransportResult | Promise<TransportResult>;
 export type TransportAdapter = Readonly<{
   id: TransportId;
   capabilities: readonly TransportCapability[];
-  supports: (request: TransportRequest) => boolean;
-  execute: (request: TransportRequest) => TransportExecution;
+  supports: (request: TransportAdapterRequest) => boolean;
+  execute: (request: TransportAdapterRequest) => TransportExecution;
 }>;
 
 export type TransportRegistry = Readonly<{
@@ -121,6 +121,6 @@ export type TransportResolution =
   | Readonly<{
       outcome: "resolved";
       adapter: TransportAdapter;
-      request: TransportRequest;
+      request: TransportAdapterRequest;
     }>
   | Readonly<{ outcome: "rejected"; error: TransportError }>;

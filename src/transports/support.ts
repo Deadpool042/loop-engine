@@ -3,7 +3,7 @@ import { createTransportError } from "./errors.js";
 import type {
   TransportAdapter,
   TransportError,
-  TransportRequest,
+  TransportAdapterRequest,
 } from "./types.js";
 
 function hasExplicitAuthorization(
@@ -18,7 +18,7 @@ function hasExplicitAuthorization(
  * selection alone never authorizes a guarded backend.
  */
 export function getTransportAuthorizationError(
-  request: TransportRequest,
+  request: TransportAdapterRequest,
 ): TransportError | null {
   const { runtimeRequest, transportPolicy } = request;
   const requirements = runtimeRequest.resolvedAgentPolicy.requirements;
@@ -100,7 +100,7 @@ export function getTransportAuthorizationError(
 
 export function getTransportCapabilityError(
   adapter: TransportAdapter,
-  request: TransportRequest,
+  request: TransportAdapterRequest,
 ): TransportError | null {
   const unsupported = request.requiredCapabilities.find(
     (capability) => !adapter.capabilities.includes(capability),

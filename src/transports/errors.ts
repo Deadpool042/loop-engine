@@ -2,7 +2,7 @@ import type {
   TransportError,
   TransportErrorCode,
   TransportMetadata,
-  TransportRequest,
+  TransportAdapterRequest,
   TransportResult,
 } from "./types.js";
 
@@ -16,7 +16,7 @@ export function createTransportError(
 }
 
 export function createRejectedTransportResult(
-  request: TransportRequest,
+  request: TransportAdapterRequest,
   error: TransportError,
 ): TransportResult {
   return {

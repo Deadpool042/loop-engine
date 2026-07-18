@@ -50,3 +50,9 @@ Voir `docs/architecture/runtime-abstraction.md`,
 V10.4 ajoute un protocole de planification OpenClaw sous `src/providers/`, sans
 mapping exécutable et sans changement CLI. Voir
 `docs/architecture/openclaw-provider-protocol.md`.
+
+V11.0 établit le RFC normatif d'exécution. V11.1 ajoute le contrat
+`src/transport-request/` comme demande déclarative, inactive, non dispatchable
+et non exécutable entre l'autorisation et une future frontière de transport.
+Voir `docs/architecture/rfc-execution-architecture-v11.md` et
+`docs/architecture/transport-request.md`.

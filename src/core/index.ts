@@ -7,6 +7,7 @@ export * from "./mapping.js";
 export * from "./intent.js";
 export * from "./policy.js";
 export * from "./authorization.js";
+export * from "./transport-request.js";
 export * from "./transports.js";
 export * from "./reports.js";
 export * from "./types.js";

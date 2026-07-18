@@ -918,7 +918,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("capabilityPolicyRule(") ||
             ruleSource.includes("noCapabilityPolicySurfaceRule(") ||
             ruleSource.includes("authorizationConfigurationRule(") ||
-            ruleSource.includes("noAuthorizationConfigurationSurfaceRule(");
+            ruleSource.includes("noAuthorizationConfigurationSurfaceRule(") ||
+            ruleSource.includes("transportRequestRule(") ||
+            ruleSource.includes("noTransportRequestSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -4917,7 +4919,7 @@ export const TRANSPORT_PROVIDER_PLAN_VALIDATION_RULE: AuditRule = {
       [
         'providerPlan.status !== "ready"',
         "provider_plan_not_executable",
-        "createTransportRequest",
+        "createTransportAdapterRequest",
       ],
       "Core validates provider plans before transport resolution.",
       "Reject non-ready or missing-intent provider plans before selecting a transport.",
@@ -5227,7 +5229,7 @@ export const TRANSPORT_CORE_EXECUTION_BOUNDARY_RULE: AuditRule = {
       TRANSPORT_CORE_EXECUTION_BOUNDARY_RULE,
       "src/core/transports.ts",
       [
-        "createTransportRequest",
+        "createTransportAdapterRequest",
         "resolveTransport",
         "executeTransport",
         "normalizeProviderTransportResult",
@@ -7174,4 +7176,227 @@ export const AUTHORIZATION_CONFIGURATION_DEPENDENCY_RULE: AuditRule =
             "Keep configuration below authorization evaluation and above any future review boundary.",
           );
     },
+  );
+
+function transportRequestSource(path: string): string {
+  return existsSync(path) ? readFileSync(path, "utf8") : "";
+}
+
+const TRANSPORT_REQUEST_AUDIT_METADATA = {
+  introducedIn: "V11.1",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function transportRequestRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...TRANSPORT_REQUEST_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function transportRequestContains(
+  rule: AuditRule,
+  path: string,
+  tokens: readonly string[],
+  message: string,
+): ReturnType<typeof pass> {
+  const missing = tokens.filter(
+    (token) => !transportRequestSource(path).includes(token),
+  );
+  return missing.length === 0
+    ? pass(rule, message, [path, ...tokens])
+    : fail(
+        rule,
+        message,
+        missing,
+        "Restore the deterministic TransportRequest contract.",
+      );
+}
+
+const TRANSPORT_REQUEST_FILES = [
+  "types.ts",
+  "errors.ts",
+  "validation.ts",
+  "support.ts",
+  "index.ts",
+].map((file) => `src/transport-request/${file}`);
+
+export const TRANSPORT_REQUEST_MODULE_RULE: AuditRule = transportRequestRule(
+  "AUDIT-203",
+  "TransportRequest module is present",
+  "V11.1 must expose declarative TransportRequest contracts and Core-only helpers.",
+  ["AUDIT-202"],
+  (rule) => {
+    const files = TRANSPORT_REQUEST_FILES.concat("src/core/transport-request.ts");
+    const missing = files.filter((path) => !existsSync(path));
+    return missing.length === 0
+      ? pass(rule, "TransportRequest module is present.", files)
+      : fail(
+          rule,
+          "TransportRequest module is incomplete.",
+          missing,
+          "Restore all V11.1 TransportRequest modules.",
+        );
+  },
+);
+
+export const TRANSPORT_REQUEST_DECLARATIVE_RULE: AuditRule =
+  transportRequestRule(
+    "AUDIT-204",
+    "TransportRequest contracts are declarative",
+    "TransportRequest must reference validated Provider, mapping, authorization, runtime, transport, capability, and policy evidence only.",
+    ["AUDIT-203"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/transport-request/types.ts",
+        [
+          "TransportRequestId",
+          "TransportRequest",
+          "TransportRequestStatus",
+          "TransportRequestValidation",
+          "TransportRequestMetadata",
+          "TransportRequestCapabilityReference",
+          "TransportRequestRuntimeReference",
+          "TransportRequestTransportReference",
+          "TransportRequestPolicyReference",
+          "TransportRequestSummary",
+          "TransportRequestResult",
+          "TransportRequestError",
+          "TransportRequestErrorCode",
+          "active: false",
+          "dispatchable: false",
+          "executable: false",
+          "validationRequired: true",
+          "executionStarted: false",
+        ],
+        "TransportRequest contracts are declarative.",
+      ),
+  );
+
+function noTransportRequestSurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return transportRequestRule(id, title, description, dependsOn, (rule) => {
+    const files = TRANSPORT_REQUEST_FILES.concat("src/core/transport-request.ts");
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(transportRequestSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep TransportRequest declarative and disconnected from execution.",
+        );
+  });
+}
+
+export const TRANSPORT_REQUEST_NO_EXECUTION_FIELDS_RULE: AuditRule =
+  noTransportRequestSurfaceRule(
+    "AUDIT-205",
+    "TransportRequest contains no execution fields",
+    "TransportRequest may not encode execution payloads or dispatch state.",
+    ["AUDIT-204"],
+    [
+      /\bexecute\s*:/,
+      /\bdispatch\s*:/,
+      /TransportAdapterRequest/,
+      /LocalProcessCommand/,
+      /LocalProcessExecutionPolicy/,
+      /TransportExecutionPolicy/,
+    ],
+  );
+
+export const TRANSPORT_REQUEST_NO_COMMAND_PROCESS_FILESYSTEM_RULE: AuditRule =
+  noTransportRequestSurfaceRule(
+    "AUDIT-206",
+    "TransportRequest contains no command, process, or filesystem fields",
+    "TransportRequest may not carry commands, arguments, process APIs, paths, environments, credentials, or filesystem discovery.",
+    ["AUDIT-205"],
+    [
+      /\bcommand\s*:/,
+      /\bargs\s*:/,
+      /\bargv\s*:/,
+      /\bstdin\s*:/,
+      /\bstdout\s*:/,
+      /\bstderr\s*:/,
+      /environment\s*:/,
+      /credentials?\s*:/,
+      /workingDirectory/,
+      /\bcwd\s*:/,
+      /timeoutMs/,
+      /executablePath/,
+      /binaryPath/,
+      /child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+      /realpathSync/,
+      /readdirSync/,
+    ],
+  );
+
+export const TRANSPORT_REQUEST_NO_NETWORK_RULE: AuditRule =
+  noTransportRequestSurfaceRule(
+    "AUDIT-207",
+    "TransportRequest contains no network surface",
+    "TransportRequest may not access the network or describe network execution.",
+    ["AUDIT-206"],
+    [/\bfetch\s*\(/, /node:(http|https|net|tls)/],
+  );
+
+export const TRANSPORT_REQUEST_RUNTIME_DISCONNECTED_RULE: AuditRule =
+  noTransportRequestSurfaceRule(
+    "AUDIT-208",
+    "TransportRequest is disconnected from Runtime execution",
+    "TransportRequest may reference Runtime identity contracts but may not consume RuntimeRequest, adapters, or implementations.",
+    ["AUDIT-207"],
+    [
+      /RuntimeRequest/,
+      /RuntimeAdapter/,
+      /RuntimeExecution/,
+      /LocalProcessRuntime/,
+      /executeRuntime/,
+      /resolveRuntime\s*\(/,
+      /from\s+["'][^"']*\/runtime\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const TRANSPORT_REQUEST_TRANSPORT_DISCONNECTED_RULE: AuditRule =
+  noTransportRequestSurfaceRule(
+    "AUDIT-209",
+    "TransportRequest is disconnected from Transport execution",
+    "TransportRequest may reference Transport identity contracts but may not consume adapters, selectors, or implementations.",
+    ["AUDIT-208"],
+    [
+      /TransportAdapter/,
+      /TransportResult/,
+      /TransportExecution/,
+      /selectTransport/,
+      /resolveTransport\s*\(/,
+      /executeTransport/,
+      /from\s+["'][^"']*\/transports\/(local-process|registry|selector)/,
+    ],
   );
