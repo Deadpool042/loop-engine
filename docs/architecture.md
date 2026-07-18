@@ -56,3 +56,9 @@ V11.0 établit le RFC normatif d'exécution. V11.1 ajoute le contrat
 et non exécutable entre l'autorisation et une future frontière de transport.
 Voir `docs/architecture/rfc-execution-architecture-v11.md` et
 `docs/architecture/transport-request.md`.
+
+V11.2 ajoute `TransportRequestBuilder`, unique mécanisme supporté pour produire
+une `TransportRequest` depuis un `ProviderExecutionPlan` et une
+`AuthorizationConfiguration`. Le builder reste pur, déterministe, sans Runtime,
+sans Transport et sans payload exécutable. Voir
+`docs/architecture/transport-request-builder.md`.

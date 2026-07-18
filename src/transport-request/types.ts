@@ -6,10 +6,7 @@ import type {
   AgentCapability,
   AgentProvider,
 } from "../agents/types.js";
-import type {
-  AuthorizationConfigurationId,
-  AuthorizationConfigurationResult,
-} from "../authorization/types.js";
+import type { AuthorizationConfigurationId } from "../authorization/types.js";
 import type { ExecutableMappingId } from "../providers/mapping/types.js";
 import type { ProviderId, ProviderMetadata } from "../providers/types.js";
 import type { CapabilityId, PolicyId } from "../policy/types.js";
@@ -137,16 +134,6 @@ export type TransportRequestResult = Readonly<{
   metadata: TransportRequestMetadata;
   error: TransportRequestError;
   executionStarted: false;
-}>;
-
-export type TransportRequestCreationOptions = Readonly<{
-  id?: TransportRequestId;
-  metadata?: TransportRequestMetadata;
-}>;
-
-export type TransportRequestSource = Readonly<{
-  configurationResult: AuthorizationConfigurationResult;
-  options?: TransportRequestCreationOptions;
 }>;
 
 export type TransportRequestCapability = AgentCapability;

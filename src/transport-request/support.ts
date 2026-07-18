@@ -1,12 +1,4 @@
-import type {
-  AuthorizationConfigurationResult,
-  AuthorizationConfigurationSummary,
-} from "../authorization/types.js";
-import type {
-  TransportRequest,
-  TransportRequestCreationOptions,
-  TransportRequestSummary,
-} from "./types.js";
+import type { TransportRequest, TransportRequestSummary } from "./types.js";
 
 export const OpenClawTransportRequestFixture: TransportRequest = Object.freeze({
   id: "transport-request.openclaw.plan",
@@ -39,15 +31,15 @@ export const OpenClawTransportRequestFixture: TransportRequest = Object.freeze({
   validationRequired: true,
 });
 
-function freezeDeep<T>(value: T): T {
+export function freezeTransportRequestValue<T>(value: T): T {
   if (value === null || typeof value !== "object") return value;
   for (const child of Object.values(value as Record<string, unknown>)) {
-    freezeDeep(child);
+    freezeTransportRequestValue(child);
   }
   return Object.freeze(value);
 }
 
-function metadataValue(
+export function readTransportRequestMetadataString(
   metadata: Readonly<Record<string, unknown>>,
   key: string,
 ): string | null {
@@ -71,69 +63,5 @@ export function summarizeTransportRequest(
     dispatchable: request.dispatchable,
     executable: request.executable,
     validationRequired: request.validationRequired,
-  });
-}
-
-function statusFromAuthorizationSummary(
-  summary: AuthorizationConfigurationSummary,
-): TransportRequest["status"] {
-  return summary.decisionAuthorized ? "validation_required" : "inactive";
-}
-
-export function createTransportRequestFromAuthorization(
-  configurationResult: AuthorizationConfigurationResult,
-  options: TransportRequestCreationOptions = {},
-): TransportRequest {
-  const evaluation = configurationResult.decision.evaluation;
-  const requirement = evaluation.policy;
-  const configurationId = configurationResult.configurationId;
-  const metadata = Object.freeze({
-    ...configurationResult.metadata,
-    ...options.metadata,
-  });
-  const requestId =
-    options.id ??
-    metadataValue(metadata, "transportRequestId") ??
-    metadataValue(metadata, "requestId") ??
-    "transport-request.openclaw.plan";
-
-  return freezeDeep({
-    id: requestId,
-    status: statusFromAuthorizationSummary(configurationResult.summary),
-    providerId: evaluation.providerPlan.providerId,
-    provider: evaluation.providerPlan.provider,
-    mapping: {
-      mappingId: configurationResult.summary.mappingCompatible
-        ? configurationResult.decision.evaluation.mapping!.id
-        : evaluation.mapping?.id ?? "openclaw-planning",
-    },
-    authorization: {
-      configurationId: configurationId ?? "openclaw-plan-review",
-      authorized: configurationResult.decision.status === "authorized",
-      reviewRequired: configurationResult.summary.reviewRequired,
-      executionStarted: false,
-    },
-    runtime: { runtimeId: evaluation.providerPlan.runtimeId },
-    transport: {
-      transportId:
-        evaluation.intent?.transportId ??
-        OpenClawTransportRequestFixture.transport.transportId,
-    },
-    capabilities:
-      configurationResult.decision.evaluation.policy.capabilitySet.capabilities.map(
-        (capabilityId) => ({
-          capabilityId,
-          source: "authorization_configuration" as const,
-        }),
-      ),
-    policy: {
-      policyId: requirement.id,
-      configurationId: configurationId ?? "openclaw-plan-review",
-    },
-    metadata,
-    active: false,
-    dispatchable: false,
-    executable: false,
-    validationRequired: true,
   });
 }

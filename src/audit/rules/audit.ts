@@ -920,7 +920,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("authorizationConfigurationRule(") ||
             ruleSource.includes("noAuthorizationConfigurationSurfaceRule(") ||
             ruleSource.includes("transportRequestRule(") ||
-            ruleSource.includes("noTransportRequestSurfaceRule(");
+            ruleSource.includes("noTransportRequestSurfaceRule(") ||
+            ruleSource.includes("transportRequestBuilderRule(") ||
+            ruleSource.includes("noTransportRequestBuilderSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -7399,4 +7401,242 @@ export const TRANSPORT_REQUEST_TRANSPORT_DISCONNECTED_RULE: AuditRule =
       /executeTransport/,
       /from\s+["'][^"']*\/transports\/(local-process|registry|selector)/,
     ],
+  );
+
+const TRANSPORT_REQUEST_BUILDER_FILES = [
+  "builder.ts",
+  "builder-errors.ts",
+  "builder-validation.ts",
+  "builder-support.ts",
+].map((file) => `src/transport-request/${file}`);
+
+function transportRequestBuilderRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...TRANSPORT_REQUEST_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function noTransportRequestBuilderSurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return transportRequestBuilderRule(
+    id,
+    title,
+    description,
+    dependsOn,
+    (rule) => {
+      const files = TRANSPORT_REQUEST_BUILDER_FILES.concat(
+        "src/core/transport-request-builder.ts",
+      );
+      const violations = files.flatMap((path) =>
+        patterns
+          .filter((pattern) => pattern.test(transportRequestSource(path)))
+          .map((pattern) => `${path}: ${pattern.source}`),
+      );
+      return violations.length === 0
+        ? pass(rule, title + ".", files)
+        : fail(
+            rule,
+            title + ".",
+            violations,
+            "Keep TransportRequestBuilder pure and disconnected from execution.",
+          );
+    },
+  );
+}
+
+export const TRANSPORT_REQUEST_BUILDER_SINGLE_FACTORY_RULE: AuditRule =
+  transportRequestBuilderRule(
+    "AUDIT-210",
+    "Single TransportRequestBuilder exists",
+    "V11.2 must expose one builder module as the supported ProviderExecutionPlan to TransportRequest factory.",
+    ["AUDIT-209"],
+    (rule) => {
+      const files = TRANSPORT_REQUEST_BUILDER_FILES.concat(
+        "src/core/transport-request-builder.ts",
+      );
+      const missing = files.filter((path) => !existsSync(path));
+      if (missing.length > 0) {
+        return fail(
+          rule,
+          "TransportRequestBuilder module is incomplete.",
+          missing,
+          "Restore all V11.2 builder files.",
+        );
+      }
+      return transportRequestContains(
+        rule,
+        "src/transport-request/builder.ts",
+        [
+          "TransportRequestBuilder",
+          "TransportRequestBuilderResult",
+          "TransportRequestBuilderError",
+          "TransportRequestBuilderErrorCode",
+          "TransportRequestBuilderValidation",
+          "TransportRequestBuilderSummary",
+          "export const buildTransportRequest",
+        ],
+        "Single TransportRequestBuilder exists.",
+      );
+    },
+  );
+
+export const TRANSPORT_REQUEST_BUILDER_PURE_RULE: AuditRule =
+  transportRequestBuilderRule(
+    "AUDIT-211",
+    "TransportRequestBuilder is pure and deterministic",
+    "The builder must validate references and return structured data without resolving registries or invoking adapters.",
+    ["AUDIT-210"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/transport-request/builder-validation.ts",
+        [
+          "validateTransportRequestBuild",
+          "builder_invalid_plan",
+          "builder_invalid_authorization",
+          "builder_invalid_mapping",
+          "builder_invalid_intent",
+          "builder_invalid_runtime_reference",
+          "builder_invalid_transport_reference",
+          "builder_invalid_capability_reference",
+        ],
+        "TransportRequestBuilder validation is pure and deterministic.",
+      ),
+  );
+
+export const TRANSPORT_REQUEST_BUILDER_NO_RUNTIME_RULE: AuditRule =
+  noTransportRequestBuilderSurfaceRule(
+    "AUDIT-212",
+    "TransportRequestBuilder has no Runtime dependency",
+    "Builder code may reference Runtime identities through contracts only and must not consume RuntimeRequest or implementations.",
+    ["AUDIT-211"],
+    [
+      /RuntimeRequest/,
+      /RuntimeAdapter/,
+      /RuntimeExecution/,
+      /LocalProcessRuntime/,
+      /resolveRuntime/,
+      /executeRuntime/,
+      /from\s+["'][^"']*\/runtime\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const TRANSPORT_REQUEST_BUILDER_NO_TRANSPORT_RULE: AuditRule =
+  noTransportRequestBuilderSurfaceRule(
+    "AUDIT-213",
+    "TransportRequestBuilder has no Transport dependency",
+    "Builder code may reference Transport identity contracts only and must not consume adapters, selectors, results, or adapter requests.",
+    ["AUDIT-212"],
+    [
+      /TransportAdapterRequest/,
+      /TransportAdapter/,
+      /TransportResult/,
+      /TransportExecution/,
+      /selectTransport/,
+      /resolveTransport\s*\(/,
+      /executeTransport/,
+      /from\s+["'][^"']*\/transports\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const TRANSPORT_REQUEST_BUILDER_NO_PROCESS_RULE: AuditRule =
+  noTransportRequestBuilderSurfaceRule(
+    "AUDIT-214",
+    "TransportRequestBuilder has no process APIs",
+    "Builder code may not import process APIs, read environment, touch filesystem, or access the network.",
+    ["AUDIT-213"],
+    [
+      /child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+      /\bfetch\s*\(/,
+      /node:(http|https|net|tls|fs)/,
+      /readFileSync/,
+      /readdirSync/,
+      /realpathSync/,
+    ],
+  );
+
+export const TRANSPORT_REQUEST_BUILDER_NO_COMMAND_RULE: AuditRule =
+  noTransportRequestBuilderSurfaceRule(
+    "AUDIT-215",
+    "TransportRequestBuilder has no command fields",
+    "Builder code may not create commands, arguments, binary paths, environments, credentials, or execution options.",
+    ["AUDIT-214"],
+    [
+      /\bcommand\s*:/,
+      /\bargs\s*:/,
+      /\bargv\s*:/,
+      /\bstdin\s*:/,
+      /\bstdout\s*:/,
+      /\bstderr\s*:/,
+      /environment\s*:/,
+      /credentials?\s*:/,
+      /workingDirectory/,
+      /\bcwd\s*:/,
+      /timeoutMs/,
+      /executablePath/,
+      /binaryPath/,
+      /LocalProcessCommand/,
+      /LocalProcessExecutionPolicy/,
+    ],
+  );
+
+export const TRANSPORT_REQUEST_BUILDER_NO_EXECUTION_RULE: AuditRule =
+  noTransportRequestBuilderSurfaceRule(
+    "AUDIT-216",
+    "TransportRequestBuilder has no execution",
+    "Builder code may not create adapter requests, dispatch requests, or cross the execution boundary.",
+    ["AUDIT-215"],
+    [
+      /TransportAdapterRequest/,
+      /createTransportAdapterRequest/,
+      /executeTransport/,
+      /executeProviderPlan/,
+      /executeRuntime/,
+      /\bdispatch\s*:/,
+      /\bexecute\s*:/,
+    ],
+  );
+
+export const TRANSPORT_REQUEST_BUILDER_IMMUTABLE_OUTPUT_RULE: AuditRule =
+  transportRequestBuilderRule(
+    "AUDIT-217",
+    "TransportRequestBuilder returns immutable TransportRequest output",
+    "The builder must recursively freeze the TransportRequest and preserve non-execution status.",
+    ["AUDIT-216"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/transport-request/builder-support.ts",
+        [
+          "freezeTransportRequestValue",
+          'status: "validation_required"',
+          "active: false",
+          "dispatchable: false",
+          "executable: false",
+          "validationRequired: true",
+        ],
+        "TransportRequestBuilder returns immutable TransportRequest output.",
+      ),
   );

@@ -26,7 +26,7 @@ structurée au `LocalProcessRuntime` existant.
 
 ```text
 ProviderExecutionPlan (ready + transportIntent)
-  -> createTransportRequest(...)
+  -> createTransportAdapterRequest(...)
   -> resolveTransport(...)
   -> executeTransport(...)
   -> LocalProcessRuntime (V10.1 guarded backend)
@@ -43,7 +43,7 @@ démarrage de processus.
 
 ## Contrats
 
-`TransportRequest` porte uniquement des champs structurés : identifiant de
+`TransportAdapterRequest` porte uniquement des champs structurés : identifiant de
 transport, identité Provider/Runtime, capacités requises, exécutable absolu,
 vecteur d’arguments, répertoire de travail, limites de ressources, politique
 locale existante, politique Transport explicite et métadonnées. Il n’accepte
@@ -101,3 +101,7 @@ V10.7 ajoute une décision de capacité et de politique en amont de cette
 frontière. Le `TransportAdapter` reste totalement inconscient de ce moteur :
 aucune décision ne devient une requête ou une exécution Transport. Voir
 `capability-policy-engine.md`.
+
+V11.1 réserve le nom `TransportRequest` au contrat déclaratif placé avant cette
+couche. Le payload exécutable historique consommé par `TransportAdapter` est
+nommé `TransportAdapterRequest`.

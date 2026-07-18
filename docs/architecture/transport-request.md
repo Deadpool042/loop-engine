@@ -23,7 +23,9 @@ The lifecycle remains declarative:
 
 ```mermaid
 flowchart TD
-  Authorization[AuthorizationConfigurationResult] --> Request[TransportRequest]
+  Plan[ProviderExecutionPlan] --> Builder[TransportRequestBuilder]
+  Authorization[AuthorizationConfiguration] --> Builder
+  Builder --> Request[TransportRequest]
   Request --> Validation[TransportRequest validation]
   Validation --> Result[TransportRequestResult]
   Result --> Stop[No execution]
@@ -33,6 +35,10 @@ flowchart TD
 transport boundary. V11.1 stops at validation. It does not dispatch to a
 `TransportAdapter`, does not call a Runtime, and does not create a backend
 operation.
+
+As of V11.2, `TransportRequestBuilder` is the sole supported factory for
+creating a `TransportRequest` from a `ProviderExecutionPlan`. See
+`docs/architecture/transport-request-builder.md`.
 
 ## References
 
