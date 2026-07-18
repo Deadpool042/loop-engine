@@ -88,6 +88,10 @@ Ces modules restent petits et déterministes.
 
 Les adaptateurs futurs doivent consommer `core/index.ts`, sans importer
 directement `audit/`, `loop/`, `intelligence/`, `policy/` ou `context/`.
+La couche [`runtime`](runtime-abstraction.md) reste elle aussi derrière ce
+façcade : elle ne change aucune sortie CLI. Depuis V10.1, son unique backend
+réel `local-process` reste accessible seulement par un appel Core explicite et
+gardé ; il n'est relié ni au routeur CLI ni au LoopRunner.
 
 ---
 

@@ -10,6 +10,8 @@ Loop Engine est un orchestrateur local, sobre et déterministe.
 - Pas de push automatique.
 - Les appels IA doivent être explicites.
 - Les validations locales passent avant toute revue IA.
+- Aucun processus local ne s'exécute par défaut : le backend interne
+  `local-process` exige une autorisation explicite par l'API Core.
 
 ## Responsabilités
 
@@ -33,3 +35,9 @@ Loop Engine ne doit pas :
 Automatiser le déterministe.
 Limiter l'IA au jugement.
 Garder l'humain sur les décisions.
+
+## Runtime interne
+
+La couche `src/runtime/` est derrière `src/core/`. V10.0 définit ses contrats
+et stubs ; V10.1 y ajoute un backend local gardé, sans nouvelle commande CLI ni
+mode `execute` public. Voir `docs/architecture/runtime-abstraction.md`.

@@ -14,6 +14,14 @@ Une commande publique ne doit pas accéder directement à Git, aux docs ou à la
 
 Elle doit consommer `ProjectSnapshot`.
 
+### Runtime local gardé (V10.1)
+
+Le backend interne `local-process` doit rester absent de la CLI et du
+LoopRunner. Les règles `AUDIT-079` à `AUDIT-090` vérifient son enregistrement,
+l'absence de shell et d'API `exec`, les doubles permissions explicites, le
+confinement canonique, les limites de ressources, le contrat d'erreur, les
+événements structurés et l'absence de réseau.
+
 ## Duplication
 
 ### DUP-001
