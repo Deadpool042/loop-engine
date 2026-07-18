@@ -224,3 +224,55 @@ Si `--profile` reçoit un profil inconnu, la commande échoue avec `Invalid audi
 Si `--profile` est fourni sans valeur, la commande échoue avec `Invalid audit profile: <missing>`.
 
 Ces erreurs retournent un code de sortie non nul.
+
+## Rapports d’exécution
+
+Loop Engine produit deux formats complémentaires de rapport d’exécution.
+
+```text
+report.json
+report.md
+```
+
+### Rapport JSON
+
+Le fichier `report.json` constitue le contrat public destiné aux outils et aux intégrations.
+
+Il expose notamment :
+
+- `schemaVersion`
+- `summary`
+- `steps`
+
+Les consommateurs doivent ignorer les champs inconnus afin de permettre des extensions additives.
+
+### Rapport Markdown
+
+Le fichier `report.md` constitue la représentation destinée aux humains.
+
+Il reprend les mêmes informations que le rapport JSON dans un format lisible.
+
+Les deux rapports sont générés à partir du même modèle d'exécution et doivent rester cohérents.
+
+### Golden fixtures
+
+Les fixtures de référence sont conservées dans :
+
+```text
+tests/fixtures/reports/report.json
+tests/fixtures/reports/report.md
+```
+
+Elles peuvent être régénérées avec :
+
+```bash
+pnpm run reports:fixtures
+```
+
+Toute évolution volontaire du contrat doit être visible dans le diff Git.
+
+La documentation complète du contrat est disponible dans :
+
+```text
+docs/architecture/execution-reporting.md
+```
