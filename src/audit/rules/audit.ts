@@ -933,7 +933,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("dispatchDescriptorRule(") ||
             ruleSource.includes("noDispatchDescriptorSurfaceRule(") ||
             ruleSource.includes("boundaryHandoffRule(") ||
-            ruleSource.includes("noBoundaryHandoffSurfaceRule(");
+            ruleSource.includes("noBoundaryHandoffSurfaceRule(") ||
+            ruleSource.includes("executionBoundaryRfcRule(") ||
+            ruleSource.includes("noExecutionBoundaryRfcSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9107,5 +9109,282 @@ export const BOUNDARY_HANDOFF_DEFAULT_DENY_RULE: AuditRule =
           "executionStarted: false",
         ],
         "BoundaryHandoff defaults to deny.",
+      ),
+  );
+
+const EXECUTION_BOUNDARY_RFC_FILES = [
+  "types.ts",
+  "errors.ts",
+  "validation.ts",
+  "evaluation.ts",
+  "support.ts",
+  "index.ts",
+].map((file) => `src/boundary/rfc/${file}`);
+
+const EXECUTION_BOUNDARY_RFC_AUDIT_METADATA = {
+  introducedIn: "V12.4",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function executionBoundaryRfcRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...EXECUTION_BOUNDARY_RFC_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function noExecutionBoundaryRfcSurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return executionBoundaryRfcRule(id, title, description, dependsOn, (rule) => {
+    const files = EXECUTION_BOUNDARY_RFC_FILES.concat(
+      "src/core/boundary-rfc.ts",
+    );
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(transportRequestSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep ExecutionBoundaryRFC declarative, inert, and disconnected from executable layers.",
+        );
+  });
+}
+
+export const EXECUTION_BOUNDARY_RFC_MODULE_RULE: AuditRule =
+  executionBoundaryRfcRule(
+    "AUDIT-274",
+    "ExecutionBoundaryRFC module exists",
+    "V12.4 must expose a dedicated execution boundary RFC module and Core integration point.",
+    ["AUDIT-273"],
+    (rule) => {
+      const files = EXECUTION_BOUNDARY_RFC_FILES.concat(
+        "src/core/boundary-rfc.ts",
+      );
+      const missing = files.filter((path) => !existsSync(path));
+      return missing.length === 0
+        ? pass(rule, "ExecutionBoundaryRFC module exists.", files)
+        : fail(
+            rule,
+            "ExecutionBoundaryRFC module files are missing.",
+            missing,
+            "Restore the V12.4 execution boundary RFC contracts and Core integration.",
+          );
+    },
+  );
+
+export const EXECUTION_BOUNDARY_RFC_IMMUTABLE_CONTRACT_RULE: AuditRule =
+  executionBoundaryRfcRule(
+    "AUDIT-275",
+    "ExecutionBoundaryRFC contracts are immutable",
+    "ExecutionBoundaryRFC must expose readonly contracts for invariants, requirements, constraints, evidence, validation, summary, result, evaluation, errors, and builder.",
+    ["AUDIT-274"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/boundary/rfc/types.ts",
+        [
+          "ExecutionBoundaryId",
+          "ExecutionBoundaryRFC",
+          "ExecutionBoundaryInvariant",
+          "ExecutionBoundaryRequirement",
+          "ExecutionBoundaryConstraint",
+          "ExecutionBoundaryValidation",
+          "ExecutionBoundaryEvidence",
+          "ExecutionBoundarySummary",
+          "ExecutionBoundaryResult",
+          "ExecutionBoundaryEvaluation",
+          "ExecutionBoundaryStatus",
+          "ExecutionBoundaryError",
+          "ExecutionBoundaryErrorCode",
+          "ExecutionBoundaryBuilder",
+          "Readonly",
+          "executionStarted: false",
+        ],
+        "ExecutionBoundaryRFC contracts are immutable.",
+      ),
+  );
+
+export const EXECUTION_BOUNDARY_RFC_PURE_BUILDER_RULE: AuditRule =
+  executionBoundaryRfcRule(
+    "AUDIT-276",
+    "ExecutionBoundaryRFC builder is pure",
+    "The RFC builder must be a deterministic function over BoundaryHandoffResult only.",
+    ["AUDIT-275"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/boundary/rfc/evaluation.ts",
+        [
+          "ExecutionBoundaryBuilder",
+          "export const createExecutionBoundaryRFC",
+          "BoundaryHandoffResult",
+        ],
+        "ExecutionBoundaryRFC builder is pure.",
+      ),
+  );
+
+export const EXECUTION_BOUNDARY_RFC_DETERMINISTIC_VALIDATION_RULE: AuditRule =
+  executionBoundaryRfcRule(
+    "AUDIT-277",
+    "ExecutionBoundaryRFC validation is deterministic",
+    "Validation must inspect declarative handoff evidence and RFC invariants without side effects.",
+    ["AUDIT-276"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/boundary/rfc/validation.ts",
+        [
+          "validateExecutionBoundaryInput",
+          "validateExecutionBoundaryRFC",
+          "boundary_invariant_failed",
+          "boundary_evidence_missing",
+          "boundary_not_ready",
+        ],
+        "ExecutionBoundaryRFC validation is deterministic.",
+      ),
+  );
+
+export const EXECUTION_BOUNDARY_RFC_NO_RUNTIME_RULE: AuditRule =
+  noExecutionBoundaryRfcSurfaceRule(
+    "AUDIT-278",
+    "ExecutionBoundaryRFC has no Runtime dependency",
+    "ExecutionBoundaryRFC may reference runtime contract versions but must not consume Runtime implementations.",
+    ["AUDIT-277"],
+    [
+      /RuntimeAdapter/,
+      /LocalProcessRuntime/,
+      /executeRuntime/,
+      /resolveRuntime/,
+      /from\s+["'][^"']*\/runtime\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const EXECUTION_BOUNDARY_RFC_NO_TRANSPORT_RULE: AuditRule =
+  noExecutionBoundaryRfcSurfaceRule(
+    "AUDIT-279",
+    "ExecutionBoundaryRFC has no Transport dependency",
+    "ExecutionBoundaryRFC may reference transport contract versions but must not consume Transport implementations.",
+    ["AUDIT-278"],
+    [
+      /TransportAdapter/,
+      /TransportResult/,
+      /executeTransport/,
+      /selectTransport/,
+      /resolveTransport/,
+      /from\s+["'][^"']*\/transports\/(local-process|registry|selector)/,
+    ],
+  );
+
+export const EXECUTION_BOUNDARY_RFC_NO_RUNTIME_REQUEST_RULE: AuditRule =
+  noExecutionBoundaryRfcSurfaceRule(
+    "AUDIT-280",
+    "ExecutionBoundaryRFC creates no RuntimeRequest",
+    "ExecutionBoundaryRFC must not materialize a runtime request.",
+    ["AUDIT-279"],
+    [/RuntimeRequest/, /createRuntimeRequest/],
+  );
+
+export const EXECUTION_BOUNDARY_RFC_NO_TRANSPORT_REQUEST_RULE: AuditRule =
+  noExecutionBoundaryRfcSurfaceRule(
+    "AUDIT-281",
+    "ExecutionBoundaryRFC creates no TransportRequest",
+    "ExecutionBoundaryRFC must not materialize a transport request.",
+    ["AUDIT-280"],
+    [/TransportRequest/, /createTransportRequest/],
+  );
+
+export const EXECUTION_BOUNDARY_RFC_NO_ADAPTER_REQUEST_RULE: AuditRule =
+  noExecutionBoundaryRfcSurfaceRule(
+    "AUDIT-282",
+    "ExecutionBoundaryRFC creates no TransportAdapterRequest",
+    "ExecutionBoundaryRFC must not materialize an adapter request.",
+    ["AUDIT-281"],
+    [/TransportAdapterRequest/, /createTransportAdapterRequest/],
+  );
+
+export const EXECUTION_BOUNDARY_RFC_NO_EXECUTION_RULE: AuditRule =
+  noExecutionBoundaryRfcSurfaceRule(
+    "AUDIT-283",
+    "ExecutionBoundaryRFC has no execution",
+    "ExecutionBoundaryRFC must not execute, spawn processes, access process state, read filesystem state, or access the network.",
+    ["AUDIT-282"],
+    [
+      /child_process/,
+      /node:child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+      /node:fs/,
+      /readFileSync/,
+      /writeFileSync/,
+      /\bfetch\s*\(/,
+      /node:(http|https|net|tls)/,
+    ],
+  );
+
+export const EXECUTION_BOUNDARY_RFC_NO_DISPATCH_RULE: AuditRule =
+  noExecutionBoundaryRfcSurfaceRule(
+    "AUDIT-284",
+    "ExecutionBoundaryRFC performs no dispatch",
+    "ExecutionBoundaryRFC must keep the boundary unsatisfied, crossing denied, non-dispatchable, and non-executable.",
+    ["AUDIT-283"],
+    [
+      /boundarySatisfied:\s*true/,
+      /crossingAllowed:\s*true/,
+      /dispatchable:\s*true/,
+      /executable:\s*true/,
+      /executeTransport/,
+      /executeRuntime/,
+      /executeProvider/,
+    ],
+  );
+
+export const EXECUTION_BOUNDARY_RFC_INVARIANT_FAMILIES_RULE: AuditRule =
+  executionBoundaryRfcRule(
+    "AUDIT-285",
+    "ExecutionBoundaryRFC invariant families are complete",
+    "The RFC contract must model authority, eligibility, descriptor, boundary, evidence, policy, review, configuration, transport isolation, and runtime isolation invariants.",
+    ["AUDIT-284"],
+    (rule) =>
+      transportRequestContains(
+        rule,
+        "src/boundary/rfc/types.ts",
+        [
+          "authority",
+          "eligibility",
+          "descriptor",
+          "boundary",
+          "evidence",
+          "policy",
+          "review",
+          "configuration",
+          "transport_isolation",
+          "runtime_isolation",
+        ],
+        "ExecutionBoundaryRFC invariant families are complete.",
       ),
   );

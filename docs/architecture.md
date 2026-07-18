@@ -106,3 +106,10 @@ V12.3 ajoute `BoundaryHandoff`, contrat immuable qui enveloppe le
 avant une future frontière d'exécution. Il reste inactif, non accepté, non
 dispatchable et non exécutable, sans Runtime, Transport, Provider ni payload
 opérationnel. Voir `docs/architecture/boundary-handoff.md`.
+
+V12.4 ajoute `ExecutionBoundaryRFC`, contrat immuable qui formalise les
+invariants à satisfaire avant qu'un futur handoff puisse seulement être
+considéré pour une frontière opérationnelle. Il reste un catalogue de
+contraintes et de preuves : aucun `TransportAdapterRequest`, aucune exécution
+et aucun dispatch ne sont créés. Voir
+`docs/architecture/execution-boundary-rfc.md`.
