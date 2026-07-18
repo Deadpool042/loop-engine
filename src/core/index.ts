@@ -1,6 +1,7 @@
 /** Stable internal integration boundary for CLI and future adapters. */
 export * from "./audit.js";
 export * from "./loop.js";
+export * from "./runtime.js";
 export * from "./reports.js";
 export * from "./types.js";
 
