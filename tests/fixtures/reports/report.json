@@ -16,7 +16,10 @@
       "startedAt": "2026-01-01T10:00:00Z",
       "completedAt": "2026-01-01T10:00:10Z",
       "detailCount": 2,
-      "details": ["candidate selected", "roadmap generated"]
+      "details": [
+        "candidate selected",
+        "roadmap generated"
+      ]
     }
   ]
 }
