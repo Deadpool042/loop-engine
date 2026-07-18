@@ -38,6 +38,13 @@ Provider, délégation exclusive au backend local-process, absence de duplicatio
 de processus/réseau/secrets, normalisation des résultats et absence
 d’exposition CLI ou LoopRunner.
 
+### Protocole OpenClaw interne (V10.4)
+
+Les règles `AUDIT-123` à `AUDIT-145` vérifient le schéma interne OpenClaw :
+versions et opérations statiques, normalisation/validation pure, diagnostics et
+erreurs structurés, absence de mapping exécutable, frontières Provider/Runtime/
+Transport/CLI/LoopRunner et absence d’I/O, de secrets ou de commandes inventées.
+
 ## Duplication
 
 ### DUP-001

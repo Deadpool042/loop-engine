@@ -4,6 +4,10 @@ import {
   normalizeProviderResult,
   createUnsupportedProviderPlan,
 } from "./errors.js";
+import {
+  createOpenClawProtocolPlan,
+  normalizeOpenClawRequest,
+} from "./openclaw/index.js";
 import { isProviderAllowed } from "./support.js";
 import type {
   ProviderAdapter,
@@ -26,15 +30,43 @@ export const OpenClawProviderAdapter: ProviderAdapter = {
   runtimeId: "openclaw",
   capabilities: [],
   supports: supportsOpenClaw,
-  prepare: (request) =>
-    supportsOpenClaw(request)
+  prepare: (request) => {
+    if (!supportsOpenClaw(request)) {
+      return createUnsupportedProviderPlan(
+        "openclaw",
+        "local",
+        "openclaw",
+        request.runtimeRequest.resolvedAgentPolicy.requirements
+          .requiredPermissions,
+        request.metadata,
+        createProviderError(
+          "provider_not_supported",
+          "Provider openclaw does not support the normalized request.",
+        ),
+      );
+    }
+
+    const protocol = createOpenClawProtocolPlan(
+      normalizeOpenClawRequest(request),
+    );
+    const metadata = {
+      ...request.metadata,
+      openclawProtocol: {
+        version: protocol.request.protocolVersion,
+        operation: protocol.request.operation,
+        status: protocol.status,
+        executable: protocol.executionIntent.executable,
+        errorCode: protocol.error.code,
+      },
+    };
+    const base = protocol.validation.valid
       ? createNotImplementedProviderPlan(
           "openclaw",
           "local",
           "openclaw",
           request.runtimeRequest.resolvedAgentPolicy.requirements
             .requiredPermissions,
-          request.metadata,
+          metadata,
         )
       : createUnsupportedProviderPlan(
           "openclaw",
@@ -42,12 +74,18 @@ export const OpenClawProviderAdapter: ProviderAdapter = {
           "openclaw",
           request.runtimeRequest.resolvedAgentPolicy.requirements
             .requiredPermissions,
-          request.metadata,
+          metadata,
           createProviderError(
-            "provider_not_supported",
-            "Provider openclaw does not support the normalized request.",
+            "invalid_provider_request",
+            "OpenClaw protocol request is invalid.",
           ),
-        ),
+        );
+
+    return {
+      ...base,
+      diagnostics: [...base.diagnostics, ...protocol.diagnostics],
+    };
+  },
   normalize: (result): ProviderResult =>
     normalizeProviderResult("openclaw", "openclaw", result),
 };

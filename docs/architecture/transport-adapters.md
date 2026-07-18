@@ -83,3 +83,7 @@ simples points d’extension futurs : ils ne sont ni enregistrés ni implément�
 V10.3 n’implémente aucune exécution OpenClaw, Claude Code, Codex ou Gemini, ni
 credentials, protocole de CLI fournisseur, retry, streaming ou comptabilité de
 tokens.
+
+V10.4 définit seulement un protocole Provider OpenClaw interne. Les plans issus
+de ce protocole restent non exécutables et n’atteignent pas cette couche. Voir
+`openclaw-provider-protocol.md`.

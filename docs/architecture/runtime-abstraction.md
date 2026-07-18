@@ -28,6 +28,9 @@ adaptateurs Provider construisent des plans inertes et ne remplacent pas
 le backend `local-process`, par un appel Core explicite. Voir
 `provider-adapters.md` et `transport-adapters.md`.
 
+V10.4 ajoute sous Provider un schéma interne OpenClaw, sans dépendance Runtime
+et sans exécution. Les plans restent non exécutables faute de mapping documenté.
+
 ## Contrats
 
 `RuntimeRequest` réutilise les modèles existants : `RoadmapCandidate`,

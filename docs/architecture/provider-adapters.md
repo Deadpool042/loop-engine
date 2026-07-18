@@ -74,3 +74,12 @@ exiger la sélection explicite Runtime/Provider, l'autorisation de politique,
 l'activation du backend, l'allow-list d'exécutables et les limites de ressources.
 V10.2 n'implémente ni OpenClaw, ni Claude Code, ni Codex, ni Gemini, ni un mode
 public `execute`.
+
+## Protocole OpenClaw interne (V10.4)
+
+V10.4 ajoute sous `src/providers/openclaw/` un schéma interne de planification
+OpenClaw. Il ne décrit aucun protocole fournisseur officiel ni commande. Son
+unique opération abstraite `plan` est validée de façon pure puis reste
+`valid_non_executable`, faute de mapping exécutable documenté. L’adaptateur
+OpenClaw garde donc son plan Provider `not_implemented`, sans `transportIntent`.
+Voir `openclaw-provider-protocol.md`.

@@ -139,6 +139,7 @@ Voir aussi :
 - `docs/architecture/runtime-abstraction.md`
 - `docs/architecture/provider-adapters.md`
 - `docs/architecture/transport-adapters.md`
+- `docs/architecture/openclaw-provider-protocol.md`
 
 ## Audit et CI
 

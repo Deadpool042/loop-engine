@@ -46,3 +46,7 @@ seule frontière qui peut déléguer explicitement au backend `local-process`.
 Voir `docs/architecture/runtime-abstraction.md`,
 `docs/architecture/provider-adapters.md` et
 `docs/architecture/transport-adapters.md`.
+
+V10.4 ajoute un protocole de planification OpenClaw sous `src/providers/`, sans
+mapping exécutable et sans changement CLI. Voir
+`docs/architecture/openclaw-provider-protocol.md`.

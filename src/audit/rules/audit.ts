@@ -908,6 +908,10 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
           const start = match.index ?? 0;
           const nextStart = exports[index + 1]?.index ?? content.length;
           const ruleSource = content.slice(start, nextStart);
+          const isFactoryRule =
+            ruleSource.includes("openClawProtocolRule(") ||
+            ruleSource.includes("noOpenClawProtocolIoRule(");
+          if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
             ruleSource.includes("description:") ? "" : "description",
@@ -5225,3 +5229,587 @@ export const TRANSPORT_CORE_EXECUTION_BOUNDARY_RULE: AuditRule = {
       "Keep the execution chain explicit and available only through Core helpers.",
     ),
 };
+
+function openClawProtocolSource(path: string): string {
+  return existsSync(path) ? readFileSync(path, "utf8") : "";
+}
+
+const OPENCLAW_PROTOCOL_AUDIT_METADATA = {
+  introducedIn: "V10.4",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function openClawProtocolRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...OPENCLAW_PROTOCOL_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function protocolContains(
+  rule: AuditRule,
+  path: string,
+  tokens: readonly string[],
+  message: string,
+): ReturnType<typeof pass> {
+  const source = openClawProtocolSource(path);
+  const missing = tokens.filter((token) => !source.includes(token));
+  return missing.length === 0
+    ? pass(rule, message, [path, ...tokens])
+    : fail(
+        rule,
+        message,
+        missing,
+        "Restore the required deterministic OpenClaw protocol contract.",
+      );
+}
+
+export const OPENCLAW_PROTOCOL_MODULE_RULE: AuditRule = openClawProtocolRule(
+  "AUDIT-123",
+  "OpenClaw protocol module is present",
+  "V10.4 must provide internal OpenClaw protocol types, registry, normalization, validation, diagnostics, and planning.",
+  ["AUDIT-122"],
+  (rule) => {
+    const files = [
+      "src/providers/openclaw/types.ts",
+      "src/providers/openclaw/protocol.ts",
+      "src/providers/openclaw/normalization.ts",
+      "src/providers/openclaw/validation.ts",
+      "src/providers/openclaw/diagnostics.ts",
+      "src/providers/openclaw/planning.ts",
+    ];
+    const missing = files.filter((path) => !existsSync(path));
+    return missing.length === 0
+      ? pass(rule, "OpenClaw protocol module is present.", files)
+      : fail(
+          rule,
+          "OpenClaw protocol module is incomplete.",
+          missing,
+          "Restore all V10.4 OpenClaw protocol modules.",
+        );
+  },
+);
+
+export const OPENCLAW_PROTOCOL_VERSION_RULE: AuditRule = openClawProtocolRule(
+  "AUDIT-124",
+  "OpenClaw protocol versions are typed and static",
+  "The internal planning schema must declare supported versions without environment or binary negotiation.",
+  ["AUDIT-123"],
+  (rule) =>
+    protocolContains(
+      rule,
+      "src/providers/openclaw/types.ts",
+      [
+        "OPENCLAW_PROTOCOL_VERSIONS",
+        "OpenClawProtocolVersion",
+        "loop-engine-openclaw-planning/v1",
+      ],
+      "OpenClaw protocol versions are typed and static.",
+    ),
+);
+
+export const OPENCLAW_PROTOCOL_OPERATION_RULE: AuditRule = openClawProtocolRule(
+  "AUDIT-125",
+  "OpenClaw operations are typed and static",
+  "Only a closed abstract operation registry justified by Loop Engine planning may be accepted.",
+  ["AUDIT-124"],
+  (rule) =>
+    protocolContains(
+      rule,
+      "src/providers/openclaw/protocol.ts",
+      ["OPENCLAW_OPERATION_REGISTRY", 'operation: "plan"', "executable: false"],
+      "OpenClaw operations are typed and static.",
+    ),
+);
+
+export const OPENCLAW_PROTOCOL_NORMALIZATION_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-126",
+    "OpenClaw request normalization is deterministic",
+    "Normalization must derive a safe envelope from ProviderRequest without task content, process discovery, or timestamps.",
+    ["AUDIT-125"],
+    (rule) =>
+      protocolContains(
+        rule,
+        "src/providers/openclaw/normalization.ts",
+        [
+          "normalizeOpenClawRequest",
+          "taskId",
+          "correlationId",
+          "Object.freeze",
+        ],
+        "OpenClaw request normalization is deterministic.",
+      ),
+  );
+
+export const OPENCLAW_PROTOCOL_VALIDATION_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-127",
+    "OpenClaw protocol validation is pure and structured",
+    "Validation must check versions, operations, identity, context, capabilities, permissions, runtime, and transport compatibility without throwing expected errors.",
+    ["AUDIT-126"],
+    (rule) =>
+      protocolContains(
+        rule,
+        "src/providers/openclaw/validation.ts",
+        [
+          "validateOpenClawProtocolRequest",
+          "OPENCLAW_PROTOCOL_VERSIONS",
+          "OPENCLAW_OPERATION_REGISTRY",
+          "openclaw_context_invalid",
+          "openclaw_permission_denied",
+        ],
+        "OpenClaw protocol validation is pure and structured.",
+      ),
+  );
+
+export const OPENCLAW_PROTOCOL_ERROR_RULE: AuditRule = openClawProtocolRule(
+  "AUDIT-128",
+  "OpenClaw protocol errors are typed and non-executing",
+  "Protocol errors require stable codes, safe details, and executionStarted false.",
+  ["AUDIT-127"],
+  (rule) =>
+    protocolContains(
+      rule,
+      "src/providers/openclaw/types.ts",
+      [
+        "OPENCLAW_PROTOCOL_ERROR_CODES",
+        "openclaw_executable_mapping_missing",
+        "executionStarted: false",
+      ],
+      "OpenClaw protocol errors are typed and non-executing.",
+    ),
+);
+
+export const OPENCLAW_PROTOCOL_DIAGNOSTIC_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-129",
+    "OpenClaw diagnostics are structured and safe",
+    "Protocol diagnostics must identify validation outcomes without prompt, context, command, or secret content.",
+    ["AUDIT-128"],
+    (rule) =>
+      protocolContains(
+        rule,
+        "src/providers/openclaw/diagnostics.ts",
+        [
+          "OpenClawProtocolDiagnostic",
+          "validProtocolDiagnostic",
+          "diagnosticFromError",
+        ],
+        "OpenClaw diagnostics are structured and safe.",
+      ),
+  );
+
+export const OPENCLAW_PROTOCOL_NO_MAPPING_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-130",
+    "OpenClaw has no executable mapping by default",
+    "A protocol-valid request must still expose an absent executable mapping in V10.4.",
+    ["AUDIT-129"],
+    (rule) =>
+      protocolContains(
+        rule,
+        "src/providers/openclaw/planning.ts",
+        [
+          'executableMapping: "absent"',
+          "openclaw_executable_mapping_missing",
+          "valid_non_executable",
+        ],
+        "OpenClaw has no executable mapping by default.",
+      ),
+  );
+
+export const OPENCLAW_PROTOCOL_INERT_PLAN_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-131",
+    "OpenClaw Provider plans remain inert",
+    "The OpenClaw adapter may use protocol planning but must still return a non-ready ProviderExecutionPlan.",
+    ["AUDIT-130"],
+    (rule) =>
+      protocolContains(
+        rule,
+        "src/providers/openclaw.ts",
+        [
+          "createOpenClawProtocolPlan",
+          "createNotImplementedProviderPlan",
+          "openclawProtocol",
+        ],
+        "OpenClaw Provider plans remain inert.",
+      ),
+  );
+
+export const OPENCLAW_PROTOCOL_INVALID_PLAN_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-132",
+    "Invalid OpenClaw protocol plans cannot reach Transport",
+    "Protocol-invalid and non-executable plans must contain no transport intent or direct transport resolution.",
+    ["AUDIT-131"],
+    (rule) => {
+      const source = openClawProtocolSource("src/providers/openclaw.ts");
+      return !/transports\/|resolveTransport|executeTransport|transportIntent:/.test(
+        source,
+      )
+        ? pass(
+            rule,
+            "Invalid OpenClaw protocol plans cannot reach Transport.",
+            ["src/providers/openclaw.ts"],
+          )
+        : fail(
+            rule,
+            "OpenClaw protocol code references transport execution.",
+            ["src/providers/openclaw.ts"],
+            "Keep OpenClaw planning inert and transport-free.",
+          );
+    },
+  );
+
+export const OPENCLAW_PROTOCOL_NO_COMMAND_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-133",
+    "OpenClaw protocol constructs no undocumented command or binary",
+    "V10.4 must not encode a provider executable, command line, flag, or discovery behavior.",
+    ["AUDIT-132"],
+    (rule) => {
+      const files = [
+        "src/providers/openclaw/protocol.ts",
+        "src/providers/openclaw/normalization.ts",
+        "src/providers/openclaw/validation.ts",
+        "src/providers/openclaw/planning.ts",
+      ];
+      const forbidden =
+        /executablePath|binaryPath|which\(|commandLine|--json|--prompt|--project|--model/;
+      const violations = files.filter((path) =>
+        forbidden.test(openClawProtocolSource(path)),
+      );
+      return violations.length === 0
+        ? pass(
+            rule,
+            "OpenClaw protocol constructs no undocumented command or binary.",
+            files,
+          )
+        : fail(
+            rule,
+            "OpenClaw protocol contains an undocumented command or binary pattern.",
+            violations,
+            "Remove executable, flag, command-line, and binary-discovery assumptions.",
+          );
+    },
+  );
+
+function noOpenClawProtocolIoRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return openClawProtocolRule(id, title, description, dependsOn, (rule) => {
+    const files = [
+      "src/providers/openclaw/types.ts",
+      "src/providers/openclaw/protocol.ts",
+      "src/providers/openclaw/diagnostics.ts",
+      "src/providers/openclaw/normalization.ts",
+      "src/providers/openclaw/validation.ts",
+      "src/providers/openclaw/planning.ts",
+    ];
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(openClawProtocolSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep the OpenClaw protocol local, inert, and free of external I/O.",
+        );
+  });
+}
+
+export const OPENCLAW_PROTOCOL_NO_PROCESS_RULE: AuditRule =
+  noOpenClawProtocolIoRule(
+    "AUDIT-134",
+    "OpenClaw protocol has no process execution",
+    "Protocol modules may not import child_process or invoke spawn or exec APIs",
+    ["AUDIT-133"],
+    [/child_process/, /\bspawn\s*\(/, /\bexec(?:File|Sync)?\s*\(/],
+  );
+export const OPENCLAW_PROTOCOL_NO_NETWORK_RULE: AuditRule =
+  noOpenClawProtocolIoRule(
+    "AUDIT-135",
+    "OpenClaw protocol has no network integration",
+    "Protocol modules may not call network APIs or import network modules",
+    ["AUDIT-134"],
+    [/\bfetch\s*\(/, /node:(http|https|net|tls)/],
+  );
+export const OPENCLAW_PROTOCOL_NO_SECRET_RULE: AuditRule =
+  noOpenClawProtocolIoRule(
+    "AUDIT-136",
+    "OpenClaw protocol has no credential or environment loading",
+    "Protocol modules may not read secrets, parent environment, or dotenv files",
+    ["AUDIT-135"],
+    [
+      /process\.env/,
+      /readFileSync\([^)]*\.env/,
+      /load(?:Secret|Credential|ApiKey)/,
+    ],
+  );
+
+export const OPENCLAW_PROTOCOL_TRANSPORT_BOUNDARY_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-137",
+    "Transport modules do not depend on OpenClaw protocol",
+    "Generic transports must remain provider-protocol agnostic",
+    ["AUDIT-136"],
+    (rule) => {
+      const files = [
+        "src/transports/types.ts",
+        "src/transports/errors.ts",
+        "src/transports/support.ts",
+        "src/transports/registry.ts",
+        "src/transports/selector.ts",
+        "src/transports/local-process.ts",
+      ];
+      const violations = files.filter((path) =>
+        /openclaw\//.test(openClawProtocolSource(path)),
+      );
+      return violations.length === 0
+        ? pass(
+            rule,
+            "Transport modules do not depend on OpenClaw protocol.",
+            files,
+          )
+        : fail(
+            rule,
+            "Transport module depends on OpenClaw protocol.",
+            violations,
+            "Keep transports provider-protocol agnostic.",
+          );
+    },
+  );
+
+export const OPENCLAW_PROTOCOL_RUNTIME_BOUNDARY_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-138",
+    "Runtime modules do not depend on OpenClaw protocol",
+    "Runtime abstractions must not import protocol-specific planning modules",
+    ["AUDIT-137"],
+    (rule) => {
+      const files = [
+        "src/runtime/local-process.ts",
+        "src/runtime/registry.ts",
+        "src/runtime/selector.ts",
+      ];
+      const violations = files.filter((path) =>
+        /openclaw\//.test(openClawProtocolSource(path)),
+      );
+      return violations.length === 0
+        ? pass(
+            rule,
+            "Runtime modules do not depend on OpenClaw protocol.",
+            files,
+          )
+        : fail(
+            rule,
+            "Runtime module depends on OpenClaw protocol.",
+            violations,
+            "Keep Runtime independent from provider protocol design.",
+          );
+    },
+  );
+
+export const OPENCLAW_PROTOCOL_CLI_BOUNDARY_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-139",
+    "CLI does not expose OpenClaw protocol",
+    "No public CLI command may import or execute the protocol layer",
+    ["AUDIT-138"],
+    (rule) => {
+      const source = openClawProtocolSource("src/cli.ts");
+      return !/openclaw\//.test(source)
+        ? pass(rule, "CLI does not expose OpenClaw protocol.", ["src/cli.ts"])
+        : fail(
+            rule,
+            "CLI exposes OpenClaw protocol.",
+            ["src/cli.ts"],
+            "Keep protocol planning Core/provider-internal.",
+          );
+    },
+  );
+
+export const OPENCLAW_PROTOCOL_LOOP_BOUNDARY_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-140",
+    "LoopRunner does not expose OpenClaw protocol",
+    "LoopRunner plan mode may not import or execute the protocol layer",
+    ["AUDIT-139"],
+    (rule) => {
+      const source = openClawProtocolSource("src/loop/runner.ts");
+      return !/openclaw\//.test(source)
+        ? pass(rule, "LoopRunner does not expose OpenClaw protocol.", [
+            "src/loop/runner.ts",
+          ])
+        : fail(
+            rule,
+            "LoopRunner exposes OpenClaw protocol.",
+            ["src/loop/runner.ts"],
+            "Keep protocol planning out of LoopRunner.",
+          );
+    },
+  );
+
+export const OPENCLAW_PROTOCOL_OTHER_STUBS_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-141",
+    "Claude Code and Codex remain inert stubs",
+    "Other providers must not gain OpenClaw protocol fields, executable plans, or provider commands",
+    ["AUDIT-140"],
+    (rule) => {
+      const files = ["src/providers/claude-code.ts", "src/providers/codex.ts"];
+      const violations = files.filter(
+        (path) =>
+          /openclaw\/|transportIntent|createNotImplementedProviderPlan/.test(
+            openClawProtocolSource(path),
+          ) &&
+          !openClawProtocolSource(path).includes(
+            "createNotImplementedProviderPlan",
+          ),
+      );
+      return violations.length === 0
+        ? pass(rule, "Claude Code and Codex remain inert stubs.", files)
+        : fail(
+            rule,
+            "Another provider gained OpenClaw-specific behavior.",
+            violations,
+            "Keep Claude Code and Codex as generic inert stubs.",
+          );
+    },
+  );
+
+export const OPENCLAW_PROTOCOL_POLICY_SEPARATION_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-142",
+    "OpenClaw protocol validity remains separate from policy authorization",
+    "Protocol validation must not import policy resolution while the Provider adapter keeps restrictive policy support",
+    ["AUDIT-141"],
+    (rule) => {
+      const protocol = openClawProtocolSource(
+        "src/providers/openclaw/validation.ts",
+      );
+      const adapter = openClawProtocolSource("src/providers/openclaw.ts");
+      return !/isProviderAllowed|resolvePolicy/.test(protocol) &&
+        adapter.includes("isProviderAllowed")
+        ? pass(
+            rule,
+            "OpenClaw protocol validity remains separate from policy authorization.",
+            [
+              "src/providers/openclaw/validation.ts",
+              "src/providers/openclaw.ts",
+            ],
+          )
+        : fail(
+            rule,
+            "OpenClaw protocol and policy authorization are not separated.",
+            [
+              "src/providers/openclaw/validation.ts",
+              "src/providers/openclaw.ts",
+            ],
+            "Keep protocol validation pure and preserve Provider policy checks separately.",
+          );
+    },
+  );
+
+export const OPENCLAW_PROTOCOL_DEPENDENCY_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-143",
+    "OpenClaw protocol dependencies remain unidirectional",
+    "Protocol modules may consume Provider/Runtime types but never Core, Transport, CLI, LoopRunner, reports, or audit",
+    ["AUDIT-142"],
+    (rule) => {
+      const files = [
+        "src/providers/openclaw/types.ts",
+        "src/providers/openclaw/protocol.ts",
+        "src/providers/openclaw/diagnostics.ts",
+        "src/providers/openclaw/normalization.ts",
+        "src/providers/openclaw/validation.ts",
+        "src/providers/openclaw/planning.ts",
+      ];
+      const forbidden =
+        /from\s+["'].*\/(core|transports|commands|loop|audit|reports)\//;
+      const violations = files.filter((path) =>
+        forbidden.test(openClawProtocolSource(path)),
+      );
+      return violations.length === 0
+        ? pass(
+            rule,
+            "OpenClaw protocol dependencies remain unidirectional.",
+            files,
+          )
+        : fail(
+            rule,
+            "OpenClaw protocol imports an upper layer.",
+            violations,
+            "Keep the protocol below Provider and above no execution layer.",
+          );
+    },
+  );
+
+export const OPENCLAW_PROTOCOL_ADAPTER_INTEGRATION_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-144",
+    "OpenClaw adapter consumes the internal protocol only",
+    "The adapter must normalize and plan internally without direct Runtime or Transport execution",
+    ["AUDIT-143"],
+    (rule) =>
+      protocolContains(
+        rule,
+        "src/providers/openclaw.ts",
+        [
+          "normalizeOpenClawRequest",
+          "createOpenClawProtocolPlan",
+          "createNotImplementedProviderPlan",
+        ],
+        "OpenClaw adapter consumes the internal protocol only.",
+      ),
+  );
+
+export const OPENCLAW_PROTOCOL_NO_PUBLIC_REPORT_RULE: AuditRule =
+  openClawProtocolRule(
+    "AUDIT-145",
+    "OpenClaw protocol does not change public reports",
+    "Protocol design must remain internal and absent from report generators",
+    ["AUDIT-144"],
+    (rule) => {
+      const files = [
+        "src/core/reports.ts",
+        "src/commands/audit.ts",
+        "src/commands/run.ts",
+      ];
+      const violations = files.filter((path) =>
+        /openclaw\//.test(openClawProtocolSource(path)),
+      );
+      return violations.length === 0
+        ? pass(rule, "OpenClaw protocol does not change public reports.", files)
+        : fail(
+            rule,
+            "OpenClaw protocol leaked into public reports.",
+            violations,
+            "Keep protocol details internal to Provider planning.",
+          );
+    },
+  );
