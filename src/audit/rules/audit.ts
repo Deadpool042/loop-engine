@@ -912,7 +912,9 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("openClawProtocolRule(") ||
             ruleSource.includes("noOpenClawProtocolIoRule(") ||
             ruleSource.includes("executableMappingRule(") ||
-            ruleSource.includes("noExecutableMappingIoRule(");
+            ruleSource.includes("noExecutableMappingIoRule(") ||
+            ruleSource.includes("transportIntentRule(") ||
+            ruleSource.includes("noTransportIntentSurfaceRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -6169,3 +6171,361 @@ export const EXECUTABLE_MAPPING_DEPENDENCY_RULE: AuditRule =
           );
     },
   );
+
+function transportIntentSource(path: string): string {
+  return existsSync(path) ? readFileSync(path, "utf8") : "";
+}
+
+const TRANSPORT_INTENT_AUDIT_METADATA = {
+  introducedIn: "V10.6",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+function transportIntentRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  check: (rule: AuditRule) => ReturnType<typeof pass>,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title,
+    description,
+    metadata: { ...TRANSPORT_INTENT_AUDIT_METADATA, dependsOn },
+    check: () => check(rule),
+  };
+  return rule;
+}
+
+function intentContains(
+  rule: AuditRule,
+  path: string,
+  tokens: readonly string[],
+  message: string,
+): ReturnType<typeof pass> {
+  const missing = tokens.filter(
+    (token) => !transportIntentSource(path).includes(token),
+  );
+  return missing.length === 0
+    ? pass(rule, message, [path, ...tokens])
+    : fail(
+        rule,
+        message,
+        missing,
+        "Restore the deterministic transport intent contract.",
+      );
+}
+
+export const TRANSPORT_INTENT_MODULE_RULE: AuditRule = transportIntentRule(
+  "AUDIT-161",
+  "Transport intent module is present",
+  "V10.6 must expose declarative intent contracts and Core-only helpers.",
+  ["AUDIT-160"],
+  (rule) => {
+    const files = [
+      "types.ts",
+      "errors.ts",
+      "registry.ts",
+      "selector.ts",
+      "validation.ts",
+      "support.ts",
+      "index.ts",
+    ]
+      .map((file) => `src/providers/intent/${file}`)
+      .concat("src/core/intent.ts");
+    const missing = files.filter((path) => !existsSync(path));
+    return missing.length === 0
+      ? pass(rule, "Transport intent module is present.", files)
+      : fail(
+          rule,
+          "Transport intent module is incomplete.",
+          missing,
+          "Restore all V10.6 intent modules.",
+        );
+  },
+);
+export const TRANSPORT_INTENT_CONTRACT_RULE: AuditRule = transportIntentRule(
+  "AUDIT-162",
+  "Transport intent contracts are typed and immutable",
+  "Intent contracts must model identity, requirements, policy, validation, resolution, and structured errors only.",
+  ["AUDIT-161"],
+  (rule) =>
+    intentContains(
+      rule,
+      "src/providers/intent/types.ts",
+      [
+        "TransportIntentId",
+        "TransportIntent",
+        "TransportIntentRequest",
+        "TransportIntentResult",
+        "TransportIntentValidation",
+        "TransportIntentPolicy",
+        "TransportIntentError",
+        "executionStarted: false",
+      ],
+      "Transport intent contracts are typed and immutable.",
+    ),
+);
+export const TRANSPORT_INTENT_REGISTRY_RULE: AuditRule = transportIntentRule(
+  "AUDIT-163",
+  "Transport intent registry is static and deterministic",
+  "Intent registration must use fixed declaration order without discovery or plugins.",
+  ["AUDIT-162"],
+  (rule) =>
+    intentContains(
+      rule,
+      "src/providers/intent/registry.ts",
+      [
+        "createTransportIntentRegistry",
+        "TRANSPORT_INTENT_REGISTRY",
+        "OpenClawTransportIntent",
+      ],
+      "Transport intent registry is static and deterministic.",
+    ),
+);
+export const TRANSPORT_INTENT_UNIQUENESS_RULE: AuditRule = transportIntentRule(
+  "AUDIT-164",
+  "Transport intent registry enforces unique identifiers",
+  "Intent identifiers must be unique in the static registry.",
+  ["AUDIT-163"],
+  (rule) =>
+    intentContains(
+      rule,
+      "src/providers/intent/registry.ts",
+      ["new Set", "Duplicate transport intent id"],
+      "Transport intent registry enforces unique identifiers.",
+    ),
+);
+export const TRANSPORT_INTENT_VALIDATION_RULE: AuditRule = transportIntentRule(
+  "AUDIT-165",
+  "Transport intent validation is explicit and structured",
+  "Validation must check provider, runtime, mapping, policy, capability, activity, and configuration without execution.",
+  ["AUDIT-164"],
+  (rule) =>
+    intentContains(
+      rule,
+      "src/providers/intent/validation.ts",
+      [
+        "validateTransportIntent",
+        "intent_disabled",
+        "intent_policy_denied",
+        "intent_not_configured",
+      ],
+      "Transport intent validation is explicit and structured.",
+    ),
+);
+export const TRANSPORT_INTENT_INACTIVE_DEFAULT_RULE: AuditRule =
+  transportIntentRule(
+    "AUDIT-166",
+    "Transport intents are inactive by default",
+    "Registered intents may not become active or configured implicitly.",
+    ["AUDIT-165"],
+    (rule) =>
+      intentContains(
+        rule,
+        "src/providers/intent/registry.ts",
+        ["active: false", "configured: false"],
+        "Transport intents are inactive by default.",
+      ),
+  );
+
+function noTransportIntentSurfaceRule(
+  id: string,
+  title: string,
+  description: string,
+  dependsOn: readonly string[],
+  patterns: readonly RegExp[],
+): AuditRule {
+  return transportIntentRule(id, title, description, dependsOn, (rule) => {
+    const files = [
+      "types.ts",
+      "errors.ts",
+      "registry.ts",
+      "selector.ts",
+      "validation.ts",
+      "support.ts",
+      "index.ts",
+    ].map((file) => `src/providers/intent/${file}`);
+    const violations = files.flatMap((path) =>
+      patterns
+        .filter((pattern) => pattern.test(transportIntentSource(path)))
+        .map((pattern) => `${path}: ${pattern.source}`),
+    );
+    return violations.length === 0
+      ? pass(rule, title + ".", files)
+      : fail(
+          rule,
+          title + ".",
+          violations,
+          "Keep transport intent declarative and non-executing.",
+        );
+  });
+}
+
+export const TRANSPORT_INTENT_NO_COMMAND_RULE: AuditRule =
+  noTransportIntentSurfaceRule(
+    "AUDIT-167",
+    "Transport intent has no command metadata",
+    "Intent code may not encode commands, arguments, flags, environments, or working directories.",
+    ["AUDIT-166"],
+    [
+      /\bcommand\s*:/,
+      /\bargs\s*:/,
+      /\bflags\s*:/,
+      /environment\s*:/,
+      /workingDirectory\s*:/,
+      /processOptions\s*:/,
+    ],
+  );
+export const TRANSPORT_INTENT_NO_PATH_RULE: AuditRule =
+  noTransportIntentSurfaceRule(
+    "AUDIT-168",
+    "Transport intent has no executable paths",
+    "Intent code may not encode executable paths, binary paths, or discovery behavior.",
+    ["AUDIT-167"],
+    [/executablePath/, /binaryPath/, /which\s*\(/, /realpathSync/],
+  );
+export const TRANSPORT_INTENT_NO_PROCESS_RULE: AuditRule =
+  noTransportIntentSurfaceRule(
+    "AUDIT-169",
+    "Transport intent has no process APIs",
+    "Intent code may not import child_process or call spawn, exec, or fork APIs.",
+    ["AUDIT-168"],
+    [
+      /child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+      /\bfork\s*\(/,
+      /process\.env/,
+    ],
+  );
+export const TRANSPORT_INTENT_NO_RUNTIME_EXECUTION_RULE: AuditRule =
+  noTransportIntentSurfaceRule(
+    "AUDIT-170",
+    "Transport intent has no runtime execution",
+    "Intent code may not resolve or execute a Runtime adapter.",
+    ["AUDIT-169"],
+    [/resolveRuntime\s*\(/, /executeRuntime\s*\(/, /\.runtime\.execute\s*\(/],
+  );
+export const TRANSPORT_INTENT_NO_TRANSPORT_EXECUTION_RULE: AuditRule =
+  noTransportIntentSurfaceRule(
+    "AUDIT-171",
+    "Transport intent has no transport execution",
+    "Intent code may not construct a transport payload, resolve a transport, or invoke a transport adapter.",
+    ["AUDIT-170"],
+    [
+      /TransportRequest/,
+      /createTransportRequest\s*\(/,
+      /resolveTransport\s*\(/,
+      /executeTransport\s*\(/,
+      /\.execute\s*\(/,
+    ],
+  );
+export const TRANSPORT_INTENT_CLI_BOUNDARY_RULE: AuditRule =
+  transportIntentRule(
+    "AUDIT-172",
+    "CLI does not expose transport intent",
+    "No public CLI command may import or resolve the intent layer.",
+    ["AUDIT-171"],
+    (rule) =>
+      !/providers\/intent|TransportIntent|resolveTransportIntent/.test(
+        transportIntentSource("src/cli.ts"),
+      )
+        ? pass(rule, "CLI does not expose transport intent.", ["src/cli.ts"])
+        : fail(
+            rule,
+            "CLI exposes transport intent.",
+            ["src/cli.ts"],
+            "Keep intent Core-only.",
+          ),
+  );
+export const TRANSPORT_INTENT_LOOP_BOUNDARY_RULE: AuditRule =
+  transportIntentRule(
+    "AUDIT-173",
+    "LoopRunner does not expose transport intent",
+    "LoopRunner planning may not import or resolve the intent layer.",
+    ["AUDIT-172"],
+    (rule) =>
+      !/providers\/intent|TransportIntent|resolveTransportIntent/.test(
+        transportIntentSource("src/loop/runner.ts"),
+      )
+        ? pass(rule, "LoopRunner does not expose transport intent.", [
+            "src/loop/runner.ts",
+          ])
+        : fail(
+            rule,
+            "LoopRunner exposes transport intent.",
+            ["src/loop/runner.ts"],
+            "Keep intent out of LoopRunner.",
+          ),
+  );
+export const TRANSPORT_INTENT_OPENCLAW_RULE: AuditRule = transportIntentRule(
+  "AUDIT-174",
+  "OpenClaw transport intent exists",
+  "The static registry must declare the documented OpenClaw intent only.",
+  ["AUDIT-173"],
+  (rule) =>
+    intentContains(
+      rule,
+      "src/providers/intent/registry.ts",
+      [
+        "OpenClawTransportIntent",
+        'id: "openclaw-plan"',
+        'mappingId: "openclaw-planning"',
+        'transportId: "local-process"',
+      ],
+      "OpenClaw transport intent exists.",
+    ),
+);
+export const TRANSPORT_INTENT_OPENCLAW_INACTIVE_RULE: AuditRule =
+  transportIntentRule(
+    "AUDIT-175",
+    "OpenClaw transport intent remains inactive",
+    "OpenClaw intent must remain non-executable and unconfigured in V10.6.",
+    ["AUDIT-174"],
+    (rule) =>
+      intentContains(
+        rule,
+        "src/providers/intent/registry.ts",
+        ["active: false", "configured: false"],
+        "OpenClaw transport intent remains inactive.",
+      ),
+  );
+export const TRANSPORT_INTENT_DEPENDENCY_RULE: AuditRule = transportIntentRule(
+  "AUDIT-176",
+  "Transport intent dependencies remain unidirectional",
+  "Intent modules may depend on Provider, mapping, policy, and transport contracts only, never upper layers or implementations.",
+  ["AUDIT-175"],
+  (rule) => {
+    const files = [
+      "types.ts",
+      "errors.ts",
+      "registry.ts",
+      "selector.ts",
+      "validation.ts",
+      "support.ts",
+      "index.ts",
+    ].map((file) => `src/providers/intent/${file}`);
+    const violations = files.filter((path) =>
+      /from\s+["'][^"']*\/(core|cli|commands|loop)\/|from\s+["'][^"']*\/transports\/(local-process|registry|selector)/.test(
+        transportIntentSource(path),
+      ),
+    );
+    return violations.length === 0
+      ? pass(
+          rule,
+          "Transport intent dependencies remain unidirectional.",
+          files,
+        )
+      : fail(
+          rule,
+          "Transport intent imports an upper layer or implementation.",
+          violations,
+          "Keep intent below mapping and above Transport contracts only.",
+        );
+  },
+);

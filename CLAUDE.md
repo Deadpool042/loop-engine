@@ -75,6 +75,7 @@ Layering is strict and one-directional: `cli.ts` → `commands/` → `loop/` →
 - **`src/transports/`** — Transport Adapter contracts (V10.3, Core-only): the static `local-process` transport validates explicit transport authorization, then delegates exclusively to the guarded V10.1 backend and normalizes its result. It does not know Provider protocols, spawn independently, load secrets/environment, access the network, or appear in CLI/LoopRunner. See `docs/architecture/transport-adapters.md`.
 - **`src/providers/openclaw/`** — OpenClaw protocol design (V10.4): a typed Loop Engine internal planning schema for the abstract `plan` operation. It validates a safe envelope and emits deterministic non-executable diagnostics only; it has no official executable mapping, command, credentials, network, Runtime/Transport dependency, CLI, or LoopRunner integration. See `docs/architecture/openclaw-provider-protocol.md`.
 - **`src/providers/mapping/`** — Executable Mapping contracts (V10.5, Core-only): immutable compatibility declarations between a validated Provider protocol and a future transport-neutral intent. The sole OpenClaw declaration is disabled and unconfigured; mappings have no commands, executable metadata, transport invocation, process/network/environment access, CLI, or LoopRunner exposure. See `docs/architecture/executable-mapping.md`.
+- **`src/providers/intent/`** — Transport Intent contracts (V10.6, Core-only): immutable desired-transport declarations with Provider/Runtime/Mapping/policy requirements. The sole OpenClaw intent is inactive and unconfigured; it creates no TransportRequest and is not consumed by the TransportAdapter, CLI, or LoopRunner. See `docs/architecture/transport-intent.md`.
 - **`src/ui/terminal.ts`** — the only place that formats terminal output; commands call `terminal.*` rather than inlining styling.
 
 Before adding a new command: check whether the data already exists on `ProjectSnapshot`; if not, extend `intelligence/` rather than computing it ad hoc inside the command.
@@ -113,6 +114,7 @@ When adjusting keyword lists, favor precision (avoid blocking ordinary work) ove
 - `docs/architecture/transport-adapters.md` — Transport Adapter contracts (`src/transports/`): explicit Core-only execution boundary, local-process delegation and result normalization.
 - `docs/architecture/openclaw-provider-protocol.md` — OpenClaw internal planning schema (`src/providers/openclaw/`): protocol validation, non-executable plans and missing mapping evidence.
 - `docs/architecture/executable-mapping.md` — Executable mapping contracts (`src/providers/mapping/`): disabled capability declarations, policy gates and transport separation.
+- `docs/architecture/transport-intent.md` — Transport intent contracts (`src/providers/intent/`): inactive declarations and the intentional Adapter boundary.
 - `docs/architecture/commands.md` — layering rules for `cli.ts` / `commands/` / `core/` / `intelligence/` / `ui/`.
 - `docs/architecture/project-intelligence.md` — `ProjectSnapshot` contract and roadmap candidate classification.
 - `docs/architecture/roadmap-reader.md` — roadmap reader formats, states, and keyword refinement history.

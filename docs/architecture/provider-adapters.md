@@ -88,3 +88,7 @@ V10.5 ajoute un registre de mapping séparé : il déclare seulement une
 compatibilité OpenClaw potentielle, désactivée et non configurée. Il ne modifie
 pas les adaptateurs Provider ni leurs plans inertes. Voir
 `executable-mapping.md`.
+
+V10.6 distingue aussi une intention de transport déclarative, inactive et non
+connectée au `TransportAdapter`. Elle ne modifie aucun plan Provider ni aucun
+adaptateur. Voir `transport-intent.md`.

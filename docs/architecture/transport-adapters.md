@@ -92,3 +92,7 @@ V10.5 intercale un mapping exécutable déclaratif entre protocole et plan
 Provider. Ce mapping est désactivé et ne crée aucune requête Transport ; la
 frontière Transport et son comportement restent donc inchangés. Voir
 `executable-mapping.md`.
+
+V10.6 ajoute une `TransportIntent` déclarative après le mapping. Elle s'arrête
+avant cette couche : aucun intent n'est converti en requête Transport et aucun
+adaptateur ne la consomme. Voir `transport-intent.md`.

@@ -48,6 +48,10 @@ V10.5 enregistre séparément une déclaration de compatibilité OpenClaw,
 Elle ne change pas le contrat V10.4 : le protocole ne dispose toujours d'aucun
 mapping exécutable configuré. Voir `executable-mapping.md`.
 
+V10.6 ajoute seulement une intention Transport OpenClaw inactive, après le
+mapping. Elle ne change ni le protocole ni le plan Provider et n'atteint pas le
+Transport Adapter. Voir `transport-intent.md`.
+
 ## Requête et diagnostics
 
 La normalisation dérive seulement des contrats existants : identité de projet,

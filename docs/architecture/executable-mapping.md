@@ -14,6 +14,7 @@ CLI
   -> ProviderAdapter
   -> OpenClawProtocol
   -> ExecutableMapping
+  -> TransportIntent
   -> ProviderExecutionPlan
   -> TransportAdapter
   -> LocalProcessTransport
@@ -85,6 +86,8 @@ public V10.4 n'est ainsi modifié.
 
 Un lot ultérieur devra apporter une source officielle acceptée par le projet,
 un mapping explicitement configuré, une politique restrictive, des tests de
-compatibilité et une intention transport structurée. Il devra garder la
-séparation entre protocole, mapping et transport, puis passer les garde-fous
+compatibilité et une intention transport structurée. V10.6 introduit cette
+intention comme contrat déclaratif, inactif et non connecté au Transport
+Adapter. Il devra garder la séparation entre protocole, mapping et transport,
+puis passer les garde-fous
 V10.1 à V10.3 avant toute possibilité d'exécution.

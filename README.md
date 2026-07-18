@@ -140,6 +140,8 @@ Voir aussi :
 - `docs/architecture/provider-adapters.md`
 - `docs/architecture/transport-adapters.md`
 - `docs/architecture/openclaw-provider-protocol.md`
+- `docs/architecture/executable-mapping.md`
+- `docs/architecture/transport-intent.md`
 
 ## Audit et CI
 
