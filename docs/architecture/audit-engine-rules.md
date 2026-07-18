@@ -22,6 +22,14 @@ l'absence de shell et d'API `exec`, les doubles permissions explicites, le
 confinement canonique, les limites de ressources, le contrat d'erreur, les
 événements structurés et l'absence de réseau.
 
+### Provider adapters inertes (V10.2)
+
+Les règles `AUDIT-091` à `AUDIT-102` vérifient la présence du module Provider,
+son registre et sélecteur déterministes, les restrictions de politique, les
+stubs inertes, l'absence de processus, réseau, secrets et environnement, la
+séparation avec `local-process`, l'absence d'exposition CLI/LoopRunner, les
+erreurs structurées et le sens de dépendance.
+
 ## Duplication
 
 ### DUP-001

@@ -93,6 +93,10 @@ façcade : elle ne change aucune sortie CLI. Depuis V10.1, son unique backend
 réel `local-process` reste accessible seulement par un appel Core explicite et
 gardé ; il n'est relié ni au routeur CLI ni au LoopRunner.
 
+Depuis V10.2, les helpers Provider du Core préparent uniquement des plans
+inertes. Ils restent absents du CLI et du LoopRunner, tout comme tout futur
+transport Provider.
+
 ---
 
 ## Rôle de `intelligence/`

@@ -137,6 +137,7 @@ Voir aussi :
 - `docs/architecture/agent-policy-engine.md`
 - `docs/architecture/minimal-context-builder.md`
 - `docs/architecture/runtime-abstraction.md`
+- `docs/architecture/provider-adapters.md`
 
 ## Audit et CI
 

@@ -13,7 +13,7 @@ Core-only, désactivé par défaut, et ne devient jamais un mode public `execute
 ## Dépendances
 
 ```text
-CLI -> Core -> Runtime -> agents / policy / context / intelligence (types)
+CLI -> Core -> Runtime -> Provider -> execution transport
 ```
 
 Le CLI ne connaît pas `runtime/`. `src/core/runtime.ts` assemble une
@@ -21,6 +21,10 @@ Le CLI ne connaît pas `runtime/`. `src/core/runtime.ts` assemble une
 statique et délègue sans branche spécifique à `local-process`. `LoopRunResult`,
 les rapports d'exécution et les sorties JSON restent inchangés : le résultat
 Runtime est interne à ce lot.
+
+Depuis V10.2, `src/providers/` se place entre Runtime et un futur transport.
+Les adaptateurs Provider construisent des plans inertes et ne remplacent pas
+`RuntimeAdapter`. Voir `provider-adapters.md`.
 
 ## Contrats
 
