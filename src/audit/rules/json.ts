@@ -5,7 +5,7 @@ import {
   PUBLIC_JSON_COMMAND_FILES,
 } from "../public-commands.js";
 import { sourceIncludesToken } from "../source.js";
-import type { AuditRule } from "../types.js";
+import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 export const JSON_SCHEMA_VERSION_RULE: AuditRule = {
   id: "JSON-001",

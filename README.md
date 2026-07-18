@@ -147,6 +147,7 @@ Commandes principales :
 - `pnpm loop audit --json`
 - `pnpm loop audit --strict`
 - `pnpm loop audit --json --strict`
+- `pnpm loop audit --manifest`
 - `pnpm run audit:strict`
 - `pnpm run ci`
 
@@ -217,6 +218,22 @@ Ce contrôle est inclus dans `pnpm run ci`.
 Si `--profile` reçoit un profil inconnu, la commande échoue avec `Invalid audit profile`.
 
 Si `--profile` est fourni sans valeur, la commande échoue avec `Invalid audit profile: <missing>`.
+
+### Registre et manifeste des règles
+
+Le moteur expose un manifeste JSON déterministe, séparé du rapport d'audit :
+
+```bash
+pnpm loop audit --manifest
+pnpm loop audit --manifest --tag self-audit
+pnpm loop audit --rule AUDIT-016
+pnpm loop audit --stability stable
+```
+
+Les filtres `--rule`, `--tag` et `--stability` acceptent plusieurs valeurs :
+elles sont réunies par filtre puis intersectées entre filtres et profil. Une
+sélection vide échoue explicitement. Le manifeste ne contient aucun timestamp
+et conserve l'ordre de `AUDIT_RULES`; `AuditReport` reste inchangé.
 
 Ces erreurs retournent un code de sortie non nul.
 

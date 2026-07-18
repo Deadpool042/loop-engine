@@ -24,6 +24,38 @@ export type AuditStatus = "pass" | "warning" | "fail" | "skipped";
 export type AuditSummaryStatus = "pass" | "warning" | "fail";
 export type AuditPriority = "low" | "medium" | "high";
 
+export const AUDIT_RULE_TAGS = [
+  "contract",
+  "self-audit",
+  "documentation",
+  "ci",
+  "json",
+  "architecture",
+  "cli",
+  "execution",
+  "policy",
+  "context",
+] as const;
+
+export type AuditRuleTag = (typeof AUDIT_RULE_TAGS)[number];
+
+export const AUDIT_RULE_STABILITIES = [
+  "stable",
+  "experimental",
+  "deprecated",
+] as const;
+
+export type AuditRuleStability = (typeof AUDIT_RULE_STABILITIES)[number];
+
+export type AuditRuleMetadata = Readonly<{
+  introducedIn: string | null;
+  tags: readonly AuditRuleTag[];
+  stability: AuditRuleStability;
+  // Declarative only in V8.0: dependencies are validated but never used to
+  // change rule execution order or to skip checks.
+  dependsOn: readonly string[];
+}>;
+
 export type AuditRecommendation = Readonly<{
   ruleId: string;
   priority: AuditPriority;
@@ -41,6 +73,16 @@ export type AuditFinding = Readonly<{
   details?: readonly string[];
 }>;
 
+export type AuditRuleDefinition = Readonly<{
+  id: string;
+  category: AuditCategory;
+  severity: AuditSeverity;
+  title: string;
+  description: string;
+  check: () => AuditFinding;
+  metadata?: Partial<AuditRuleMetadata>;
+}>;
+
 export type AuditRule = Readonly<{
   id: string;
   category: AuditCategory;
@@ -48,6 +90,7 @@ export type AuditRule = Readonly<{
   title: string;
   description: string;
   check: () => AuditFinding;
+  metadata: AuditRuleMetadata;
 }>;
 
 export type AuditReport = Readonly<{

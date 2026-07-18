@@ -1,7 +1,27 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fail, pass } from "../findings.js";
 import { sourceIncludesToken } from "../source.js";
-import type { AuditRule } from "../types.js";
+import type { AuditRuleDefinition as AuditRule } from "../types.js";
+
+function verifyRegistryContract(
+  rule: AuditRule,
+  expectedTokens: readonly string[],
+): ReturnType<typeof pass> {
+  const registryPath = "src/audit/registry.ts";
+  const content = existsSync(registryPath)
+    ? readFileSync(registryPath, "utf8")
+    : "";
+  const missing = expectedTokens.filter((token) => !content.includes(token));
+
+  return missing.length === 0
+    ? pass(rule, "Audit rule registry contract is verified.", expectedTokens)
+    : fail(
+        rule,
+        "Audit rule registry contract is incomplete.",
+        missing.length > 0 ? missing : [registryPath],
+        "Restore the typed audit rule registry validation and manifest contract.",
+      );
+}
 
 export const AUDIT_SCORE_EXPOSURE_RULE: AuditRule = {
   id: "AUDIT-001",
@@ -583,8 +603,8 @@ export const AUDIT_RULE_ORDER_RULE: AuditRule = {
     }
 
     const content = readFileSync(rulesPath, "utf8");
-    const registryStart = content.indexOf("export const AUDIT_RULES");
-    const registryEnd = content.indexOf("];", registryStart);
+    const registryStart = content.indexOf("createAuditRuleRegistry([");
+    const registryEnd = content.indexOf("])", registryStart);
     const registry = content.slice(registryStart, registryEnd);
 
     const expectedOrder = [
@@ -799,15 +819,15 @@ export const AUDIT_RULE_REGISTRY_COMPLETENESS_RULE: AuditRule = {
     });
 
     const registryContent = readFileSync(registryPath, "utf8");
-    const registryStart = registryContent.indexOf("export const AUDIT_RULES");
-    const registryEnd = registryContent.indexOf("];", registryStart);
+    const registryStart = registryContent.indexOf("createAuditRuleRegistry([");
+    const registryEnd = registryContent.indexOf("])", registryStart);
 
     if (registryStart < 0 || registryEnd < 0) {
       return fail(
         AUDIT_RULE_REGISTRY_COMPLETENESS_RULE,
         "Audit rule registry cannot be parsed.",
-        ["export const AUDIT_RULES"],
-        "Keep AUDIT_RULES declared as a static array in src/audit/rules.ts.",
+        ["createAuditRuleRegistry(["],
+        "Keep AUDIT_RULES declared through createAuditRuleRegistry in src/audit/rules.ts.",
       );
     }
 
@@ -1913,8 +1933,9 @@ export const AUDIT_CLI_PROFILE_PARSING_RULE: AuditRule = {
       'args.indexOf("--profile")',
       "isAuditProfile(value)",
       "Invalid audit profile",
-      "const profile = parseAuditProfileOption(process.argv)",
-      "runAudit({ profile })",
+      "const profile = parseAuditProfileOption(args)",
+      "const options = parseAuditCommandOptions(process.argv)",
+      "runAudit(options)",
     ];
 
     const missing = expectedTokens.filter((token) => !content.includes(token));
@@ -3692,4 +3713,131 @@ export const CONTEXT_BUILDER_DEPENDENCY_DIRECTION_RULE: AuditRule = {
       allFiles,
     );
   },
+};
+
+export const AUDIT_RULE_METADATA_COMPLETENESS_V8_RULE: AuditRule = {
+  id: "AUDIT-073",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule metadata is normalized completely",
+  description:
+    "The registry should supply introducedIn, tags, stability, and dependsOn metadata for every rule.",
+  metadata: {
+    introducedIn: "V8.0",
+    tags: ["self-audit", "architecture"],
+    stability: "stable",
+    dependsOn: [],
+  },
+  check: () =>
+    verifyRegistryContract(AUDIT_RULE_METADATA_COMPLETENESS_V8_RULE, [
+      "function normalizeMetadata",
+      "introducedIn:",
+      "tags:",
+      "stability:",
+      "dependsOn:",
+    ]),
+};
+
+export const AUDIT_RULE_TAG_VALIDITY_V8_RULE: AuditRule = {
+  id: "AUDIT-074",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule tags are validated against the typed registry",
+  description:
+    "The registry should reject tags that are outside AUDIT_RULE_TAGS.",
+  metadata: {
+    introducedIn: "V8.0",
+    tags: ["self-audit", "architecture"],
+    stability: "stable",
+    dependsOn: ["AUDIT-073"],
+  },
+  check: () =>
+    verifyRegistryContract(AUDIT_RULE_TAG_VALIDITY_V8_RULE, [
+      "AUDIT_RULE_TAGS",
+      "isAuditRuleTag",
+      "Invalid tags metadata",
+    ]),
+};
+
+export const AUDIT_RULE_STABILITY_VALIDITY_V8_RULE: AuditRule = {
+  id: "AUDIT-075",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule stability is validated against the typed registry",
+  description:
+    "The registry should reject stability values outside AUDIT_RULE_STABILITIES.",
+  metadata: {
+    introducedIn: "V8.0",
+    tags: ["self-audit", "architecture"],
+    stability: "stable",
+    dependsOn: ["AUDIT-073"],
+  },
+  check: () =>
+    verifyRegistryContract(AUDIT_RULE_STABILITY_VALIDITY_V8_RULE, [
+      "AUDIT_RULE_STABILITIES",
+      "isAuditRuleStability",
+      "Invalid stability metadata",
+    ]),
+};
+
+export const AUDIT_RULE_DEPENDENCY_VALIDITY_V8_RULE: AuditRule = {
+  id: "AUDIT-076",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule dependencies reference registered rules",
+  description:
+    "The registry should reject declared dependencies that do not exist in AUDIT_RULES.",
+  metadata: {
+    introducedIn: "V8.0",
+    tags: ["self-audit", "architecture"],
+    stability: "stable",
+    dependsOn: ["AUDIT-073"],
+  },
+  check: () =>
+    verifyRegistryContract(AUDIT_RULE_DEPENDENCY_VALIDITY_V8_RULE, [
+      "Audit rule dependency does not exist",
+      "ids.has(dependency)",
+    ]),
+};
+
+export const AUDIT_RULE_NO_SELF_DEPENDENCY_V8_RULE: AuditRule = {
+  id: "AUDIT-077",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rules cannot depend on themselves",
+  description:
+    "The registry should reject a metadata dependency equal to the rule id.",
+  metadata: {
+    introducedIn: "V8.0",
+    tags: ["self-audit", "architecture"],
+    stability: "stable",
+    dependsOn: ["AUDIT-073"],
+  },
+  check: () =>
+    verifyRegistryContract(AUDIT_RULE_NO_SELF_DEPENDENCY_V8_RULE, [
+      "dependency === rule.id",
+      "Audit rule must not depend on itself",
+    ]),
+};
+
+export const AUDIT_RULE_MANIFEST_CONSISTENCY_V8_RULE: AuditRule = {
+  id: "AUDIT-078",
+  category: "architecture",
+  severity: "warning",
+  title: "Audit rule manifest is derived from registry order",
+  description:
+    "The manifest should be generated directly from the selected AUDIT_RULES entries without volatile fields.",
+  metadata: {
+    introducedIn: "V8.0",
+    tags: ["self-audit", "contract", "architecture"],
+    stability: "stable",
+    dependsOn: ["AUDIT-073"],
+  },
+  check: () =>
+    verifyRegistryContract(AUDIT_RULE_MANIFEST_CONSISTENCY_V8_RULE, [
+      "export function createAuditRuleManifest",
+      "rules.map((rule)",
+      "schemaVersion: 1",
+      "introducedIn: rule.metadata.introducedIn",
+    ]),
 };

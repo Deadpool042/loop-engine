@@ -1,4 +1,8 @@
-import type { AuditFinding, AuditPriority, AuditRule } from "./types.js";
+import type {
+  AuditFinding,
+  AuditPriority,
+  AuditRuleDefinition,
+} from "./types.js";
 
 function normalizeDetails(
   details?: readonly string[],
@@ -11,7 +15,7 @@ function normalizeDetails(
 }
 
 export function getPriority(
-  rule: AuditRule,
+  rule: AuditRuleDefinition,
   status: AuditFinding["status"],
 ): AuditPriority {
   if (status === "fail" && rule.severity === "error") {
@@ -26,7 +30,7 @@ export function getPriority(
 }
 
 export function pass(
-  rule: AuditRule,
+  rule: AuditRuleDefinition,
   message: string,
   details?: readonly string[],
 ): AuditFinding {
@@ -44,7 +48,7 @@ export function pass(
 }
 
 export function fail(
-  rule: AuditRule,
+  rule: AuditRuleDefinition,
   message: string,
   details?: readonly string[],
   recommendation?: string,

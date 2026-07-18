@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 
 const COMMANDS = [
   ["audit", "--json"],
+  ["audit", "--manifest"],
   ["summary", "--json"],
   ["context", "loop-engine", "--json"],
   ["next", "loop-engine", "--json"],
@@ -420,7 +421,32 @@ function validatePayload(command: readonly string[], json: unknown): void {
 
   const commandName = command[0];
 
-  if (commandName === "audit") {
+  if (commandName === "audit" && command.includes("--manifest")) {
+    assertField(json, "rules");
+    const rules = json.rules;
+    assertArray(rules);
+    if (rules.length === 0) {
+      throw new Error("audit manifest rules must not be empty");
+    }
+    for (const rule of rules) {
+      assertRecord(rule);
+      for (const field of [
+        "id",
+        "category",
+        "severity",
+        "title",
+        "description",
+        "introducedIn",
+        "tags",
+        "stability",
+        "dependsOn",
+      ]) {
+        assertField(rule, field);
+      }
+      assertArray(rule.tags);
+      assertArray(rule.dependsOn);
+    }
+  } else if (commandName === "audit") {
     validateAuditJsonPayload(json);
   } else if (commandName === "summary") {
     assertField(json, "projects");

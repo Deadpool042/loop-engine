@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fail, pass } from "../findings.js";
-import type { AuditRule } from "../types.js";
+import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 export const AUDIT_DOCUMENTATION_COVERAGE_RULE: AuditRule = {
   id: "DOCS-001",
