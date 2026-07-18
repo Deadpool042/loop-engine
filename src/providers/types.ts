@@ -9,6 +9,8 @@ import type {
 } from "../agents/types.js";
 import type {
   RuntimeId,
+  LocalProcessCommand,
+  LocalProcessExecutionPolicy,
   RuntimeMetadata,
   RuntimeRequest,
 } from "../runtime/types.js";
@@ -40,7 +42,9 @@ export const PROVIDER_ERROR_CODES = [
   "capability_not_supported",
   "invalid_provider_request",
   "provider_not_implemented",
+  "provider_plan_not_executable",
   "transport_not_available",
+  "transport_execution_failed",
 ] as const;
 
 export type ProviderErrorCode = (typeof PROVIDER_ERROR_CODES)[number];
@@ -61,10 +65,23 @@ export type ProviderDiagnostic = Readonly<{
 export const PROVIDER_PLAN_STATUSES = [
   "not_implemented",
   "unsupported",
+  "ready",
 ] as const;
 
 export type ProviderExecutionPlanStatus =
   (typeof PROVIDER_PLAN_STATUSES)[number];
+
+/**
+ * An optional, provider-declared intent for a future guarded transport. It is
+ * structured deliberately: it cannot contain a shell command string, raw
+ * environment, credentials, or a transport implementation reference.
+ */
+export type ProviderTransportIntent = Readonly<{
+  transportId: string;
+  requiredCapabilities: readonly ProviderCapability[];
+  command: LocalProcessCommand;
+  executionPolicy: LocalProcessExecutionPolicy;
+}>;
 
 /**
  * A plan is intentionally transport-neutral in V10.2. A future provider
@@ -81,11 +98,20 @@ export type ProviderExecutionPlan = Readonly<{
   diagnostics: readonly ProviderDiagnostic[];
   metadata: ProviderMetadata;
   error: ProviderError;
+  /** Absent from all V10.2 stubs; execution remains opt-in and explicit. */
+  transportIntent?: ProviderTransportIntent;
 }>;
 
 export const PROVIDER_RESULT_STATUSES = [
   "not_implemented",
   "unsupported",
+  "completed",
+  "rejected",
+  "spawn_failed",
+  "non_zero_exit",
+  "timed_out",
+  "stdout_limit_exceeded",
+  "stderr_limit_exceeded",
 ] as const;
 
 export type ProviderResultStatus = (typeof PROVIDER_RESULT_STATUSES)[number];
@@ -98,6 +124,7 @@ export type ProviderRawResult = Readonly<{
   startedAt: string;
   completedAt: string;
   metadata: ProviderMetadata;
+  error?: ProviderError;
   exitCode?: number | null;
   signal?: string | null;
 }>;

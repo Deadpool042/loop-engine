@@ -4670,3 +4670,558 @@ export const PROVIDER_DEPENDENCY_DIRECTION_RULE: AuditRule = {
         );
   },
 };
+
+function transportSource(path: string): string | null {
+  return existsSync(path) ? readFileSync(path, "utf8") : null;
+}
+
+function verifyTransportSource(
+  rule: AuditRule,
+  path: string,
+  expectedTokens: readonly string[],
+  message: string,
+  recommendation: string,
+): ReturnType<typeof pass> {
+  const source = transportSource(path);
+  const missing = source
+    ? expectedTokens.filter((token) => !source.includes(token))
+    : [path];
+
+  return missing.length === 0
+    ? pass(rule, message, [path, ...expectedTokens])
+    : fail(rule, message, missing, recommendation);
+}
+
+const TRANSPORT_AUDIT_METADATA = {
+  introducedIn: "V10.3",
+  tags: ["architecture", "execution"] as const,
+  stability: "stable" as const,
+};
+
+export const TRANSPORT_MODULE_PRESENCE_RULE: AuditRule = {
+  id: "AUDIT-103",
+  category: "architecture",
+  severity: "error",
+  title: "Transport adapter module is present",
+  description:
+    "The V10.3 transport contracts, static registry, selector, support, errors, and local-process adapter must be present.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-102"] },
+  check: () => {
+    const files = [
+      "src/transports/types.ts",
+      "src/transports/errors.ts",
+      "src/transports/registry.ts",
+      "src/transports/selector.ts",
+      "src/transports/support.ts",
+      "src/transports/local-process.ts",
+      "src/core/transports.ts",
+    ];
+    const missing = files.filter((path) => !existsSync(path));
+    return missing.length === 0
+      ? pass(
+          TRANSPORT_MODULE_PRESENCE_RULE,
+          "Transport adapter module is present.",
+          files,
+        )
+      : fail(
+          TRANSPORT_MODULE_PRESENCE_RULE,
+          "Transport adapter module is incomplete.",
+          missing,
+          "Restore the V10.3 transport contracts, Core boundary, and local-process adapter.",
+        );
+  },
+};
+
+export const TRANSPORT_STATIC_REGISTRY_RULE: AuditRule = {
+  id: "AUDIT-104",
+  category: "architecture",
+  severity: "error",
+  title: "Transport registry is static and deterministic",
+  description:
+    "Transport registration must keep a fixed declaration order and reject duplicate ids without dynamic discovery.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-103"] },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_STATIC_REGISTRY_RULE,
+      "src/transports/registry.ts",
+      [
+        "createTransportRegistry",
+        "Duplicate transport adapter id",
+        "LocalProcessTransport",
+      ],
+      "Transport registry is static and deterministic.",
+      "Keep transport registration fixed, ordered, and duplicate-safe.",
+    ),
+};
+
+export const TRANSPORT_ID_UNIQUENESS_RULE: AuditRule = {
+  id: "AUDIT-105",
+  category: "architecture",
+  severity: "error",
+  title: "Transport registry enforces unique identifiers",
+  description:
+    "Transport identifiers must be declared once and rejected when duplicated.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-104"] },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_ID_UNIQUENESS_RULE,
+      "src/transports/registry.ts",
+      ["const ids = new Set<string>()", "ids.has(adapter.id)"],
+      "Transport registry enforces unique identifiers.",
+      "Retain duplicate-id detection in the static transport registry.",
+    ),
+};
+
+export const TRANSPORT_DETERMINISTIC_SELECTION_RULE: AuditRule = {
+  id: "AUDIT-106",
+  category: "architecture",
+  severity: "error",
+  title: "Transport selection is pure and deterministic",
+  description:
+    "Transport resolution must use the requested transport and static registry only, with no scoring or discovery.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-105"] },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_DETERMINISTIC_SELECTION_RULE,
+      "src/transports/selector.ts",
+      [
+        "export function selectTransport",
+        "request.transportId",
+        "TRANSPORT_REGISTRY.adapters.find",
+      ],
+      "Transport selection is pure and deterministic.",
+      "Resolve only the explicit transport from the static registry.",
+    ),
+};
+
+export const TRANSPORT_POLICY_RESTRICTION_RULE: AuditRule = {
+  id: "AUDIT-107",
+  category: "architecture",
+  severity: "error",
+  title: "Transport execution requires explicit policy authorization",
+  description:
+    "Transport registration or runtime selection must never enable execution without restrictive transport authorization.",
+  metadata: {
+    ...TRANSPORT_AUDIT_METADATA,
+    tags: ["architecture", "execution", "policy"],
+    dependsOn: ["AUDIT-106"],
+  },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_POLICY_RESTRICTION_RULE,
+      "src/transports/support.ts",
+      [
+        "transportPolicy.enabled",
+        "allowedTransportIds",
+        "LOCAL_PROCESS_RUNTIME_ID",
+        "shell_exec",
+      ],
+      "Transport execution requires explicit policy authorization.",
+      "Require an enabled allow-listed transport, approved runtime, provider, and shell_exec authorization.",
+    ),
+};
+
+export const TRANSPORT_LOCAL_PROCESS_DELEGATION_RULE: AuditRule = {
+  id: "AUDIT-108",
+  category: "architecture",
+  severity: "error",
+  title: "Local-process transport delegates to the guarded backend",
+  description:
+    "The transport adapter must reuse the V10.1 local-process runtime rather than owning process execution.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-107"] },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_LOCAL_PROCESS_DELEGATION_RULE,
+      "src/transports/local-process.ts",
+      ["LocalProcessRuntime", "LocalProcessRuntime.execute", "shell_exec"],
+      "Local-process transport delegates to the guarded backend.",
+      "Keep V10.1 local-process as the only process execution source of truth.",
+    ),
+};
+
+export const TRANSPORT_NO_DUPLICATE_SPAWN_RULE: AuditRule = {
+  id: "AUDIT-109",
+  category: "architecture",
+  severity: "error",
+  title: "Transport adapter does not duplicate process spawning",
+  description:
+    "The local-process transport must contain no child-process API or independent spawn implementation.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-108"] },
+  check: () => {
+    const source = transportSource("src/transports/local-process.ts") ?? "";
+    const forbidden = [
+      /child_process/,
+      /\bspawn\s*\(/,
+      /\bexec(?:File|Sync)?\s*\(/,
+    ];
+    const violations = forbidden
+      .filter((pattern) => pattern.test(source))
+      .map((pattern) => pattern.source);
+    return violations.length === 0
+      ? pass(
+          TRANSPORT_NO_DUPLICATE_SPAWN_RULE,
+          "Transport adapter does not duplicate process spawning.",
+          ["src/transports/local-process.ts"],
+        )
+      : fail(
+          TRANSPORT_NO_DUPLICATE_SPAWN_RULE,
+          "Transport adapter contains a process execution API.",
+          violations,
+          "Delegate only to the guarded local-process backend.",
+        );
+  },
+};
+
+export const TRANSPORT_NO_SHELL_RULE: AuditRule = {
+  id: "AUDIT-110",
+  category: "architecture",
+  severity: "error",
+  title: "Transport preserves the no-shell boundary",
+  description:
+    "Transport contracts must use a structured command and delegate to the shell-false local-process backend.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-109"] },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_NO_SHELL_RULE,
+      "src/transports/types.ts",
+      ["LocalProcessCommand", "shell command string"],
+      "Transport preserves the no-shell boundary.",
+      "Keep transport commands structured and never accept shell command strings.",
+    ),
+};
+
+export const TRANSPORT_PROVIDER_PLAN_VALIDATION_RULE: AuditRule = {
+  id: "AUDIT-111",
+  category: "architecture",
+  severity: "error",
+  title: "Core validates provider plans before transport resolution",
+  description:
+    "Incomplete or stub provider plans must fail with a structured transport error before transport selection.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-110"] },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_PROVIDER_PLAN_VALIDATION_RULE,
+      "src/core/transports.ts",
+      [
+        'providerPlan.status !== "ready"',
+        "provider_plan_not_executable",
+        "createTransportRequest",
+      ],
+      "Core validates provider plans before transport resolution.",
+      "Reject non-ready or missing-intent provider plans before selecting a transport.",
+    ),
+};
+
+export const TRANSPORT_INVALID_PLAN_NO_START_RULE: AuditRule = {
+  id: "AUDIT-112",
+  category: "architecture",
+  severity: "error",
+  title: "Invalid provider plans cannot start a transport",
+  description:
+    "The explicit Core execution helper must return a rejection before resolving or invoking a transport for invalid plans.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-111"] },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_INVALID_PLAN_NO_START_RULE,
+      "src/core/transports.ts",
+      [
+        'if (created.outcome === "rejected")',
+        "return createProviderResult",
+        "executeTransport",
+      ],
+      "Invalid provider plans cannot start a transport.",
+      "Retain the early rejection branch before transport resolution and execution.",
+    ),
+};
+
+export const TRANSPORT_LOCAL_PROCESS_PROVIDER_AGNOSTIC_RULE: AuditRule = {
+  id: "AUDIT-113",
+  category: "architecture",
+  severity: "error",
+  title: "Guarded local-process backend remains provider-agnostic",
+  description:
+    "The V10.1 backend must not import or reference provider-specific code after transport layering.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-112"] },
+  check: () => {
+    const source = transportSource("src/runtime/local-process.ts") ?? "";
+    return !/providers\/|ProviderAdapter|OpenClawProvider|ClaudeCodeProvider|CodexProvider/.test(
+      source,
+    )
+      ? pass(
+          TRANSPORT_LOCAL_PROCESS_PROVIDER_AGNOSTIC_RULE,
+          "Guarded local-process backend remains provider-agnostic.",
+          ["src/runtime/local-process.ts"],
+        )
+      : fail(
+          TRANSPORT_LOCAL_PROCESS_PROVIDER_AGNOSTIC_RULE,
+          "Guarded local-process backend references provider-specific code.",
+          ["src/runtime/local-process.ts"],
+          "Keep the local-process backend independent from Provider adapters.",
+        );
+  },
+};
+
+export const TRANSPORT_PROVIDER_AGNOSTIC_RULE: AuditRule = {
+  id: "AUDIT-114",
+  category: "architecture",
+  severity: "error",
+  title: "Transport adapters remain provider-agnostic",
+  description:
+    "Transport modules may carry provider identity data but must not import provider adapters or construct provider commands.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-113"] },
+  check: () => {
+    const files = [
+      "src/transports/types.ts",
+      "src/transports/errors.ts",
+      "src/transports/support.ts",
+      "src/transports/registry.ts",
+      "src/transports/selector.ts",
+      "src/transports/local-process.ts",
+    ];
+    const violations = files.filter((path) =>
+      /providers\/|ProviderAdapter/.test(transportSource(path) ?? ""),
+    );
+    return violations.length === 0
+      ? pass(
+          TRANSPORT_PROVIDER_AGNOSTIC_RULE,
+          "Transport adapters remain provider-agnostic.",
+          files,
+        )
+      : fail(
+          TRANSPORT_PROVIDER_AGNOSTIC_RULE,
+          "Transport adapter references provider-specific code.",
+          violations,
+          "Keep provider protocol and command construction outside transport adapters.",
+        );
+  },
+};
+
+export const TRANSPORT_NO_NETWORK_RULE: AuditRule = {
+  id: "AUDIT-115",
+  category: "architecture",
+  severity: "error",
+  title: "Transport module has no network integration",
+  description:
+    "V10.3 transports must not add HTTP, SDK, MCP, remote-worker, or network execution.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-114"] },
+  check: () => {
+    const files = [
+      "src/transports/types.ts",
+      "src/transports/errors.ts",
+      "src/transports/support.ts",
+      "src/transports/registry.ts",
+      "src/transports/selector.ts",
+      "src/transports/local-process.ts",
+    ];
+    const violations = files.filter((path) =>
+      /\bfetch\s*\(|node:(http|https|net|tls)/.test(
+        transportSource(path) ?? "",
+      ),
+    );
+    return violations.length === 0
+      ? pass(
+          TRANSPORT_NO_NETWORK_RULE,
+          "Transport module has no network integration.",
+          files,
+        )
+      : fail(
+          TRANSPORT_NO_NETWORK_RULE,
+          "Transport module contains a network integration pattern.",
+          violations,
+          "Keep V10.3 transport adapters local and network-free.",
+        );
+  },
+};
+
+export const TRANSPORT_NO_SECRET_LOADING_RULE: AuditRule = {
+  id: "AUDIT-116",
+  category: "architecture",
+  severity: "error",
+  title: "Transport module does not load secrets or environment",
+  description:
+    "Transport adapters must receive only structured filtered intent and must not load credentials or the parent environment.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-115"] },
+  check: () => {
+    const files = [
+      "src/transports/types.ts",
+      "src/transports/errors.ts",
+      "src/transports/support.ts",
+      "src/transports/registry.ts",
+      "src/transports/selector.ts",
+      "src/transports/local-process.ts",
+    ];
+    const violations = files.filter((path) =>
+      /process\.env|readFileSync\([^)]*\.env|load(?:Secret|Credential|ApiKey)/.test(
+        transportSource(path) ?? "",
+      ),
+    );
+    return violations.length === 0
+      ? pass(
+          TRANSPORT_NO_SECRET_LOADING_RULE,
+          "Transport module does not load secrets or environment.",
+          files,
+        )
+      : fail(
+          TRANSPORT_NO_SECRET_LOADING_RULE,
+          "Transport module may load credentials or environment.",
+          violations,
+          "Keep secret and parent-environment loading outside transport adapters.",
+        );
+  },
+};
+
+export const TRANSPORT_STRUCTURED_ERRORS_RULE: AuditRule = {
+  id: "AUDIT-117",
+  category: "architecture",
+  severity: "error",
+  title: "Transport errors are structured and stable",
+  description:
+    "Transport failures must expose stable codes, safe details, and explicit execution-started semantics.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-103"] },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_STRUCTURED_ERRORS_RULE,
+      "src/transports/types.ts",
+      [
+        "TRANSPORT_ERROR_CODES",
+        "executionStarted: boolean",
+        "provider_plan_not_executable",
+      ],
+      "Transport errors are structured and stable.",
+      "Keep TransportError codes typed, non-sensitive, and explicit about execution start.",
+    ),
+};
+
+export const TRANSPORT_RESULT_NORMALIZATION_RULE: AuditRule = {
+  id: "AUDIT-118",
+  category: "architecture",
+  severity: "error",
+  title: "Transport results normalize guarded backend output",
+  description:
+    "Local-process results must be normalized to the stable TransportResult contract before Provider normalization.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-117"] },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_RESULT_NORMALIZATION_RULE,
+      "src/transports/local-process.ts",
+      [
+        "normalizeLocalProcessResult",
+        "executionStarted",
+        "durationMs",
+        "runtimeStatus",
+      ],
+      "Transport results normalize guarded backend output.",
+      "Keep backend result mapping inside the local-process transport adapter.",
+    ),
+};
+
+export const TRANSPORT_NO_CLI_EXPOSURE_RULE: AuditRule = {
+  id: "AUDIT-119",
+  category: "architecture",
+  severity: "error",
+  title: "Transport execution is absent from the CLI",
+  description:
+    "No public CLI command may import or expose transport execution.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-103"] },
+  check: () => {
+    const source = transportSource("src/cli.ts") ?? "";
+    return !/transports\/|executeTransport|executeProviderPlan/.test(source)
+      ? pass(
+          TRANSPORT_NO_CLI_EXPOSURE_RULE,
+          "Transport execution is absent from the CLI.",
+          ["src/cli.ts"],
+        )
+      : fail(
+          TRANSPORT_NO_CLI_EXPOSURE_RULE,
+          "Transport execution leaked into the CLI.",
+          ["src/cli.ts"],
+          "Keep transport execution Core-only and out of public commands.",
+        );
+  },
+};
+
+export const TRANSPORT_NO_LOOPRUNNER_EXPOSURE_RULE: AuditRule = {
+  id: "AUDIT-120",
+  category: "architecture",
+  severity: "error",
+  title: "Transport execution is absent from LoopRunner",
+  description:
+    "LoopRunner plan mode must not import or invoke transport execution.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-119"] },
+  check: () => {
+    const source = transportSource("src/loop/runner.ts") ?? "";
+    return !/transports\/|executeTransport|executeProviderPlan/.test(source)
+      ? pass(
+          TRANSPORT_NO_LOOPRUNNER_EXPOSURE_RULE,
+          "Transport execution is absent from LoopRunner.",
+          ["src/loop/runner.ts"],
+        )
+      : fail(
+          TRANSPORT_NO_LOOPRUNNER_EXPOSURE_RULE,
+          "Transport execution leaked into LoopRunner.",
+          ["src/loop/runner.ts"],
+          "Keep transport execution outside LoopRunner until an explicit public mode exists.",
+        );
+  },
+};
+
+export const TRANSPORT_DEPENDENCY_DIRECTION_RULE: AuditRule = {
+  id: "AUDIT-121",
+  category: "architecture",
+  severity: "error",
+  title: "Transport dependencies remain unidirectional",
+  description:
+    "Transport modules may depend on local-process runtime contracts and policy types, never Core or upper orchestration layers.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-114"] },
+  check: () => {
+    const files = [
+      "src/transports/types.ts",
+      "src/transports/errors.ts",
+      "src/transports/support.ts",
+      "src/transports/registry.ts",
+      "src/transports/selector.ts",
+      "src/transports/local-process.ts",
+    ];
+    const forbidden =
+      /from\s+["'].*\/(core|commands|loop|providers|audit|reports)\//;
+    const violations = files.filter((path) =>
+      forbidden.test(transportSource(path) ?? ""),
+    );
+    return violations.length === 0
+      ? pass(
+          TRANSPORT_DEPENDENCY_DIRECTION_RULE,
+          "Transport dependencies remain unidirectional.",
+          files,
+        )
+      : fail(
+          TRANSPORT_DEPENDENCY_DIRECTION_RULE,
+          "Transport module imports an upper orchestration layer.",
+          violations,
+          "Keep transports independent from Core, providers, CLI, LoopRunner, reports, and audit.",
+        );
+  },
+};
+
+export const TRANSPORT_CORE_EXECUTION_BOUNDARY_RULE: AuditRule = {
+  id: "AUDIT-122",
+  category: "architecture",
+  severity: "error",
+  title: "Core owns explicit transport execution orchestration",
+  description:
+    "Only the Core helper may compose provider-plan validation, resolution, transport execution, and Provider result normalization.",
+  metadata: { ...TRANSPORT_AUDIT_METADATA, dependsOn: ["AUDIT-121"] },
+  check: () =>
+    verifyTransportSource(
+      TRANSPORT_CORE_EXECUTION_BOUNDARY_RULE,
+      "src/core/transports.ts",
+      [
+        "createTransportRequest",
+        "resolveTransport",
+        "executeTransport",
+        "normalizeProviderTransportResult",
+        "executeProviderPlan",
+      ],
+      "Core owns explicit transport execution orchestration.",
+      "Keep the execution chain explicit and available only through Core helpers.",
+    ),
+};

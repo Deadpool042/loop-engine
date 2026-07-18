@@ -41,6 +41,8 @@ Garder l'humain sur les décisions.
 La couche `src/runtime/` est derrière `src/core/`. V10.0 définit ses contrats
 et stubs ; V10.1 y ajoute un backend local gardé, sans nouvelle commande CLI ni
 mode `execute` public. V10.2 intercale `src/providers/` pour préparer des plans
-fournisseur inertes, jamais des appels IA. Voir
-`docs/architecture/runtime-abstraction.md` et
-`docs/architecture/provider-adapters.md`.
+fournisseur inertes, jamais des appels IA. V10.3 ajoute `src/transports/` : la
+seule frontière qui peut déléguer explicitement au backend `local-process`.
+Voir `docs/architecture/runtime-abstraction.md`,
+`docs/architecture/provider-adapters.md` et
+`docs/architecture/transport-adapters.md`.

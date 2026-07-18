@@ -7,20 +7,20 @@ intégrations futures pour OpenClaw, Claude Code et Codex sans appeler de modèl
 sans réseau, sans lecture de credentials et sans exécution de processus.
 
 Les trois adaptateurs actuels sont des stubs. Ils construisent seulement un
-`ProviderExecutionPlan` inerté avec le statut `not_implemented`.
+`ProviderExecutionPlan` inerte avec le statut `not_implemented`.
 
 ## Frontières
 
 ```text
-CLI -> Core -> RuntimeAdapter -> ProviderAdapter -> execution transport
+CLI -> Core -> RuntimeAdapter -> ProviderAdapter -> TransportAdapter -> LocalProcessTransport
 ```
 
 Le `RuntimeAdapter` pilote le cycle d'exécution général. Le `ProviderAdapter`
 traduit une `RuntimeRequest` normalisée vers un plan spécifique au fournisseur,
-sans décider de permissions ni lancer le transport. Le transport futur pourra
-être `local-process`, mais `local-process` reste une primitive générique : il
-ne connaît aucun fournisseur, aucun format de CLI fournisseur et aucune
-credential.
+sans décider de permissions ni lancer le transport. Depuis V10.3, un
+`TransportAdapter` explicite porte seul la délégation vers le backend
+`local-process`, qui reste une primitive générique : il ne connaît aucun
+fournisseur, aucun format de CLI fournisseur et aucune credential.
 
 Le Core n'importe pas de type OpenClaw, Claude Code ou Codex. Il expose
 uniquement `createProviderRequest`, `resolveProvider` et
@@ -35,10 +35,11 @@ parallèle. Il ne contient ni commande shell, ni exécutable, ni allow-list, ni
 environnement brut, ni secret.
 
 `ProviderExecutionPlan` est un objet inspectable, sérialisable et sans effet
-de bord. En V10.2, son transport est `not_configured`; il ne porte donc ni
-argument de commande spéculatif ni chemin d'exécutable. Les résultats et erreurs
-sont normalisés via des statuts et codes stables, avec l'indication explicite
-qu'aucune exécution n'a commencé.
+de bord. Les stubs V10.2 gardent leur transport `not_configured`; ils ne
+portent donc ni argument de commande spéculatif ni chemin d'exécutable. Un plan
+futur explicitement `ready` pourra déclarer une intention Transport structurée,
+mais devra encore être validé et résolu par le Core avant tout démarrage. Voir
+`transport-adapters.md`.
 
 ## Registre et sélection
 

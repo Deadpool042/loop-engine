@@ -30,6 +30,14 @@ stubs inertes, l'absence de processus, réseau, secrets et environnement, la
 séparation avec `local-process`, l'absence d'exposition CLI/LoopRunner, les
 erreurs structurées et le sens de dépendance.
 
+### Transport adapters explicites (V10.3)
+
+Les règles `AUDIT-103` à `AUDIT-122` vérifient la couche Transport : registre
+statique, sélection déterministe, autorisation explicite, validation du plan
+Provider, délégation exclusive au backend local-process, absence de duplication
+de processus/réseau/secrets, normalisation des résultats et absence
+d’exposition CLI ou LoopRunner.
+
 ## Duplication
 
 ### DUP-001
