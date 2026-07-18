@@ -87,3 +87,10 @@ V11.6 consolide les couches déclaratives V11 sans changer leurs contrats :
 mais partagent désormais les helpers techniques d'immuabilité, métadonnées,
 validation, diagnostics et résumés. Voir
 `docs/architecture/v11-consolidation.md`.
+
+V12.0 ouvre la spécification de la frontière d'exécution. Le RFC définit les
+termes normatifs, les limites de confiance, le modèle d'approbation opérateur,
+l'autorité d'exécution future, le dispatch futur, les cycles Transport/Runtime
+futurs, l'observabilité et les non-objectifs. Il reste documentaire et
+n'introduit aucune exécution. Voir
+`docs/architecture/rfc-execution-boundary-v12.md`.
