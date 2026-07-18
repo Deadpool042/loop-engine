@@ -52,9 +52,19 @@ function printLoopRunResult(result: LoopRunResult): void {
 
   terminal.section("Context package (forecast)");
   if (result.contextPackage) {
-    const { files, omitted, totalCharacters, estimatedTokens, truncated } = result.contextPackage;
-    terminal.info(`Files included: ${files.length} (${totalCharacters} chars, ~${estimatedTokens} tokens)`);
+    const {
+      files,
+      omitted,
+      totalCharacters,
+      estimatedTokens,
+      truncated,
+    } = result.contextPackage;
+
+    terminal.info(
+      `Files included: ${files.length} (${totalCharacters} chars, ~${estimatedTokens} tokens)`,
+    );
     terminal.info(`Omitted: ${omitted.length}`);
+
     if (truncated) {
       terminal.warning("Context was truncated to fit the budget.");
     }
