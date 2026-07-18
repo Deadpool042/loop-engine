@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fail, pass } from "../findings.js";
 import { PUBLIC_COMMANDS } from "../public-commands.js";
-import type { AuditRule } from "../types.js";
+import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 export const CLI_COMMAND_COVERAGE_RULE: AuditRule = {
   id: "CLI-001",

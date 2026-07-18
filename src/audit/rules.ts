@@ -132,9 +132,10 @@ import {
   LOOP_RUNNER_PLAN_MODE_RULE,
   JSON_CHECK_CONTEXT_PACKAGE_ASSERTION_RULE,
 } from "./rules/json.js";
-import type { AuditRule } from "./types.js";
+import { createAuditRuleRegistry } from "./registry.js";
+import type { AuditRuleDefinition } from "./types.js";
 
-export const AUDIT_RULES: readonly AuditRule[] = [
+export const AUDIT_RULES = createAuditRuleRegistry([
   JSON_SCHEMA_VERSION_RULE,
   JSON_CHECK_COVERAGE_RULE,
   AUDIT_JSON_SUMMARY_CONTRACT_RULE,
@@ -263,4 +264,4 @@ export const AUDIT_RULES: readonly AuditRule[] = [
   README_EXECUTION_REPORTING_DOCUMENTATION_RULE,
   EXECUTION_REPORT_GOLDEN_FIXTURES_RULE,
   EXECUTION_REPORT_DETERMINISM_DOCUMENTATION_RULE,
-];
+]) satisfies readonly AuditRuleDefinition[];

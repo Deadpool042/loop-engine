@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { fail, pass } from "../findings.js";
 import { sourceIncludesToken } from "../source.js";
-import type { AuditRule } from "../types.js";
+import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 export const AUDIT_SCORE_EXPOSURE_RULE: AuditRule = {
   id: "AUDIT-001",
@@ -583,8 +583,8 @@ export const AUDIT_RULE_ORDER_RULE: AuditRule = {
     }
 
     const content = readFileSync(rulesPath, "utf8");
-    const registryStart = content.indexOf("export const AUDIT_RULES");
-    const registryEnd = content.indexOf("];", registryStart);
+    const registryStart = content.indexOf("createAuditRuleRegistry([");
+    const registryEnd = content.indexOf("])", registryStart);
     const registry = content.slice(registryStart, registryEnd);
 
     const expectedOrder = [
@@ -799,15 +799,15 @@ export const AUDIT_RULE_REGISTRY_COMPLETENESS_RULE: AuditRule = {
     });
 
     const registryContent = readFileSync(registryPath, "utf8");
-    const registryStart = registryContent.indexOf("export const AUDIT_RULES");
-    const registryEnd = registryContent.indexOf("];", registryStart);
+    const registryStart = registryContent.indexOf("createAuditRuleRegistry([");
+    const registryEnd = registryContent.indexOf("])", registryStart);
 
     if (registryStart < 0 || registryEnd < 0) {
       return fail(
         AUDIT_RULE_REGISTRY_COMPLETENESS_RULE,
         "Audit rule registry cannot be parsed.",
-        ["export const AUDIT_RULES"],
-        "Keep AUDIT_RULES declared as a static array in src/audit/rules.ts.",
+        ["createAuditRuleRegistry(["],
+        "Keep AUDIT_RULES declared through createAuditRuleRegistry in src/audit/rules.ts.",
       );
     }
 
