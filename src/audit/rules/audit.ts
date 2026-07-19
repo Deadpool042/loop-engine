@@ -946,7 +946,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("authorityLifecycleRule(") ||
             ruleSource.includes("bridgeContractRule(") ||
             ruleSource.includes("bridgeRequestRule(") ||
-            ruleSource.includes("executionBridgeRule(");
+            ruleSource.includes("executionBridgeRule(") ||
+            ruleSource.includes("runtimeRequestRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9874,3 +9875,13 @@ export const EXECUTION_BRIDGE_DIAGNOSTICS_RULE: AuditRule = executionBridgeRule(
 export const EXECUTION_BRIDGE_TIME_RULE: AuditRule = executionBridgeRule("AUDIT-335", "architecture", "Execution Bridge uses explicit identifiers and time", "Execution Bridge must use caller-supplied identifiers and time.", "src/bridge/execution/types.ts", ["evaluatedAt: string", "id: string"]);
 export const EXECUTION_BRIDGE_DOCUMENT_RULE: AuditRule = executionBridgeRule("AUDIT-336", "docs", "Execution Bridge RFC documents execution boundary semantics", "RFC must state the non-operational execution boundary.", "docs/architecture/execution-bridge-rfc.md", ["not authorization", "not execution", "executionAllowed` remains false"]);
 export const EXECUTION_BRIDGE_NO_SURFACE_RULE: AuditRule = executionBridgeRule("AUDIT-337", "architecture", "Execution Bridge exposes no runtime transport or provider implementation", "Execution Bridge must remain implementation-neutral.", "src/bridge/execution/evaluation.ts", ["Execution Bridge never authorizes execution"]);
+
+function runtimeRequestRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.7", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required Runtime Request invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
+export const RUNTIME_REQUEST_MODULE_RULE: AuditRule = runtimeRequestRule("AUDIT-338", "architecture", "Runtime Request module exists", "Runtime Request must expose declarative contracts.", "src/runtime/request/types.ts", ["RuntimeRequestInput", "RuntimeRequestResult"]);
+export const RUNTIME_REQUEST_IMMUTABLE_RULE: AuditRule = runtimeRequestRule("AUDIT-339", "architecture", "Runtime Request contracts are immutable and default denied", "Runtime Request must preserve denied execution flags.", "src/runtime/request/types.ts", ["executionAllowed: false", "executionStarted: false"]);
+export const RUNTIME_REQUEST_BRIDGE_RULE: AuditRule = runtimeRequestRule("AUDIT-340", "architecture", "Runtime Request requires valid Execution Bridge", "Runtime Request must require ready Execution Bridge evidence.", "src/runtime/request/validation.ts", ["runtime_request_bridge_invalid"]);
+export const RUNTIME_REQUEST_NON_OPERATIONAL_RULE: AuditRule = runtimeRequestRule("AUDIT-341", "architecture", "Runtime Request remains non-operational", "Runtime Request must not authorize execution.", "src/runtime/request/evaluation.ts", ["Runtime Request never authorizes execution"]);
+export const RUNTIME_REQUEST_DIAGNOSTICS_RULE: AuditRule = runtimeRequestRule("AUDIT-342", "architecture", "Runtime Request diagnostics are deterministic", "Runtime Request diagnostics must be stable and safe.", "src/runtime/request/types.ts", ["RuntimeRequestErrorCode"]);
+export const RUNTIME_REQUEST_TIME_RULE: AuditRule = runtimeRequestRule("AUDIT-343", "architecture", "Runtime Request uses explicit identifiers and timestamps", "Runtime Request must use caller-supplied identifiers and timestamps.", "src/runtime/request/types.ts", ["createdAt: string", "id: string"]);
+export const RUNTIME_REQUEST_DOCUMENT_RULE: AuditRule = runtimeRequestRule("AUDIT-344", "docs", "Runtime Request RFC documents runtime-request semantics", "RFC must state the non-operational runtime-neutral request semantics.", "docs/architecture/runtime-request-rfc.md", ["not runtime execution", "not a runtime adapter", "executionAllowed` remains false"]);
+export const RUNTIME_REQUEST_NO_SURFACE_RULE: AuditRule = runtimeRequestRule("AUDIT-345", "architecture", "Runtime Request exposes no runtime implementation", "Runtime Request must remain implementation-neutral.", "src/runtime/request/evaluation.ts", ["Runtime Request never authorizes execution"]);
