@@ -1,0 +1,12 @@
+export type BridgeRequestId = string;
+export type BridgeRequestVersion = string;
+export type BridgeRequestKind = "bridge_handoff";
+export type BridgeRequestReference = Readonly<{ id: string; version: string }>;
+export type BridgeRequestPayload = Readonly<Record<string, string | boolean | number | readonly string[]>>;
+export type BridgeRequestInput = Readonly<{ id: BridgeRequestId; version: BridgeRequestVersion; schemaVersion: "bridge-request-rfc-v13.5"; kind: BridgeRequestKind; createdAt: string; contract: BridgeRequestReference & Readonly<{ eligible: boolean; executionAllowed: false; executionStarted: false }>; lifecycle: BridgeRequestReference & Readonly<{ state: "active" | "expired" | "revoked" | "superseded" }>; authority: BridgeRequestReference; approval: BridgeRequestReference; verification: BridgeRequestReference; descriptor: BridgeRequestReference; handoff: BridgeRequestReference; policy: BridgeRequestReference; evidenceReferences: readonly string[]; payload: BridgeRequestPayload }>;
+export type BridgeRequestCheck = Readonly<{ id: string; passed: boolean; reason: string }>;
+export type BridgeRequestEvidence = Readonly<{ id: string; type: "declared_reference" }>;
+export const BRIDGE_REQUEST_ERROR_CODES = ["bridge_request_input_missing", "bridge_request_input_invalid", "bridge_request_kind_unsupported", "bridge_request_id_invalid", "bridge_request_version_invalid", "bridge_request_contract_reference_missing", "bridge_request_contract_not_eligible", "bridge_request_contract_execution_flag_invalid", "bridge_request_lifecycle_inactive", "bridge_request_evidence_incomplete", "bridge_request_timestamp_missing", "bridge_request_payload_invalid", "bridge_request_payload_operational", "bridge_request_not_constructible"] as const;
+export type BridgeRequestErrorCode = (typeof BRIDGE_REQUEST_ERROR_CODES)[number];
+export type BridgeRequestError = Readonly<{ code: BridgeRequestErrorCode; message: string; executionAllowed: false; executionStarted: false }>;
+export type BridgeRequestResult = Readonly<{ input: BridgeRequestInput; checks: readonly BridgeRequestCheck[]; evidence: readonly BridgeRequestEvidence[]; diagnostics: readonly BridgeRequestError[]; structurallyValid: boolean; sourceContractEligible: boolean; referencesConsistent: boolean; payloadSerializable: boolean; payloadInert: boolean; requestConstructible: boolean; bridgeConsumptionEligible: boolean; executionAllowed: false; executionStarted: false }>;
