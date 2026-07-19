@@ -125,3 +125,4 @@ cycle de vie explicite, traçabilité de revue, portée, version, expiration et
 révocation. Une approbation reste une preuve et ne crée ni Bridge ni exécution.
 Voir `docs/architecture/operator-approval-rfc.md`.
  - [Authority Verification RFC](architecture/authority-verification-rfc.md) — V13.2 deterministic consistency assessment for authority and operator-approval evidence; it never authorizes execution.
+ - [Revocation & Expiry Lifecycle RFC](architecture/revocation-expiry-rfc.md) — V13.3 declarative lifecycle evidence for expiry, revocation, supersession, and replacement.

@@ -942,7 +942,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("noOperatorApprovalRfcSurfaceRule(") ||
             ruleSource.includes("authorityVerificationRfcRule(") ||
             ruleSource.includes("authorityVerificationRfcDocumentRule(") ||
-            ruleSource.includes("noAuthorityVerificationRfcSurfaceRule(");
+            ruleSource.includes("noAuthorityVerificationRfcSurfaceRule(") ||
+            ruleSource.includes("authorityLifecycleRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9833,3 +9834,10 @@ export const AUTHORITY_VERIFICATION_RFC_TIME_RULE: AuditRule = authorityVerifica
 export const AUTHORITY_VERIFICATION_RFC_DIAGNOSTICS_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-307", "architecture", "Authority verification emits safe deterministic diagnostics", "Errors must be stable, safe, and non-starting.", ["AUDIT-306"], (rule) => transportRequestContains(rule, "src/authority/verification/types.ts", ["AuthorityVerificationErrorCode", "verification_input_missing", "verification_unsupported", "executionAllowed: false", "executionStarted: false"], "Authority verification emits safe deterministic diagnostics."));
 export const AUTHORITY_VERIFICATION_RFC_DEFAULT_DENY_RULE: AuditRule = authorityVerificationRfcDocumentRule("AUDIT-308", "Authority verification documents non-authorizing default deny", ["AUDIT-307"], ["not verified", "MUST NOT be considered authorization", "executionAllowed: false", "executionStarted: false"]);
 export const AUTHORITY_VERIFICATION_RFC_NO_EXECUTION_RULE: AuditRule = noAuthorityVerificationRfcSurfaceRule("AUDIT-309", "Authority Verification RFC has no operational surface", ["AUDIT-308"]);
+
+const AUTHORITY_LIFECYCLE_FILES = ["types.ts", "errors.ts", "validation.ts", "evaluation.ts", "support.ts", "index.ts"].map((file) => `src/authority/lifecycle/${file}`);
+function authorityLifecycleRule(id: string, category: AuditRule["category"], title: string, tokens: readonly string[], file: string): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description: "V13.3 lifecycle RFC must remain declarative, deterministic, and default-denied.", metadata: { introducedIn: "V13.3", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: id === "AUDIT-310" ? ["AUDIT-309"] : [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const content = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !content.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required V13.3 lifecycle evidence.") : pass(rule, title + ".", tokens); } }; return rule; }
+export const AUTHORITY_LIFECYCLE_RFC_MODULE_RULE: AuditRule = authorityLifecycleRule("AUDIT-310", "architecture", "Authority lifecycle module exists", ["AuthorityLifecycleId", "AuthorityLifecycleRFC"], "src/authority/lifecycle/types.ts");
+export const AUTHORITY_LIFECYCLE_RFC_CONTRACT_RULE: AuditRule = authorityLifecycleRule("AUDIT-311", "architecture", "Authority lifecycle contracts are immutable and default denied", ["AuthorityLifecycleRFC", "AuthorityLifecycleEvent", "AuthorityLifecycleState", "executionAllowed: false", "executionStarted: false"], "src/authority/lifecycle/types.ts");
+export const AUTHORITY_LIFECYCLE_RFC_EVALUATION_RULE: AuditRule = authorityLifecycleRule("AUDIT-312", "architecture", "Authority lifecycle evaluates expiry, revocation, supersession, replacement and active state", ["expired", "revoked", "superseded", "replaced", "not_yet_valid", "active"], "src/authority/lifecycle/evaluation.ts");
+export const AUTHORITY_LIFECYCLE_RFC_DOCUMENT_RULE: AuditRule = authorityLifecycleRule("AUDIT-313", "docs", "Revocation and expiry RFC documents lifecycle semantics and security", ["Revocation & Expiry Lifecycle RFC", "Expiry is a time-based", "Revocation is an explicit", "`active` does not mean approved", "executionAllowed: false"], "docs/architecture/revocation-expiry-rfc.md");

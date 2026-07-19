@@ -311,3 +311,4 @@ La documentation complète du contrat est disponible dans :
 docs/architecture/execution-reporting.md
 ```
  - [Authority Verification RFC](docs/architecture/authority-verification-rfc.md) — V13.2 declarative verification of authority and approval evidence; verification is not execution authority.
+ - [Revocation & Expiry Lifecycle RFC](docs/architecture/revocation-expiry-rfc.md) — V13.3 declarative governance lifecycle; no lifecycle state authorizes execution.
