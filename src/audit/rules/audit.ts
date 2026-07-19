@@ -950,7 +950,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("runtimeRequestRule(") ||
             ruleSource.includes("runtimeResolutionRule(") ||
             ruleSource.includes("runtimeDescriptorRule(") ||
-            ruleSource.includes("runtimeRegistryRule(");
+            ruleSource.includes("runtimeRegistryRule(") ||
+            ruleSource.includes("runtimeCapabilityRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9918,3 +9919,13 @@ export const RUNTIME_REGISTRY_DETERMINISM_RULE: AuditRule = runtimeRegistryRule(
 export const RUNTIME_REGISTRY_IDENTIFIERS_RULE: AuditRule = runtimeRegistryRule("AUDIT-367", "architecture", "Runtime Registry uses explicit identifiers and versions", "Runtime Registry must require explicit id and version.", "src/runtime/registry/types.ts", ["id: string", "version: string"]);
 export const RUNTIME_REGISTRY_DOCUMENT_RULE: AuditRule = runtimeRegistryRule("AUDIT-368", "docs", "Runtime Registry RFC documents registry semantics", "RFC must state metadata-only registry semantics.", "docs/architecture/runtime-registry-rfc.md", ["metadata only", "not runtime implementation"]);
 export const RUNTIME_REGISTRY_NO_SURFACE_RULE: AuditRule = runtimeRegistryRule("AUDIT-369", "architecture", "Runtime Registry exposes no runtime implementation or adapter", "Runtime Registry must not expose runtime implementations.", "src/runtime/registry/evaluation.ts", ["Runtime Registry stores metadata only and never executes"]);
+
+function runtimeCapabilityRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.11", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required Runtime Capability invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
+export const RUNTIME_CAPABILITY_MODULE_RULE: AuditRule = runtimeCapabilityRule("AUDIT-370", "architecture", "Runtime Capability module exists", "Runtime Capability must expose declarative contracts.", "src/runtime/capability/types.ts", ["RuntimeCapabilityInput", "RuntimeCapabilityResult"]);
+export const RUNTIME_CAPABILITY_IMMUTABLE_RULE: AuditRule = runtimeCapabilityRule("AUDIT-371", "architecture", "Runtime Capability contracts are immutable", "Runtime Capability must freeze metadata.", "src/runtime/capability/support.ts", ["Object.freeze"]);
+export const RUNTIME_CAPABILITY_METADATA_RULE: AuditRule = runtimeCapabilityRule("AUDIT-372", "architecture", "Runtime Capability contains metadata only", "Runtime Capability must expose metadata-only fields.", "src/runtime/capability/types.ts", ["supportedFeatures", "declaredConstraints", "compatibilityReferences"]);
+export const RUNTIME_CAPABILITY_NON_OPERATIONAL_RULE: AuditRule = runtimeCapabilityRule("AUDIT-373", "architecture", "Runtime Capability remains non-operational", "Runtime Capability must not execute.", "src/runtime/capability/evaluation.ts", ["Runtime Capability is metadata only and never executes"]);
+export const RUNTIME_CAPABILITY_DETERMINISM_RULE: AuditRule = runtimeCapabilityRule("AUDIT-374", "architecture", "Runtime Capability is deterministic", "Runtime Capability metadata ordering must be stable.", "src/runtime/capability/evaluation.ts", ["sort()"]);
+export const RUNTIME_CAPABILITY_IDENTIFIERS_RULE: AuditRule = runtimeCapabilityRule("AUDIT-375", "architecture", "Runtime Capability uses explicit identifiers and versions", "Runtime Capability must require explicit id and version.", "src/runtime/capability/types.ts", ["id: string", "version: string"]);
+export const RUNTIME_CAPABILITY_DOCUMENT_RULE: AuditRule = runtimeCapabilityRule("AUDIT-376", "docs", "Runtime Capability RFC documents capability semantics", "RFC must state metadata-only capability semantics.", "docs/architecture/runtime-capability-rfc.md", ["metadata only", "not runtime implementation"]);
+export const RUNTIME_CAPABILITY_NO_SURFACE_RULE: AuditRule = runtimeCapabilityRule("AUDIT-377", "architecture", "Runtime Capability exposes no runtime implementation or adapter", "Runtime Capability must not expose runtime implementations.", "src/runtime/capability/evaluation.ts", ["Runtime Capability is metadata only and never executes"]);
