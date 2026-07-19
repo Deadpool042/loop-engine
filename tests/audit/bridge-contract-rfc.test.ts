@@ -1,0 +1,4 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { BRIDGE_CONTRACT_DIAGNOSTICS_RULE, BRIDGE_CONTRACT_DOCUMENT_RULE, BRIDGE_CONTRACT_IMMUTABLE_RULE, BRIDGE_CONTRACT_MODULE_RULE, BRIDGE_CONTRACT_NO_SURFACE_RULE, BRIDGE_CONTRACT_TIME_RULE, BRIDGE_CONTRACT_VALIDATION_RULE } from "../../src/audit/rules/audit.js";
+test("bridge contract audit rules are contiguous and pass", () => { const rules = [BRIDGE_CONTRACT_MODULE_RULE, BRIDGE_CONTRACT_IMMUTABLE_RULE, BRIDGE_CONTRACT_VALIDATION_RULE, BRIDGE_CONTRACT_TIME_RULE, BRIDGE_CONTRACT_DIAGNOSTICS_RULE, BRIDGE_CONTRACT_DOCUMENT_RULE, BRIDGE_CONTRACT_NO_SURFACE_RULE]; assert.deepEqual(rules.map((rule) => rule.id), ["AUDIT-314", "AUDIT-315", "AUDIT-316", "AUDIT-317", "AUDIT-318", "AUDIT-319", "AUDIT-320"]); assert.ok(rules.every((rule) => rule.check().status === "pass")); });

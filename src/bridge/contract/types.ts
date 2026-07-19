@@ -1,0 +1,14 @@
+export type BridgeContractId = string;
+export type BridgeContractVersion = string;
+export type BridgeContractMetadata = Readonly<Record<string, unknown>>;
+export type BridgeContractSubject = Readonly<{ authorityId: string; authorityVersion: string; approvalId: string; approvalVersion: string; verificationId: string; verificationVersion: string; lifecycleId: string; lifecycleVersion: string; lifecycleState: "active" | "not_yet_valid" | "expired" | "revoked" | "superseded" | "replaced" | "invalid" | "unsupported"; descriptorId: string; descriptorVersion: string; handoffId: string; handoffVersion: string; providerId: string; protocolId: string; mappingId: string; intentId: string; runtimeCapabilityId: string; transportCapabilityId: string; policyId: string }>;
+export type BridgeContractInput = Readonly<{ kind: "declarative_handoff"; subject: BridgeContractSubject; evaluationAt: string; evidenceReferences: readonly string[] }>;
+export type BridgeContractContext = Readonly<{ supportedKinds: readonly string[]; expectedPolicyId: string }>;
+export type BridgeContractOutput = Readonly<{ bridgeEligible: boolean; executionAllowed: false; executionStarted: false }>;
+export type BridgeContractCheck = Readonly<{ id: string; passed: boolean; reason: string }>;
+export type BridgeContractEvidence = Readonly<{ id: string; type: string }>;
+export type BridgeContractRFC = Readonly<{ id: BridgeContractId; version: BridgeContractVersion; input: BridgeContractInput; checks: readonly BridgeContractCheck[]; evidence: readonly BridgeContractEvidence[]; metadata: BridgeContractMetadata; executionAllowed: false; executionStarted: false }>;
+export const BRIDGE_CONTRACT_ERROR_CODES = ["bridge_input_missing", "bridge_input_invalid", "bridge_reference_missing", "bridge_reference_inconsistent", "bridge_version_inconsistent", "bridge_lifecycle_inactive", "bridge_evidence_incomplete", "bridge_evaluation_time_missing", "bridge_unsupported", "bridge_not_eligible"] as const;
+export type BridgeContractErrorCode = (typeof BRIDGE_CONTRACT_ERROR_CODES)[number];
+export type BridgeContractError = Readonly<{ code: BridgeContractErrorCode; message: string; executionAllowed: false; executionStarted: false }>;
+export type BridgeContractResult = Readonly<{ contract: BridgeContractRFC; structurallyValid: boolean; contractSatisfied: boolean; bridgeEligible: boolean; diagnostics: readonly BridgeContractError[]; output: BridgeContractOutput; executionAllowed: false; executionStarted: false }>;
