@@ -945,7 +945,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("noAuthorityVerificationRfcSurfaceRule(") ||
             ruleSource.includes("authorityLifecycleRule(") ||
             ruleSource.includes("bridgeContractRule(") ||
-            ruleSource.includes("bridgeRequestRule(");
+            ruleSource.includes("bridgeRequestRule(") ||
+            ruleSource.includes("executionBridgeRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9863,3 +9864,13 @@ export const BRIDGE_REQUEST_PAYLOAD_RULE: AuditRule = bridgeRequestRule("AUDIT-3
 export const BRIDGE_REQUEST_DIAGNOSTICS_RULE: AuditRule = bridgeRequestRule("AUDIT-327", "architecture", "Bridge Request diagnostics are deterministic", "Bridge Request diagnostics must be safe and stable.", "src/bridge/request/types.ts", ["BridgeRequestErrorCode"]);
 export const BRIDGE_REQUEST_DOCUMENT_RULE: AuditRule = bridgeRequestRule("AUDIT-328", "docs", "Bridge Request RFC documents non-authorizing semantics", "RFC must describe a non-operational default-deny request.", "docs/architecture/bridge-request-rfc.md", ["not authorization", "not execution", "executionAllowed` remains false"]);
 export const BRIDGE_REQUEST_NO_SURFACE_RULE: AuditRule = bridgeRequestRule("AUDIT-329", "architecture", "Bridge Request RFC has no operational surface", "Bridge Request must not invoke operational layers.", "src/bridge/request/evaluation.ts", ["Bridge request never authorizes execution"]);
+
+function executionBridgeRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.6", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required Execution Bridge invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
+export const EXECUTION_BRIDGE_MODULE_RULE: AuditRule = executionBridgeRule("AUDIT-330", "architecture", "Execution Bridge module exists", "Execution Bridge must expose declarative contracts.", "src/bridge/execution/types.ts", ["ExecutionBridgeInput", "ExecutionBridgeResult"]);
+export const EXECUTION_BRIDGE_IMMUTABLE_RULE: AuditRule = executionBridgeRule("AUDIT-331", "architecture", "Execution Bridge contracts are immutable and default denied", "Execution Bridge must preserve denied execution flags.", "src/bridge/execution/types.ts", ["executionAllowed: false", "executionStarted: false"]);
+export const EXECUTION_BRIDGE_REQUEST_RULE: AuditRule = executionBridgeRule("AUDIT-332", "architecture", "Execution Bridge requires valid Bridge Request", "Execution Bridge must require constructible Bridge Request evidence.", "src/bridge/execution/validation.ts", ["execution_bridge_request_not_constructible"]);
+export const EXECUTION_BRIDGE_NON_OPERATIONAL_RULE: AuditRule = executionBridgeRule("AUDIT-333", "architecture", "Execution Bridge remains non-operational", "Execution Bridge must not authorize execution.", "src/bridge/execution/evaluation.ts", ["Execution Bridge never authorizes execution"]);
+export const EXECUTION_BRIDGE_DIAGNOSTICS_RULE: AuditRule = executionBridgeRule("AUDIT-334", "architecture", "Execution Bridge diagnostics are deterministic", "Execution Bridge diagnostics must be stable and safe.", "src/bridge/execution/types.ts", ["ExecutionBridgeErrorCode"]);
+export const EXECUTION_BRIDGE_TIME_RULE: AuditRule = executionBridgeRule("AUDIT-335", "architecture", "Execution Bridge uses explicit identifiers and time", "Execution Bridge must use caller-supplied identifiers and time.", "src/bridge/execution/types.ts", ["evaluatedAt: string", "id: string"]);
+export const EXECUTION_BRIDGE_DOCUMENT_RULE: AuditRule = executionBridgeRule("AUDIT-336", "docs", "Execution Bridge RFC documents execution boundary semantics", "RFC must state the non-operational execution boundary.", "docs/architecture/execution-bridge-rfc.md", ["not authorization", "not execution", "executionAllowed` remains false"]);
+export const EXECUTION_BRIDGE_NO_SURFACE_RULE: AuditRule = executionBridgeRule("AUDIT-337", "architecture", "Execution Bridge exposes no runtime transport or provider implementation", "Execution Bridge must remain implementation-neutral.", "src/bridge/execution/evaluation.ts", ["Execution Bridge never authorizes execution"]);
