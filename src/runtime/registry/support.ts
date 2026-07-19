@@ -1,0 +1,1 @@
+export function freezeRuntimeRegistryValue<T>(value: T): T { if (Array.isArray(value)) value.forEach(freezeRuntimeRegistryValue); else if (value && typeof value === "object" && !Object.isFrozen(value)) Object.values(value as Record<string, unknown>).forEach(freezeRuntimeRegistryValue); if (value && typeof value === "object") Object.freeze(value); return value; }

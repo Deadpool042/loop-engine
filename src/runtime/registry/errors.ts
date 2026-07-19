@@ -1,0 +1,1 @@
+import { freezeRuntimeRegistryValue } from "./support.js"; import type { RuntimeRegistryError, RuntimeRegistryErrorCode } from "./types.js"; export const runtimeRegistryError = (code: RuntimeRegistryErrorCode, message: string): RuntimeRegistryError => freezeRuntimeRegistryValue({ code, message });

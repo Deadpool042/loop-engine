@@ -949,7 +949,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("executionBridgeRule(") ||
             ruleSource.includes("runtimeRequestRule(") ||
             ruleSource.includes("runtimeResolutionRule(") ||
-            ruleSource.includes("runtimeDescriptorRule(");
+            ruleSource.includes("runtimeDescriptorRule(") ||
+            ruleSource.includes("runtimeRegistryRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9907,3 +9908,13 @@ export const RUNTIME_DESCRIPTOR_DETERMINISM_RULE: AuditRule = runtimeDescriptorR
 export const RUNTIME_DESCRIPTOR_IDENTIFIERS_RULE: AuditRule = runtimeDescriptorRule("AUDIT-359", "architecture", "Runtime Descriptor uses explicit identifiers and versions", "Runtime Descriptor must require explicit id and version.", "src/runtime/descriptor/types.ts", ["id: string", "version: string"]);
 export const RUNTIME_DESCRIPTOR_DOCUMENT_RULE: AuditRule = runtimeDescriptorRule("AUDIT-360", "docs", "Runtime Descriptor RFC documents metadata semantics", "RFC must state metadata-only non-operational semantics.", "docs/architecture/runtime-descriptor-rfc.md", ["metadata only", "not a runtime implementation"]);
 export const RUNTIME_DESCRIPTOR_NO_SURFACE_RULE: AuditRule = runtimeDescriptorRule("AUDIT-361", "architecture", "Runtime Descriptor exposes no executable runtime implementation", "Runtime Descriptor must not expose execution primitives.", "src/runtime/descriptor/evaluation.ts", ["Runtime Descriptor is metadata only and never executes"]);
+
+function runtimeRegistryRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.10", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required Runtime Registry invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
+export const RUNTIME_REGISTRY_MODULE_RULE: AuditRule = runtimeRegistryRule("AUDIT-362", "architecture", "Runtime Registry module exists", "Runtime Registry must expose declarative contracts.", "src/runtime/registry/types.ts", ["RuntimeRegistryInput", "RuntimeRegistryResult"]);
+export const RUNTIME_REGISTRY_IMMUTABLE_RULE: AuditRule = runtimeRegistryRule("AUDIT-363", "architecture", "Runtime Registry is immutable", "Runtime Registry must freeze its collections.", "src/runtime/registry/support.ts", ["Object.freeze"]);
+export const RUNTIME_REGISTRY_DESCRIPTOR_RULE: AuditRule = runtimeRegistryRule("AUDIT-364", "architecture", "Runtime Registry stores Runtime Descriptor metadata only", "Runtime Registry must store descriptor metadata only.", "src/runtime/registry/types.ts", ["RuntimeRegistryDescriptor", "capabilityReferences"]);
+export const RUNTIME_REGISTRY_NON_OPERATIONAL_RULE: AuditRule = runtimeRegistryRule("AUDIT-365", "architecture", "Runtime Registry remains non-operational", "Runtime Registry must not execute.", "src/runtime/registry/evaluation.ts", ["Runtime Registry stores metadata only and never executes"]);
+export const RUNTIME_REGISTRY_DETERMINISM_RULE: AuditRule = runtimeRegistryRule("AUDIT-366", "architecture", "Runtime Registry indexing is deterministic", "Runtime Registry indexing must use stable ordering.", "src/runtime/registry/evaluation.ts", ["sort((left, right) => left.id.localeCompare(right.id))"]);
+export const RUNTIME_REGISTRY_IDENTIFIERS_RULE: AuditRule = runtimeRegistryRule("AUDIT-367", "architecture", "Runtime Registry uses explicit identifiers and versions", "Runtime Registry must require explicit id and version.", "src/runtime/registry/types.ts", ["id: string", "version: string"]);
+export const RUNTIME_REGISTRY_DOCUMENT_RULE: AuditRule = runtimeRegistryRule("AUDIT-368", "docs", "Runtime Registry RFC documents registry semantics", "RFC must state metadata-only registry semantics.", "docs/architecture/runtime-registry-rfc.md", ["metadata only", "not runtime implementation"]);
+export const RUNTIME_REGISTRY_NO_SURFACE_RULE: AuditRule = runtimeRegistryRule("AUDIT-369", "architecture", "Runtime Registry exposes no runtime implementation or adapter", "Runtime Registry must not expose runtime implementations.", "src/runtime/registry/evaluation.ts", ["Runtime Registry stores metadata only and never executes"]);
