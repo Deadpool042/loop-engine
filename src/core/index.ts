@@ -2,6 +2,7 @@
 export * from "./audit.js";
 export * from "./loop.js";
 export * from "./runtime.js";
+export * from "./runtime-execution-bridge.js";
 export {
   createRuntimeCapability,
   createRuntimeCapabilityRequirement,

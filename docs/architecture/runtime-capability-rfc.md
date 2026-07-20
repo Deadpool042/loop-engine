@@ -59,6 +59,12 @@ payload. It always preserves `executionAllowed: false` and
 remain separate legacy operational surfaces and are neither called nor inferred
 by capability selection.
 
+V13.15 introduces an opt-in Core bridge after this declarative selection. The
+bridge may translate a selected descriptor identifier through an explicit
+`descriptorId -> RuntimeId` mapping and then call V10 APIs, but Runtime
+Capability itself still stops at compatibility evidence and never owns adapter
+resolution or execution.
+
 ## Runtime Capability and AgentCapability
 
 `RuntimeCapability` and `AgentCapability` are intentionally different:

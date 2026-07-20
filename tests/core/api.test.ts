@@ -9,6 +9,7 @@ import {
   createDeclarativeRuntimeRequest,
   createRuntimeRequest,
   evaluateRuntimeCapability,
+  executeDeclarativeRuntime,
   executeRuntime,
   generateAuditReport,
   generateAuditRuleManifest,
@@ -21,6 +22,7 @@ import {
   generateWorkspaceSummaryReport,
   loadConfig,
   resolveRuntime,
+  resolveDeclarativeRuntimeExecution,
   runLoopPlan,
   selectRuntimeByCapabilities,
   summarizeRuntimeCapability,
@@ -54,6 +56,8 @@ describe("Core public API", () => {
     assert.equal(typeof selectRuntimeByCapabilities, "function");
     assert.equal(typeof createDeclarativeRuntimeRequest, "function");
     assert.equal(typeof createDeclarativeRuntimeRegistry, "function");
+    assert.equal(typeof resolveDeclarativeRuntimeExecution, "function");
+    assert.equal(typeof executeDeclarativeRuntime, "function");
     assert.equal(typeof createRuntimeRequest, "function");
     assert.equal(typeof resolveRuntime, "function");
     assert.equal(typeof executeRuntime, "function");

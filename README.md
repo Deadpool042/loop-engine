@@ -109,11 +109,18 @@ Cette boucle reste déterministe :
 
 - `src/cli.ts` : routeur CLI minimal.
 - `src/commands/` : commandes utilisateur et cas d'usage.
-- `src/core/` : primitives bas niveau comme config, Git, docs et résolution projet.
+- `src/core/` : primitives bas niveau comme config, Git, docs, résolution projet et surfaces internes opt-in.
 - `src/intelligence/` : états calculés, ProjectSnapshot, roadmap et sélection de candidats.
 - `src/ui/` : helpers d'affichage terminal.
 
 Les commandes doivent consommer le `ProjectSnapshot` plutôt que relire directement Git, les docs ou la roadmap.
+
+Depuis V13.15, Core expose aussi le bridge opt-in
+`resolveDeclarativeRuntimeExecution` / `executeDeclarativeRuntime`. Il compose
+la sélection déclarative V13, un mapping explicite `descriptorId -> RuntimeId`,
+et les APIs V10 existantes `createRuntimeRequest`, `resolveRuntime` et
+`executeRuntime`. Il ne modifie ni le CLI, ni le JSON public, ni
+`LoopRunResult`, et ne crée aucun provider ou adapter réel.
 
 Voir aussi :
 

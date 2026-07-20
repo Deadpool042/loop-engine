@@ -28,6 +28,10 @@ RuntimeRequest is **not runtime execution**, **not a runtime adapter**, **not a 
 
 Execution Bridge remains the sole upstream evidence reference. RuntimeRequest validates its identifier, version, ready state, denied execution flags, and the structure of any capability requirements. It does not evaluate those requirements, select a runtime, or reinterpret governance, approval, eligibility, authority, transport, provider, or agent policy. Runtime Capability requirements are distinct from `AgentCapability` and grant no permission. Future Runtime Resolution and a future Runtime Adapter, if ever introduced, MUST be specified by a separate RFC and MUST NOT be inferred from this contract.
 
+V13.15 does not change this contract. The opt-in Core bridge consumes a valid
+declarative request as input evidence, but the request still carries no adapter,
+provider, command, runtime handle, V10 `RuntimeRequest`, or execution authority.
+
 ## Validation and deterministic model
 
 Validation is pure and deterministic. A request requires an explicit identifier, version, timestamp, and valid Execution Bridge reference. Diagnostics use stable codes, are sorted deterministically, and contain only safe declarative information. Missing or invalid evidence makes `requestConstructible` false; it never makes a request executable.

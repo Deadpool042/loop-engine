@@ -53,6 +53,50 @@ déclarative par capabilities vit dans `runtime/resolution/selection.ts` et ne
 retourne jamais un adapter ; `resolveRuntime` et `executeRuntime` restent des
 surfaces V10 séparées.
 
+## Bridge déclaratif V13.15
+
+V13.15 ajoute une façade Core opt-in entre la résolution déclarative V13 et
+l’exécution abstraite V10. Elle ne fusionne pas les modèles :
+
+```text
+Declarative Runtime Request
+  -> Capability validation
+  -> Compatibility evaluation
+  -> Eligible descriptor selection
+  -> explicit descriptorId -> RuntimeId mapping
+  -> V10 resolveRuntime
+  -> V10 executeRuntime
+```
+
+La phase pure `resolveDeclarativeRuntimeExecution` reçoit une requête
+déclarative, un registre déclaratif, un catalogue de `RuntimeCapability`, un
+mapping explicite `descriptorId -> RuntimeId` et un `LoopRunResult` déjà
+calculé. Elle délègue la sélection V13 à `selectRuntimeByCapabilities`, associe
+le descriptor choisi au runtime V10 via le mapping fourni, construit une
+`RuntimeRequest` V10 avec `createRuntimeRequest`, puis vérifie `resolveRuntime`.
+Elle ne lit ni horloge, ni filesystem, ni environnement, ne lance aucun
+processus et ne retourne aucun adapter ou callback.
+
+La phase avec effets `executeDeclarativeRuntime` réutilise la résolution pure
+et délègue ensuite uniquement à `executeRuntime`. L’exécution V10 reste donc la
+seule couche responsable d’appeler l’adapter sélectionné. Le bridge ne réordonne
+pas les descriptors après la sélection V13 et conserve le tie-break lexical
+défini par `selectRuntimeByCapabilities`.
+
+Les erreurs typées distinguent :
+
+- requête déclarative invalide ;
+- absence de descriptor compatible ;
+- descriptor sélectionné sans mapping V10 ;
+- impossibilité de construire une `RuntimeRequest` V10 ;
+- runtime V10 non résolu par le registre V10 ;
+- statut d’exécution V10 non réussi.
+
+Le bridge ne modifie pas `RuntimeRequest`, `RuntimeResult`, `LoopRunResult`, le
+CLI ou les schémas JSON publics. Les appels V10 historiques à
+`createRuntimeRequest`, `resolveRuntime` et `executeRuntime` restent utilisables
+sans configuration déclarative.
+
 `RuntimeResult` est additif par conception : runtime, statut, horodatages,
 diagnostics, sortie et métadonnées. V10.1 ajoute optionnellement `exitCode`,
 `signal`, `stdout`, `stderr`, une erreur structurée et les événements. Les

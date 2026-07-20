@@ -953,7 +953,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("runtimeRegistryRule(") ||
             ruleSource.includes("runtimeCapabilityRule(") ||
             ruleSource.includes("runtimeCapabilityReconciliationRule(") ||
-            ruleSource.includes("standardTestDiscoveryRule(");
+            ruleSource.includes("standardTestDiscoveryRule(") ||
+            ruleSource.includes("declarativeRuntimeExecutionBridgeRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -10053,3 +10054,171 @@ function standardTestDiscoveryRule(id: string): AuditRule {
 
 export const STANDARD_TEST_DISCOVERY_INCLUDES_EXECUTION_RULE: AuditRule =
   standardTestDiscoveryRule("AUDIT-383");
+
+export type DeclarativeRuntimeExecutionBridgeInvariant = Readonly<{
+  file: string;
+  requiredTokens: readonly string[];
+  forbiddenTokens: readonly string[];
+}>;
+
+export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_INVARIANTS = {
+  module: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "resolveDeclarativeRuntimeExecution",
+      "executeDeclarativeRuntime",
+      "DeclarativeRuntimeExecutionBridgeInput",
+      "DeclarativeRuntimeExecutionBridgeErrorCode",
+    ],
+    forbiddenTokens: [],
+  },
+  pureBoundary: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "selectRuntimeByCapabilities",
+      "createRuntimeRequest",
+      "resolveRuntime",
+      "executeRuntime",
+    ],
+    forbiddenTokens: [
+      "evaluateRuntimeCapabilityCompatibility",
+      "adapter.execute",
+      "from \"node:fs\"",
+      "from \"node:child_process\"",
+      "fetch(",
+      "Date.now",
+      "new Date",
+      "Math.random",
+      "process.env",
+    ],
+  },
+  mapping: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "DeclarativeRuntimeExecutionMapping",
+      "runtimeMapping",
+      "descriptorId",
+      "declarative_runtime_v10_mapping_missing",
+    ],
+    forbiddenTokens: ["instanceof", "constructor.name", "import("],
+  },
+  coreExports: {
+    file: "src/core/index.ts",
+    requiredTokens: ["./runtime-execution-bridge.js"],
+    forbiddenTokens: [],
+  },
+  documentation: {
+    file: "docs/architecture/runtime-abstraction.md",
+    requiredTokens: [
+      "V13.15",
+      "resolveDeclarativeRuntimeExecution",
+      "executeDeclarativeRuntime",
+      "descriptorId -> RuntimeId",
+      "opt-in",
+    ],
+    forbiddenTokens: [],
+  },
+} as const satisfies Record<
+  string,
+  DeclarativeRuntimeExecutionBridgeInvariant
+>;
+
+export function inspectDeclarativeRuntimeExecutionBridgeInvariant(
+  source: string,
+  invariant: DeclarativeRuntimeExecutionBridgeInvariant,
+): Readonly<{ missing: readonly string[]; forbidden: readonly string[] }> {
+  return {
+    missing: invariant.requiredTokens.filter(
+      (token) => !sourceIncludesToken(source, token),
+    ),
+    forbidden: invariant.forbiddenTokens.filter((token) =>
+      sourceIncludesToken(source, token),
+    ),
+  };
+}
+
+function declarativeRuntimeExecutionBridgeRule(
+  id: string,
+  category: AuditRule["category"],
+  title: string,
+  description: string,
+  invariant: DeclarativeRuntimeExecutionBridgeInvariant,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category,
+    severity: "error",
+    title,
+    description,
+    metadata: {
+      introducedIn: "V13.15",
+      tags: ["architecture", "contract", "execution"],
+      stability: "stable",
+      dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`],
+    },
+    check: () => {
+      const source = existsSync(invariant.file)
+        ? readFileSync(invariant.file, "utf8")
+        : "";
+      const result = inspectDeclarativeRuntimeExecutionBridgeInvariant(
+        source,
+        invariant,
+      );
+      const details = [
+        ...result.missing.map((token) => `missing: ${token}`),
+        ...result.forbidden.map((token) => `forbidden: ${token}`),
+      ];
+
+      return details.length
+        ? fail(
+            rule,
+            `${title}.`,
+            details,
+            "Restore the declarative runtime execution bridge boundary.",
+          )
+        : pass(rule, `${title}.`, [invariant.file]);
+    },
+  };
+  return rule;
+}
+
+export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_MODULE_RULE: AuditRule =
+  declarativeRuntimeExecutionBridgeRule(
+    "AUDIT-384",
+    "architecture",
+    "Declarative Runtime execution bridge module exists",
+    "V13.15 must expose a minimal Core bridge between declarative resolution and V10 execution.",
+    DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_INVARIANTS.module,
+  );
+export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_BOUNDARY_RULE: AuditRule =
+  declarativeRuntimeExecutionBridgeRule(
+    "AUDIT-385",
+    "architecture",
+    "Declarative Runtime execution bridge composes public V13 and V10 APIs",
+    "The bridge must use existing V13 selection and V10 runtime APIs without duplicating compatibility or adapter execution logic.",
+    DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_INVARIANTS.pureBoundary,
+  );
+export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_MAPPING_RULE: AuditRule =
+  declarativeRuntimeExecutionBridgeRule(
+    "AUDIT-386",
+    "architecture",
+    "Declarative Runtime execution bridge uses explicit V10 mapping",
+    "Descriptor to V10 runtime association must be explicit, deterministic, and testable.",
+    DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_INVARIANTS.mapping,
+  );
+export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_CORE_EXPORT_RULE: AuditRule =
+  declarativeRuntimeExecutionBridgeRule(
+    "AUDIT-387",
+    "architecture",
+    "Core exports Declarative Runtime execution bridge",
+    "The Core facade must expose the opt-in V13 to V10 bridge without changing existing V10 APIs.",
+    DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_INVARIANTS.coreExports,
+  );
+export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_DOCUMENT_RULE: AuditRule =
+  declarativeRuntimeExecutionBridgeRule(
+    "AUDIT-388",
+    "docs",
+    "Runtime abstraction documents Declarative Runtime execution bridge",
+    "Runtime abstraction documentation must distinguish V13 declarative selection, the opt-in bridge, and V10 execution.",
+    DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_INVARIANTS.documentation,
+  );
