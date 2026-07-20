@@ -4,10 +4,12 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
+  createRuntimeExecutionPlan,
   createRuntimeCapability,
   createDeclarativeRuntimeRegistry,
   createDeclarativeRuntimeRequest,
   createRuntimeRequest,
+  dryRunPolicyAwareDeclarativeRuntimeExecution,
   evaluateRuntimeCapability,
   evaluateRuntimeExecutionAdmission,
   executeDeclarativeRuntime,
@@ -67,6 +69,8 @@ describe("Core public API", () => {
       "function",
     );
     assert.equal(typeof executePolicyAwareDeclarativeRuntime, "function");
+    assert.equal(typeof createRuntimeExecutionPlan, "function");
+    assert.equal(typeof dryRunPolicyAwareDeclarativeRuntimeExecution, "function");
     assert.equal(typeof createRuntimeRequest, "function");
     assert.equal(typeof resolveRuntime, "function");
     assert.equal(typeof executeRuntime, "function");

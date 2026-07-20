@@ -129,6 +129,11 @@ avant V10 : `evaluateRuntimeExecutionAdmission`,
 déjà fournie, refusent runtime/provider/effort/budget hors politique, puis
 délèguent seulement après admission.
 
+Depuis V13.17, `createRuntimeExecutionPlan` et
+`dryRunPolicyAwareDeclarativeRuntimeExecution` exposent un plan Runtime
+`schemaVersion: 1`, déterministe et sérialisable, pour décrire ce qui serait
+exécuté sans appeler d'adapter et sans modifier le CLI ou les JSON publics.
+
 Voir aussi :
 
 - `docs/architecture/autonomous-loop-runner.md`

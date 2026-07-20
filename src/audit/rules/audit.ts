@@ -955,7 +955,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("runtimeCapabilityReconciliationRule(") ||
             ruleSource.includes("standardTestDiscoveryRule(") ||
             ruleSource.includes("declarativeRuntimeExecutionBridgeRule(") ||
-            ruleSource.includes("runtimeExecutionPolicyAdmissionRule(");
+            ruleSource.includes("runtimeExecutionPolicyAdmissionRule(") ||
+            ruleSource.includes("runtimeExecutionPlanRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -10397,4 +10398,199 @@ export const RUNTIME_EXECUTION_POLICY_ADMISSION_DOCUMENT_RULE: AuditRule =
     "Runtime abstraction documents execution policy admission",
     "Runtime abstraction documentation must distinguish capability compatibility, policy admission, and V10 execution.",
     RUNTIME_EXECUTION_POLICY_ADMISSION_INVARIANTS.documentation,
+  );
+
+export type RuntimeExecutionPlanInvariant = Readonly<{
+  file: string;
+  requiredTokens: readonly string[];
+  forbiddenTokens: readonly string[];
+}>;
+
+export const RUNTIME_EXECUTION_PLAN_INVARIANTS = {
+  contract: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "RUNTIME_EXECUTION_PLAN_SCHEMA_VERSION",
+      "RuntimeExecutionPlan",
+      "schemaVersion: RuntimeExecutionPlanSchemaVersion",
+      "createRuntimeExecutionPlan",
+      "RuntimeExecutionPlanDryRunResult",
+    ],
+    forbiddenTokens: [],
+  },
+  pureData: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "findNonSerializableRuntimeExecutionPlanValue",
+      "localProcessConfigured",
+      "Map",
+      "Set",
+      "Promise",
+      "undefined",
+    ],
+    forbiddenTokens: [
+      "from \"node:fs\"",
+      "from \"node:child_process\"",
+      "fetch(",
+      "Date.now",
+      "new Date",
+      "Math.random",
+      "crypto.randomUUID",
+      "process.env",
+      "import(",
+      "require(",
+      "console.",
+    ],
+  },
+  dryRun: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "dryRunPolicyAwareDeclarativeRuntimeExecution",
+      "resolvePolicyAwareDeclarativeRuntimeExecution(input)",
+      "createRuntimeExecutionPlan",
+      "outcome: \"planned\"",
+      "runtime_execution_plan_unserializable",
+    ],
+    forbiddenTokens: [],
+  },
+  adapterBoundary: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "v10Resolution: {",
+      "runtimeId: v10Selection.adapter.runtimeId",
+      "localProcessConfigured",
+      "runtimeRequest.localProcess !== undefined",
+    ],
+    forbiddenTokens: [],
+  },
+  compatibility: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "resolveDeclarativeRuntimeExecution",
+      "executeDeclarativeRuntime",
+      "resolvePolicyAwareDeclarativeRuntimeExecution",
+      "executePolicyAwareDeclarativeRuntime",
+      "dryRunPolicyAwareDeclarativeRuntimeExecution",
+    ],
+    forbiddenTokens: [],
+  },
+  documentation: {
+    file: "docs/architecture/runtime-abstraction.md",
+    requiredTokens: [
+      "V13.17",
+      "Runtime Execution Plan",
+      "dry-run",
+      "schemaVersion: 1",
+      "plan Runtime",
+      "plan `LoopRunner`",
+      "forgé",
+      "n8n",
+    ],
+    forbiddenTokens: [],
+  },
+} as const satisfies Record<string, RuntimeExecutionPlanInvariant>;
+
+export function inspectRuntimeExecutionPlanInvariant(
+  source: string,
+  invariant: RuntimeExecutionPlanInvariant,
+): Readonly<{ missing: readonly string[]; forbidden: readonly string[] }> {
+  return {
+    missing: invariant.requiredTokens.filter(
+      (token) => !sourceIncludesToken(source, token),
+    ),
+    forbidden: invariant.forbiddenTokens.filter((token) =>
+      sourceIncludesToken(source, token),
+    ),
+  };
+}
+
+function runtimeExecutionPlanRule(
+  id: string,
+  category: AuditRule["category"],
+  title: string,
+  description: string,
+  invariant: RuntimeExecutionPlanInvariant,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category,
+    severity: "error",
+    title,
+    description,
+    metadata: {
+      introducedIn: "V13.17",
+      tags: ["architecture", "contract", "execution", "policy"],
+      stability: "stable",
+      dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`],
+    },
+    check: () => {
+      const source = existsSync(invariant.file)
+        ? readFileSync(invariant.file, "utf8")
+        : "";
+      const result = inspectRuntimeExecutionPlanInvariant(source, invariant);
+      const details = [
+        ...result.missing.map((token) => `missing: ${token}`),
+        ...result.forbidden.map((token) => `forbidden: ${token}`),
+      ];
+
+      return details.length
+        ? fail(
+            rule,
+            `${title}.`,
+            details,
+            "Restore the V13.17 runtime execution plan and dry-run boundary.",
+          )
+        : pass(rule, `${title}.`, [invariant.file]);
+    },
+  };
+  return rule;
+}
+
+export const RUNTIME_EXECUTION_PLAN_CONTRACT_RULE: AuditRule =
+  runtimeExecutionPlanRule(
+    "AUDIT-394",
+    "architecture",
+    "Runtime Execution Plan exposes a versioned contract",
+    "V13.17 must expose a schema-versioned Runtime Execution Plan and dry-run result.",
+    RUNTIME_EXECUTION_PLAN_INVARIANTS.contract,
+  );
+export const RUNTIME_EXECUTION_PLAN_SERIALIZABLE_RULE: AuditRule =
+  runtimeExecutionPlanRule(
+    "AUDIT-395",
+    "architecture",
+    "Runtime Execution Plan remains serializable pure data",
+    "Runtime Execution Plan construction must exclude platform effects and non-JSON values.",
+    RUNTIME_EXECUTION_PLAN_INVARIANTS.pureData,
+  );
+export const RUNTIME_EXECUTION_PLAN_DRY_RUN_RULE: AuditRule =
+  runtimeExecutionPlanRule(
+    "AUDIT-396",
+    "architecture",
+    "Runtime Execution Plan dry-run is explicit and non-executing",
+    "Dry-run must reuse policy-aware resolution and return a plan without adapter execution.",
+    RUNTIME_EXECUTION_PLAN_INVARIANTS.dryRun,
+  );
+export const RUNTIME_EXECUTION_PLAN_ADAPTER_BOUNDARY_RULE: AuditRule =
+  runtimeExecutionPlanRule(
+    "AUDIT-397",
+    "architecture",
+    "Runtime Execution Plan exposes no adapter instance",
+    "The public plan may describe selected runtime data but must not expose an adapter, command, cwd, environment, or callback.",
+    RUNTIME_EXECUTION_PLAN_INVARIANTS.adapterBoundary,
+  );
+export const RUNTIME_EXECUTION_PLAN_COMPAT_RULE: AuditRule =
+  runtimeExecutionPlanRule(
+    "AUDIT-398",
+    "architecture",
+    "Runtime Execution Plan preserves historical bridge APIs",
+    "The plan and dry-run APIs must be additive and preserve V13.15, V13.16, and V10 execution surfaces.",
+    RUNTIME_EXECUTION_PLAN_INVARIANTS.compatibility,
+  );
+export const RUNTIME_EXECUTION_PLAN_DOCUMENT_RULE: AuditRule =
+  runtimeExecutionPlanRule(
+    "AUDIT-399",
+    "docs",
+    "Runtime abstraction documents Runtime Execution Plan",
+    "Runtime abstraction documentation must distinguish Runtime plans, LoopRunner plans, dry-run, schema evolution, and serialized-plan limits.",
+    RUNTIME_EXECUTION_PLAN_INVARIANTS.documentation,
   );

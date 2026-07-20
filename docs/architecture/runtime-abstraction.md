@@ -160,6 +160,69 @@ les contrôles locaux V10 comme `LocalProcessExecutionPolicy`. Aucun provider
 réel, adapter réel, réseau, registre dynamique, conteneur DI, horloge implicite,
 aléatoire, filesystem ou variable d'environnement n'est ajouté.
 
+## Runtime Execution Plan V13.17
+
+V13.17 ajoute un **Runtime Execution Plan** descriptif, sérialisable et sans
+effets. Il est construit après sélection par capacités, mapping explicite,
+admission de politique et vérification que V10 peut résoudre le runtime courant,
+mais avant tout appel d'adapter.
+
+```text
+Declarative Runtime Request
+  -> Capability selection
+  -> explicit descriptorId -> RuntimeId mapping
+  -> Execution policy admission
+  -> Runtime Execution Plan
+     -> dry-run: retourne le plan
+     -> execute: continue via V10 avec les inputs originaux
+```
+
+Le plan Runtime n'est pas le plan du `LoopRunner`. Le plan `LoopRunner`
+représente un cycle projet (`plan`, `execute`, `commit`, `publish`) et son état
+produit (`LoopRunResult`). Le plan Runtime représente uniquement une décision
+d'exécution déjà admise : quel descriptor déclaratif a été choisi, vers quel
+`RuntimeId` V10 il a été mappé, quelle requête V10 serait utilisée, et quelles
+contraintes runtime/provider/effort/budget ont été retenues.
+
+Le contrat public `RuntimeExecutionPlan` expose `schemaVersion: 1`. Les règles
+d'évolution sont :
+
+- ajouter une propriété optionnelle est compatible ;
+- changer le sens d'une propriété impose une nouvelle version ;
+- supprimer ou renommer une propriété est breaking ;
+- changer un discriminant est breaking.
+
+Doctrine de sérialisation :
+
+- le plan ne contient que des données JSON ;
+- les fonctions, classes, adapters, callbacks, promesses, `Map`, `Set`, symboles,
+  `bigint`, erreurs natives et valeurs `undefined` dans des tableaux sont
+  exclus ;
+- les valeurs optionnelles non disponibles sont normalisées en `null` dans les
+  champs publics du plan ;
+- les propriétés réellement optionnelles sont omises plutôt que présentes avec
+  `undefined` ;
+- aucun timestamp n'est généré par la planification : les dates exposées viennent
+  de la `RuntimeRequest` déjà construite ;
+- aucun UUID, random, environnement, secret, commande locale, cwd ou détail
+  d'adapter n'est ajouté au plan.
+
+Le dry-run public `dryRunPolicyAwareDeclarativeRuntimeExecution` reçoit les
+mêmes entrées que le bridge policy-aware, appelle la résolution V13.16, vérifie
+que V10 peut sélectionner un runtime, construit le plan avec
+`createRuntimeExecutionPlan`, puis retourne `planned`. Il ne retourne jamais
+l'instance d'adapter sélectionnée et n'appelle jamais `executeRuntime`. Pour un
+runtime `local-process`, le plan peut indiquer `localProcessConfigured: true`,
+mais il n'inclut ni commande, ni chemin absolu, ni environnement.
+
+Un plan sérialisé est une preuve descriptive, pas une autorisation d'exécuter.
+Il peut être forgé, modifié, périmé, ou produit avec un registre V10 différent.
+V13.17 ne fournit donc pas de reprise depuis plan, pas de signature, pas de
+stockage et pas d'exécution depuis un plan public. L'exécution continue à
+utiliser les inputs originaux et les garde-fous V10 existants. n8n pourra
+ultérieurement recevoir un résultat de dry-run, mais ne décide pas la sélection
+interne, l'admission ou la résolution V10.
+
 `RuntimeResult` est additif par conception : runtime, statut, horodatages,
 diagnostics, sortie et métadonnées. V10.1 ajoute optionnellement `exitCode`,
 `signal`, `stdout`, `stderr`, une erreur structurée et les événements. Les

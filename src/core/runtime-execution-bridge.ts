@@ -15,6 +15,7 @@ import {
 } from "./runtime.js";
 import type {
   RuntimeId,
+  RuntimeMetadata,
   RuntimeRequest,
   RuntimeResult,
 } from "../runtime/index.js";
@@ -34,6 +35,7 @@ export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_ERROR_CODES = [
   "v10_runtime_request_unavailable",
   "v10_runtime_unresolved",
   "v10_runtime_execution_failed",
+  "runtime_execution_plan_unserializable",
 ] as const;
 
 export type DeclarativeRuntimeExecutionBridgeErrorCode =
@@ -279,6 +281,122 @@ export type PolicyAwareDeclarativeRuntimeExecutionResult =
         { outcome: "resolved" }
       >;
       runtimeResult: RuntimeResult;
+      diagnostics: readonly DeclarativeRuntimeExecutionBridgeError[];
+    }>;
+
+export const RUNTIME_EXECUTION_PLAN_SCHEMA_VERSION = 1 as const;
+
+export type RuntimeExecutionPlanSchemaVersion =
+  typeof RUNTIME_EXECUTION_PLAN_SCHEMA_VERSION;
+
+export type RuntimeExecutionPlanCapabilityRequirement = Readonly<{
+  requirementId: string;
+  category: string;
+  version: string;
+  requiredFeatures: readonly string[];
+  acceptedConstraints: readonly string[];
+  capabilityId: string;
+  supportedFeatures: readonly string[];
+  declaredConstraints: readonly string[];
+  compatible: true;
+  diagnosticCodes: readonly string[];
+}>;
+
+export type RuntimeExecutionPlanCapabilityDecision = Readonly<{
+  outcome: "selected";
+  descriptorId: string;
+  compatibleRuntimeIds: readonly string[];
+  evaluatedRuntimeIds: readonly string[];
+  requirements: readonly RuntimeExecutionPlanCapabilityRequirement[];
+}>;
+
+export type RuntimeExecutionPlanRequest = Readonly<{
+  task: RuntimeRequest["task"];
+  mode: RuntimeRequest["mode"];
+  provider: AgentProvider;
+  effort: AgentEffort;
+  requestedAt: string;
+  requestedRuntime: RuntimeId;
+  allowedProviders: readonly AgentProvider[] | null;
+  allowedRuntimes: readonly RuntimeId[] | null;
+  contextPackage: RuntimeRequest["contextPackage"];
+  metadata: RuntimeMetadata;
+  localProcessConfigured: boolean;
+}>;
+
+export type RuntimeExecutionPlanPolicyDecision = Readonly<{
+  outcome: "admitted";
+  policyId: string;
+  mode: AgentPolicyResolution["mode"];
+  status: "resolved";
+  checks: readonly RuntimeExecutionAdmissionCheck[];
+  diagnosticCodes: readonly RuntimeExecutionAdmissionErrorCode[];
+}>;
+
+export type RuntimeExecutionPlanConstraints = Readonly<{
+  provider: AgentProvider | null;
+  effort: AgentEffort | null;
+  requestedBudget: AgentBudget | null;
+  limitBudget: AgentBudget;
+  mergedBudget: AgentBudget | null;
+  allowedProviders: readonly AgentProvider[] | null;
+  allowedRuntimes: readonly RuntimeId[] | null;
+}>;
+
+export type RuntimeExecutionPlan = Readonly<{
+  schemaVersion: RuntimeExecutionPlanSchemaVersion;
+  descriptorId: string;
+  runtimeId: RuntimeId;
+  capabilityDecision: RuntimeExecutionPlanCapabilityDecision;
+  request: RuntimeExecutionPlanRequest;
+  policyDecision: RuntimeExecutionPlanPolicyDecision;
+  executionConstraints: RuntimeExecutionPlanConstraints;
+  reasons: Readonly<{
+    selectionCodes: readonly string[];
+    admissionCodes: readonly string[];
+  }>;
+}>;
+
+export type RuntimeExecutionPlanInput = Readonly<{
+  resolution: Extract<
+    PolicyAwareDeclarativeRuntimeExecutionResolution,
+    { outcome: "resolved" }
+  >;
+  admission: RuntimeExecutionPolicyAdmissionOptions;
+}>;
+
+export type RuntimeExecutionPlanDryRunResult =
+  | Readonly<{
+      outcome: "planned";
+      plan: RuntimeExecutionPlan;
+      resolution: Extract<
+        PolicyAwareDeclarativeRuntimeExecutionResolution,
+        { outcome: "resolved" }
+      >;
+      diagnostics: readonly [];
+    }>
+  | Readonly<{
+      outcome: Exclude<
+        PolicyAwareDeclarativeRuntimeExecutionResolution["outcome"],
+        "resolved"
+      >;
+      plan: null;
+      resolution: Exclude<
+        PolicyAwareDeclarativeRuntimeExecutionResolution,
+        { outcome: "resolved" }
+      >;
+      diagnostics: readonly (
+        | DeclarativeRuntimeExecutionBridgeError
+        | RuntimeExecutionAdmissionError
+      )[];
+    }>
+  | Readonly<{
+      outcome: "runtime_execution_plan_unserializable";
+      plan: null;
+      resolution: Extract<
+        PolicyAwareDeclarativeRuntimeExecutionResolution,
+        { outcome: "resolved" }
+      >;
       diagnostics: readonly DeclarativeRuntimeExecutionBridgeError[];
     }>;
 
@@ -642,6 +760,202 @@ function failedPolicyAwareResolution(
   }) as PolicyAwareDeclarativeRuntimeExecutionResolution;
 }
 
+function asRuntimeIds(
+  runtimes: readonly string[] | undefined,
+): readonly RuntimeId[] | null {
+  return runtimes === undefined ? null : ([...runtimes] as RuntimeId[]);
+}
+
+function budgetFromValue(value: unknown): AgentBudget | null {
+  if (value === null || typeof value !== "object") return null;
+  const candidate = value as Partial<Record<keyof AgentBudget, unknown>>;
+  const budget = {
+    maxTokens: candidate.maxTokens ?? null,
+    maxCostUsd: candidate.maxCostUsd ?? null,
+    maxDurationMs: candidate.maxDurationMs ?? null,
+    maxCalls: candidate.maxCalls ?? null,
+    maxRepairs: candidate.maxRepairs ?? null,
+  };
+
+  return BUDGET_DIMENSIONS.every((dimension) =>
+    isValidBudgetValue(budget[dimension]),
+  )
+    ? (budget as AgentBudget)
+    : null;
+}
+
+function budgetCheckDetails(
+  admission: Extract<RuntimeExecutionAdmissionResult, { outcome: "admitted" }>,
+) {
+  return admission.checks.find((check) => check.name === "budget")?.details;
+}
+
+function selectedCapabilityRequirements(
+  resolution: Extract<
+    PolicyAwareDeclarativeRuntimeExecutionResolution,
+    { outcome: "resolved" }
+  >,
+): readonly RuntimeExecutionPlanCapabilityRequirement[] {
+  const selected = resolution.declarativeSelection.candidates.find(
+    (candidate) => candidate.runtimeId === resolution.descriptorId,
+  );
+
+  return (selected?.requirements ?? []).map((requirement) =>
+    deepFreeze({
+      requirementId: requirement.requirement.id,
+      category: requirement.requirement.category,
+      version: requirement.requirement.version,
+      requiredFeatures: [...requirement.requirement.requiredFeatures],
+      acceptedConstraints: [...requirement.requirement.acceptedConstraints],
+      capabilityId: requirement.capability.id,
+      supportedFeatures: [...requirement.capability.supportedFeatures],
+      declaredConstraints: [...requirement.capability.declaredConstraints],
+      compatible: true as const,
+      diagnosticCodes: requirement.diagnostics.map(
+        (diagnostic) => diagnostic.code,
+      ),
+    }),
+  );
+}
+
+function findNonSerializableRuntimeExecutionPlanValue(
+  value: unknown,
+  path = "plan",
+  inArray = false,
+): string | null {
+  if (value === undefined) return `${path}:undefined`;
+  if (typeof value === "function") return `${path}:function`;
+  if (typeof value === "symbol") return `${path}:symbol`;
+  if (typeof value === "bigint") return `${path}:bigint`;
+  if (value === null || typeof value !== "object") return null;
+  const tag = Object.prototype.toString.call(value);
+  if (tag === "[object Map]") return `${path}:Map`;
+  if (tag === "[object Set]") return `${path}:Set`;
+  if (tag === "[object Error]") return `${path}:Error`;
+  if (
+    tag === "[object Promise]" ||
+    ("then" in value && typeof value.then === "function")
+  ) {
+    return `${path}:Promise`;
+  }
+
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      const violation = findNonSerializableRuntimeExecutionPlanValue(
+        item,
+        `${path}[${index}]`,
+        true,
+      );
+      if (violation) return violation;
+    }
+    return null;
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    const violation = findNonSerializableRuntimeExecutionPlanValue(
+      child,
+      `${path}.${key}`,
+      inArray,
+    );
+    if (violation) return violation;
+  }
+
+  return inArray ? null : null;
+}
+
+function assertRuntimeExecutionPlanSerializable(
+  plan: RuntimeExecutionPlan,
+): DeclarativeRuntimeExecutionBridgeError | null {
+  const violation = findNonSerializableRuntimeExecutionPlanValue(plan);
+  if (violation) {
+    return bridgeError(
+      "runtime_execution_plan_unserializable",
+      "Runtime Execution Plan contains a non-serializable value.",
+      { violation },
+    );
+  }
+
+  return null;
+}
+
+export function createRuntimeExecutionPlan(
+  input: RuntimeExecutionPlanInput,
+): RuntimeExecutionPlan {
+  const { resolution } = input;
+  const admissionInput = createAdmissionInput(
+    resolution.runtimeId,
+    input.admission,
+  );
+  const budgetDetails = budgetCheckDetails(resolution.admission);
+  const requestedBudget = budgetFromValue(budgetDetails?.requestedBudget);
+  const mergedBudget = budgetFromValue(budgetDetails?.mergedBudget);
+  const runtimeRequest = resolution.runtimeRequest;
+
+  return deepFreeze({
+    schemaVersion: RUNTIME_EXECUTION_PLAN_SCHEMA_VERSION,
+    descriptorId: resolution.descriptorId,
+    runtimeId: resolution.runtimeId,
+    capabilityDecision: {
+      outcome: "selected",
+      descriptorId: resolution.descriptorId,
+      compatibleRuntimeIds: [
+        ...resolution.declarativeSelection.compatibleRuntimeIds,
+      ],
+      evaluatedRuntimeIds: resolution.declarativeSelection.candidates.map(
+        (candidate) => candidate.runtimeId,
+      ),
+      requirements: selectedCapabilityRequirements(resolution),
+    },
+    request: {
+      task: runtimeRequest.task,
+      mode: runtimeRequest.mode,
+      provider: runtimeRequest.provider,
+      effort: runtimeRequest.effort,
+      requestedAt: runtimeRequest.requestedAt,
+      requestedRuntime: resolution.runtimeId,
+      allowedProviders: runtimeRequest.allowedProviders
+        ? [...runtimeRequest.allowedProviders]
+        : null,
+      allowedRuntimes: runtimeRequest.allowedRuntimes
+        ? [...runtimeRequest.allowedRuntimes]
+        : null,
+      contextPackage: runtimeRequest.contextPackage,
+      metadata: runtimeRequest.metadata,
+      localProcessConfigured: runtimeRequest.localProcess !== undefined,
+    },
+    policyDecision: {
+      outcome: "admitted",
+      policyId: input.admission.policy.policyId,
+      mode: input.admission.policy.mode,
+      status: "resolved",
+      checks: resolution.admission.checks,
+      diagnosticCodes: resolution.admission.diagnostics.map(
+        (diagnostic) => diagnostic.code,
+      ),
+    },
+    executionConstraints: {
+      provider: admissionInput.provider ?? null,
+      effort: admissionInput.effort ?? null,
+      requestedBudget,
+      limitBudget: input.admission.policy.requirements.executionBudget,
+      mergedBudget,
+      allowedProviders:
+        input.admission.policy.requirements.allowedProviders === undefined
+          ? null
+          : [...input.admission.policy.requirements.allowedProviders],
+      allowedRuntimes: asRuntimeIds(
+        input.admission.policy.requirements.allowedRuntimes,
+      ),
+    },
+    reasons: {
+      selectionCodes: ["runtime_capability_selected"],
+      admissionCodes: resolution.admission.checks.map(
+        (check) => `${check.name}:${check.status}`,
+      ),
+    },
+  }) as RuntimeExecutionPlan;
+}
+
 export function resolveDeclarativeRuntimeExecution(
   input: DeclarativeRuntimeExecutionBridgeInput,
 ): DeclarativeRuntimeExecutionResolution {
@@ -903,6 +1217,43 @@ export function resolvePolicyAwareDeclarativeRuntimeExecution(
     },
     diagnostics: [],
   }) as PolicyAwareDeclarativeRuntimeExecutionResolution;
+}
+
+export function dryRunPolicyAwareDeclarativeRuntimeExecution(
+  input: PolicyAwareDeclarativeRuntimeExecutionBridgeInput,
+): RuntimeExecutionPlanDryRunResult {
+  const resolution = resolvePolicyAwareDeclarativeRuntimeExecution(input);
+
+  if (resolution.outcome !== "resolved") {
+    return deepFreeze({
+      outcome: resolution.outcome,
+      plan: null,
+      resolution,
+      diagnostics: resolution.diagnostics,
+    }) as RuntimeExecutionPlanDryRunResult;
+  }
+
+  const plan = createRuntimeExecutionPlan({
+    resolution,
+    admission: input.admission,
+  });
+  const serializableDiagnostic = assertRuntimeExecutionPlanSerializable(plan);
+
+  if (serializableDiagnostic) {
+    return deepFreeze({
+      outcome: "runtime_execution_plan_unserializable",
+      plan: null,
+      resolution,
+      diagnostics: [serializableDiagnostic],
+    }) as RuntimeExecutionPlanDryRunResult;
+  }
+
+  return deepFreeze({
+    outcome: "planned",
+    plan,
+    resolution,
+    diagnostics: [],
+  }) as RuntimeExecutionPlanDryRunResult;
 }
 
 export async function executeDeclarativeRuntime(

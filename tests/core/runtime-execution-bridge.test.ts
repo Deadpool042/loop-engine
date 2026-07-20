@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  createRuntimeExecutionPlan,
+  dryRunPolicyAwareDeclarativeRuntimeExecution,
   executeDeclarativeRuntime,
   executePolicyAwareDeclarativeRuntime,
   evaluateRuntimeExecutionAdmission,
@@ -13,6 +15,7 @@ import {
   type DeclarativeRuntimeExecutionBridgeInput,
   type DeclarativeRuntimeExecutionMapping,
   type RuntimeExecutionAdmissionInput,
+  type RuntimeExecutionPlan,
 } from "../../src/core/index.js";
 import type {
   AgentBudget,
@@ -259,6 +262,33 @@ function policyAwareBridgeInput(
     },
     ...overrides,
   };
+}
+
+function assertPlanContainsOnlySerializableData(value: unknown): void {
+  const visit = (current: unknown, path: string, inArray = false): void => {
+    assert.notEqual(typeof current, "function", `${path} is a function`);
+    assert.notEqual(typeof current, "symbol", `${path} is a symbol`);
+    assert.notEqual(typeof current, "bigint", `${path} is a bigint`);
+    assert.notEqual(current instanceof Map, true, `${path} is a Map`);
+    assert.notEqual(current instanceof Set, true, `${path} is a Set`);
+    assert.notEqual(current instanceof Error, true, `${path} is an Error`);
+    assert.notEqual(current instanceof Promise, true, `${path} is a Promise`);
+    if (inArray) {
+      assert.notEqual(current, undefined, `${path} is undefined in an array`);
+    }
+    if (current === null || current === undefined) return;
+    if (Array.isArray(current)) {
+      current.forEach((item, index) => visit(item, `${path}[${index}]`, true));
+      return;
+    }
+    if (typeof current === "object") {
+      Object.entries(current).forEach(([key, child]) =>
+        visit(child, `${path}.${key}`),
+      );
+    }
+  };
+
+  visit(value, "plan");
 }
 
 describe("Core declarative runtime execution bridge — pure resolution", () => {
@@ -940,6 +970,343 @@ describe("Policy-aware declarative runtime execution bridge", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("Runtime execution plan and dry-run", () => {
+  it("builds a deterministic schemaVersion 1 plan after capability selection and policy admission", () => {
+    const resolution = resolvePolicyAwareDeclarativeRuntimeExecution(
+      policyAwareBridgeInput(),
+    );
+
+    assert.equal(resolution.outcome, "resolved");
+    if (resolution.outcome !== "resolved") return;
+
+    const plan = createRuntimeExecutionPlan({
+      resolution,
+      admission: policyAwareBridgeInput().admission,
+    });
+
+    assert.equal(plan.schemaVersion, 1);
+    assert.equal(plan.descriptorId, "runtime-a");
+    assert.equal(plan.runtimeId, "codex");
+    assert.equal(plan.capabilityDecision.outcome, "selected");
+    assert.deepEqual(plan.capabilityDecision.compatibleRuntimeIds, [
+      "runtime-a",
+      "runtime-b",
+    ]);
+    assert.equal(plan.request.requestedRuntime, "codex");
+    assert.equal(plan.policyDecision.outcome, "admitted");
+    assert.equal(plan.executionConstraints.provider, "openai");
+    assert.equal(plan.executionConstraints.effort, "medium");
+    assert.deepEqual(plan.executionConstraints.requestedBudget, {
+      maxTokens: 500,
+      maxCostUsd: 5,
+      maxDurationMs: 30_000,
+      maxCalls: 1,
+      maxRepairs: 1,
+    });
+    assert.equal(Object.isFrozen(plan), true);
+  });
+
+  it("keeps lexical tie-break, explicit mapping, provider not_available, effort ceiling, and exact budget limits", () => {
+    const input = policyAwareBridgeInput({
+      declarativeRegistry: {
+        ...declarativeRegistry,
+        descriptors: [...declarativeRegistry.descriptors].reverse(),
+      },
+      admission: {
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedRuntimes: ["codex"],
+            allowedProviders: undefined,
+            maximumEffort: "medium",
+            executionBudget: {
+              maxTokens: 500,
+              maxCostUsd: 5,
+              maxDurationMs: 30_000,
+              maxCalls: 1,
+              maxRepairs: 1,
+            },
+          },
+        }),
+        effort: "medium",
+        budget: {
+          maxTokens: 500,
+          maxCostUsd: 5,
+          maxDurationMs: 30_000,
+          maxCalls: 1,
+          maxRepairs: 1,
+        },
+      },
+    });
+    const dryRun = dryRunPolicyAwareDeclarativeRuntimeExecution(input);
+
+    assert.equal(dryRun.outcome, "planned");
+    if (dryRun.outcome !== "planned") return;
+    assert.equal(dryRun.plan.descriptorId, "runtime-a");
+    assert.equal(dryRun.plan.runtimeId, "codex");
+    assert.equal(dryRun.plan.executionConstraints.provider, "openai");
+    assert.equal(
+      dryRun.plan.policyDecision.checks.find(
+        (check) => check.name === "provider",
+      )?.status,
+      "not_applicable",
+    );
+    assert.deepEqual(dryRun.plan.executionConstraints.limitBudget, {
+      maxTokens: 500,
+      maxCostUsd: 5,
+      maxDurationMs: 30_000,
+      maxCalls: 1,
+      maxRepairs: 1,
+    });
+  });
+
+  it("omits unavailable optional values by normalizing them to null in the plan contract", () => {
+    const dryRun = dryRunPolicyAwareDeclarativeRuntimeExecution(
+      policyAwareBridgeInput({
+        admission: {
+          policy: policyResolution({
+            requirements: {
+              ...policyResolution().requirements,
+              allowedRuntimes: undefined,
+              allowedProviders: undefined,
+            },
+            selection: null,
+          }),
+        },
+      }),
+    );
+
+    assert.equal(dryRun.outcome, "planned");
+    if (dryRun.outcome !== "planned") return;
+    assert.equal(dryRun.plan.executionConstraints.allowedProviders, null);
+    assert.equal(dryRun.plan.executionConstraints.allowedRuntimes, null);
+    assert.equal(dryRun.plan.executionConstraints.provider, null);
+    assert.equal(dryRun.plan.executionConstraints.effort, null);
+    assert.equal(dryRun.plan.executionConstraints.requestedBudget, null);
+  });
+
+  it("returns failures without presenting a partial plan as executable", () => {
+    const cases = [
+      dryRunPolicyAwareDeclarativeRuntimeExecution(
+        policyAwareBridgeInput({
+          declarativeRequest: { ...declarativeRequest, createdAt: "" },
+        }),
+      ),
+      dryRunPolicyAwareDeclarativeRuntimeExecution(
+        policyAwareBridgeInput({
+          runtimeCapabilities: [
+            { ...runtimeCapability, supportedFeatures: ["test"] },
+          ],
+        }),
+      ),
+      dryRunPolicyAwareDeclarativeRuntimeExecution(
+        policyAwareBridgeInput({
+          runtimeMapping: {} as DeclarativeRuntimeExecutionMapping,
+        }),
+      ),
+      dryRunPolicyAwareDeclarativeRuntimeExecution(
+        policyAwareBridgeInput({
+          runtimeMapping: { "runtime-a": "custom" },
+          admission: {
+            policy: policyResolution({
+              requirements: {
+                ...policyResolution().requirements,
+                allowedRuntimes: undefined,
+                allowedProviders: undefined,
+              },
+            }),
+            budget: {
+              maxTokens: 500,
+              maxCostUsd: 5,
+              maxDurationMs: 30_000,
+              maxCalls: 1,
+              maxRepairs: 1,
+            },
+          },
+        }),
+      ),
+      dryRunPolicyAwareDeclarativeRuntimeExecution(
+        policyAwareBridgeInput({
+          admission: {
+            policy: policyResolution({
+              requirements: {
+                ...policyResolution().requirements,
+                allowedRuntimes: ["claude_code"],
+              },
+            }),
+          },
+        }),
+      ),
+      dryRunPolicyAwareDeclarativeRuntimeExecution(
+        policyAwareBridgeInput({
+          admission: {
+            policy: policyResolution({
+              requirements: {
+                ...policyResolution().requirements,
+                allowedProviders: ["anthropic"],
+              },
+            }),
+            provider: "openai",
+          },
+        }),
+      ),
+      dryRunPolicyAwareDeclarativeRuntimeExecution(
+        policyAwareBridgeInput({
+          admission: {
+            policy: policyResolution({
+              requirements: {
+                ...policyResolution().requirements,
+                allowedProviders: ["openai"],
+              },
+            }),
+            provider: undefined,
+          },
+        }),
+      ),
+      dryRunPolicyAwareDeclarativeRuntimeExecution(
+        policyAwareBridgeInput({
+          admission: {
+            policy: policyResolution({
+              requirements: {
+                ...policyResolution().requirements,
+                maximumEffort: "low",
+              },
+            }),
+            effort: "high",
+          },
+        }),
+      ),
+      dryRunPolicyAwareDeclarativeRuntimeExecution(
+        policyAwareBridgeInput({
+          admission: {
+            policy: policyResolution(),
+            budget: { maxTokens: 2_000 },
+          },
+        }),
+      ),
+    ];
+
+    assert.deepEqual(
+      cases.map((result) => result.outcome),
+      [
+        "invalid_declarative_request",
+        "no_compatible_descriptor",
+        "missing_v10_mapping",
+        "unresolved_v10_runtime",
+        "admission_denied",
+        "admission_denied",
+        "admission_denied",
+        "admission_denied",
+        "admission_denied",
+      ],
+    );
+    assert.ok(cases.every((result) => result.plan === null));
+  });
+
+  it("dry-run consults V10 runtime resolution but never executes the selected adapter", () => {
+    const root = realpathSync(
+      mkdtempSync(join(tmpdir(), "loop-runtime-plan-dry-run-")),
+    );
+
+    try {
+      const result = dryRunPolicyAwareDeclarativeRuntimeExecution(
+        policyAwareBridgeInput({
+          loopRunResult: loopRunResult("custom", "local"),
+          runtimeMapping: { "runtime-a": "local-process" },
+          runtimeRequestOptions: {
+            allowedProviders: ["local"],
+            localProcess: {
+              command: {
+                executable: process.execPath,
+                args: ["-e", "process.stdout.write('must-not-run')"],
+                cwd: root,
+              },
+              executionPolicy: {
+                enabled: true,
+                projectRoot: root,
+                allowedExecutables: [process.execPath],
+                allowedEnvironmentKeys: [],
+                timeoutMs: 2_000,
+                maxStdoutBytes: 128,
+                maxStderrBytes: 128,
+              },
+            },
+          },
+          admission: {
+            policy: policyResolution({
+              requirements: {
+                ...policyResolution().requirements,
+                allowedProviders: ["local"],
+                executionBudget: {
+                  maxTokens: null,
+                  maxCostUsd: null,
+                  maxDurationMs: null,
+                  maxCalls: 1,
+                  maxRepairs: 0,
+                },
+              },
+            }),
+            provider: "local",
+            effort: "medium",
+            budget: { maxCalls: 1, maxRepairs: 0 },
+          },
+        }),
+      );
+
+      assert.equal(result.outcome, "planned");
+      if (result.outcome !== "planned") return;
+      assert.equal(result.plan.runtimeId, "local-process");
+      assert.equal(result.plan.request.localProcessConfigured, true);
+      assert.equal("localProcess" in result.plan.request, false);
+      assert.equal(JSON.stringify(result.plan).includes(root), false);
+      assert.equal(JSON.stringify(result.plan).includes("must-not-run"), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("returns deterministic JSON-serializable data with no functions, instances, timestamps, random ids, or input mutation", () => {
+    const input = policyAwareBridgeInput();
+    const before = structuredClone(input);
+    const first = dryRunPolicyAwareDeclarativeRuntimeExecution(input);
+    const second = dryRunPolicyAwareDeclarativeRuntimeExecution(input);
+
+    assert.deepEqual(input, before);
+    assert.deepEqual(second, first);
+    assert.equal(first.outcome, "planned");
+    if (first.outcome !== "planned") return;
+
+    assertPlanContainsOnlySerializableData(first.plan);
+    const serialized = JSON.stringify(first.plan);
+    const restored = JSON.parse(serialized) as RuntimeExecutionPlan;
+    assert.deepEqual(restored, first.plan);
+    assert.equal(serialized.includes("function"), false);
+    assert.equal(serialized.includes("Promise"), false);
+    assert.equal(serialized.includes("Date.now"), false);
+  });
+
+  it("keeps V13.15, V13.16, RuntimeRequest, RuntimeResult, LoopRunResult, and V10 behavior unchanged", async () => {
+    const historical = resolveDeclarativeRuntimeExecution(bridgeInput());
+    const policyAware = resolvePolicyAwareDeclarativeRuntimeExecution(
+      policyAwareBridgeInput(),
+    );
+    const dryRun = dryRunPolicyAwareDeclarativeRuntimeExecution(
+      policyAwareBridgeInput(),
+    );
+    const executed = await executePolicyAwareDeclarativeRuntime(
+      policyAwareBridgeInput(),
+    );
+
+    assert.equal(historical.outcome, "resolved");
+    assert.equal(policyAware.outcome, "resolved");
+    assert.equal(dryRun.outcome, "planned");
+    assert.equal(executed.outcome, "v10_execution_failed");
+    assert.equal("plan" in policyAware, false);
+    assert.equal("runtimeResult" in dryRun, false);
+    assert.equal(bridgeInput().loopRunResult.schemaVersion, 1);
   });
 });
 

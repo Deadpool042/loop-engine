@@ -208,6 +208,13 @@ de permissions restent portés par les contrats de politique, le futur
 LoopRunner/LoopExecutor explicite, et les garde-fous V10 comme
 `LocalProcessExecutionPolicy`.
 
+Depuis V13.17, une admission réussie peut alimenter un `RuntimeExecutionPlan`
+Core. Le plan ne copie pas l'`AgentPolicyResolution` complète : il expose une
+vue minimale de la décision admise (`policyId`, mode, checks, provider connu ou
+`null`, effort, budget demandé/limite/effectif). Cette vue sert au dry-run et à
+l'observabilité future ; elle n'autorise pas une exécution depuis un document
+sérialisé et ne déplace pas les responsabilités du Policy Engine.
+
 ## Position de n8n
 
 n8n peut fournir, via `AgentPolicyRequest` (`src/policy/types.ts`) : `requestedBudget` (partiel), `requestedMaxEffort`, `requestedProviders`, `requestedRuntimes` — plus, au niveau de l'appel `run`, le projet, l'objectif, et le mode demandé (voir `autonomous-loop-runner.md`).
