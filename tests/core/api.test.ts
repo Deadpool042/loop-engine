@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 
 import {
   createRuntimeExecutionPlan,
+  createSimulatedRuntimeAdapter,
   createRuntimeCapability,
   createDeclarativeRuntimeRegistry,
   createDeclarativeRuntimeRequest,
@@ -71,6 +72,7 @@ describe("Core public API", () => {
     assert.equal(typeof executePolicyAwareDeclarativeRuntime, "function");
     assert.equal(typeof createRuntimeExecutionPlan, "function");
     assert.equal(typeof dryRunPolicyAwareDeclarativeRuntimeExecution, "function");
+    assert.equal(typeof createSimulatedRuntimeAdapter, "function");
     assert.equal(typeof createRuntimeRequest, "function");
     assert.equal(typeof resolveRuntime, "function");
     assert.equal(typeof executeRuntime, "function");

@@ -229,6 +229,31 @@ diagnostics, sortie et métadonnées. V10.1 ajoute optionnellement `exitCode`,
 stubs retournent toujours `not_implemented`, avec les horodatages fournis par
 la requête ; ils restent déterministes.
 
+## Simulated Runtime Adapter V13.18
+
+V13.18 ajoute `createSimulatedRuntimeAdapter` dans `src/runtime/simulated.ts`
+et une instance statique `SimulatedRuntime` enregistrée comme runtime V10
+`custom`. C'est un worker de validation architecturale local, déterministe et
+**non fournisseur** : il ne représente ni modèle, ni API, ni transport, ni
+agent autonome. Ce n'est pas non plus un mock de test ; les tests peuvent
+instrumenter localement son appel, mais le module productif ne conserve ni
+compteur, ni historique, ni état mutable.
+
+Sa configuration explicite contient seulement un `runtimeId`, un scénario
+`success` ou `failure`, une sortie JSON optionnelle et un code d'erreur stable
+optionnel. Pour une même requête et une même configuration, les horodatages
+viennent de `RuntimeRequest.requestedAt`, les sorties sont clonées depuis des
+données JSON et le `RuntimeResult` est identique. Sont exclus : fournisseur,
+réseau, filesystem, processus, horloge implicite, aléatoire, environnement,
+latence, coûts, tokens, retry et télémétrie.
+
+Il valide de bout en bout le chemin V13.15–V13.17 : sélection par capability,
+mapping explicite vers `custom`, admission de politique, résolution V10 puis
+résultat simulé. Le dry-run continue de produire uniquement un plan Runtime
+descriptif et n'appelle jamais l'adapter. L'exécution policy-aware continue à
+partir des inputs admis, et non du JSON du plan ; aucun fournisseur réel n'est
+intégré.
+
 ## local-process (V10.1)
 
 `LocalProcessCommand` sépare strictement la commande demandée de sa politique
@@ -260,7 +285,7 @@ monotone. Elles ne sont ni persistées ni ajoutées aux rapports publics.
 ## Registre et sélection
 
 `RUNTIME_REGISTRY` est une liste statique dans l'ordre déclaré : OpenClaw,
-Claude Code, Codex, puis `local-process`. Il n'existe ni découverte filesystem,
+Claude Code, Codex, `local-process`, puis `custom` simulé. Il n'existe ni découverte filesystem,
 ni injection de dépendance, ni reflection, ni système de plugin.
 
 `selectRuntime` est pur. Il retient d'abord le runtime explicitement demandé,

@@ -11,6 +11,13 @@ import {
 import type { AgentProvider } from "../agents/types.js";
 import type { LoopRunResult } from "../loop/types.js";
 
+export {
+  createSimulatedRuntimeAdapter,
+  SimulatedRuntime,
+  type SimulatedRuntimeAdapterOptions,
+  type SimulatedRuntimeOutput,
+} from "../runtime/simulated.js";
+
 export type CreateRuntimeRequestOptions = Readonly<{
   requestedRuntime?: RuntimeId;
   allowedProviders?: readonly AgentProvider[];

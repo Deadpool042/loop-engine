@@ -28,6 +28,7 @@ import type { AgentPolicyResolution } from "../../src/policy/types.js";
 import type { RuntimeCapabilityInput } from "../../src/runtime/capability/types.js";
 import type { RuntimeRegistryInput } from "../../src/runtime/registry/types.js";
 import type { RuntimeRequestInput } from "../../src/runtime/request/types.js";
+import { SimulatedRuntime } from "../../src/runtime/simulated.js";
 
 function loopRunResult(
   runtime: AgentRuntime = "codex",
@@ -481,7 +482,7 @@ describe("Core declarative runtime execution bridge — pure resolution", () => 
     );
     const unknown = resolveDeclarativeRuntimeExecution(
       bridgeInput({
-        runtimeMapping: { "runtime-a": "custom" },
+        runtimeMapping: { "runtime-a": "chatgpt" },
       }),
     );
 
@@ -1109,7 +1110,7 @@ describe("Runtime execution plan and dry-run", () => {
       ),
       dryRunPolicyAwareDeclarativeRuntimeExecution(
         policyAwareBridgeInput({
-          runtimeMapping: { "runtime-a": "custom" },
+          runtimeMapping: { "runtime-a": "chatgpt" },
           admission: {
             policy: policyResolution({
               requirements: {
@@ -1311,6 +1312,70 @@ describe("Runtime execution plan and dry-run", () => {
 });
 
 describe("Core declarative runtime execution bridge — V10 execution", () => {
+  it("plans without calling and executes the selected simulated adapter exactly once", async () => {
+    const input = policyAwareBridgeInput({
+      loopRunResult: loopRunResult("custom", "local"),
+      runtimeMapping: { "runtime-a": "custom", "runtime-b": "codex" },
+      admission: {
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedRuntimes: ["custom"],
+            allowedProviders: ["local"],
+          },
+        }),
+        provider: "local",
+        effort: "medium",
+        budget: { maxCalls: 1, maxRepairs: 0 },
+      },
+    });
+    const instrumented = SimulatedRuntime as {
+      execute: typeof SimulatedRuntime.execute;
+    };
+    const originalExecute = instrumented.execute;
+    let calls = 0;
+    instrumented.execute = (request) => {
+      calls += 1;
+      return originalExecute(request);
+    };
+
+    try {
+      const dryRun = dryRunPolicyAwareDeclarativeRuntimeExecution(input);
+      assert.equal(dryRun.outcome, "planned");
+      if (dryRun.outcome !== "planned") return;
+      assert.equal(dryRun.plan.descriptorId, "runtime-a");
+      assert.equal(dryRun.plan.runtimeId, "custom");
+      assert.equal(calls, 0);
+
+      const execution = await executePolicyAwareDeclarativeRuntime(input);
+      assert.equal(execution.outcome, "success");
+      assert.equal(execution.resolution.descriptorId, dryRun.plan.descriptorId);
+      assert.equal(execution.resolution.runtimeId, dryRun.plan.runtimeId);
+      assert.equal(execution.runtimeResult.runtimeId, "custom");
+      assert.deepEqual(execution.runtimeResult.output, {
+        kind: "simulated-runtime-result",
+      });
+      assert.equal(calls, 1);
+
+      const denied = await executePolicyAwareDeclarativeRuntime({
+        ...input,
+        admission: {
+          ...input.admission,
+          policy: policyResolution({
+            requirements: {
+              ...policyResolution().requirements,
+              allowedRuntimes: ["codex"],
+            },
+          }),
+        },
+      });
+      assert.equal(denied.outcome, "resolution_failed");
+      assert.equal(calls, 1);
+    } finally {
+      instrumented.execute = originalExecute;
+    }
+  });
+
   it("delegates to the selected V10 adapter and propagates its result", async () => {
     const result = await executeDeclarativeRuntime(bridgeInput());
 

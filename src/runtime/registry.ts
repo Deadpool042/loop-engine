@@ -2,6 +2,7 @@ import { ClaudeRuntime } from "./claude.js";
 import { CodexRuntime } from "./codex.js";
 import { OpenClawRuntime } from "./openclaw.js";
 import { LocalProcessRuntime } from "./local-process.js";
+import { SimulatedRuntime } from "./simulated.js";
 import {
   createStaticRegistryEntries,
   findStaticRegistryEntry,
@@ -32,6 +33,7 @@ export const RUNTIME_REGISTRY: RuntimeRegistry = createRuntimeRegistry([
   ClaudeRuntime,
   CodexRuntime,
   LocalProcessRuntime,
+  SimulatedRuntime,
 ]);
 
 export function getRuntimeAdapter(runtimeId: RuntimeId): RuntimeAdapter | null {

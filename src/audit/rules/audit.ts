@@ -956,7 +956,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("standardTestDiscoveryRule(") ||
             ruleSource.includes("declarativeRuntimeExecutionBridgeRule(") ||
             ruleSource.includes("runtimeExecutionPolicyAdmissionRule(") ||
-            ruleSource.includes("runtimeExecutionPlanRule(");
+            ruleSource.includes("runtimeExecutionPlanRule(") ||
+            ruleSource.includes("simulatedRuntimeAdapterRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -10593,4 +10594,178 @@ export const RUNTIME_EXECUTION_PLAN_DOCUMENT_RULE: AuditRule =
     "Runtime abstraction documents Runtime Execution Plan",
     "Runtime abstraction documentation must distinguish Runtime plans, LoopRunner plans, dry-run, schema evolution, and serialized-plan limits.",
     RUNTIME_EXECUTION_PLAN_INVARIANTS.documentation,
+  );
+
+export type SimulatedRuntimeAdapterInvariant = Readonly<{
+  file: string;
+  requiredTokens: readonly string[];
+  forbiddenTokens: readonly string[];
+}>;
+
+export const SIMULATED_RUNTIME_ADAPTER_INVARIANTS = {
+  contract: {
+    file: "src/runtime/simulated.ts",
+    requiredTokens: [
+      "createSimulatedRuntimeAdapter",
+      "SimulatedRuntimeAdapterOptions",
+      "outcome: \"success\" | \"failure\"",
+      "SimulatedRuntime",
+    ],
+    forbiddenTokens: [],
+  },
+  deterministic: {
+    file: "src/runtime/simulated.ts",
+    requiredTokens: ["cloneOutput", "requestedAt", "runtime_disabled"],
+    forbiddenTokens: [
+      "from \"node:fs\"",
+      "from \"node:child_process\"",
+      "fetch(",
+      "Date.now",
+      "new Date",
+      "setTimeout",
+      "setInterval",
+      "Math.random",
+      "crypto.randomUUID",
+      "process.env",
+      "import(",
+      "require(",
+      "console.",
+    ],
+  },
+  registry: {
+    file: "src/runtime/registry.ts",
+    requiredTokens: ["SimulatedRuntime", "createRuntimeRegistry"],
+    forbiddenTokens: [],
+  },
+  publicApi: {
+    file: "src/runtime/index.ts",
+    requiredTokens: ["createSimulatedRuntimeAdapter", "SimulatedRuntime"],
+    forbiddenTokens: [],
+  },
+  planBoundary: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "dryRunPolicyAwareDeclarativeRuntimeExecution",
+      "resolvePolicyAwareDeclarativeRuntimeExecution(input)",
+      "executePolicyAwareDeclarativeRuntime",
+      "executeRuntime(resolution.runtimeRequest)",
+    ],
+    forbiddenTokens: ["JSON.parse(JSON.stringify(plan))"],
+  },
+  documentation: {
+    file: "docs/architecture/runtime-abstraction.md",
+    requiredTokens: [
+      "V13.18",
+      "Simulated Runtime Adapter",
+      "déterministe",
+      "non fournisseur",
+      "dry-run",
+    ],
+    forbiddenTokens: [],
+  },
+} as const satisfies Record<string, SimulatedRuntimeAdapterInvariant>;
+
+export function inspectSimulatedRuntimeAdapterInvariant(
+  source: string,
+  invariant: SimulatedRuntimeAdapterInvariant,
+): Readonly<{ missing: readonly string[]; forbidden: readonly string[] }> {
+  return {
+    missing: invariant.requiredTokens.filter(
+      (token) => !sourceIncludesToken(source, token),
+    ),
+    forbidden: invariant.forbiddenTokens.filter((token) =>
+      sourceIncludesToken(source, token),
+    ),
+  };
+}
+
+function simulatedRuntimeAdapterRule(
+  id: string,
+  category: AuditRule["category"],
+  title: string,
+  description: string,
+  invariant: SimulatedRuntimeAdapterInvariant,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category,
+    severity: "error",
+    title,
+    description,
+    metadata: {
+      introducedIn: "V13.18",
+      tags: ["architecture", "contract", "execution"],
+      stability: "stable",
+      dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`],
+    },
+    check: () => {
+      const source = existsSync(invariant.file)
+        ? readFileSync(invariant.file, "utf8")
+        : "";
+      const result = inspectSimulatedRuntimeAdapterInvariant(source, invariant);
+      const details = [
+        ...result.missing.map((token) => `missing: ${token}`),
+        ...result.forbidden.map((token) => `forbidden: ${token}`),
+      ];
+
+      return details.length
+        ? fail(
+            rule,
+            `${title}.`,
+            details,
+            "Restore the deterministic simulated RuntimeAdapter boundary.",
+          )
+        : pass(rule, `${title}.`, [invariant.file]);
+    },
+  };
+  return rule;
+}
+
+export const SIMULATED_RUNTIME_ADAPTER_CONTRACT_RULE: AuditRule =
+  simulatedRuntimeAdapterRule(
+    "AUDIT-400",
+    "architecture",
+    "Simulated RuntimeAdapter exposes a minimal explicit contract",
+    "V13.18 must construct a deterministic simulated adapter without a scenario framework.",
+    SIMULATED_RUNTIME_ADAPTER_INVARIANTS.contract,
+  );
+export const SIMULATED_RUNTIME_ADAPTER_DETERMINISM_RULE: AuditRule =
+  simulatedRuntimeAdapterRule(
+    "AUDIT-401",
+    "architecture",
+    "Simulated RuntimeAdapter remains effect-free and deterministic",
+    "The simulated adapter must not read platform state or create external effects.",
+    SIMULATED_RUNTIME_ADAPTER_INVARIANTS.deterministic,
+  );
+export const SIMULATED_RUNTIME_ADAPTER_REGISTRY_RULE: AuditRule =
+  simulatedRuntimeAdapterRule(
+    "AUDIT-402",
+    "architecture",
+    "Simulated RuntimeAdapter is declared in the static V10 registry",
+    "The V13 to V10 bridge must resolve the simulated adapter through the existing static registry.",
+    SIMULATED_RUNTIME_ADAPTER_INVARIANTS.registry,
+  );
+export const SIMULATED_RUNTIME_ADAPTER_PUBLIC_API_RULE: AuditRule =
+  simulatedRuntimeAdapterRule(
+    "AUDIT-403",
+    "architecture",
+    "Simulated RuntimeAdapter exports only construction surfaces",
+    "The Runtime public API exposes the adapter factory and static instance without a metrics API.",
+    SIMULATED_RUNTIME_ADAPTER_INVARIANTS.publicApi,
+  );
+export const SIMULATED_RUNTIME_ADAPTER_PLAN_BOUNDARY_RULE: AuditRule =
+  simulatedRuntimeAdapterRule(
+    "AUDIT-404",
+    "architecture",
+    "Runtime plans remain descriptive before simulated execution",
+    "Dry-run and execution must preserve the V13.17 plan boundary and execute only from admitted original inputs.",
+    SIMULATED_RUNTIME_ADAPTER_INVARIANTS.planBoundary,
+  );
+export const SIMULATED_RUNTIME_ADAPTER_DOCUMENT_RULE: AuditRule =
+  simulatedRuntimeAdapterRule(
+    "AUDIT-405",
+    "docs",
+    "Runtime abstraction documents the simulated adapter",
+    "Documentation must distinguish the deterministic simulated adapter from a provider and a test mock.",
+    SIMULATED_RUNTIME_ADAPTER_INVARIANTS.documentation,
   );
