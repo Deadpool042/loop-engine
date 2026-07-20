@@ -85,7 +85,7 @@ La partie roadmap utilise :
 ## Validation locale
 
 - `pnpm run typecheck` : vérifie le typage TypeScript.
-- `pnpm run test` : lance les tests unitaires Node.
+- `pnpm run test` : lance les tests unitaires Node sous `tests/` et `src/execution/`.
 - `pnpm run validate` : lance le typecheck, les tests et `json-check`.
 
 ## Auto-pilotage local

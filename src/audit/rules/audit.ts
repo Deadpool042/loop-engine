@@ -952,7 +952,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("runtimeDescriptorRule(") ||
             ruleSource.includes("runtimeRegistryRule(") ||
             ruleSource.includes("runtimeCapabilityRule(") ||
-            ruleSource.includes("runtimeCapabilityReconciliationRule(");
+            ruleSource.includes("runtimeCapabilityReconciliationRule(") ||
+            ruleSource.includes("standardTestDiscoveryRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9954,3 +9955,101 @@ export const RUNTIME_CAPABILITY_PURE_EVALUATION_RULE: AuditRule = runtimeCapabil
 export const RUNTIME_CAPABILITY_SELECTION_BOUNDARY_RULE: AuditRule = runtimeCapabilityReconciliationRule("AUDIT-380", "architecture", "Runtime Capability selection remains non-operational", "Capability-based runtime selection must not depend on adapters, providers, or execution.", RUNTIME_CAPABILITY_RECONCILIATION_INVARIANTS.selection);
 export const RUNTIME_CAPABILITY_CORE_EXPORT_RULE: AuditRule = runtimeCapabilityReconciliationRule("AUDIT-381", "architecture", "Core exports reconciled Runtime Capability contracts", "The Core facade must expose the reconciled capability and selection APIs.", RUNTIME_CAPABILITY_RECONCILIATION_INVARIANTS.coreExports);
 export const RUNTIME_CAPABILITY_RECONCILIATION_DOCUMENT_RULE: AuditRule = runtimeCapabilityReconciliationRule("AUDIT-382", "docs", "Runtime Capability RFC documents reconciled responsibilities", "The RFC must distinguish declarations, requirements, selection, execution, and agent capabilities.", RUNTIME_CAPABILITY_RECONCILIATION_INVARIANTS.documentation);
+
+const STANDARD_TEST_DISCOVERY_GLOBS = [
+  "tests/**/*.test.ts",
+  "src/execution/*.test.ts",
+  "src/execution/**/*.test.ts",
+] as const;
+
+export function inspectStandardTestDiscoveryScript(
+  script: string,
+): Readonly<{ missing: readonly string[]; duplicate: readonly string[] }> {
+  const tokens = script.split(/\s+/).filter(Boolean);
+  return {
+    missing: STANDARD_TEST_DISCOVERY_GLOBS.filter(
+      (glob) => !tokens.includes(glob),
+    ),
+    duplicate: STANDARD_TEST_DISCOVERY_GLOBS.filter(
+      (glob) => tokens.filter((token) => token === glob).length > 1,
+    ),
+  };
+}
+
+function standardTestDiscoveryRule(id: string): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category: "architecture",
+    severity: "error",
+    title: "Standard test discovery includes execution suites",
+    description:
+      "The canonical pnpm test script must include both repository tests and src/execution suites exactly once.",
+    metadata: {
+      introducedIn: "V13.14",
+      tags: ["architecture", "ci", "execution"],
+      stability: "stable",
+      dependsOn: ["AUDIT-382"],
+    },
+    check: () => {
+      const packagePath = "package.json";
+
+      if (!existsSync(packagePath)) {
+        return fail(
+          rule,
+          "package.json is missing.",
+          [packagePath],
+          "Restore package.json so standard test discovery can be verified.",
+        );
+      }
+
+      const content = readFileSync(packagePath, "utf8");
+      let parsed: { readonly scripts?: { readonly test?: unknown } };
+      try {
+        parsed = JSON.parse(content) as {
+          readonly scripts?: { readonly test?: unknown };
+        };
+      } catch {
+        return fail(
+          rule,
+          "package.json cannot be parsed.",
+          [packagePath],
+          "Restore valid package.json so standard test discovery can be verified.",
+        );
+      }
+
+      const script = parsed.scripts?.test;
+
+      if (typeof script !== "string") {
+        return fail(
+          rule,
+          "The standard test script is missing.",
+          ["scripts.test"],
+          "Restore scripts.test with the canonical test discovery globs.",
+        );
+      }
+
+      const result = inspectStandardTestDiscoveryScript(script);
+      const details = [
+        ...result.missing.map((glob) => `missing: ${glob}`),
+        ...result.duplicate.map((glob) => `duplicate: ${glob}`),
+      ];
+
+      return details.length === 0
+        ? pass(
+            rule,
+            "Standard test discovery includes repository and execution suites.",
+            STANDARD_TEST_DISCOVERY_GLOBS,
+          )
+        : fail(
+            rule,
+            "Standard test discovery is incomplete.",
+            details,
+            "Keep scripts.test as the single canonical test-discovery entry point for both tests/ and src/execution/.",
+          );
+    },
+  };
+  return rule;
+}
+
+export const STANDARD_TEST_DISCOVERY_INCLUDES_EXECUTION_RULE: AuditRule =
+  standardTestDiscoveryRule("AUDIT-383");

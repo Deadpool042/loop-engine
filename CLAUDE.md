@@ -43,7 +43,7 @@ When adding a feature, do not silently violate any of the above — if a task se
 ```bash
 pnpm loop <command>            # run the CLI (tsx src/cli.ts)
 pnpm run typecheck             # tsc --noEmit
-pnpm run test                  # tsx --test tests/**/*.test.ts
+pnpm run test                  # tsx --test tests/**/*.test.ts src/execution/*.test.ts src/execution/**/*.test.ts
 pnpm run validate              # typecheck + test + json-check
 pnpm run audit:strict          # tsx src/cli.ts audit --json --strict
 pnpm run audit:profiles        # scripts/audit-profile-check.ts (checks all public audit profiles)
