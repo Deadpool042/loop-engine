@@ -15,10 +15,12 @@ import {
 } from "./runtime.js";
 import type {
   RuntimeId,
+  LocalProcessRuntimeRequest,
   RuntimeMetadata,
   RuntimeRequest,
   RuntimeResult,
 } from "../runtime/index.js";
+import { LOCAL_PROCESS_RUNTIME_ID } from "../runtime/index.js";
 import type { RuntimeCapabilityInput } from "./runtime-capability.js";
 import type { RuntimeRegistryInput as DeclarativeRuntimeRegistryInput } from "./runtime-registry.js";
 import type { RuntimeRequestInput as DeclarativeRuntimeRequestInput } from "./runtime-request.js";
@@ -38,6 +40,8 @@ export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_ERROR_CODES = [
   "runtime_execution_plan_unserializable",
   "runtime_execution_receipt_inconsistent",
   "runtime_execution_receipt_unserializable",
+  "runtime_execution_local_process_binding_required",
+  "runtime_execution_local_process_binding_unexpected",
 ] as const;
 
 export type DeclarativeRuntimeExecutionBridgeErrorCode =
@@ -145,6 +149,27 @@ export type PolicyAwareDeclarativeRuntimeExecutionBridgeInput =
     Readonly<{
       admission: RuntimeExecutionPolicyAdmissionOptions;
     }>;
+
+/**
+ * Explicit process authority supplied by the caller of the opt-in bridge.
+ * It is deliberately separate from AgentPolicyResolution: agent selection
+ * admits the runtime, while this policy bounds the actual local effect.
+ */
+export type LocalProcessExecutionBinding = Readonly<{
+  localProcess: LocalProcessRuntimeRequest;
+}>;
+
+export type PolicyBoundLocalProcessBridgeInput = Omit<
+  PolicyAwareDeclarativeRuntimeExecutionBridgeInput,
+  "runtimeRequestOptions"
+> &
+  Readonly<{
+    runtimeRequestOptions?: Omit<
+      DeclarativeRuntimeExecutionRequestOptions,
+      "localProcess"
+    >;
+    localProcessBinding?: LocalProcessExecutionBinding;
+  }>;
 
 export type DeclarativeRuntimeV10Resolution = Readonly<{
   outcome: "selected";
@@ -471,6 +496,9 @@ export type PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult =
       receipt: null;
       diagnostics: readonly DeclarativeRuntimeExecutionBridgeError[];
     }>;
+
+export type PolicyBoundLocalProcessExecutionResult =
+  PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult;
 
 const BUDGET_DIMENSIONS = [
   "maxTokens",
@@ -1036,7 +1064,12 @@ export function createRuntimeExecutionReceipt(
     reasons: plan.reasons,
     outcome: {
       status: runtimeResult.status,
-      output: runtimeResult.output,
+      // Process output is adapter-internal evidence. A public receipt proves
+      // the admitted effect without serialising command output or secrets.
+      output:
+        runtimeResult.runtimeId === LOCAL_PROCESS_RUNTIME_ID
+          ? null
+          : runtimeResult.output,
       diagnostics: runtimeResult.diagnostics,
       errorCode: runtimeResult.error?.code ?? null,
       errorMessage: runtimeResult.error?.message ?? null,
@@ -1052,6 +1085,139 @@ export function createRuntimeExecutionReceipt(
       "runtime_execution_receipt_unserializable",
       receiptErrorMessage(error),
     );
+  }
+}
+
+function localProcessBindingDiagnostic(
+  resolution: PolicyAwareDeclarativeRuntimeExecutionResolution,
+  binding: LocalProcessExecutionBinding | undefined,
+): DeclarativeRuntimeExecutionBridgeError | null {
+  if (resolution.outcome !== "resolved") return null;
+
+  if (
+    resolution.runtimeId === LOCAL_PROCESS_RUNTIME_ID &&
+    binding === undefined
+  ) {
+    return bridgeError(
+      "runtime_execution_local_process_binding_required",
+      "Local-process execution requires an explicit LocalProcessExecutionBinding.",
+      { runtimeId: resolution.runtimeId },
+    );
+  }
+
+  if (
+    resolution.runtimeId !== LOCAL_PROCESS_RUNTIME_ID &&
+    binding !== undefined
+  ) {
+    return bridgeError(
+      "runtime_execution_local_process_binding_unexpected",
+      "LocalProcessExecutionBinding is valid only for the local-process runtime.",
+      { runtimeId: resolution.runtimeId },
+    );
+  }
+
+  return null;
+}
+
+/**
+ * Opt-in bridge for the existing V10.1 local-process adapter. It validates
+ * declarative selection and Agent policy first, then refuses ambiguous local
+ * process authority before adapter execution. No process is started here.
+ */
+export function resolvePolicyBoundLocalProcessExecution(
+  input: PolicyBoundLocalProcessBridgeInput,
+): PolicyAwareDeclarativeRuntimeExecutionResolution {
+  // Preflight only the pure V13 decision stages so local authority is checked
+  // before the V10 RuntimeRequest can be constructed or resolved.
+  const requestDiagnostics = validateDeclarativeRuntimeRequest(input.declarativeRequest);
+  if (requestDiagnostics.length > 0) {
+    return resolvePolicyAwareDeclarativeRuntimeExecution(input);
+  }
+  const declarativeSelection = selectRuntimeByCapabilities(
+    input.declarativeRequest,
+    input.declarativeRegistry,
+    input.runtimeCapabilities,
+  );
+  if (declarativeSelection.outcome !== "selected") {
+    return resolvePolicyAwareDeclarativeRuntimeExecution(input);
+  }
+  const descriptorId = declarativeSelection.runtimeId;
+  const runtimeId = descriptorId ? input.runtimeMapping[descriptorId] : null;
+  if (!descriptorId || !runtimeId) {
+    return resolvePolicyAwareDeclarativeRuntimeExecution(input);
+  }
+  const admission = evaluateRuntimeExecutionAdmission(
+    createAdmissionInput(runtimeId, input.admission),
+  );
+  if (admission.outcome !== "admitted") {
+    return resolvePolicyAwareDeclarativeRuntimeExecution(input);
+  }
+  const bindingMissing =
+    runtimeId === LOCAL_PROCESS_RUNTIME_ID && input.localProcessBinding === undefined;
+  const bindingUnexpected =
+    runtimeId !== LOCAL_PROCESS_RUNTIME_ID && input.localProcessBinding !== undefined;
+  if (bindingMissing || bindingUnexpected) {
+    const diagnostic = bridgeError(
+      bindingMissing
+        ? "runtime_execution_local_process_binding_required"
+        : "runtime_execution_local_process_binding_unexpected",
+      bindingMissing
+        ? "Local-process execution requires an explicit LocalProcessExecutionBinding."
+        : "LocalProcessExecutionBinding is valid only for the local-process runtime.",
+      { runtimeId },
+    );
+    return deepFreeze({
+      outcome: "unavailable_v10_request",
+      descriptorId,
+      runtimeId,
+      declarativeSelection,
+      admission: null,
+      runtimeRequest: null,
+      v10Resolution: null,
+      diagnostics: [diagnostic],
+    }) as PolicyAwareDeclarativeRuntimeExecutionResolution;
+  }
+  const resolution = resolvePolicyAwareDeclarativeRuntimeExecution({
+    ...input,
+    runtimeRequestOptions: {
+      ...(input.runtimeRequestOptions ?? {}),
+      ...(input.localProcessBinding === undefined
+        ? {}
+        : { localProcess: input.localProcessBinding.localProcess }),
+    },
+  });
+  return resolution;
+}
+
+export function dryRunPolicyBoundLocalProcessExecution(
+  input: PolicyBoundLocalProcessBridgeInput,
+): RuntimeExecutionPlanDryRunResult {
+  const resolution = resolvePolicyBoundLocalProcessExecution(input);
+  if (resolution.outcome !== "resolved") {
+    return deepFreeze({ outcome: resolution.outcome, plan: null, resolution, diagnostics: resolution.diagnostics }) as RuntimeExecutionPlanDryRunResult;
+  }
+  const plan = createRuntimeExecutionPlan({ resolution, admission: input.admission });
+  const serializableDiagnostic = assertRuntimeExecutionPlanSerializable(plan);
+  if (serializableDiagnostic) {
+    return deepFreeze({ outcome: "runtime_execution_plan_unserializable", plan: null, resolution, diagnostics: [serializableDiagnostic] }) as RuntimeExecutionPlanDryRunResult;
+  }
+  return deepFreeze({ outcome: "planned", plan, resolution, diagnostics: [] }) as RuntimeExecutionPlanDryRunResult;
+}
+
+export async function executePolicyBoundLocalProcessWithReceipt(
+  input: PolicyBoundLocalProcessBridgeInput,
+): Promise<PolicyBoundLocalProcessExecutionResult> {
+  const resolution = resolvePolicyBoundLocalProcessExecution(input);
+  if (resolution.outcome !== "resolved") {
+    return deepFreeze({ outcome: "resolution_failed", resolution, runtimeResult: null, receipt: null, diagnostics: resolution.diagnostics }) as PolicyBoundLocalProcessExecutionResult;
+  }
+  const runtimeResult = await executeRuntime(resolution.runtimeRequest);
+  try {
+    const receipt = createRuntimeExecutionReceipt({ resolution, admission: input.admission, runtimeResult });
+    return deepFreeze({ outcome: "executed", resolution, runtimeResult, receipt, diagnostics: [] }) as PolicyBoundLocalProcessExecutionResult;
+  } catch (error) {
+    const diagnostic = bridgeError("runtime_execution_receipt_unserializable", "Runtime execution receipt could not be constructed.", { reason: receiptErrorMessage(error) });
+    return deepFreeze({ outcome: "receipt_creation_failed", resolution, runtimeResult, receipt: null, diagnostics: [diagnostic] }) as PolicyBoundLocalProcessExecutionResult;
   }
 }
 

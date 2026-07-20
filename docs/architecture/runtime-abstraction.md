@@ -297,6 +297,30 @@ retries, réparations ou escalades d'une session Runtime unitaire.
 
 ## local-process (V10.1)
 
+## Policy-bound Local Process Bridge V13.21
+
+V13.21 ajoute une unique surface Core opt-in :
+`resolvePolicyBoundLocalProcessExecution`,
+`dryRunPolicyBoundLocalProcessExecution` et
+`executePolicyBoundLocalProcessWithReceipt`. Elle ne crée pas d'adapter : elle
+relie le `LocalProcessRuntime` V10.1 existant à la sélection déclarative V13,
+à l'admission `AgentPolicyResolution` et à une
+`LocalProcessExecutionBinding` fournie explicitement par l'appelant.
+
+Les deux politiques restent distinctes. L'Agent policy admet le runtime,
+provider, effort et budget ; le binding porte le `LocalProcessExecutionPolicy`
+local (allow-list, cwd, environnement et limites). Un binding absent pour
+`local-process`, ou présent pour un autre runtime, est refusé avant toute
+exécution V10. Le dry-run ne lance jamais l'adapter et ne projette que
+`localProcessConfigured`, jamais commande, arguments, cwd ou environnement.
+
+Le `RuntimeResult` conserve ses sorties techniques internes. Pour
+`local-process`, le receipt public projette `output: null` : stdout, stderr,
+commande, arguments, exécutable, cwd, environnement et secrets sont exclus.
+La limite OS demeure inchangée : Node ne fournit pas de sandbox de réseau,
+filesystem ou descendants, et l'arrêt ne garantit pas le contrôle universel
+des enfants d'un processus.
+
 `LocalProcessCommand` sépare strictement la commande demandée de sa politique
 d'exécution : `executable` absolu, `args` structurés, `cwd`, environnement
 explicite et stdin optionnel. Aucune chaîne shell n'est acceptée.

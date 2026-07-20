@@ -958,7 +958,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("runtimeExecutionPolicyAdmissionRule(") ||
             ruleSource.includes("runtimeExecutionPlanRule(") ||
             ruleSource.includes("simulatedRuntimeAdapterRule(") ||
-            ruleSource.includes("runtimeExecutionReceiptRule(");
+            ruleSource.includes("runtimeExecutionReceiptRule(") ||
+            ruleSource.includes("policyBoundLocalProcessBridgeRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -10848,3 +10849,40 @@ export const RUNTIME_EXECUTION_RECEIPT_EXECUTION_RULE: AuditRule = runtimeExecut
 export const RUNTIME_EXECUTION_RECEIPT_COMPAT_RULE: AuditRule = runtimeExecutionReceiptRule("AUDIT-409", "architecture", "Runtime Execution Receipt preserves historical execution contracts", "The receipt API must be additive and leave V10 and V13.15–V13.18 execution APIs unchanged.", RUNTIME_EXECUTION_RECEIPT_INVARIANTS.compatibility);
 export const RUNTIME_EXECUTION_RECEIPT_REPORTING_BOUNDARY_RULE: AuditRule = runtimeExecutionReceiptRule("AUDIT-410", "architecture", "Runtime Execution Receipt does not alter execution reporting", "V13.19 must not add receipts to the historical src/execution reporting layer.", RUNTIME_EXECUTION_RECEIPT_INVARIANTS.executionReportBoundary);
 export const RUNTIME_EXECUTION_RECEIPT_DOCUMENT_RULE: AuditRule = runtimeExecutionReceiptRule("AUDIT-411", "docs", "Runtime abstraction documents Runtime Execution Receipt boundaries", "Documentation must distinguish plan, V10 result, receipt, ExecutionReport, LoopRunResult, and the two denial levels.", RUNTIME_EXECUTION_RECEIPT_INVARIANTS.documentation);
+
+const POLICY_BOUND_LOCAL_PROCESS_BRIDGE_INVARIANTS = [
+  ["AUDIT-412", "Policy-bound local process bridge is explicit", ["LocalProcessExecutionBinding", "resolvePolicyBoundLocalProcessExecution", "runtime_execution_local_process_binding_required"]],
+  ["AUDIT-413", "Policy-bound local process dry-run remains inert", ["dryRunPolicyBoundLocalProcessExecution", "localProcessConfigured"]],
+  ["AUDIT-414", "Local process receipts redact adapter output", ["LOCAL_PROCESS_RUNTIME_ID", "? null", "createRuntimeExecutionReceipt"]],
+  ["AUDIT-415", "Runtime abstraction documents the policy-bound bridge", ["Policy-bound Local Process Bridge V13.21", "LocalProcessExecutionBinding", "output: null"]],
+] as const;
+
+function policyBoundLocalProcessBridgeRule(
+  id: string,
+  title: string,
+  requiredTokens: readonly string[],
+  file: string,
+  category: AuditRule["category"],
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category,
+    severity: "error",
+    title,
+    description: "V13.21 must keep local process authority explicit, inert in dry-run, and redacted in public receipts.",
+    metadata: { introducedIn: "V13.21", tags: ["architecture", "execution", "policy"], stability: "stable", dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`] },
+    check: () => {
+      const source = existsSync(file) ? readFileSync(file, "utf8") : "";
+      const missing = requiredTokens.filter((token) => !sourceIncludesToken(source, token));
+      return missing.length > 0
+        ? fail(rule, `${title}.`, missing.map((token) => `missing: ${token}`), "Restore the V13.21 local process boundary.")
+        : pass(rule, `${title}.`, [file]);
+    },
+  };
+  return rule;
+}
+
+export const POLICY_BOUND_LOCAL_PROCESS_BRIDGE_CONTRACT_RULE: AuditRule = policyBoundLocalProcessBridgeRule("AUDIT-412", POLICY_BOUND_LOCAL_PROCESS_BRIDGE_INVARIANTS[0][1], POLICY_BOUND_LOCAL_PROCESS_BRIDGE_INVARIANTS[0][2], "src/core/runtime-execution-bridge.ts", "architecture");
+export const POLICY_BOUND_LOCAL_PROCESS_BRIDGE_DRY_RUN_RULE: AuditRule = policyBoundLocalProcessBridgeRule("AUDIT-413", POLICY_BOUND_LOCAL_PROCESS_BRIDGE_INVARIANTS[1][1], POLICY_BOUND_LOCAL_PROCESS_BRIDGE_INVARIANTS[1][2], "src/core/runtime-execution-bridge.ts", "architecture");
+export const POLICY_BOUND_LOCAL_PROCESS_BRIDGE_RECEIPT_RULE: AuditRule = policyBoundLocalProcessBridgeRule("AUDIT-414", POLICY_BOUND_LOCAL_PROCESS_BRIDGE_INVARIANTS[2][1], POLICY_BOUND_LOCAL_PROCESS_BRIDGE_INVARIANTS[2][2], "src/core/runtime-execution-bridge.ts", "architecture");
+export const POLICY_BOUND_LOCAL_PROCESS_BRIDGE_DOCUMENT_RULE: AuditRule = policyBoundLocalProcessBridgeRule("AUDIT-415", POLICY_BOUND_LOCAL_PROCESS_BRIDGE_INVARIANTS[3][1], POLICY_BOUND_LOCAL_PROCESS_BRIDGE_INVARIANTS[3][2], "docs/architecture/runtime-abstraction.md", "docs");

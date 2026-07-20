@@ -11,6 +11,8 @@ import {
   executeDeclarativeRuntime,
   executePolicyAwareDeclarativeRuntime,
   executePolicyAwareDeclarativeRuntimeWithReceipt,
+  dryRunPolicyBoundLocalProcessExecution,
+  executePolicyBoundLocalProcessWithReceipt,
   evaluateRuntimeExecutionAdmission,
   resolveDeclarativeRuntimeExecution,
   resolvePolicyAwareDeclarativeRuntimeExecution,
@@ -515,6 +517,84 @@ describe("Core declarative runtime execution bridge — pure resolution", () => 
     );
 
     assert.deepEqual(second, first);
+  });
+});
+
+describe("Policy-bound local-process bridge", () => {
+  function localProcessInput(root: string) {
+    return policyAwareBridgeInput({
+      loopRunResult: loopRunResult("custom", "local"),
+      runtimeMapping: { "runtime-a": "local-process" },
+      runtimeRequestOptions: { allowedProviders: ["local"] },
+      admission: {
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedProviders: ["local"],
+            allowedRuntimes: ["local-process"] as AgentRuntime[],
+          },
+        }),
+        provider: "local",
+        effort: "medium",
+        budget: { maxCalls: 1 },
+      },
+      localProcessBinding: {
+        localProcess: {
+          command: {
+            executable: process.execPath,
+            args: ["-e", "process.stdout.write('receipt-secret')"],
+            cwd: root,
+            environment: { BRIDGE_SECRET: "receipt-secret" },
+          },
+          executionPolicy: {
+            enabled: true,
+            projectRoot: root,
+            allowedExecutables: [process.execPath],
+            allowedEnvironmentKeys: ["BRIDGE_SECRET"],
+            timeoutMs: 2_000,
+            maxStdoutBytes: 128,
+            maxStderrBytes: 128,
+          },
+        },
+      },
+    }) as Parameters<typeof dryRunPolicyBoundLocalProcessExecution>[0];
+  }
+
+  it("requires explicit local binding and never executes during dry-run", () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-v1321-dry-")));
+    try {
+      const missing = dryRunPolicyBoundLocalProcessExecution({
+        ...localProcessInput(root),
+        localProcessBinding: undefined,
+      });
+      assert.equal(missing.outcome, "unavailable_v10_request");
+
+      const planned = dryRunPolicyBoundLocalProcessExecution(localProcessInput(root));
+      assert.equal(planned.outcome, "planned");
+      if (planned.outcome !== "planned") return;
+      assert.equal(planned.plan.request.localProcessConfigured, true);
+      assert.equal(JSON.stringify(planned.plan).includes("receipt-secret"), false);
+      assert.equal(JSON.stringify(planned.plan).includes(process.execPath), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("redacts local process output and binding data from the receipt", async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-v1321-receipt-")));
+    try {
+      const result = await executePolicyBoundLocalProcessWithReceipt(localProcessInput(root));
+      assert.equal(result.outcome, "executed");
+      if (result.outcome !== "executed") return;
+      assert.equal(result.runtimeResult.stdout, "receipt-secret");
+      assert.equal(result.receipt.outcome.output, null);
+      const serialized = JSON.stringify(result.receipt);
+      assert.equal(serialized.includes("receipt-secret"), false);
+      assert.equal(serialized.includes(process.execPath), false);
+      assert.equal(serialized.includes(root), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
