@@ -122,6 +122,13 @@ et les APIs V10 existantes `createRuntimeRequest`, `resolveRuntime` et
 `executeRuntime`. Il ne modifie ni le CLI, ni le JSON public, ni
 `LoopRunResult`, et ne crée aucun provider ou adapter réel.
 
+Depuis V13.16, la variante policy-aware ajoute une admission pure et explicite
+avant V10 : `evaluateRuntimeExecutionAdmission`,
+`resolvePolicyAwareDeclarativeRuntimeExecution` et
+`executePolicyAwareDeclarativeRuntime` consomment une `AgentPolicyResolution`
+déjà fournie, refusent runtime/provider/effort/budget hors politique, puis
+délèguent seulement après admission.
+
 Voir aussi :
 
 - `docs/architecture/autonomous-loop-runner.md`

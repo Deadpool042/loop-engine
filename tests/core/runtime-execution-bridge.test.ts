@@ -6,12 +6,22 @@ import { describe, it } from "node:test";
 
 import {
   executeDeclarativeRuntime,
+  executePolicyAwareDeclarativeRuntime,
+  evaluateRuntimeExecutionAdmission,
   resolveDeclarativeRuntimeExecution,
+  resolvePolicyAwareDeclarativeRuntimeExecution,
   type DeclarativeRuntimeExecutionBridgeInput,
   type DeclarativeRuntimeExecutionMapping,
+  type RuntimeExecutionAdmissionInput,
 } from "../../src/core/index.js";
-import type { AgentProvider, AgentRuntime } from "../../src/agents/types.js";
+import type {
+  AgentBudget,
+  AgentEffort,
+  AgentProvider,
+  AgentRuntime,
+} from "../../src/agents/types.js";
 import type { LoopRunResult } from "../../src/loop/types.js";
+import type { AgentPolicyResolution } from "../../src/policy/types.js";
 import type { RuntimeCapabilityInput } from "../../src/runtime/capability/types.js";
 import type { RuntimeRegistryInput } from "../../src/runtime/registry/types.js";
 import type { RuntimeRequestInput } from "../../src/runtime/request/types.js";
@@ -184,6 +194,70 @@ function bridgeInput(
     },
     loopRunResult: loopRunResult(),
     ...options,
+  };
+}
+
+function policyResolution(
+  overrides: Partial<AgentPolicyResolution> = {},
+): AgentPolicyResolution {
+  const base = loopRunResult().agentPolicy!;
+  return {
+    ...base,
+    requirements: {
+      ...base.requirements,
+      executionBudget: {
+        maxTokens: 1_000,
+        maxCostUsd: 10,
+        maxDurationMs: 60_000,
+        maxCalls: 1,
+        maxRepairs: 1,
+      },
+    },
+    ...overrides,
+  };
+}
+
+function admissionInput(
+  overrides: Partial<RuntimeExecutionAdmissionInput> = {},
+): RuntimeExecutionAdmissionInput {
+  return {
+    runtimeId: "codex",
+    provider: "openai",
+    effort: "medium",
+    budget: {
+      maxTokens: 500,
+      maxCostUsd: 5,
+      maxDurationMs: 30_000,
+      maxCalls: 1,
+      maxRepairs: 1,
+    },
+    policy: policyResolution(),
+    ...overrides,
+  };
+}
+
+function policyAwareBridgeInput(
+  overrides: Partial<Parameters<typeof resolvePolicyAwareDeclarativeRuntimeExecution>[0]> = {},
+) {
+  return {
+    ...bridgeInput(),
+    admission: {
+      policy: policyResolution({
+        requirements: {
+          ...policyResolution().requirements,
+          allowedRuntimes: ["codex"],
+          allowedProviders: ["openai"],
+        },
+      }),
+      budget: {
+        maxTokens: 500,
+        maxCostUsd: 5,
+        maxDurationMs: 30_000,
+        maxCalls: 1,
+        maxRepairs: 1,
+      },
+    },
+    ...overrides,
   };
 }
 
@@ -405,6 +479,467 @@ describe("Core declarative runtime execution bridge — pure resolution", () => 
     );
 
     assert.deepEqual(second, first);
+  });
+});
+
+describe("Runtime execution policy admission", () => {
+  it("admits an explicitly allowed runtime/provider/effort/budget", () => {
+    const result = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedRuntimes: ["codex"],
+            allowedProviders: ["openai"],
+            maximumEffort: "medium",
+          },
+        }),
+      }),
+    );
+
+    assert.equal(result.outcome, "admitted");
+    assert.equal(result.admitted, true);
+    assert.deepEqual(
+      result.checks.map((check) => check.status),
+      ["passed", "passed", "passed", "passed", "passed"],
+    );
+  });
+
+  it("denies runtimes outside a non-empty allow-list, including compatible descriptors mapped to forbidden runtimes", () => {
+    const result = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        runtimeId: "codex",
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedRuntimes: ["claude_code"],
+          },
+        }),
+      }),
+    );
+
+    assert.equal(result.outcome, "denied");
+    assert.equal(result.reason, "runtime_execution_runtime_not_allowed");
+  });
+
+  it("preserves policy semantics for absent and empty runtime restrictions", () => {
+    const unrestricted = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedRuntimes: undefined,
+          },
+        }),
+      }),
+    );
+    const empty = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedRuntimes: [],
+          },
+        }),
+      }),
+    );
+
+    assert.equal(unrestricted.outcome, "admitted");
+    assert.equal(
+      unrestricted.checks.find((check) => check.name === "runtime")?.status,
+      "not_applicable",
+    );
+    assert.equal(empty.outcome, "denied");
+    assert.equal(empty.reason, "runtime_execution_runtime_not_allowed");
+  });
+
+  it("admits allowed providers, denies forbidden providers, and never infers provider from runtime", () => {
+    const allowed = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        provider: "openai",
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedProviders: ["openai"],
+          },
+        }),
+      }),
+    );
+    const denied = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        provider: "anthropic",
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedProviders: ["openai"],
+          },
+        }),
+      }),
+    );
+    const unavailable = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        provider: undefined,
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedProviders: ["openai"],
+          },
+        }),
+      }),
+    );
+    const unrestricted = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        provider: undefined,
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedProviders: undefined,
+          },
+        }),
+      }),
+    );
+
+    assert.equal(allowed.outcome, "admitted");
+    assert.equal(denied.outcome, "denied");
+    assert.equal(denied.reason, "runtime_execution_provider_not_allowed");
+    assert.equal(unavailable.outcome, "denied");
+    assert.equal(
+      unavailable.reason,
+      "runtime_execution_provider_unverifiable",
+    );
+    assert.equal(unrestricted.outcome, "admitted");
+    assert.equal(
+      unrestricted.checks.find((check) => check.name === "provider")?.status,
+      "not_available",
+    );
+  });
+
+  it("checks effort with the existing effort ranking, including lower, equal, higher, and absent effort", () => {
+    const basePolicy = policyResolution({
+      requirements: { ...policyResolution().requirements, maximumEffort: "high" },
+    });
+    const lower = evaluateRuntimeExecutionAdmission(
+      admissionInput({ effort: "medium", policy: basePolicy }),
+    );
+    const equal = evaluateRuntimeExecutionAdmission(
+      admissionInput({ effort: "high", policy: basePolicy }),
+    );
+    const higher = evaluateRuntimeExecutionAdmission(
+      admissionInput({ effort: "max", policy: basePolicy }),
+    );
+    const absent = evaluateRuntimeExecutionAdmission(
+      admissionInput({ effort: undefined, policy: basePolicy }),
+    );
+
+    assert.equal(lower.outcome, "admitted");
+    assert.equal(equal.outcome, "admitted");
+    assert.equal(higher.outcome, "denied");
+    assert.equal(higher.reason, "runtime_execution_effort_exceeds_maximum");
+    assert.equal(absent.outcome, "admitted");
+    assert.equal(
+      absent.checks.find((check) => check.name === "effort")?.status,
+      "not_available",
+    );
+  });
+
+  it("checks every budget field with lower/equal/greater/absent/null/zero semantics", () => {
+    const policyBudget: AgentBudget = {
+      maxTokens: 100,
+      maxCostUsd: 10,
+      maxDurationMs: 1_000,
+      maxCalls: 1,
+      maxRepairs: 0,
+    };
+    const policy = policyResolution({
+      requirements: {
+        ...policyResolution().requirements,
+        executionBudget: policyBudget,
+      },
+    });
+    const lowerOrEqual = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        policy,
+        budget: {
+          maxTokens: 50,
+          maxCostUsd: 10,
+          maxDurationMs: 999,
+          maxCalls: 1,
+          maxRepairs: 0,
+        },
+      }),
+    );
+    const exceeded = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        policy,
+        budget: {
+          maxTokens: 101,
+          maxCostUsd: 11,
+          maxDurationMs: 1_001,
+          maxCalls: 2,
+          maxRepairs: 1,
+        },
+      }),
+    );
+    const absent = evaluateRuntimeExecutionAdmission(
+      admissionInput({ policy, budget: undefined }),
+    );
+    const partial = evaluateRuntimeExecutionAdmission(
+      admissionInput({ policy, budget: { maxCalls: 1 } }),
+    );
+    const unboundedRequestedAgainstBoundedLimit =
+      evaluateRuntimeExecutionAdmission(
+        admissionInput({ policy, budget: { maxCalls: null } }),
+      );
+    const unboundedLimit = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            executionBudget: { ...policyBudget, maxTokens: null },
+          },
+        }),
+        budget: { maxTokens: 1_000 },
+      }),
+    );
+    const invalid = evaluateRuntimeExecutionAdmission(
+      admissionInput({ policy, budget: { maxCalls: -1 as never } }),
+    );
+
+    assert.equal(lowerOrEqual.outcome, "admitted");
+    assert.equal(exceeded.outcome, "denied");
+    assert.deepEqual(
+      exceeded.diagnostics.map((diagnostic) => diagnostic.details.dimension),
+      [
+        "maxTokens",
+        "maxCostUsd",
+        "maxDurationMs",
+        "maxCalls",
+        "maxRepairs",
+      ],
+    );
+    assert.equal(absent.outcome, "admitted");
+    assert.equal(
+      absent.checks.find((check) => check.name === "budget")?.status,
+      "not_available",
+    );
+    assert.equal(partial.outcome, "admitted");
+    assert.equal(unboundedRequestedAgainstBoundedLimit.outcome, "denied");
+    assert.equal(unboundedLimit.outcome, "admitted");
+    assert.equal(invalid.outcome, "denied");
+    assert.equal(
+      invalid.reason,
+      "runtime_execution_admission_input_inconsistent",
+    );
+  });
+
+  it("denies when the policy resolution is not resolved", () => {
+    const result = evaluateRuntimeExecutionAdmission(
+      admissionInput({
+        policy: policyResolution({ status: "runtime_not_allowed" }),
+      }),
+    );
+
+    assert.equal(result.outcome, "denied");
+    assert.equal(result.reason, "runtime_execution_policy_not_resolved");
+  });
+
+  it("returns stable deterministic output without mutating inputs", () => {
+    const input = admissionInput({
+      policy: policyResolution({
+        requirements: {
+          ...policyResolution().requirements,
+          allowedRuntimes: ["codex"],
+          allowedProviders: ["openai"],
+        },
+      }),
+    });
+    const before = structuredClone(input);
+    const first = evaluateRuntimeExecutionAdmission(input);
+    const second = evaluateRuntimeExecutionAdmission(input);
+
+    assert.deepEqual(input, before);
+    assert.deepEqual(second, first);
+    assert.equal(Object.isFrozen(first), true);
+    assert.doesNotThrow(() => JSON.stringify(first));
+  });
+});
+
+describe("Policy-aware declarative runtime execution bridge", () => {
+  it("resolves only after capability compatibility, mapping, and policy admission all pass", () => {
+    const result = resolvePolicyAwareDeclarativeRuntimeExecution(
+      policyAwareBridgeInput(),
+    );
+
+    assert.equal(result.outcome, "resolved");
+    if (result.outcome !== "resolved") return;
+    assert.equal(result.descriptorId, "runtime-a");
+    assert.equal(result.runtimeId, "codex");
+    assert.equal(result.admission.outcome, "admitted");
+    assert.equal(result.runtimeRequest.requestedRuntime, "codex");
+  });
+
+  it("stops before V10 request construction and resolution when admission is denied", () => {
+    const result = resolvePolicyAwareDeclarativeRuntimeExecution(
+      policyAwareBridgeInput({
+        admission: {
+          policy: policyResolution({
+            requirements: {
+              ...policyResolution().requirements,
+              allowedRuntimes: ["claude_code"],
+            },
+          }),
+        },
+      }),
+    );
+
+    assert.equal(result.outcome, "admission_denied");
+    assert.equal(result.runtimeRequest, null);
+    assert.equal(result.v10Resolution, null);
+    assert.equal(
+      result.admission.reason,
+      "runtime_execution_runtime_not_allowed",
+    );
+  });
+
+  it("keeps V13.15 historical resolution unchanged when no policy-aware API is used", () => {
+    const historical = resolveDeclarativeRuntimeExecution(bridgeInput());
+    const policyAware = resolvePolicyAwareDeclarativeRuntimeExecution(
+      policyAwareBridgeInput(),
+    );
+
+    assert.equal(historical.outcome, "resolved");
+    assert.equal(policyAware.outcome, "resolved");
+    if (historical.outcome !== "resolved" || policyAware.outcome !== "resolved") {
+      return;
+    }
+    assert.equal(historical.runtimeId, policyAware.runtimeId);
+    assert.equal(historical.runtimeRequest.requestedRuntime, "codex");
+    assert.equal("admission" in historical, false);
+  });
+
+  it("executes V10 once after admission and propagates V10 errors", async () => {
+    const result = await executePolicyAwareDeclarativeRuntime(
+      policyAwareBridgeInput(),
+    );
+
+    assert.equal(result.outcome, "v10_execution_failed");
+    assert.equal(result.runtimeResult?.runtimeId, "codex");
+    assert.equal(result.runtimeResult?.status, "not_implemented");
+  });
+
+  it("never executes V10 after admission refusal", async () => {
+    const root = realpathSync(
+      mkdtempSync(join(tmpdir(), "loop-policy-aware-denied-")),
+    );
+
+    try {
+      const result = await executePolicyAwareDeclarativeRuntime(
+        policyAwareBridgeInput({
+          loopRunResult: loopRunResult("custom", "local"),
+          runtimeMapping: { "runtime-a": "local-process" },
+          runtimeRequestOptions: {
+            allowedProviders: ["local"],
+            localProcess: {
+              command: {
+                executable: process.execPath,
+                args: ["-e", "process.stdout.write('should-not-run')"],
+                cwd: root,
+              },
+              executionPolicy: {
+                enabled: true,
+                projectRoot: root,
+                allowedExecutables: [process.execPath],
+                allowedEnvironmentKeys: [],
+                timeoutMs: 2_000,
+                maxStdoutBytes: 128,
+                maxStderrBytes: 128,
+              },
+            },
+          },
+          admission: {
+            policy: policyResolution({
+              requirements: {
+                ...policyResolution().requirements,
+                allowedRuntimes: ["codex"],
+              },
+            }),
+            provider: "local",
+            effort: "medium",
+            budget: { maxCalls: 1 },
+          },
+        }),
+      );
+
+      assert.equal(result.outcome, "resolution_failed");
+      assert.equal(result.runtimeResult, null);
+      assert.equal(result.resolution.outcome, "admission_denied");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("executes the selected local-process adapter exactly once after admission", async () => {
+    const root = realpathSync(
+      mkdtempSync(join(tmpdir(), "loop-policy-aware-success-")),
+    );
+
+    try {
+      const result = await executePolicyAwareDeclarativeRuntime(
+        policyAwareBridgeInput({
+          loopRunResult: loopRunResult("custom", "local"),
+          runtimeMapping: { "runtime-a": "local-process" },
+          runtimeRequestOptions: {
+            allowedProviders: ["local"],
+            localProcess: {
+              command: {
+                executable: process.execPath,
+                args: ["-e", "process.stdout.write('admitted')"],
+                cwd: root,
+              },
+              executionPolicy: {
+                enabled: true,
+                projectRoot: root,
+                allowedExecutables: [process.execPath],
+                allowedEnvironmentKeys: [],
+                timeoutMs: 2_000,
+                maxStdoutBytes: 128,
+                maxStderrBytes: 128,
+              },
+            },
+          },
+          admission: {
+            policy: policyResolution({
+              requirements: {
+                ...policyResolution().requirements,
+                allowedProviders: ["local"],
+                executionBudget: {
+                  maxTokens: null,
+                  maxCostUsd: null,
+                  maxDurationMs: null,
+                  maxCalls: 1,
+                  maxRepairs: 0,
+                },
+              },
+            }),
+            provider: "local",
+            effort: "medium",
+            budget: { maxCalls: 1, maxRepairs: 0 },
+          },
+        }),
+      );
+
+      assert.equal(result.outcome, "success");
+      assert.equal(result.runtimeResult.status, "completed");
+      assert.equal(result.runtimeResult.stdout, "admitted");
+      assert.equal(
+        result.runtimeResult.events?.filter(
+          (event) => event.type === "process_started",
+        ).length,
+        1,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

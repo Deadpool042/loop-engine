@@ -954,7 +954,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("runtimeCapabilityRule(") ||
             ruleSource.includes("runtimeCapabilityReconciliationRule(") ||
             ruleSource.includes("standardTestDiscoveryRule(") ||
-            ruleSource.includes("declarativeRuntimeExecutionBridgeRule(");
+            ruleSource.includes("declarativeRuntimeExecutionBridgeRule(") ||
+            ruleSource.includes("runtimeExecutionPolicyAdmissionRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -10221,4 +10222,179 @@ export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_DOCUMENT_RULE: AuditRule =
     "Runtime abstraction documents Declarative Runtime execution bridge",
     "Runtime abstraction documentation must distinguish V13 declarative selection, the opt-in bridge, and V10 execution.",
     DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_INVARIANTS.documentation,
+  );
+
+export type RuntimeExecutionPolicyAdmissionInvariant = Readonly<{
+  file: string;
+  requiredTokens: readonly string[];
+  forbiddenTokens: readonly string[];
+}>;
+
+export const RUNTIME_EXECUTION_POLICY_ADMISSION_INVARIANTS = {
+  admission: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "evaluateRuntimeExecutionAdmission",
+      "RuntimeExecutionAdmissionInput",
+      "RuntimeExecutionAdmissionResult",
+      "RuntimeExecutionAdmissionErrorCode",
+      "RUNTIME_EXECUTION_ADMISSION_CHECKS",
+    ],
+    forbiddenTokens: [
+      "from \"node:fs\"",
+      "from \"node:child_process\"",
+      "fetch(",
+      "Date.now",
+      "new Date",
+      "Math.random",
+      "process.env",
+      "import(",
+      "require(",
+    ],
+  },
+  policyAwareBridge: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "resolvePolicyAwareDeclarativeRuntimeExecution",
+      "executePolicyAwareDeclarativeRuntime",
+      "evaluateRuntimeExecutionAdmission",
+      "outcome: \"admission_denied\"",
+      "runtimeRequest: null",
+      "v10Resolution: null",
+    ],
+    forbiddenTokens: [],
+  },
+  policyReuse: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: [
+      "AgentPolicyResolution",
+      "compareAgentEffort",
+      "mergeBudgetsRestrictively",
+      "toBudget",
+      "policy.requirements.allowedRuntimes",
+      "policy.requirements.allowedProviders",
+      "policy.requirements.executionBudget",
+    ],
+    forbiddenTokens: ["DEFAULT_AGENT_POLICY", "resolvePolicy("],
+  },
+  publicCompatibility: {
+    file: "src/core/index.ts",
+    requiredTokens: ["./runtime-execution-bridge.js"],
+    forbiddenTokens: [],
+  },
+  documentation: {
+    file: "docs/architecture/runtime-abstraction.md",
+    requiredTokens: [
+      "V13.16",
+      "Execution policy admission",
+      "policy explicitly supplied",
+      "provider non vérifiable",
+      "permissions",
+      "opt-in",
+    ],
+    forbiddenTokens: [],
+  },
+} as const satisfies Record<
+  string,
+  RuntimeExecutionPolicyAdmissionInvariant
+>;
+
+export function inspectRuntimeExecutionPolicyAdmissionInvariant(
+  source: string,
+  invariant: RuntimeExecutionPolicyAdmissionInvariant,
+): Readonly<{ missing: readonly string[]; forbidden: readonly string[] }> {
+  return {
+    missing: invariant.requiredTokens.filter(
+      (token) => !sourceIncludesToken(source, token),
+    ),
+    forbidden: invariant.forbiddenTokens.filter((token) =>
+      sourceIncludesToken(source, token),
+    ),
+  };
+}
+
+function runtimeExecutionPolicyAdmissionRule(
+  id: string,
+  category: AuditRule["category"],
+  title: string,
+  description: string,
+  invariant: RuntimeExecutionPolicyAdmissionInvariant,
+): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category,
+    severity: "error",
+    title,
+    description,
+    metadata: {
+      introducedIn: "V13.16",
+      tags: ["architecture", "contract", "execution", "policy"],
+      stability: "stable",
+      dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`],
+    },
+    check: () => {
+      const source = existsSync(invariant.file)
+        ? readFileSync(invariant.file, "utf8")
+        : "";
+      const result = inspectRuntimeExecutionPolicyAdmissionInvariant(
+        source,
+        invariant,
+      );
+      const details = [
+        ...result.missing.map((token) => `missing: ${token}`),
+        ...result.forbidden.map((token) => `forbidden: ${token}`),
+      ];
+
+      return details.length
+        ? fail(
+            rule,
+            `${title}.`,
+            details,
+            "Restore the V13.16 runtime execution policy admission boundary.",
+          )
+        : pass(rule, `${title}.`, [invariant.file]);
+    },
+  };
+  return rule;
+}
+
+export const RUNTIME_EXECUTION_POLICY_ADMISSION_MODULE_RULE: AuditRule =
+  runtimeExecutionPolicyAdmissionRule(
+    "AUDIT-389",
+    "architecture",
+    "Runtime execution policy admission module exists",
+    "V13.16 must expose a pure admission contract before V10 runtime resolution.",
+    RUNTIME_EXECUTION_POLICY_ADMISSION_INVARIANTS.admission,
+  );
+export const RUNTIME_EXECUTION_POLICY_ADMISSION_GATE_RULE: AuditRule =
+  runtimeExecutionPolicyAdmissionRule(
+    "AUDIT-390",
+    "architecture",
+    "Runtime execution policy admission gates the V10 bridge",
+    "Policy-aware execution must stop before V10 request construction, resolution, or execution when admission is denied.",
+    RUNTIME_EXECUTION_POLICY_ADMISSION_INVARIANTS.policyAwareBridge,
+  );
+export const RUNTIME_EXECUTION_POLICY_ADMISSION_POLICY_REUSE_RULE: AuditRule =
+  runtimeExecutionPolicyAdmissionRule(
+    "AUDIT-391",
+    "architecture",
+    "Runtime execution policy admission reuses Policy contracts",
+    "Admission must consume an explicit AgentPolicyResolution and existing Policy helpers instead of resolving defaults or duplicating restrictions.",
+    RUNTIME_EXECUTION_POLICY_ADMISSION_INVARIANTS.policyReuse,
+  );
+export const RUNTIME_EXECUTION_POLICY_ADMISSION_COMPAT_RULE: AuditRule =
+  runtimeExecutionPolicyAdmissionRule(
+    "AUDIT-392",
+    "architecture",
+    "Runtime execution policy admission preserves historical Core exports",
+    "The policy-aware bridge must be additive and preserve V13.15 and V10 historical APIs.",
+    RUNTIME_EXECUTION_POLICY_ADMISSION_INVARIANTS.publicCompatibility,
+  );
+export const RUNTIME_EXECUTION_POLICY_ADMISSION_DOCUMENT_RULE: AuditRule =
+  runtimeExecutionPolicyAdmissionRule(
+    "AUDIT-393",
+    "docs",
+    "Runtime abstraction documents execution policy admission",
+    "Runtime abstraction documentation must distinguish capability compatibility, policy admission, and V10 execution.",
+    RUNTIME_EXECUTION_POLICY_ADMISSION_INVARIANTS.documentation,
   );

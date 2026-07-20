@@ -97,6 +97,69 @@ CLI ou les schémas JSON publics. Les appels V10 historiques à
 `createRuntimeRequest`, `resolveRuntime` et `executeRuntime` restent utilisables
 sans configuration déclarative.
 
+## Admission de politique d'exécution V13.16
+
+V13.16 ajoute une phase pure **Execution policy admission** entre le mapping
+déclaratif et la résolution V10. Elle reste opt-in : les fonctions historiques
+V13.15 ne demandent aucune politique, et les surfaces V10 restent inchangées.
+
+```text
+Declarative Runtime Request
+  -> Capability validation and selection
+  -> explicit descriptorId -> RuntimeId mapping
+  -> Execution policy admission
+  -> V10 resolveRuntime
+  -> V10 executeRuntime
+```
+
+La politique est **policy explicitly supplied** par l'appelant sous forme
+d'`AgentPolicyResolution` déjà résolue. Le bridge ne charge pas
+`DEFAULT_AGENT_POLICY`, ne résout pas silencieusement une politique, ne lit pas
+de contexte global et n'invente jamais de politique permissive.
+
+Les responsabilités restent séparées :
+
+- `RuntimeCapability` répond à la compatibilité technique : le descriptor peut-il
+  satisfaire la requête déclarative ?
+- l'admission de politique répond à l'autorisation courante : le runtime mappé,
+  le provider connu, l'effort et le budget sont-ils admis par la politique ?
+- V10 répond à la résolution opérationnelle : quel `RuntimeAdapter` enregistré
+  traite la `RuntimeRequest` ?
+
+La surface additive expose une évaluation isolable
+`evaluateRuntimeExecutionAdmission`, une résolution pure
+`resolvePolicyAwareDeclarativeRuntimeExecution`, et une fonction avec effets
+`executePolicyAwareDeclarativeRuntime`. En cas de refus d'admission, la
+résolution retourne `admission_denied`, `runtimeRequest: null` et
+`v10Resolution: null` : `createRuntimeRequest`, `resolveRuntime` et
+`executeRuntime` ne sont pas appelés après refus.
+
+Les règles appliquées sont strictement celles déjà portées par les contrats
+Policy/Agent existants :
+
+- `allowedRuntimes` : si la politique déclare une allow-list, le `RuntimeId`
+  mappé doit y appartenir ; une liste vide garde la sémantique restrictive du
+  Policy Engine.
+- `allowedProviders` : si le provider est connu, il doit appartenir à
+  l'allow-list ; le bridge ne déduit jamais un provider depuis le nom du
+  runtime.
+- provider inconnu : sans restriction provider, le contrôle est marqué
+  `not_available` et l'admission peut continuer ; avec restriction provider,
+  le résultat est un refus `runtime_execution_provider_unverifiable` parce que
+  le provider est **provider non vérifiable**.
+- effort : l'effort demandé est comparé avec `compareAgentEffort`, jamais
+  lexicalement, et doit rester inférieur ou égal au maximum de politique.
+- budget : le budget demandé est normalisé avec `toBudget`, comparé champ par
+  champ au budget résolu, et les bornes effectives sont représentées via
+  `mergeBudgetsRestrictively`.
+
+Les permissions ne sont pas inventées dans V13.16. L'admission ne contrôle une
+permission que si une future surface transporte explicitement l'opération
+demandée ; aujourd'hui elle ne remplace donc ni les plafonds du `LoopRunner`, ni
+les contrôles locaux V10 comme `LocalProcessExecutionPolicy`. Aucun provider
+réel, adapter réel, réseau, registre dynamique, conteneur DI, horloge implicite,
+aléatoire, filesystem ou variable d'environnement n'est ajouté.
+
 `RuntimeResult` est additif par conception : runtime, statut, horodatages,
 diagnostics, sortie et métadonnées. V10.1 ajoute optionnellement `exitCode`,
 `signal`, `stdout`, `stderr`, une erreur structurée et les événements. Les

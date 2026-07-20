@@ -184,6 +184,30 @@ La résolution distingue explicitement deux échecs de nature différente :
 
 `resolvePolicy` n'appelle jamais un agent réel : `selectAgentProfile` (`src/agents/selector.ts`) est un lookup pur sur un registre local, jamais une invocation. Aucun réseau, aucun processus, aucune écriture.
 
+## Consommation par l'admission Runtime V13.16
+
+Depuis V13.16, le bridge Core policy-aware consomme une
+`AgentPolicyResolution` déjà calculée pour décider si une exécution Runtime peut
+continuer après la sélection par capacités. Cette consommation est
+unidirectionnelle : `src/core/runtime-execution-bridge.ts` importe les contrats
+publics Policy/Agent, mais `src/policy/` ne dépend pas de `src/core/`,
+`src/runtime/`, `src/loop/` ou `src/execution/`.
+
+L'admission ne résout pas une politique, ne charge pas les defaults et ne
+modifie pas les règles du Policy Engine. Elle lit seulement les exigences
+résolues (`allowedRuntimes`, `allowedProviders`, `maximumEffort`,
+`executionBudget`) et réutilise les helpers existants (`compareAgentEffort`,
+`toBudget`, `mergeBudgetsRestrictively`) pour vérifier un runtime mappé, un
+provider explicitement connu, un effort demandé et un budget demandé. Si le
+provider n'est pas connu et qu'une allow-list provider existe, l'admission refuse
+avec un résultat structuré plutôt que de déduire le provider depuis le runtime.
+
+Cette phase ne remplace pas les permissions par mode : aucune permission
+d'exécution n'est inventée à partir d'un runtime ou d'un adapter. Les contrôles
+de permissions restent portés par les contrats de politique, le futur
+LoopRunner/LoopExecutor explicite, et les garde-fous V10 comme
+`LocalProcessExecutionPolicy`.
+
 ## Position de n8n
 
 n8n peut fournir, via `AgentPolicyRequest` (`src/policy/types.ts`) : `requestedBudget` (partiel), `requestedMaxEffort`, `requestedProviders`, `requestedRuntimes` — plus, au niveau de l'appel `run`, le projet, l'objectif, et le mode demandé (voir `autonomous-loop-runner.md`).
