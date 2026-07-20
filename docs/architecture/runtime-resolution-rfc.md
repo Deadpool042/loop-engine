@@ -2,7 +2,7 @@
 
 ## Purpose, scope, and terminology
 
-RuntimeResolution is the immutable, versioned, serializable and deterministic contract that maps a valid RuntimeRequest to an eligible runtime descriptor reference. A **resolution** is only the declarative assessment of the supplied request and descriptor references; it never identifies, allocates, creates, or invokes an operational runtime.
+RuntimeResolution is the immutable, versioned, serializable and deterministic contract that maps a valid RuntimeRequest to eligible runtime descriptor metadata. A **resolution** is only the declarative assessment of the supplied request, registry, descriptor, and capability evidence; it never identifies, allocates, creates, or invokes an operational runtime.
 
 ```mermaid
 flowchart TD
@@ -27,9 +27,11 @@ RuntimeResolution follows RuntimeRequest and remains inside the declarative boun
 
 ## Deterministic selection and validation
 
-The contract evaluates only explicit RuntimeRequest evidence and descriptor references. Validation requires an explicit resolution identifier, version, timestamp, and a constructible RuntimeRequest reference with denied execution flags. Descriptor references are normalized into stable lexical ordering. Diagnostics use stable safe codes and are sorted deterministically.
+The original resolution contract evaluates explicit RuntimeRequest evidence and descriptor references. Validation requires an explicit resolution identifier, version, timestamp, and a constructible RuntimeRequest reference with denied execution flags. Descriptor references are normalized into stable lexical ordering. Diagnostics use stable safe codes and are sorted deterministically.
 
-Resolution does not choose a concrete runtime implementation. It performs no lookup, registry discovery, scoring heuristic, implicit fallback, clock read, environment read, filesystem access, network access, process access, or mutable global-state access. All identifiers and time are explicit caller input.
+V13.13 adds `selectRuntimeByCapabilities`, a separate pure selection function. It consumes one valid RuntimeRequest, one explicit metadata-only RuntimeRegistry, and one explicit RuntimeCapability catalog. Only descriptors whose lifecycle state is `eligible` participate. Every request requirement must match a referenced declaration; extra declarations are allowed. Compatible descriptor identifiers are sorted lexically and the first identifier is the deterministic tie-break.
+
+Selection does not choose a concrete runtime implementation or return a RuntimeAdapter. It performs no dynamic lookup, registry discovery, scoring heuristic, implicit fallback, clock read, environment read, filesystem access, network access, process access, provider access, or mutable global-state access. Empty requirements, invalid inputs, duplicate capability identifiers, and the absence of a compatible descriptor fail closed with `executionAllowed` and `executionStarted` still false.
 
 ## Future relationships, serialization, and extension
 

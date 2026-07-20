@@ -2,6 +2,49 @@
 export * from "./audit.js";
 export * from "./loop.js";
 export * from "./runtime.js";
+export {
+  createRuntimeCapability,
+  createRuntimeCapabilityRequirement,
+  evaluateRuntimeCapability,
+  evaluateRuntimeCapabilityCompatibility,
+  summarizeRuntimeCapability,
+  summarizeRuntimeCapabilityCompatibility,
+  validateRuntimeCapability,
+  validateRuntimeCapabilityRequirement,
+  type RuntimeCapabilityCompatibilityResult,
+  type RuntimeCapabilityError,
+  type RuntimeCapabilityErrorCode,
+  type RuntimeCapabilityInput,
+  type RuntimeCapabilityRequirementInput,
+  type RuntimeCapabilityResult,
+} from "./runtime-capability.js";
+export {
+  selectRuntimeByCapabilities,
+  summarizeRuntimeCapabilitySelection,
+  type RuntimeCapabilityCandidateEvaluation,
+  type RuntimeCapabilitySelectionResult,
+} from "./runtime-resolution.js";
+export {
+  createRuntimeRequest as createDeclarativeRuntimeRequest,
+  evaluateRuntimeRequest as evaluateDeclarativeRuntimeRequest,
+  summarizeRuntimeRequest as summarizeDeclarativeRuntimeRequest,
+  validateRuntimeRequest as validateDeclarativeRuntimeRequest,
+  type RuntimeRequestError as DeclarativeRuntimeRequestError,
+  type RuntimeRequestErrorCode as DeclarativeRuntimeRequestErrorCode,
+  type RuntimeRequestInput as DeclarativeRuntimeRequestInput,
+  type RuntimeRequestResult as DeclarativeRuntimeRequestResult,
+} from "./runtime-request.js";
+export {
+  createRuntimeRegistry as createDeclarativeRuntimeRegistry,
+  evaluateRuntimeRegistry as evaluateDeclarativeRuntimeRegistry,
+  summarizeRuntimeRegistry as summarizeDeclarativeRuntimeRegistry,
+  validateRuntimeRegistry as validateDeclarativeRuntimeRegistry,
+  type RuntimeRegistryDescriptor as DeclarativeRuntimeRegistryDescriptor,
+  type RuntimeRegistryError as DeclarativeRuntimeRegistryError,
+  type RuntimeRegistryErrorCode as DeclarativeRuntimeRegistryErrorCode,
+  type RuntimeRegistryInput as DeclarativeRuntimeRegistryInput,
+  type RuntimeRegistryResult as DeclarativeRuntimeRegistryResult,
+} from "./runtime-registry.js";
 export * from "./providers.js";
 export * from "./mapping.js";
 export * from "./intent.js";

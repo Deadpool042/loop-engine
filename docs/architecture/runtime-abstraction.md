@@ -45,6 +45,14 @@ politique ou de contexte.
 - `supports(request)` ;
 - `execute(request)`.
 
+Depuis V13.13, le champ V10 `RuntimeAdapter.capabilities` est explicitement
+qualifié de liste de labels `AgentCapability` conservée pour compatibilité avec
+la politique d’agent. Il ne s’agit pas de déclarations `RuntimeCapability` et
+aucune conversion implicite n’existe entre ces deux contrats. La sélection
+déclarative par capabilities vit dans `runtime/resolution/selection.ts` et ne
+retourne jamais un adapter ; `resolveRuntime` et `executeRuntime` restent des
+surfaces V10 séparées.
+
 `RuntimeResult` est additif par conception : runtime, statut, horodatages,
 diagnostics, sortie et métadonnées. V10.1 ajoute optionnellement `exitCode`,
 `signal`, `stdout`, `stderr`, une erreur structurée et les événements. Les

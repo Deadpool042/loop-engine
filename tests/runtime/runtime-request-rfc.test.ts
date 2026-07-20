@@ -27,6 +27,7 @@ test("Runtime Request is immutable, serializable, and default denied", () => {
   const result = evaluateRuntimeRequest(input);
 
   assert.deepEqual(request.evidenceReferences, ["evidence-a", "evidence-b"]);
+  assert.equal("capabilityRequirements" in request, false);
   assert.equal(result.requestConstructible, true);
   assert.equal(result.executionAllowed, false);
   assert.equal(result.executionStarted, false);
@@ -43,17 +44,24 @@ test("Runtime Request is immutable, serializable, and default denied", () => {
 test("Runtime Request rejects absent and invalid Execution Bridge evidence deterministically", () => {
   assert.equal(evaluateRuntimeRequest(null).requestConstructible, false);
   assert.equal(
-    evaluateRuntimeRequest({ ...input, bridge: { ...input.bridge, id: "" } }).diagnostics[0]?.code,
+    evaluateRuntimeRequest({ ...input, bridge: { ...input.bridge, id: "" } })
+      .diagnostics[0]?.code,
     "runtime_request_bridge_missing",
   );
-  assert.deepEqual(validateRuntimeRequest({ ...input, bridge: { ...input.bridge, ready: false } }), [
-    {
-      code: "runtime_request_bridge_invalid",
-      message: "Execution Bridge reference is invalid.",
-      executionAllowed: false,
-      executionStarted: false,
-    },
-  ]);
+  assert.deepEqual(
+    validateRuntimeRequest({
+      ...input,
+      bridge: { ...input.bridge, ready: false },
+    }),
+    [
+      {
+        code: "runtime_request_bridge_invalid",
+        message: "Execution Bridge reference is invalid.",
+        executionAllowed: false,
+        executionStarted: false,
+      },
+    ],
+  );
   assert.equal(
     evaluateRuntimeRequest({ ...input, createdAt: "" }).diagnostics[0]?.code,
     "runtime_request_invalid",

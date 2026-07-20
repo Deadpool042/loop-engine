@@ -146,12 +146,20 @@ export type RuntimeResult = Readonly<{
 export type RuntimeExecution = RuntimeResult | Promise<RuntimeResult>;
 
 /**
+ * Legacy V10 adapter labels used by agent policy. They are not V13
+ * RuntimeCapability declarations and no implicit conversion is allowed.
+ */
+export type RuntimeAdapterAgentCapability = AgentCapability;
+
+/**
  * Minimal stable runtime contract. `capabilities` is declarative only; a stub
  * advertises no executable capability and `execute` always returns a result.
+ * The field retains its V10 shape for compatibility and carries agent-policy
+ * labels, not RuntimeCapability declarations.
  */
 export type RuntimeAdapter = Readonly<{
   runtimeId: RuntimeId;
-  capabilities: readonly AgentCapability[];
+  capabilities: readonly RuntimeAdapterAgentCapability[];
   supports: (request: RuntimeRequest) => boolean;
   execute: (request: RuntimeRequest) => RuntimeExecution;
 }>;

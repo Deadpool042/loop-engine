@@ -951,7 +951,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("runtimeResolutionRule(") ||
             ruleSource.includes("runtimeDescriptorRule(") ||
             ruleSource.includes("runtimeRegistryRule(") ||
-            ruleSource.includes("runtimeCapabilityRule(");
+            ruleSource.includes("runtimeCapabilityRule(") ||
+            ruleSource.includes("runtimeCapabilityReconciliationRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -9929,3 +9930,27 @@ export const RUNTIME_CAPABILITY_DETERMINISM_RULE: AuditRule = runtimeCapabilityR
 export const RUNTIME_CAPABILITY_IDENTIFIERS_RULE: AuditRule = runtimeCapabilityRule("AUDIT-375", "architecture", "Runtime Capability uses explicit identifiers and versions", "Runtime Capability must require explicit id and version.", "src/runtime/capability/types.ts", ["id: string", "version: string"]);
 export const RUNTIME_CAPABILITY_DOCUMENT_RULE: AuditRule = runtimeCapabilityRule("AUDIT-376", "docs", "Runtime Capability RFC documents capability semantics", "RFC must state metadata-only capability semantics.", "docs/architecture/runtime-capability-rfc.md", ["metadata only", "not runtime implementation"]);
 export const RUNTIME_CAPABILITY_NO_SURFACE_RULE: AuditRule = runtimeCapabilityRule("AUDIT-377", "architecture", "Runtime Capability exposes no runtime implementation or adapter", "Runtime Capability must not expose runtime implementations.", "src/runtime/capability/evaluation.ts", ["Runtime Capability is metadata only and never executes"]);
+
+export type RuntimeCapabilityReconciliationInvariant = Readonly<{ file: string; requiredTokens: readonly string[]; forbiddenTokens: readonly string[] }>;
+export const RUNTIME_CAPABILITY_RECONCILIATION_INVARIANTS = {
+  contracts: { file: "src/runtime/capability/types.ts", requiredTokens: ["RuntimeCapabilityInput", "RuntimeCapabilityRequirementInput", "RuntimeCapabilityCompatibilityResult"], forbiddenTokens: [] },
+  evaluation: { file: "src/runtime/capability/evaluation.ts", requiredTokens: ["evaluateRuntimeCapabilityCompatibility", "missingFeatures", "unacceptedConstraints"], forbiddenTokens: ["Date.now", "Math.random", "randomUUID", "node:"] },
+  selection: { file: "src/runtime/resolution/selection.ts", requiredTokens: ["selectRuntimeByCapabilities", "executionAllowed: false", "executionStarted: false"], forbiddenTokens: ["executeRuntime(", "from \"../types.js\"", "../providers/", "node:"] },
+  coreExports: { file: "src/core/index.ts", requiredTokens: ["createRuntimeCapability", "evaluateRuntimeCapabilityCompatibility", "selectRuntimeByCapabilities", "createDeclarativeRuntimeRequest", "createDeclarativeRuntimeRegistry"], forbiddenTokens: [] },
+  documentation: { file: "docs/architecture/runtime-capability-rfc.md", requiredTokens: ["Capability declaration", "Capability requirement", "Runtime selection", "AgentCapability"], forbiddenTokens: [] },
+} as const satisfies Record<string, RuntimeCapabilityReconciliationInvariant>;
+
+export function inspectRuntimeCapabilityReconciliationInvariant(source: string, invariant: RuntimeCapabilityReconciliationInvariant): Readonly<{ missing: readonly string[]; forbidden: readonly string[] }> {
+  return { missing: invariant.requiredTokens.filter((token) => !sourceIncludesToken(source, token)), forbidden: invariant.forbiddenTokens.filter((token) => sourceIncludesToken(source, token)) };
+}
+
+function runtimeCapabilityReconciliationRule(id: string, category: AuditRule["category"], title: string, description: string, invariant: RuntimeCapabilityReconciliationInvariant): AuditRule {
+  const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.13", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const source = existsSync(invariant.file) ? readFileSync(invariant.file, "utf8") : ""; const result = inspectRuntimeCapabilityReconciliationInvariant(source, invariant); const details = [...result.missing.map((token) => `missing: ${token}`), ...result.forbidden.map((token) => `forbidden: ${token}`)]; return details.length ? fail(rule, `${title}.`, details, "Restore the Runtime Capability reconciliation boundary.") : pass(rule, `${title}.`, [invariant.file]); } };
+  return rule;
+}
+
+export const RUNTIME_CAPABILITY_CONTRACT_SEPARATION_RULE: AuditRule = runtimeCapabilityReconciliationRule("AUDIT-378", "architecture", "Runtime Capability declarations and requirements are distinct", "Runtime Capability offers, requirements, and compatibility results must use explicit contracts.", RUNTIME_CAPABILITY_RECONCILIATION_INVARIANTS.contracts);
+export const RUNTIME_CAPABILITY_PURE_EVALUATION_RULE: AuditRule = runtimeCapabilityReconciliationRule("AUDIT-379", "architecture", "Runtime Capability compatibility evaluation is deterministic", "Compatibility evaluation must remain pure and free of implicit time, randomness, and platform APIs.", RUNTIME_CAPABILITY_RECONCILIATION_INVARIANTS.evaluation);
+export const RUNTIME_CAPABILITY_SELECTION_BOUNDARY_RULE: AuditRule = runtimeCapabilityReconciliationRule("AUDIT-380", "architecture", "Runtime Capability selection remains non-operational", "Capability-based runtime selection must not depend on adapters, providers, or execution.", RUNTIME_CAPABILITY_RECONCILIATION_INVARIANTS.selection);
+export const RUNTIME_CAPABILITY_CORE_EXPORT_RULE: AuditRule = runtimeCapabilityReconciliationRule("AUDIT-381", "architecture", "Core exports reconciled Runtime Capability contracts", "The Core facade must expose the reconciled capability and selection APIs.", RUNTIME_CAPABILITY_RECONCILIATION_INVARIANTS.coreExports);
+export const RUNTIME_CAPABILITY_RECONCILIATION_DOCUMENT_RULE: AuditRule = runtimeCapabilityReconciliationRule("AUDIT-382", "docs", "Runtime Capability RFC documents reconciled responsibilities", "The RFC must distinguish declarations, requirements, selection, execution, and agent capabilities.", RUNTIME_CAPABILITY_RECONCILIATION_INVARIANTS.documentation);

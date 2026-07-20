@@ -4,6 +4,12 @@ import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import {
+  createRuntimeCapability,
+  createDeclarativeRuntimeRegistry,
+  createDeclarativeRuntimeRequest,
+  createRuntimeRequest,
+  evaluateRuntimeCapability,
+  executeRuntime,
   generateAuditReport,
   generateAuditRuleManifest,
   generateExecutionReport,
@@ -14,7 +20,11 @@ import {
   generateReviewReport,
   generateWorkspaceSummaryReport,
   loadConfig,
+  resolveRuntime,
   runLoopPlan,
+  selectRuntimeByCapabilities,
+  summarizeRuntimeCapability,
+  validateRuntimeCapability,
 } from "../../src/core/index.js";
 
 function runJson(command: string): unknown {
@@ -36,6 +46,19 @@ function loopEngineProject() {
 }
 
 describe("Core public API", () => {
+  it("exports reconciled capability APIs without breaking legacy runtime APIs", () => {
+    assert.equal(typeof createRuntimeCapability, "function");
+    assert.equal(typeof validateRuntimeCapability, "function");
+    assert.equal(typeof evaluateRuntimeCapability, "function");
+    assert.equal(typeof summarizeRuntimeCapability, "function");
+    assert.equal(typeof selectRuntimeByCapabilities, "function");
+    assert.equal(typeof createDeclarativeRuntimeRequest, "function");
+    assert.equal(typeof createDeclarativeRuntimeRegistry, "function");
+    assert.equal(typeof createRuntimeRequest, "function");
+    assert.equal(typeof resolveRuntime, "function");
+    assert.equal(typeof executeRuntime, "function");
+  });
+
   it("keeps the stable report payloads identical to their CLI adapters", () => {
     const config = loadConfig();
     const project = loopEngineProject();
