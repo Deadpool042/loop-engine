@@ -36,6 +36,8 @@ export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_ERROR_CODES = [
   "v10_runtime_unresolved",
   "v10_runtime_execution_failed",
   "runtime_execution_plan_unserializable",
+  "runtime_execution_receipt_inconsistent",
+  "runtime_execution_receipt_unserializable",
 ] as const;
 
 export type DeclarativeRuntimeExecutionBridgeErrorCode =
@@ -397,6 +399,76 @@ export type RuntimeExecutionPlanDryRunResult =
         PolicyAwareDeclarativeRuntimeExecutionResolution,
         { outcome: "resolved" }
       >;
+      diagnostics: readonly DeclarativeRuntimeExecutionBridgeError[];
+    }>;
+
+export const RUNTIME_EXECUTION_RECEIPT_SCHEMA_VERSION = 1 as const;
+
+export type RuntimeExecutionReceiptSchemaVersion =
+  typeof RUNTIME_EXECUTION_RECEIPT_SCHEMA_VERSION;
+
+export type RuntimeExecutionReceiptOutcome = Readonly<{
+  status: RuntimeResult["status"];
+  output: unknown;
+  diagnostics: readonly string[];
+  errorCode: string | null;
+  errorMessage: string | null;
+}>;
+
+/** A deterministic, public post-execution proof for one admitted Runtime call. */
+export type RuntimeExecutionReceipt = Readonly<{
+  schemaVersion: RuntimeExecutionReceiptSchemaVersion;
+  descriptorId: string;
+  runtimeId: RuntimeId;
+  request: RuntimeExecutionPlanRequest;
+  capabilityDecision: RuntimeExecutionPlanCapabilityDecision;
+  policyDecision: RuntimeExecutionPlanPolicyDecision;
+  executionConstraints: RuntimeExecutionPlanConstraints;
+  reasons: RuntimeExecutionPlan["reasons"];
+  outcome: RuntimeExecutionReceiptOutcome;
+}>;
+
+export type RuntimeExecutionReceiptInput = Readonly<{
+  resolution: Extract<
+    PolicyAwareDeclarativeRuntimeExecutionResolution,
+    { outcome: "resolved" }
+  >;
+  admission: RuntimeExecutionPolicyAdmissionOptions;
+  runtimeResult: RuntimeResult;
+}>;
+
+export type PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult =
+  | Readonly<{
+      outcome: "executed";
+      resolution: Extract<
+        PolicyAwareDeclarativeRuntimeExecutionResolution,
+        { outcome: "resolved" }
+      >;
+      runtimeResult: RuntimeResult;
+      receipt: RuntimeExecutionReceipt;
+      diagnostics: readonly [];
+    }>
+  | Readonly<{
+      outcome: "resolution_failed";
+      resolution: Exclude<
+        PolicyAwareDeclarativeRuntimeExecutionResolution,
+        { outcome: "resolved" }
+      >;
+      runtimeResult: null;
+      receipt: null;
+      diagnostics: readonly (
+        | DeclarativeRuntimeExecutionBridgeError
+        | RuntimeExecutionAdmissionError
+      )[];
+    }>
+  | Readonly<{
+      outcome: "receipt_creation_failed";
+      resolution: Extract<
+        PolicyAwareDeclarativeRuntimeExecutionResolution,
+        { outcome: "resolved" }
+      >;
+      runtimeResult: RuntimeResult;
+      receipt: null;
       diagnostics: readonly DeclarativeRuntimeExecutionBridgeError[];
     }>;
 
@@ -878,6 +950,111 @@ function assertRuntimeExecutionPlanSerializable(
   return null;
 }
 
+function cloneRuntimeExecutionReceiptValue(value: unknown, path = "receipt"): unknown {
+  if (value === null || typeof value === "string" || typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    if (Number.isFinite(value)) return value;
+    throw new TypeError(`${path} contains a non-finite number.`);
+  }
+  if (value === undefined) throw new TypeError(`${path} contains undefined.`);
+  if (typeof value === "function") throw new TypeError(`${path} contains a function.`);
+  if (typeof value === "symbol") throw new TypeError(`${path} contains a symbol.`);
+  if (typeof value === "bigint") throw new TypeError(`${path} contains a bigint.`);
+  if (typeof value !== "object") throw new TypeError(`${path} is not JSON-safe.`);
+
+  const tag = Object.prototype.toString.call(value);
+  if (tag === "[object Map]" || tag === "[object Set]" || tag === "[object Error]" || tag === "[object Promise]") {
+    throw new TypeError(`${path} contains ${tag}.`);
+  }
+  if ("then" in value && typeof value.then === "function") {
+    throw new TypeError(`${path} contains a thenable.`);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item, index) =>
+      cloneRuntimeExecutionReceiptValue(item, `${path}[${index}]`),
+    );
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    throw new TypeError(`${path} contains a non-JSON instance.`);
+  }
+
+  return Object.keys(value)
+    .sort((left, right) => left.localeCompare(right))
+    .reduce<Record<string, unknown>>((copy, key) => {
+      copy[key] = cloneRuntimeExecutionReceiptValue(
+        (value as Record<string, unknown>)[key],
+        `${path}.${key}`,
+      );
+      return copy;
+    }, {});
+}
+
+function receiptConstructionError(
+  code: Extract<
+    DeclarativeRuntimeExecutionBridgeErrorCode,
+    | "runtime_execution_receipt_inconsistent"
+    | "runtime_execution_receipt_unserializable"
+  >,
+  message: string,
+): TypeError {
+  return new TypeError(`${code}: ${message}`);
+}
+
+function receiptErrorMessage(error: unknown): string {
+  return typeof error === "object" && error !== null && "message" in error &&
+    typeof error.message === "string"
+    ? error.message
+    : "Receipt data is not JSON-safe.";
+}
+
+export function createRuntimeExecutionReceipt(
+  input: RuntimeExecutionReceiptInput,
+): RuntimeExecutionReceipt {
+  const { resolution, runtimeResult } = input;
+  if (runtimeResult.runtimeId !== resolution.runtimeId) {
+    throw receiptConstructionError(
+      "runtime_execution_receipt_inconsistent",
+      "RuntimeResult identity must match the resolved runtime.",
+    );
+  }
+
+  const plan = createRuntimeExecutionPlan({
+    resolution,
+    admission: input.admission,
+  });
+  const candidate = {
+    schemaVersion: RUNTIME_EXECUTION_RECEIPT_SCHEMA_VERSION,
+    descriptorId: plan.descriptorId,
+    runtimeId: plan.runtimeId,
+    request: plan.request,
+    capabilityDecision: plan.capabilityDecision,
+    policyDecision: plan.policyDecision,
+    executionConstraints: plan.executionConstraints,
+    reasons: plan.reasons,
+    outcome: {
+      status: runtimeResult.status,
+      output: runtimeResult.output,
+      diagnostics: runtimeResult.diagnostics,
+      errorCode: runtimeResult.error?.code ?? null,
+      errorMessage: runtimeResult.error?.message ?? null,
+    },
+  };
+
+  try {
+    return deepFreeze(
+      cloneRuntimeExecutionReceiptValue(candidate),
+    ) as RuntimeExecutionReceipt;
+  } catch (error) {
+    throw receiptConstructionError(
+      "runtime_execution_receipt_unserializable",
+      receiptErrorMessage(error),
+    );
+  }
+}
+
 export function createRuntimeExecutionPlan(
   input: RuntimeExecutionPlanInput,
 ): RuntimeExecutionPlan {
@@ -1340,4 +1517,56 @@ export async function executePolicyAwareDeclarativeRuntime(
     runtimeResult,
     diagnostics: [diagnostic],
   }) as PolicyAwareDeclarativeRuntimeExecutionResult;
+}
+
+/**
+ * Opt-in post-execution proof. Resolution failures create no receipt because
+ * they never reach a RuntimeAdapter; adapter-level denied results do.
+ */
+export async function executePolicyAwareDeclarativeRuntimeWithReceipt(
+  input: PolicyAwareDeclarativeRuntimeExecutionBridgeInput,
+): Promise<PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult> {
+  const resolution = resolvePolicyAwareDeclarativeRuntimeExecution(input);
+
+  if (resolution.outcome !== "resolved") {
+    return deepFreeze({
+      outcome: "resolution_failed",
+      resolution,
+      runtimeResult: null,
+      receipt: null,
+      diagnostics: resolution.diagnostics,
+    }) as PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult;
+  }
+
+  const runtimeResult = await executeRuntime(resolution.runtimeRequest);
+
+  try {
+    const receipt = createRuntimeExecutionReceipt({
+      resolution,
+      admission: input.admission,
+      runtimeResult,
+    });
+    return deepFreeze({
+      outcome: "executed",
+      resolution,
+      runtimeResult,
+      receipt,
+      diagnostics: [],
+    }) as PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult;
+  } catch (error) {
+    const diagnostic = bridgeError(
+      "runtime_execution_receipt_unserializable",
+      "Runtime execution receipt could not be constructed.",
+      {
+        reason: receiptErrorMessage(error),
+      },
+    );
+    return deepFreeze({
+      outcome: "receipt_creation_failed",
+      resolution,
+      runtimeResult,
+      receipt: null,
+      diagnostics: [diagnostic],
+    }) as PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult;
+  }
 }

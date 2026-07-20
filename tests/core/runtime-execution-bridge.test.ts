@@ -6,9 +6,11 @@ import { describe, it } from "node:test";
 
 import {
   createRuntimeExecutionPlan,
+  createRuntimeExecutionReceipt,
   dryRunPolicyAwareDeclarativeRuntimeExecution,
   executeDeclarativeRuntime,
   executePolicyAwareDeclarativeRuntime,
+  executePolicyAwareDeclarativeRuntimeWithReceipt,
   evaluateRuntimeExecutionAdmission,
   resolveDeclarativeRuntimeExecution,
   resolvePolicyAwareDeclarativeRuntimeExecution,
@@ -28,7 +30,10 @@ import type { AgentPolicyResolution } from "../../src/policy/types.js";
 import type { RuntimeCapabilityInput } from "../../src/runtime/capability/types.js";
 import type { RuntimeRegistryInput } from "../../src/runtime/registry/types.js";
 import type { RuntimeRequestInput } from "../../src/runtime/request/types.js";
-import { SimulatedRuntime } from "../../src/runtime/simulated.js";
+import {
+  createSimulatedRuntimeAdapter,
+  SimulatedRuntime,
+} from "../../src/runtime/simulated.js";
 
 function loopRunResult(
   runtime: AgentRuntime = "codex",
@@ -1545,6 +1550,191 @@ describe("Core declarative runtime execution bridge — V10 execution", () => {
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Runtime Execution Receipt V13.19", () => {
+  function simulatedInput() {
+    return policyAwareBridgeInput({
+      loopRunResult: loopRunResult("custom", "local"),
+      runtimeMapping: { "runtime-a": "custom", "runtime-b": "codex" },
+      admission: {
+        policy: policyResolution({
+          requirements: {
+            ...policyResolution().requirements,
+            allowedRuntimes: ["custom"],
+            allowedProviders: ["local"],
+          },
+        }),
+        provider: "local",
+        effort: "medium",
+        budget: { maxCalls: 1, maxRepairs: 0 },
+      },
+    });
+  }
+
+  it("builds an immutable JSON-safe receipt from a resolved context and RuntimeResult", () => {
+    const input = simulatedInput();
+    const resolution = resolvePolicyAwareDeclarativeRuntimeExecution(input);
+    assert.equal(resolution.outcome, "resolved");
+    if (resolution.outcome !== "resolved") return;
+    const output = { nested: ["stable"] };
+    const runtimeResult = {
+      runtimeId: "custom" as const,
+      status: "completed" as const,
+      startedAt: "2026-07-20T00:00:00.000Z",
+      completedAt: "2026-07-20T00:00:00.000Z",
+      diagnostics: ["completed"],
+      output,
+      metadata: { private: "not projected" },
+    };
+    const beforeResolution = structuredClone(resolution);
+    const beforeResult = structuredClone(runtimeResult);
+
+    const receipt = createRuntimeExecutionReceipt({
+      resolution,
+      admission: input.admission,
+      runtimeResult,
+    });
+    assert.equal(receipt.schemaVersion, 1);
+    assert.equal(receipt.descriptorId, "runtime-a");
+    assert.equal(receipt.runtimeId, "custom");
+    assert.equal(receipt.outcome.status, "completed");
+    assert.deepEqual(receipt.outcome.output, { nested: ["stable"] });
+    assert.deepEqual(JSON.parse(JSON.stringify(receipt)), receipt);
+    assert.equal(Object.isFrozen(receipt), true);
+    assert.deepEqual(resolution, beforeResolution);
+    assert.deepEqual(runtimeResult, beforeResult);
+    output.nested.push("outside");
+    assert.deepEqual(receipt.outcome.output, { nested: ["stable"] });
+  });
+
+  it("rejects inconsistent and non-JSON RuntimeResult values", () => {
+    const input = simulatedInput();
+    const resolution = resolvePolicyAwareDeclarativeRuntimeExecution(input);
+    assert.equal(resolution.outcome, "resolved");
+    if (resolution.outcome !== "resolved") return;
+    const base = {
+      runtimeId: "custom" as const,
+      status: "completed" as const,
+      startedAt: "2026-07-20T00:00:00.000Z",
+      completedAt: "2026-07-20T00:00:00.000Z",
+      diagnostics: [],
+      output: null,
+      metadata: {},
+    };
+
+    assert.throws(
+      () =>
+        createRuntimeExecutionReceipt({
+          resolution,
+          admission: input.admission,
+          runtimeResult: { ...base, runtimeId: "codex" },
+        }),
+      /runtime_execution_receipt_inconsistent/,
+    );
+    assert.throws(
+      () =>
+        createRuntimeExecutionReceipt({
+          resolution,
+          admission: input.admission,
+          runtimeResult: { ...base, output: new Map() },
+        }),
+      /runtime_execution_receipt_unserializable/,
+    );
+  });
+
+  it("keeps policy denial distinct from adapter denial and receipt creation", async () => {
+    const input = simulatedInput();
+    const instrumented = SimulatedRuntime as {
+      execute: typeof SimulatedRuntime.execute;
+    };
+    const originalExecute = instrumented.execute;
+    let calls = 0;
+    instrumented.execute = (request) => {
+      calls += 1;
+      return originalExecute(request);
+    };
+
+    try {
+      const dryRun = dryRunPolicyAwareDeclarativeRuntimeExecution(input);
+      assert.equal(dryRun.outcome, "planned");
+      if (dryRun.outcome !== "planned") return;
+      assert.equal(calls, 0);
+
+      const success = await executePolicyAwareDeclarativeRuntimeWithReceipt(input);
+      assert.equal(success.outcome, "executed");
+      if (success.outcome !== "executed") return;
+      assert.equal(calls, 1);
+      assert.equal(success.receipt.descriptorId, dryRun.plan.descriptorId);
+      assert.equal(success.receipt.runtimeId, dryRun.plan.runtimeId);
+      assert.equal(success.receipt.outcome.status, success.runtimeResult.status);
+
+      const policyDenied = await executePolicyAwareDeclarativeRuntimeWithReceipt({
+        ...input,
+        admission: {
+          ...input.admission,
+          policy: policyResolution({
+            requirements: {
+              ...policyResolution().requirements,
+              allowedRuntimes: ["codex"],
+            },
+          }),
+        },
+      });
+      assert.equal(policyDenied.outcome, "resolution_failed");
+      assert.equal(policyDenied.receipt, null);
+      assert.equal(calls, 1);
+
+      const deniedAdapter = createSimulatedRuntimeAdapter({
+        runtimeId: "custom",
+        outcome: "failure",
+      });
+      instrumented.execute = (request) => {
+        calls += 1;
+        return deniedAdapter.execute(request);
+      };
+      const adapterDenied = await executePolicyAwareDeclarativeRuntimeWithReceipt(input);
+      assert.equal(adapterDenied.outcome, "executed");
+      if (adapterDenied.outcome !== "executed") return;
+      assert.equal(calls, 2);
+      assert.equal(adapterDenied.runtimeResult.status, "denied");
+      assert.equal(adapterDenied.receipt.outcome.status, "denied");
+      assert.equal(adapterDenied.receipt.outcome.errorCode, "runtime_disabled");
+    } finally {
+      instrumented.execute = originalExecute;
+    }
+  });
+
+  it("creates no receipt or adapter call for missing mappings and unknown V10 runtimes", async () => {
+    const instrumented = SimulatedRuntime as {
+      execute: typeof SimulatedRuntime.execute;
+    };
+    const originalExecute = instrumented.execute;
+    let calls = 0;
+    instrumented.execute = (request) => {
+      calls += 1;
+      return originalExecute(request);
+    };
+
+    try {
+      const mappingMissing = await executePolicyAwareDeclarativeRuntimeWithReceipt({
+        ...simulatedInput(),
+        runtimeMapping: {},
+      });
+      const unknownRuntime = await executePolicyAwareDeclarativeRuntimeWithReceipt({
+        ...simulatedInput(),
+        runtimeMapping: { "runtime-a": "chatgpt" },
+      });
+
+      assert.equal(mappingMissing.outcome, "resolution_failed");
+      assert.equal(mappingMissing.receipt, null);
+      assert.equal(unknownRuntime.outcome, "resolution_failed");
+      assert.equal(unknownRuntime.receipt, null);
+      assert.equal(calls, 0);
+    } finally {
+      instrumented.execute = originalExecute;
     }
   });
 });

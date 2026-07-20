@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 
 import {
   createRuntimeExecutionPlan,
+  createRuntimeExecutionReceipt,
   createSimulatedRuntimeAdapter,
   createRuntimeCapability,
   createDeclarativeRuntimeRegistry,
@@ -15,6 +16,7 @@ import {
   evaluateRuntimeExecutionAdmission,
   executeDeclarativeRuntime,
   executePolicyAwareDeclarativeRuntime,
+  executePolicyAwareDeclarativeRuntimeWithReceipt,
   executeRuntime,
   generateAuditReport,
   generateAuditRuleManifest,
@@ -70,7 +72,9 @@ describe("Core public API", () => {
       "function",
     );
     assert.equal(typeof executePolicyAwareDeclarativeRuntime, "function");
+    assert.equal(typeof executePolicyAwareDeclarativeRuntimeWithReceipt, "function");
     assert.equal(typeof createRuntimeExecutionPlan, "function");
+    assert.equal(typeof createRuntimeExecutionReceipt, "function");
     assert.equal(typeof dryRunPolicyAwareDeclarativeRuntimeExecution, "function");
     assert.equal(typeof createSimulatedRuntimeAdapter, "function");
     assert.equal(typeof createRuntimeRequest, "function");

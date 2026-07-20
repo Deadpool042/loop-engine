@@ -957,7 +957,8 @@ export const AUDIT_RULE_METADATA_COMPLETENESS_RULE: AuditRule = {
             ruleSource.includes("declarativeRuntimeExecutionBridgeRule(") ||
             ruleSource.includes("runtimeExecutionPolicyAdmissionRule(") ||
             ruleSource.includes("runtimeExecutionPlanRule(") ||
-            ruleSource.includes("simulatedRuntimeAdapterRule(");
+            ruleSource.includes("simulatedRuntimeAdapterRule(") ||
+            ruleSource.includes("runtimeExecutionReceiptRule(");
           if (isFactoryRule) return "";
           const missing = [
             ruleSource.includes("title:") ? "" : "title",
@@ -10769,3 +10770,81 @@ export const SIMULATED_RUNTIME_ADAPTER_DOCUMENT_RULE: AuditRule =
     "Documentation must distinguish the deterministic simulated adapter from a provider and a test mock.",
     SIMULATED_RUNTIME_ADAPTER_INVARIANTS.documentation,
   );
+
+export type RuntimeExecutionReceiptInvariant = Readonly<{
+  file: string;
+  requiredTokens: readonly string[];
+  forbiddenTokens: readonly string[];
+}>;
+
+export const RUNTIME_EXECUTION_RECEIPT_INVARIANTS = {
+  contract: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: ["RUNTIME_EXECUTION_RECEIPT_SCHEMA_VERSION", "RuntimeExecutionReceipt", "createRuntimeExecutionReceipt", "schemaVersion: RuntimeExecutionReceiptSchemaVersion"],
+    forbiddenTokens: [],
+  },
+  serialization: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: ["cloneRuntimeExecutionReceiptValue", "non-JSON instance", "thenable", "deepFreeze"],
+    forbiddenTokens: ["from \"node:fs\"", "from \"node:child_process\"", "fetch(", "Date.now", "new Date", "performance.now", "setTimeout", "setInterval", "Math.random", "crypto.randomUUID", "process.env", "import(", "require(", "console."],
+  },
+  execution: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: ["executePolicyAwareDeclarativeRuntimeWithReceipt", "const runtimeResult = await executeRuntime(resolution.runtimeRequest)", "receipt: null", "outcome: \"executed\"", "createRuntimeExecutionReceipt({"],
+    forbiddenTokens: ["JSON.parse(JSON.stringify(plan))"],
+  },
+  compatibility: {
+    file: "src/core/runtime-execution-bridge.ts",
+    requiredTokens: ["executePolicyAwareDeclarativeRuntime(", "executePolicyAwareDeclarativeRuntimeWithReceipt(", "RuntimeExecutionPlan", "RuntimeResult"],
+    forbiddenTokens: [],
+  },
+  executionReportBoundary: {
+    file: "src/execution/report.ts",
+    requiredTokens: [],
+    forbiddenTokens: ["RuntimeExecutionReceipt"],
+  },
+  documentation: {
+    file: "docs/architecture/runtime-abstraction.md",
+    requiredTokens: ["V13.19", "Runtime Execution Receipt", "refus policy", "refus adapter", "ExecutionReport", "LoopRunResult"],
+    forbiddenTokens: [],
+  },
+} as const satisfies Record<string, RuntimeExecutionReceiptInvariant>;
+
+export function inspectRuntimeExecutionReceiptInvariant(source: string, invariant: RuntimeExecutionReceiptInvariant): Readonly<{ missing: readonly string[]; forbidden: readonly string[] }> {
+  return {
+    missing: invariant.requiredTokens.filter((token) => !sourceIncludesToken(source, token)),
+    forbidden: invariant.forbiddenTokens.filter((token) => sourceIncludesToken(source, token)),
+  };
+}
+
+function runtimeExecutionReceiptRule(id: string, category: AuditRule["category"], title: string, description: string, invariant: RuntimeExecutionReceiptInvariant): AuditRule {
+  const rule: AuditRule = {
+    id,
+    category,
+    severity: "error",
+    title,
+    description,
+    metadata: {
+      introducedIn: "V13.19",
+      tags: ["architecture", "contract", "execution"],
+      stability: "stable",
+      dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`],
+    },
+    check: () => {
+      const source = existsSync(invariant.file) ? readFileSync(invariant.file, "utf8") : "";
+      const result = inspectRuntimeExecutionReceiptInvariant(source, invariant);
+      const details = [...result.missing.map((token) => `missing: ${token}`), ...result.forbidden.map((token) => `forbidden: ${token}`)];
+      return details.length
+        ? fail(rule, `${title}.`, details, "Restore the deterministic Runtime Execution Receipt boundary.")
+        : pass(rule, `${title}.`, [invariant.file]);
+    },
+  };
+  return rule;
+}
+
+export const RUNTIME_EXECUTION_RECEIPT_CONTRACT_RULE: AuditRule = runtimeExecutionReceiptRule("AUDIT-406", "architecture", "Runtime Execution Receipt exposes a versioned post-execution contract", "V13.19 must expose a schema-versioned receipt distinct from the Runtime Execution Plan and RuntimeResult.", RUNTIME_EXECUTION_RECEIPT_INVARIANTS.contract);
+export const RUNTIME_EXECUTION_RECEIPT_SERIALIZATION_RULE: AuditRule = runtimeExecutionReceiptRule("AUDIT-407", "architecture", "Runtime Execution Receipt is immutable JSON-safe data", "Receipt construction must clone public data and reject non-JSON values without platform effects.", RUNTIME_EXECUTION_RECEIPT_INVARIANTS.serialization);
+export const RUNTIME_EXECUTION_RECEIPT_EXECUTION_RULE: AuditRule = runtimeExecutionReceiptRule("AUDIT-408", "architecture", "Runtime Execution Receipt is created only after adapter execution", "Pre-execution failures must have no receipt, while adapter-returned denied outcomes remain receipts of actual execution.", RUNTIME_EXECUTION_RECEIPT_INVARIANTS.execution);
+export const RUNTIME_EXECUTION_RECEIPT_COMPAT_RULE: AuditRule = runtimeExecutionReceiptRule("AUDIT-409", "architecture", "Runtime Execution Receipt preserves historical execution contracts", "The receipt API must be additive and leave V10 and V13.15–V13.18 execution APIs unchanged.", RUNTIME_EXECUTION_RECEIPT_INVARIANTS.compatibility);
+export const RUNTIME_EXECUTION_RECEIPT_REPORTING_BOUNDARY_RULE: AuditRule = runtimeExecutionReceiptRule("AUDIT-410", "architecture", "Runtime Execution Receipt does not alter execution reporting", "V13.19 must not add receipts to the historical src/execution reporting layer.", RUNTIME_EXECUTION_RECEIPT_INVARIANTS.executionReportBoundary);
+export const RUNTIME_EXECUTION_RECEIPT_DOCUMENT_RULE: AuditRule = runtimeExecutionReceiptRule("AUDIT-411", "docs", "Runtime abstraction documents Runtime Execution Receipt boundaries", "Documentation must distinguish plan, V10 result, receipt, ExecutionReport, LoopRunResult, and the two denial levels.", RUNTIME_EXECUTION_RECEIPT_INVARIANTS.documentation);

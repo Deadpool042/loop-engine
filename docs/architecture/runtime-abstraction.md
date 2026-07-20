@@ -254,6 +254,47 @@ descriptif et n'appelle jamais l'adapter. L'exécution policy-aware continue à
 partir des inputs admis, et non du JSON du plan ; aucun fournisseur réel n'est
 intégré.
 
+## Runtime Execution Receipt V13.19
+
+V13.19 ajoute `RuntimeExecutionReceipt`, une preuve post-exécution publique,
+déterministe et sérialisable. Il relie une décision déjà admise à l'issue V10
+effectivement retournée, sans remplacer ni le plan ni le résultat :
+
+- `RuntimeExecutionPlan` est pré-exécution : sélection, mapping, admission,
+  contraintes et requête projetée, sans appel d'adapter ;
+- `RuntimeResult` est le résultat technique V10 historique retourné par un
+  `RuntimeAdapter` ;
+- `RuntimeExecutionReceipt` est le contrat post-exécution minimal : identité
+  descriptor/runtime, projection publique de la décision et outcome observé.
+
+`createRuntimeExecutionReceipt` ne prend pas un plan JSON fourni par un
+appelant : il reçoit une résolution policy-aware réussie, les mêmes paramètres
+d'admission et le `RuntimeResult` réellement observé, puis reconstruit la
+projection du plan. Il vérifie que l'identité runtime du résultat correspond à
+la résolution, clone récursivement les seules données JSON et fige le receipt.
+Fonctions, symboles, bigint, undefined, Map, Set, Error, Promise, thenable et
+instances non JSON sont refusés. Aucune date, durée, UUID ou autre donnée n'est
+générée ; les valeurs temporelles éventuelles restent celles déjà présentes
+dans l'entrée V10.
+
+`executePolicyAwareDeclarativeRuntimeWithReceipt` est opt-in et additive. Après
+résolution policy-aware, elle appelle V10 une fois, construit le receipt et
+retourne `{ outcome: "executed", runtimeResult, receipt }`, quelle que soit
+l'issue V10. La distinction est volontaire : un **refus policy** ne parvient
+pas à l'adapter et retourne `receipt: null`, tandis qu'un **refus adapter** V10
+`denied` a atteint l'adapter et produit un receipt `denied`.
+
+Le receipt ne contient ni adapter, registre, closure, commande, cwd,
+environnement, métadonnées privées, persistance, historique, télémétrie ou
+reporting. Il ne rend pas un receipt sérialisé exécutable et n'introduit aucun
+fournisseur réel.
+
+`ExecutionReport` reste le rapport d'une session et de ses étapes dans
+`src/execution`; V13.19 ne le modifie pas et ne lui ajoute aucun receipt. Une
+future couche pourra éventuellement référencer un receipt. `LoopRunResult`
+reste le résultat global du LoopRunner : il ne porte pas ce receipt, les
+retries, réparations ou escalades d'une session Runtime unitaire.
+
 ## local-process (V10.1)
 
 `LocalProcessCommand` sépare strictement la commande demandée de sa politique
