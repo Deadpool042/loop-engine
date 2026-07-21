@@ -13,6 +13,7 @@ import {
 import type { AgentEscalationRequest } from "../agents/escalation.js";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentSelectionRequest } from "../agents/selector.js";
+import type { RuntimeResult } from "../runtime/types.js";
 import type { LoopRuntimeEscalationPolicy } from "./loop-runtime-outcome.js";
 import {
   evaluatePolicyBoundRuntimeExecutionEscalation,
@@ -48,6 +49,21 @@ export type ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationResult =
     runtimeExecutionResult: PolicyBoundLocalProcessExecutionResult;
     escalationEvaluation: LoopRuntimeAgentEscalationResult;
   }>;
+
+export type LoopRuntimeEscalationPublicProjection = Readonly<{
+  loopRunResult: LoopRunResult;
+  runtime: Readonly<{
+    outcome: PolicyBoundLocalProcessExecutionResult["outcome"];
+    runtimeStatus: RuntimeResult["status"] | null;
+    receipt: PolicyBoundLocalProcessExecutionResult["receipt"];
+  }>;
+  escalation: Readonly<{
+    outcome: LoopRuntimeAgentEscalationResult["outcome"];
+    failure: LoopRuntimeAgentEscalationResult["failure"];
+    decision: LoopRuntimeAgentEscalationResult["decision"];
+    selectedProfileId: string | null;
+  }>;
+}>;
 
 export type ExecuteLoopPolicyBoundLocalProcessWithReceiptOptions = LoopRunPlanOptions &
   Readonly<{
@@ -149,6 +165,31 @@ export async function executeLoopPolicyBoundLocalProcessWithEscalationEvaluation
     loopRunResult: runtimeExecutionResult.loopRunResult,
     runtimeExecutionResult: runtimeExecutionResult.runtimeExecutionResult,
     escalationEvaluation,
+  });
+}
+
+export function projectLoopRuntimeEscalationResult(
+  result: ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationResult,
+): LoopRuntimeEscalationPublicProjection {
+  const runtimeStatus = result.runtimeExecutionResult.runtimeResult?.status ?? null;
+  const selectedProfileId =
+    result.escalationEvaluation.agentEscalationResult?.outcome === "escalated"
+      ? result.escalationEvaluation.agentEscalationResult.profile.id
+      : null;
+
+  return Object.freeze({
+    loopRunResult: result.loopRunResult,
+    runtime: Object.freeze({
+      outcome: result.runtimeExecutionResult.outcome,
+      runtimeStatus,
+      receipt: result.runtimeExecutionResult.receipt,
+    }),
+    escalation: Object.freeze({
+      outcome: result.escalationEvaluation.outcome,
+      failure: result.escalationEvaluation.failure,
+      decision: result.escalationEvaluation.decision,
+      selectedProfileId,
+    }),
   });
 }
 

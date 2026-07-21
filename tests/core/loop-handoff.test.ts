@@ -8,6 +8,7 @@ import {
   executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   prepareLoopPolicyBoundLocalProcessExecution,
   executeLoopPolicyBoundLocalProcessWithReceipt,
+  projectLoopRuntimeEscalationResult,
   runLoopPlan,
   type LoopPolicyBoundLocalProcessDryRunResult,
   type LoopPolicyBoundLocalProcessExecutionResult,
@@ -310,6 +311,94 @@ function bridgeInput(
   return defaultInput;
 }
 
+function loopOptions(
+  plannedSteps: readonly string[] = ["Prepare context", "Prepare prompt"],
+) {
+  return {
+    ...deterministicOptions(),
+    loadConfig: () => fixtureConfig(fixtureProject()),
+    planLoopCycle: () => {
+      const project = fixtureProject();
+      const candidate = fixtureCandidate();
+      return {
+        outcome: "ready" as const,
+        candidate,
+        plannedSteps: [...plannedSteps],
+        snapshot: fixtureSnapshot(project, candidate),
+      };
+    },
+  };
+}
+
+const escalationRegistry = Object.freeze({
+  profiles: Object.freeze([
+    {
+      id: "agent-low",
+      runtime: "custom",
+      provider: "local",
+      model: "fixture-model",
+      effort: "low",
+      capabilities: ["code_edit"],
+      permissions: [],
+      budget: {
+        maxTokens: null,
+        maxCostUsd: null,
+        maxDurationMs: null,
+        maxCalls: null,
+        maxRepairs: null,
+      },
+    },
+    {
+      id: "agent-high",
+      runtime: "custom",
+      provider: "local",
+      model: "fixture-model",
+      effort: "high",
+      capabilities: ["code_edit"],
+      permissions: [],
+      budget: {
+        maxTokens: null,
+        maxCostUsd: null,
+        maxDurationMs: null,
+        maxCalls: null,
+        maxRepairs: null,
+      },
+    },
+  ]),
+});
+
+const escalationRequest = Object.freeze({
+  requiredCapabilities: Object.freeze(["code_edit"] as const),
+  requiredPermissions: Object.freeze([] as const),
+  minEffort: "low",
+  maxEffort: "max",
+});
+
+function defaultEscalationInput(
+  overrides: Partial<
+    Parameters<typeof executeLoopPolicyBoundLocalProcessWithEscalationEvaluation>[2]
+  > = {},
+) {
+  return Object.freeze({
+    policy: {
+      eligibleFailureKinds: Object.freeze(["timed_out"] as const),
+    },
+    registry: escalationRegistry,
+    request: escalationRequest,
+    previousProfileId: "agent-low",
+    failureReason: "runtime_error",
+    ...overrides,
+  }) satisfies Parameters<
+    typeof executeLoopPolicyBoundLocalProcessWithEscalationEvaluation
+  >[2];
+}
+
+function noEligibleEscalationPolicy() {
+  return Object.freeze({
+    eligibleFailureKinds: Object.freeze([] as const),
+  });
+}
+
 function runtimeResult(status: RuntimeResult["status"]): RuntimeResult {
   return {
     runtimeId: "codex",
@@ -349,6 +438,37 @@ function executionResult(
                 stdout: receiptText,
                 stderr: "receipt stderr",
               },
+            },
+          },
+    diagnostics: [],
+  } as unknown as RuntimePolicyBoundLocalProcessExecutionResult;
+}
+
+function redactedExecutionResult(
+  runtimeResultValue: RuntimeResult | null,
+): RuntimePolicyBoundLocalProcessExecutionResult {
+  return {
+    outcome: runtimeResultValue === null ? "resolution_failed" : "executed",
+    resolution: {},
+    runtimeResult: runtimeResultValue,
+    receipt:
+      runtimeResultValue === null
+        ? null
+        : {
+            schemaVersion: 1,
+            descriptorId: "descriptor-runtime-a",
+            runtimeId: "local-process",
+            proof: {
+              commandId: "local-process",
+              policyId: "fixture-policy",
+              details: {
+                kind: "ok",
+              },
+            },
+            statusInfo: {
+              status: runtimeResultValue.status,
+              reason: "redacted",
+              notes: [],
             },
           },
     diagnostics: [],
@@ -741,78 +861,15 @@ describe("executeLoopPolicyBoundLocalProcessWithEscalationEvaluation", () => {
   const ineligiblePolicy = Object.freeze({
     eligibleFailureKinds: Object.freeze([] as const),
   });
-  const escalationRegistry = Object.freeze({
-    profiles: Object.freeze([
-      {
-        id: "agent-low",
-        runtime: "custom",
-        provider: "local",
-        model: "fixture-model",
-        effort: "low",
-        capabilities: ["code_edit"],
-        permissions: [],
-        budget: {
-          maxTokens: null,
-          maxCostUsd: null,
-          maxDurationMs: null,
-          maxCalls: null,
-          maxRepairs: null,
-        },
-      },
-      {
-        id: "agent-high",
-        runtime: "custom",
-        provider: "local",
-        model: "fixture-model",
-        effort: "high",
-        capabilities: ["code_edit"],
-        permissions: [],
-        budget: {
-          maxTokens: null,
-          maxCostUsd: null,
-          maxDurationMs: null,
-          maxCalls: null,
-          maxRepairs: null,
-        },
-      },
-    ]),
-  });
-  const escalationRequest = Object.freeze({
-    requiredCapabilities: Object.freeze(["code_edit"] as const),
-    requiredPermissions: Object.freeze([] as const),
-    minEffort: "low",
-    maxEffort: "max",
-  });
-
-  function buildEscalationInput() {
-    return Object.freeze({
-      policy: eligiblePolicy,
-      registry: escalationRegistry,
-      request: escalationRequest,
-      previousProfileId: "agent-low",
-      failureReason: "runtime_error",
-    }) satisfies Parameters<
-      typeof executeLoopPolicyBoundLocalProcessWithEscalationEvaluation
-    >[2];
-  }
-
-  function loopOptions(
-    plannedSteps: readonly string[] = ["Prepare context", "Prepare prompt"],
+  function buildEscalationInput(
+    overrides: Partial<
+      Parameters<typeof executeLoopPolicyBoundLocalProcessWithEscalationEvaluation>[2]
+    > = {},
   ) {
-    return {
-      ...deterministicOptions(),
-      loadConfig: () => fixtureConfig(fixtureProject()),
-      planLoopCycle: () => {
-        const project = fixtureProject();
-        const candidate = fixtureCandidate();
-        return {
-          outcome: "ready" as const,
-          candidate,
-          plannedSteps: [...plannedSteps],
-          snapshot: fixtureSnapshot(project, candidate),
-        };
-      },
-    };
+    return defaultEscalationInput({
+      policy: eligiblePolicy,
+      ...overrides,
+    });
   }
 
   it("returns the loop result, runtime execution result, and a pure escalation evaluation for a successful execution", async () => {
@@ -1000,6 +1057,191 @@ describe("executeLoopPolicyBoundLocalProcessWithEscalationEvaluation", () => {
       assert.equal(denied.escalationEvaluation.agentRequest, null);
       assert.equal(denied.escalationEvaluation.agentEscalationResult, null);
       assert.deepEqual(denied.loopRunResult, expectedLoop);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("projectLoopRuntimeEscalationResult", () => {
+  const singleProfileRegistry = Object.freeze({
+    profiles: Object.freeze([
+      {
+        id: "agent-low",
+        runtime: "custom",
+        provider: "local",
+        model: "fixture-model",
+        effort: "low",
+        capabilities: ["code_edit"],
+        permissions: [],
+        budget: {
+          maxTokens: null,
+          maxCostUsd: null,
+          maxDurationMs: null,
+          maxCalls: null,
+          maxRepairs: null,
+        },
+      },
+    ]),
+  });
+
+  function assertForbiddenKeys(value: unknown, path = "root"): void {
+    if (value === null || typeof value !== "object") {
+      return;
+    }
+
+    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+      assert.doesNotMatch(
+        key,
+        /^(runtimeResult|resolution|diagnostics|agentRequest|registry|request|failureReason|profile|rejected|budget|capabilities|permissions|provider|model|effort|stdout|stderr|output)$/,
+        `forbidden key at ${path}.${key}`,
+      );
+      assertForbiddenKeys(nested, `${path}.${key}`);
+    }
+  }
+
+  it("projects a successful runtime without escalation into a redacted public shape", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-projection-success-")));
+    const options = loopOptions();
+
+    try {
+      const loopRunResult = runLoopPlan(project.name, options);
+      const result = await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
+        project.name,
+        bridgeInput(loopRunResult, root),
+        defaultEscalationInput(),
+        {
+          ...options,
+          executePolicyBoundLocalProcessWithReceipt: async () =>
+            redactedExecutionResult(runtimeResult("completed")),
+        },
+      );
+
+      const projected = projectLoopRuntimeEscalationResult(result);
+      const before = structuredClone(projected);
+
+      assert.strictEqual(projected.loopRunResult, result.loopRunResult);
+      assert.deepEqual(projected, {
+        loopRunResult: result.loopRunResult,
+        runtime: {
+          outcome: "executed",
+          runtimeStatus: "completed",
+          receipt: result.runtimeExecutionResult.receipt,
+        },
+        escalation: {
+          outcome: {
+            outcome: "succeeded",
+            runtimeStatus: "completed",
+          },
+          failure: {
+            kind: null,
+            runtimeStatus: "completed",
+          },
+          decision: {
+            action: "none",
+            reason: "no_failure",
+            failureKind: null,
+            runtimeStatus: "completed",
+          },
+          selectedProfileId: null,
+        },
+      });
+      assert.strictEqual(projected.runtime.receipt, result.runtimeExecutionResult.receipt);
+      assertForbiddenKeys(projected.runtime, "root.runtime");
+      assertForbiddenKeys(projected.escalation, "root.escalation");
+      assert.equal(JSON.stringify(projected).includes("receipt-secret"), false);
+      assert.deepEqual(projected, before);
+      assert.ok(Object.isFrozen(projected));
+      assert.ok(Object.isFrozen(projected.runtime));
+      assert.ok(Object.isFrozen(projected.escalation));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("projects selected and unselected escalations deterministically", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-projection-escalation-")));
+    const options = loopOptions([]);
+
+    try {
+      const loopRunResult = runLoopPlan(project.name, options);
+      const selected = await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
+        project.name,
+        bridgeInput(loopRunResult, root),
+        defaultEscalationInput(),
+        {
+          ...options,
+          executePolicyBoundLocalProcessWithReceipt: async () =>
+            redactedExecutionResult(runtimeResult("timed_out")),
+        },
+      );
+      const projectedSelected = projectLoopRuntimeEscalationResult(selected);
+
+      assert.equal(projectedSelected.escalation.selectedProfileId, "agent-high");
+      assertForbiddenKeys(projectedSelected.runtime, "root.runtime");
+      assertForbiddenKeys(projectedSelected.escalation, "root.escalation");
+
+      const unselected = await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
+        project.name,
+        bridgeInput(loopRunResult, root),
+        defaultEscalationInput({
+          registry: singleProfileRegistry,
+        }),
+        {
+          ...options,
+          executePolicyBoundLocalProcessWithReceipt: async () =>
+            redactedExecutionResult(runtimeResult("timed_out")),
+        },
+      );
+      const projectedUnselected = projectLoopRuntimeEscalationResult(unselected);
+
+      assert.equal(projectedUnselected.escalation.selectedProfileId, null);
+      assertForbiddenKeys(projectedUnselected.runtime, "root.runtime");
+      assertForbiddenKeys(projectedUnselected.escalation, "root.escalation");
+      assert.equal(
+        JSON.stringify(projectedSelected),
+        JSON.stringify(projectLoopRuntimeEscalationResult(selected)),
+      );
+      assert.equal(
+        JSON.stringify(projectedUnselected),
+        JSON.stringify(projectLoopRuntimeEscalationResult(unselected)),
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps runtime absent redacted and remains immutable", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-projection-absent-")));
+    const options = loopOptions([]);
+
+    try {
+      const loopRunResult = runLoopPlan(project.name, options);
+      const result = await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
+        project.name,
+        bridgeInput(loopRunResult, root),
+        defaultEscalationInput({
+          policy: noEligibleEscalationPolicy(),
+        }),
+        {
+          ...options,
+          executePolicyBoundLocalProcessWithReceipt: async () =>
+            executionResult(null),
+        },
+      );
+      const projected = projectLoopRuntimeEscalationResult(result);
+
+      assert.equal(projected.runtime.runtimeStatus, null);
+      assert.equal(projected.runtime.receipt, null);
+      assert.equal(projected.escalation.selectedProfileId, null);
+      assertForbiddenKeys(projected.runtime, "root.runtime");
+      assertForbiddenKeys(projected.escalation, "root.escalation");
+      assert.equal(JSON.stringify(projected).includes("runtimeResult"), false);
+      assert.deepEqual(projected, projectLoopRuntimeEscalationResult(result));
+      assert.ok(Object.isFrozen(projected));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
