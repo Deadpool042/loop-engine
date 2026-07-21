@@ -372,4 +372,25 @@ describe("runLoopPlan", () => {
     );
     assert.deepEqual(result.contextPackage, fixturePackage);
   });
+
+  it("keeps the historical LoopRunResult shape free of runtime handoff fields", () => {
+    const project = fixtureProject();
+    const candidate = fixtureCandidate("safe");
+
+    const result = runLoopPlan(project.name, {
+      ...deterministicOptions(),
+      loadConfig: () => fixtureConfig(project),
+      planLoopCycle: () => ({
+        outcome: "ready",
+        candidate,
+        plannedSteps: [],
+        snapshot: fixtureSnapshot(project, candidate),
+      }),
+    });
+
+    assert.equal("loopRunResult" in result, false);
+    assert.equal("runtimeDryRunResult" in result, false);
+    assert.equal(result.mode, "plan");
+    assert.equal(result.status, "completed");
+  });
 });

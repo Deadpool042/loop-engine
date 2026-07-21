@@ -12,6 +12,7 @@ import {
   createDeclarativeRuntimeRequest,
   createRuntimeRequest,
   dryRunPolicyAwareDeclarativeRuntimeExecution,
+  prepareLoopPolicyBoundLocalProcessExecution,
   evaluateRuntimeCapability,
   evaluateRuntimeExecutionAdmission,
   executeDeclarativeRuntime,
@@ -78,6 +79,10 @@ describe("Core public API", () => {
     assert.equal(typeof dryRunPolicyAwareDeclarativeRuntimeExecution, "function");
     assert.equal(typeof createSimulatedRuntimeAdapter, "function");
     assert.equal(typeof createRuntimeRequest, "function");
+    assert.equal(
+      typeof prepareLoopPolicyBoundLocalProcessExecution,
+      "function",
+    );
     assert.equal(typeof resolveRuntime, "function");
     assert.equal(typeof executeRuntime, "function");
   });

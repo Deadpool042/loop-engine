@@ -3,6 +3,16 @@ import {
   type LoopRunPlanOptions,
 } from "../loop/runner.js";
 import type { LoopRunResult } from "../loop/types.js";
+import {
+  dryRunPolicyBoundLocalProcessExecution,
+  type PolicyBoundLocalProcessBridgeInput,
+  type RuntimeExecutionPlanDryRunResult,
+} from "./runtime-execution-bridge.js";
+
+export type PrepareLoopPolicyBoundLocalProcessExecutionResult = Readonly<{
+  loopRunResult: LoopRunResult;
+  runtimeDryRunResult: RuntimeExecutionPlanDryRunResult;
+}>;
 
 /** Runs the plan-only LoopRunner through the stable Core boundary. */
 export function runLoopPlan(
@@ -10,6 +20,27 @@ export function runLoopPlan(
   options: LoopRunPlanOptions = {},
 ): LoopRunResult {
   return runLoopPlanImplementation(projectName, options);
+}
+
+/**
+ * Adds an explicit policy-bound local-process dry-run on top of the historical
+ * Loop plan result without changing the public LoopRunResult contract.
+ */
+export function prepareLoopPolicyBoundLocalProcessExecution(
+  projectName: string,
+  bridgeInput: PolicyBoundLocalProcessBridgeInput,
+  options: LoopRunPlanOptions = {},
+): PrepareLoopPolicyBoundLocalProcessExecutionResult {
+  const loopRunResult = runLoopPlanImplementation(projectName, options);
+  const runtimeDryRunResult = dryRunPolicyBoundLocalProcessExecution({
+    ...bridgeInput,
+    loopRunResult,
+  });
+
+  return {
+    loopRunResult,
+    runtimeDryRunResult,
+  };
 }
 
 /** Preserves the public execution-report JSON shape used by CLI adapters. */
