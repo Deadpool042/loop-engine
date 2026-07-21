@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 
 import {
   classifyLoopRuntimeExecutionOutcome,
+  classifyLoopRuntimeFailure,
   type LoopRuntimeExecutionOutcome,
+  type LoopRuntimeFailure,
 } from "../../src/core/index.js";
 import type { PolicyBoundLocalProcessExecutionResult } from "../../src/core/runtime-execution-bridge.js";
 import type { RuntimeResult, RuntimeResultStatus } from "../../src/runtime/types.js";
@@ -330,5 +332,147 @@ describe("classifyLoopRuntimeExecutionOutcome", () => {
       outcome: "succeeded",
       runtimeStatus: "completed",
     } satisfies LoopRuntimeExecutionOutcome);
+  });
+});
+
+describe("classifyLoopRuntimeFailure", () => {
+  const failureKindByStatus: Record<
+    RuntimeResultStatus,
+    LoopRuntimeFailure["kind"]
+  > = {
+    not_implemented: "unsupported",
+    unsupported: "unsupported",
+    completed: null,
+    denied: "policy_denied",
+    spawn_failed: "launch_failed",
+    non_zero_exit: "process_failed",
+    timed_out: "timed_out",
+    stdout_limit_exceeded: "output_limit",
+    stderr_limit_exceeded: "output_limit",
+  };
+
+  it("classifies not_started as null", () => {
+    const outcome = classifyLoopRuntimeExecutionOutcome(null);
+    const failure = classifyLoopRuntimeFailure(outcome);
+
+    assert.deepEqual(failure, {
+      kind: null,
+      runtimeStatus: null,
+    } satisfies LoopRuntimeFailure);
+    assert.ok(Object.isFrozen(failure));
+  });
+
+  it("classifies success as null", () => {
+    const outcome = classifyLoopRuntimeExecutionOutcome(
+      executedResult("completed"),
+    );
+    const failure = classifyLoopRuntimeFailure(outcome);
+
+    assert.deepEqual(failure, {
+      kind: null,
+      runtimeStatus: "completed",
+    } satisfies LoopRuntimeFailure);
+  });
+
+  for (const status of [
+    "denied",
+    "not_implemented",
+    "unsupported",
+    "spawn_failed",
+    "non_zero_exit",
+    "timed_out",
+    "stdout_limit_exceeded",
+    "stderr_limit_exceeded",
+  ] as const) {
+    it(`maps ${status} to ${failureKindByStatus[status] ?? "null"}`, () => {
+      const outcome = classifyLoopRuntimeExecutionOutcome(executedResult(status));
+      const first = classifyLoopRuntimeFailure(outcome);
+      const second = classifyLoopRuntimeFailure(outcome);
+
+      assert.deepEqual(first, {
+        kind: failureKindByStatus[status],
+        runtimeStatus: status,
+      } satisfies LoopRuntimeFailure);
+      assert.deepEqual(first, second);
+    });
+  }
+
+  it("groups both unsupported statuses into the same failure kind", () => {
+    const notImplemented = classifyLoopRuntimeFailure(
+      classifyLoopRuntimeExecutionOutcome(executedResult("not_implemented")),
+    );
+    const unsupported = classifyLoopRuntimeFailure(
+      classifyLoopRuntimeExecutionOutcome(executedResult("unsupported")),
+    );
+
+    assert.deepEqual(notImplemented, {
+      kind: "unsupported",
+      runtimeStatus: "not_implemented",
+    } satisfies LoopRuntimeFailure);
+    assert.deepEqual(unsupported, {
+      kind: "unsupported",
+      runtimeStatus: "unsupported",
+    } satisfies LoopRuntimeFailure);
+  });
+
+  it("groups both output limit statuses into the same failure kind", () => {
+    const stdout = classifyLoopRuntimeFailure(
+      classifyLoopRuntimeExecutionOutcome(
+        executedResult("stdout_limit_exceeded"),
+      ),
+    );
+    const stderr = classifyLoopRuntimeFailure(
+      classifyLoopRuntimeExecutionOutcome(
+        executedResult("stderr_limit_exceeded"),
+      ),
+    );
+
+    assert.deepEqual(stdout, {
+      kind: "output_limit",
+      runtimeStatus: "stdout_limit_exceeded",
+    } satisfies LoopRuntimeFailure);
+    assert.deepEqual(stderr, {
+      kind: "output_limit",
+      runtimeStatus: "stderr_limit_exceeded",
+    } satisfies LoopRuntimeFailure);
+  });
+
+  it("preserves the original runtime status", () => {
+    const failure = classifyLoopRuntimeFailure(
+      classifyLoopRuntimeExecutionOutcome(executedResult("non_zero_exit")),
+    );
+
+    assert.equal(failure.runtimeStatus, "non_zero_exit");
+  });
+
+  it("covers every runtime status exhaustively", () => {
+    const statuses = Object.keys(failureKindByStatus) as RuntimeResultStatus[];
+
+    assert.deepEqual(
+      statuses.map((status) => [
+        status,
+        classifyLoopRuntimeFailure(
+          classifyLoopRuntimeExecutionOutcome(executedResult(status)),
+        ).kind,
+      ]),
+      statuses.map((status) => [status, failureKindByStatus[status]]),
+    );
+  });
+
+  it("does not mutate the provided outcome", () => {
+    const outcome = Object.freeze(
+      classifyLoopRuntimeExecutionOutcome(executedResult("timed_out")),
+    ) as LoopRuntimeExecutionOutcome;
+
+    const failure = classifyLoopRuntimeFailure(outcome);
+
+    assert.deepEqual(outcome, {
+      outcome: "timed_out",
+      runtimeStatus: "timed_out",
+    } satisfies LoopRuntimeExecutionOutcome);
+    assert.deepEqual(failure, {
+      kind: "timed_out",
+      runtimeStatus: "timed_out",
+    } satisfies LoopRuntimeFailure);
   });
 });

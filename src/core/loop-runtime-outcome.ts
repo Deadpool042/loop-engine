@@ -12,6 +12,33 @@ export type LoopRuntimeExecutionOutcome = Readonly<{
   runtimeStatus: RuntimeResult["status"] | null;
 }>;
 
+export type LoopRuntimeFailureKind =
+  | "policy_denied"
+  | "unsupported"
+  | "launch_failed"
+  | "process_failed"
+  | "timed_out"
+  | "output_limit";
+
+export type LoopRuntimeFailure = Readonly<{
+  kind: LoopRuntimeFailureKind | null;
+  runtimeStatus: RuntimeResult["status"] | null;
+}>;
+
+const LOOP_RUNTIME_FAILURE_KIND_BY_STATUS: Readonly<
+  Record<RuntimeResult["status"], LoopRuntimeFailureKind | null>
+> = Object.freeze({
+  not_implemented: "unsupported",
+  unsupported: "unsupported",
+  completed: null,
+  denied: "policy_denied",
+  spawn_failed: "launch_failed",
+  non_zero_exit: "process_failed",
+  timed_out: "timed_out",
+  stdout_limit_exceeded: "output_limit",
+  stderr_limit_exceeded: "output_limit",
+});
+
 function runtimeStatus(
   runtimeExecutionResult: PolicyBoundLocalProcessExecutionResult | null | undefined,
 ): RuntimeResult["status"] | null {
@@ -47,5 +74,28 @@ export function classifyLoopRuntimeExecutionOutcome(
   return Object.freeze({
     outcome: "failed",
     runtimeStatus: status,
+  });
+}
+
+export function classifyLoopRuntimeFailure(
+  outcome: LoopRuntimeExecutionOutcome,
+): LoopRuntimeFailure {
+  if (outcome.outcome === "not_started" || outcome.outcome === "succeeded") {
+    return Object.freeze({
+      kind: null,
+      runtimeStatus: outcome.runtimeStatus,
+    });
+  }
+
+  if (outcome.runtimeStatus === null) {
+    return Object.freeze({
+      kind: null,
+      runtimeStatus: null,
+    });
+  }
+
+  return Object.freeze({
+    kind: LOOP_RUNTIME_FAILURE_KIND_BY_STATUS[outcome.runtimeStatus],
+    runtimeStatus: outcome.runtimeStatus,
   });
 }
