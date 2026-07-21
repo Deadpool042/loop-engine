@@ -36,6 +36,15 @@ export type EvaluateLoopRuntimeAgentEscalationInput = Readonly<{
   failureReason: AgentEscalationRequest["failureReason"];
 }>;
 
+export type EvaluatePolicyBoundRuntimeExecutionEscalationInput = Readonly<{
+  runtimeExecutionResult: PolicyBoundLocalProcessExecutionResult | null | undefined;
+  policy: LoopRuntimeEscalationPolicy;
+  registry: AgentRegistry;
+  request: AgentSelectionRequest;
+  previousProfileId: string;
+  failureReason: AgentEscalationRequest["failureReason"];
+}>;
+
 export type CreateAgentEscalationRequestFromRuntimeDecisionInput = Readonly<{
   decision: LoopRuntimeEscalationDecision;
   registry: AgentRegistry;
@@ -92,5 +101,18 @@ export function evaluateLoopRuntimeAgentEscalation(
     decision,
     agentRequest,
     agentEscalationResult,
+  });
+}
+
+export function evaluatePolicyBoundRuntimeExecutionEscalation(
+  input: EvaluatePolicyBoundRuntimeExecutionEscalationInput,
+): LoopRuntimeAgentEscalationResult {
+  return evaluateLoopRuntimeAgentEscalation({
+    runtimeExecutionResult: input.runtimeExecutionResult,
+    policy: input.policy,
+    registry: input.registry,
+    request: input.request,
+    previousProfileId: input.previousProfileId,
+    failureReason: input.failureReason,
   });
 }

@@ -32,6 +32,7 @@ import {
   classifyLoopRuntimeFailure,
   createAgentEscalationRequestFromRuntimeDecision,
   evaluateLoopRuntimeAgentEscalation,
+  evaluatePolicyBoundRuntimeExecutionEscalation,
   evaluateRuntimeAgentEscalation,
   evaluateLoopRuntimeEscalation,
   loadConfig,
@@ -101,6 +102,10 @@ describe("Core public API", () => {
     assert.equal(typeof classifyLoopRuntimeFailure, "function");
     assert.equal(
       typeof evaluateLoopRuntimeAgentEscalation,
+      "function",
+    );
+    assert.equal(
+      typeof evaluatePolicyBoundRuntimeExecutionEscalation,
       "function",
     );
     assert.equal(

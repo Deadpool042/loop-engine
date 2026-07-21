@@ -8,6 +8,7 @@ import {
   classifyLoopRuntimeFailure,
   evaluateLoopRuntimeEscalation,
   evaluateLoopRuntimeAgentEscalation,
+  evaluatePolicyBoundRuntimeExecutionEscalation,
   evaluateRuntimeAgentEscalation,
   type CreateAgentEscalationRequestFromRuntimeDecisionInput,
 } from "../../src/core/index.js";
@@ -108,6 +109,35 @@ function executedResult(
   return {
     runtimeResult: runtimeResult(status),
   } as PolicyBoundLocalProcessExecutionResult;
+}
+
+function bridgeResult(
+  runtimeResultValue: RuntimeResult | null,
+  receiptOutput: string,
+): PolicyBoundLocalProcessExecutionResult {
+  return {
+    outcome: runtimeResultValue === null ? "resolution_failed" : "executed",
+    resolution: {},
+    runtimeResult: runtimeResultValue,
+    receipt:
+      runtimeResultValue === null
+        ? null
+        : {
+            schemaVersion: 1,
+            receiptOutput,
+            runtimeResult: {
+              ...runtimeResultValue,
+              stdout: receiptOutput,
+              stderr: "receipt stderr",
+              output: {
+                exitCode: 0,
+                stdout: receiptOutput,
+                stderr: "receipt stderr",
+              },
+            },
+          },
+    diagnostics: [],
+  } as unknown as PolicyBoundLocalProcessExecutionResult;
 }
 
 function buildDecision(
@@ -456,6 +486,174 @@ describe("evaluateLoopRuntimeAgentEscalation", () => {
     const second = evaluateLoopRuntimeAgentEscalation(input);
 
     assert.deepEqual(first, second);
+  });
+});
+
+describe("evaluatePolicyBoundRuntimeExecutionEscalation", () => {
+  const eligiblePolicy = Object.freeze({
+    eligibleFailureKinds: Object.freeze(["timed_out"] as const),
+  });
+  const ineligiblePolicy = Object.freeze({
+    eligibleFailureKinds: Object.freeze([] as const),
+  });
+
+  function buildInput(
+    runtimeExecutionResult: Parameters<
+      typeof evaluatePolicyBoundRuntimeExecutionEscalation
+    >[0]["runtimeExecutionResult"],
+    policy: Parameters<typeof evaluatePolicyBoundRuntimeExecutionEscalation>[0]["policy"],
+    requestValue = escalationRequestWithoutBudgetCeiling,
+  ) {
+    return Object.freeze({
+      runtimeExecutionResult,
+      policy,
+      registry: escalationRegistry,
+      request: requestValue,
+      previousProfileId: "agent-low",
+      failureReason: "runtime_error",
+    }) satisfies Parameters<typeof evaluatePolicyBoundRuntimeExecutionEscalation>[0];
+  }
+
+  it("treats a bridge result without a RuntimeResult as not_started", () => {
+    const result = evaluatePolicyBoundRuntimeExecutionEscalation(
+      buildInput(bridgeResult(null, "receipt-secret"), eligiblePolicy),
+    );
+
+    assert.deepEqual(result, {
+      outcome: {
+        outcome: "not_started",
+        runtimeStatus: null,
+      },
+      failure: {
+        kind: null,
+        runtimeStatus: null,
+      },
+      decision: {
+        action: "none",
+        reason: "no_failure",
+        failureKind: null,
+        runtimeStatus: null,
+      },
+      agentRequest: null,
+      agentEscalationResult: null,
+    });
+  });
+
+  it("handles a completed runtime result without copying bridge receipt data", () => {
+    const bridge = bridgeResult(runtimeResult("completed"), "receipt-secret");
+    const result = evaluatePolicyBoundRuntimeExecutionEscalation(
+      buildInput(bridge, eligiblePolicy),
+    );
+
+    assert.deepEqual(result, {
+      outcome: {
+        outcome: "succeeded",
+        runtimeStatus: "completed",
+      },
+      failure: {
+        kind: null,
+        runtimeStatus: "completed",
+      },
+      decision: {
+        action: "none",
+        reason: "no_failure",
+        failureKind: null,
+        runtimeStatus: "completed",
+      },
+      agentRequest: null,
+      agentEscalationResult: null,
+    });
+    assert.equal("receipt" in result, false);
+    assert.equal("runtimeResult" in result, false);
+    assert.equal(JSON.stringify(result).includes("receipt-secret"), false);
+  });
+
+  it("propagates non-eligible failures exactly as V13.36", () => {
+    const bridge = bridgeResult(runtimeResult("non_zero_exit"), "receipt-secret");
+    const result = evaluatePolicyBoundRuntimeExecutionEscalation(
+      buildInput(bridge, ineligiblePolicy),
+    );
+
+    assert.deepEqual(
+      result,
+      evaluateLoopRuntimeAgentEscalation(
+        buildInput(bridge, ineligiblePolicy),
+      ),
+    );
+    assert.deepEqual(result.decision, {
+      action: "none",
+      reason: "failure_not_eligible",
+      failureKind: "process_failed",
+      runtimeStatus: "non_zero_exit",
+    });
+  });
+
+  it("propagates eligible failures exactly as V13.36", () => {
+    const bridge = bridgeResult(runtimeResult("timed_out"), "receipt-secret");
+    const result = evaluatePolicyBoundRuntimeExecutionEscalation(
+      buildInput(bridge, eligiblePolicy),
+    );
+
+    assert.deepEqual(
+      result,
+      evaluateLoopRuntimeAgentEscalation(
+        buildInput(bridge, eligiblePolicy),
+      ),
+    );
+    assert.deepEqual(result.agentEscalationResult, {
+      outcome: "escalated",
+      profile: escalationRegistry.profiles[1],
+      rejected: [
+        {
+          profileId: "agent-low",
+          reason: "excluded: this is the profile that just failed",
+        },
+      ],
+    });
+  });
+
+  it("ignores receipt payloads and keeps the runtime output out of the adapter result", () => {
+    const bridge = bridgeResult(runtimeResult("completed"), "receipt-secret");
+    const result = evaluatePolicyBoundRuntimeExecutionEscalation(
+      buildInput(bridge, eligiblePolicy),
+    );
+
+    assert.equal(result.outcome.outcome, "succeeded");
+    assert.equal(result.outcome.runtimeStatus, "completed");
+    assert.equal(
+      JSON.stringify(result).includes("receipt-secret"),
+      false,
+    );
+    assert.equal(JSON.stringify(result).includes("receipt stderr"), false);
+  });
+
+  it("does not mutate bridge inputs and remains deterministic", () => {
+    const bridge = bridgeResult(runtimeResult("timed_out"), "receipt-secret");
+    const input = buildInput(bridge, eligiblePolicy);
+
+    const first = evaluatePolicyBoundRuntimeExecutionEscalation(input);
+    const second = evaluatePolicyBoundRuntimeExecutionEscalation(input);
+
+    assert.deepEqual(first, second);
+    assert.deepEqual(input, buildInput(bridge, eligiblePolicy));
+  });
+
+  it("does not call the bridge, process, or Agent execution directly", () => {
+    const source = readFileSync(
+      "src/core/loop-runtime-escalation.ts",
+      "utf8",
+    );
+
+    assert.equal(
+      (source.match(/return evaluateLoopRuntimeAgentEscalation\(/g) ?? []).length,
+      1,
+    );
+    assert.doesNotMatch(source, /executePolicyBoundLocalProcessWithReceipt\s*\(/);
+    assert.doesNotMatch(source, /\bspawn\s*\(/);
+    assert.doesNotMatch(source, /\bexecFile\s*\(/);
+    assert.doesNotMatch(source, /\bexec\s*\(/);
+    assert.doesNotMatch(source, /\bfork\s*\(/);
+    assert.doesNotMatch(source, /selectAgentProfile\s*\(/);
   });
 });
 
