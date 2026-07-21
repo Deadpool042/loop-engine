@@ -1,4 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { fail, pass } from "../findings.js";
 import { sourceIncludesToken } from "../source.js";
 import type { AuditRuleDefinition as AuditRule } from "../types.js";
@@ -10891,3 +10892,82 @@ export const LOCAL_PROCESS_TERMINATION_CONTRACT_RULE: AuditRule = policyBoundLoc
 export const LOCAL_PROCESS_TERMINATION_ORDER_RULE: AuditRule = policyBoundLocalProcessBridgeRule("AUDIT-417", "Local process requests SIGTERM before SIGKILL", ["requestSignal(\"SIGTERM\")", "requestSignal(\"SIGKILL\")", "graceTimer"], "src/runtime/local-process.ts", "architecture");
 export const LOCAL_PROCESS_TERMINATION_RECEIPT_RULE: AuditRule = policyBoundLocalProcessBridgeRule("AUDIT-418", "Local process receipt keeps output redacted with safe termination metadata", ["runtimeResult.termination", "output:", "? null"], "src/core/runtime-execution-bridge.ts", "architecture");
 export const LOCAL_PROCESS_TERMINATION_DOCUMENT_RULE: AuditRule = policyBoundLocalProcessBridgeRule("AUDIT-419", "Runtime abstraction documents direct-child termination limits", ["Termination Contract V13.22", "descendants n'est pas garanti", "POSIX"], "docs/architecture/runtime-abstraction.md", "docs");
+
+function collectLoopExecutionBoundarySources(directory: string): readonly string[] {
+  if (!existsSync(directory)) {
+    return [];
+  }
+
+  const entries = readdirSync(directory, { withFileTypes: true });
+  const files = entries.flatMap((entry) => {
+    const entryPath = join(directory, entry.name);
+    return entry.isDirectory()
+      ? collectLoopExecutionBoundarySources(entryPath)
+      : entry.isFile()
+        ? [entryPath]
+        : [];
+  });
+
+  return Object.freeze([...files].sort((left, right) => left.localeCompare(right)));
+}
+
+function readLoopExecutionBoundarySource(directory: string): string {
+  return collectLoopExecutionBoundarySources(directory)
+    .map((file) => readFileSync(file, "utf8"))
+    .join("\n\n");
+}
+
+export const LOOP_EXECUTION_BOUNDARY_INVARIANTS = Object.freeze({
+  sourceRoot: "src/loop",
+  forbiddenTokens: Object.freeze([
+    "from \"../runtime/",
+    "from '../runtime/",
+    "runtime-execution-bridge",
+    "prepareLoopPolicyBoundLocalProcessExecution",
+    "executeLoopPolicyBoundLocalProcessWithReceipt",
+    "dryRunPolicyBoundLocalProcessExecution",
+    "executePolicyBoundLocalProcessWithReceipt",
+  ]),
+});
+
+export function inspectLoopExecutionBoundaryInvariant(source: string): readonly string[] {
+  return LOOP_EXECUTION_BOUNDARY_INVARIANTS.forbiddenTokens.filter((token) =>
+    sourceIncludesToken(source, token),
+  );
+}
+
+export const LOOP_EXECUTION_BOUNDARY_RULE: AuditRule = (() => {
+  const rule: AuditRule = {
+    id: "AUDIT-420",
+    category: "architecture",
+    severity: "error",
+    title: "Loop execution boundary keeps LoopRunner plan-only",
+    description:
+      "src/loop/** must stay isolated from runtime execution and Core local-process handoffs.",
+    metadata: {
+      introducedIn: "V13.28",
+      tags: ["architecture", "documentation", "contract"],
+      stability: "stable",
+      dependsOn: ["AUDIT-419"],
+    },
+    check: () => {
+      const source = readLoopExecutionBoundarySource(
+        LOOP_EXECUTION_BOUNDARY_INVARIANTS.sourceRoot,
+      );
+      const forbidden = inspectLoopExecutionBoundaryInvariant(source);
+
+      return forbidden.length > 0
+        ? fail(
+            rule,
+            `${rule.title}.`,
+            forbidden.map((token) => `forbidden: ${token}`),
+            "Keep LoopRunner plan-only and route local-process execution through Core.",
+          )
+        : pass(rule, `${rule.title}.`, [
+            LOOP_EXECUTION_BOUNDARY_INVARIANTS.sourceRoot,
+          ]);
+    },
+  };
+
+  return rule;
+})();
