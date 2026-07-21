@@ -297,6 +297,25 @@ retries, réparations ou escalades d'une session Runtime unitaire.
 
 ## local-process (V10.1)
 
+## Local Process Termination Contract V13.22
+
+`LocalProcessExecutionPolicy.termination` est une extension additive et
+fermée : `SIGTERM`, une période de grâce entière positive, puis `SIGKILL`.
+Les anciens appels utilisent `DEFAULT_LOCAL_PROCESS_TERMINATION_POLICY`
+documenté. À expiration du timeout, le résultat reste `timed_out`, même si
+l'enfant direct s'arrête après SIGTERM ou après SIGKILL. `RuntimeResult`
+expose seulement une métadonnée sûre `termination` (`none`, `graceful`,
+`forced` ou `failed`), et le receipt local redacted peut la projeter tout en
+conservant `output: null`.
+
+La machine locale est `running → termination_requested →
+force_termination_requested → settled`. Elle nettoie les deux timers et ne
+finalise qu'une fois malgré les courses `error`/`close`/timeout. Le runtime vise
+uniquement l'enfant direct : l'arrêt des descendants n'est pas garanti. Le
+contrat SIGTERM/SIGKILL est orienté POSIX ; Node conserve son comportement
+standard ailleurs, sans promesse Windows équivalente, sandbox, CLI ou
+intégration LoopRunner.
+
 ## Policy-bound Local Process Bridge V13.21
 
 V13.21 ajoute une unique surface Core opt-in :

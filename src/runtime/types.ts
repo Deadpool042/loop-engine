@@ -43,6 +43,27 @@ export type LocalProcessExecutionPolicy = Readonly<{
   timeoutMs: number;
   maxStdoutBytes: number;
   maxStderrBytes: number;
+  /** Additive V13.22 termination policy; omitted values use the public default. */
+  termination?: LocalProcessTerminationPolicy;
+}>;
+
+/** Closed, POSIX-oriented direct-child termination contract. */
+export type LocalProcessTerminationPolicy = Readonly<{
+  gracefulSignal: "SIGTERM";
+  forceSignal: "SIGKILL";
+  gracePeriodMs: number;
+}>;
+
+/** Compatibility default for V10.1 callers that predate V13.22. */
+export const DEFAULT_LOCAL_PROCESS_TERMINATION_POLICY: LocalProcessTerminationPolicy =
+  Object.freeze({ gracefulSignal: "SIGTERM", forceSignal: "SIGKILL", gracePeriodMs: 250 });
+
+export const MAX_LOCAL_PROCESS_TERMINATION_GRACE_PERIOD_MS = 30_000 as const;
+
+export type LocalProcessTermination = Readonly<{
+  timedOut: boolean;
+  mode: "none" | "graceful" | "forced" | "failed";
+  finalSignal: "SIGTERM" | "SIGKILL" | null;
 }>;
 
 export type LocalProcessRuntimeRequest = Readonly<{
@@ -141,6 +162,7 @@ export type RuntimeResult = Readonly<{
   stderr?: string;
   error?: RuntimeExecutionError;
   events?: readonly RuntimeEvent[];
+  termination?: LocalProcessTermination;
 }>;
 
 export type RuntimeExecution = RuntimeResult | Promise<RuntimeResult>;

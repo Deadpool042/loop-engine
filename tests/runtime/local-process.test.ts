@@ -246,6 +246,15 @@ describe("LocalProcessRuntime", () => {
           }),
           "invalid_request",
         ],
+        [
+          "termination grace period",
+          request(root, {
+            executionPolicy: policy(root, {
+              termination: { gracefulSignal: "SIGTERM", forceSignal: "SIGKILL", gracePeriodMs: 0 },
+            }),
+          }),
+          "invalid_request",
+        ],
       ];
 
       for (const [, input, code] of cases) {
@@ -313,6 +322,11 @@ describe("LocalProcessRuntime", () => {
       );
       assert.equal(timedOut.status, "timed_out");
       assert.equal(timedOut.error?.code, "timed_out");
+      assert.deepEqual(timedOut.termination, {
+        timedOut: true,
+        mode: "graceful",
+        finalSignal: "SIGTERM",
+      });
 
       const stdoutLimited = await execute(
         request(root, {
@@ -331,6 +345,35 @@ describe("LocalProcessRuntime", () => {
       );
       assert.equal(stderrLimited.status, "stderr_limit_exceeded");
       assert.equal(stderrLimited.stderr, "0123");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("escalates a timeout from SIGTERM to SIGKILL only after the explicit grace period", async (context) => {
+    if (process.platform === "win32") {
+      context.skip("SIGKILL termination contract is POSIX-oriented");
+      return;
+    }
+    const root = projectRoot();
+    try {
+      const result = await execute(request(root, {
+        args: ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1_000)"],
+        executionPolicy: policy(root, {
+          timeoutMs: 150,
+          termination: { gracefulSignal: "SIGTERM", forceSignal: "SIGKILL", gracePeriodMs: 20 },
+        }),
+      }));
+      assert.equal(result.status, "timed_out");
+      assert.deepEqual(result.termination, {
+        timedOut: true,
+        mode: "forced",
+        finalSignal: "SIGKILL",
+      });
+      assert.deepEqual(
+        result.events?.filter((entry) => entry.type === "process_terminated").map((entry) => entry.data.signal),
+        ["SIGTERM", "SIGKILL"],
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

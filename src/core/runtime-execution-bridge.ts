@@ -438,6 +438,7 @@ export type RuntimeExecutionReceiptOutcome = Readonly<{
   diagnostics: readonly string[];
   errorCode: string | null;
   errorMessage: string | null;
+  termination?: RuntimeResult["termination"];
 }>;
 
 /** A deterministic, public post-execution proof for one admitted Runtime call. */
@@ -1073,6 +1074,10 @@ export function createRuntimeExecutionReceipt(
       diagnostics: runtimeResult.diagnostics,
       errorCode: runtimeResult.error?.code ?? null,
       errorMessage: runtimeResult.error?.message ?? null,
+      ...(runtimeResult.runtimeId === LOCAL_PROCESS_RUNTIME_ID &&
+      runtimeResult.termination !== undefined
+        ? { termination: runtimeResult.termination }
+        : {}),
     },
   };
 
