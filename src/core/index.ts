@@ -4,6 +4,7 @@ export * from "./loop.js";
 export * from "./loop-runtime-escalation-serialization.js";
 export * from "./loop-runtime-escalation-delivery.js";
 export * from "./loop-runtime-escalation.js";
+export * from "./loop-runtime-public-request.js";
 export * from "./loop-runtime-outcome.js";
 export * from "./runtime.js";
 export * from "./runtime-execution-bridge.js";

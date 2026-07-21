@@ -11,6 +11,7 @@ import {
   createDeclarativeRuntimeRegistry,
   createDeclarativeRuntimeRequest,
   createRuntimeRequest,
+  validateLoopRuntimePublicRequest,
   dryRunPolicyAwareDeclarativeRuntimeExecution,
   prepareLoopPolicyBoundLocalProcessExecution,
   evaluateRuntimeCapability,
@@ -36,9 +37,11 @@ import {
   evaluateRuntimeAgentEscalation,
   evaluateLoopRuntimeEscalation,
   LOOP_RUNTIME_ESCALATION_PUBLIC_SCHEMA_VERSION,
+  LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
   loadConfig,
   executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection,
+  type LoopRuntimePublicRequest,
   projectLoopRuntimeEscalationResult,
   deliverLoopRuntimeEscalationProjection,
   serializeLoopRuntimeEscalationProjection,
@@ -126,6 +129,10 @@ describe("Core public API", () => {
       1,
     );
     assert.equal(
+      LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      1,
+    );
+    assert.equal(
       typeof classifyLoopRuntimeExecutionOutcome,
       "function",
     );
@@ -142,10 +149,34 @@ describe("Core public API", () => {
       typeof createAgentEscalationRequestFromRuntimeDecision,
       "function",
     );
+    assert.equal(
+      typeof validateLoopRuntimePublicRequest,
+      "function",
+    );
     assert.equal(typeof evaluateRuntimeAgentEscalation, "function");
     assert.equal(typeof evaluateLoopRuntimeEscalation, "function");
     assert.equal(typeof resolveRuntime, "function");
     assert.equal(typeof executeRuntime, "function");
+  });
+
+  it("exports the public runtime request contract without internal execution inputs", () => {
+    const request: LoopRuntimePublicRequest = {
+      schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      project: "loop-engine",
+      mode: "dry-run",
+      policyRef: "policy.loop",
+      profileRef: "profile.loop",
+      requestedMaxEffort: "low",
+      budget: {
+        maxTokens: 0,
+        maxCostUsd: 0,
+        maxDurationMs: 0,
+        maxCalls: 0,
+        maxRepairs: 0,
+      },
+    };
+
+    assert.equal(validateLoopRuntimePublicRequest(request).valid, true);
   });
 
   it("keeps the stable report payloads identical to their CLI adapters", () => {
