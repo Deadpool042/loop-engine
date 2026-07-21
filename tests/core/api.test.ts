@@ -35,6 +35,7 @@ import {
   evaluatePolicyBoundRuntimeExecutionEscalation,
   evaluateRuntimeAgentEscalation,
   evaluateLoopRuntimeEscalation,
+  LOOP_RUNTIME_ESCALATION_PUBLIC_SCHEMA_VERSION,
   loadConfig,
   executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   projectLoopRuntimeEscalationResult,
@@ -104,6 +105,10 @@ describe("Core public API", () => {
     assert.equal(
       typeof projectLoopRuntimeEscalationResult,
       "function",
+    );
+    assert.equal(
+      LOOP_RUNTIME_ESCALATION_PUBLIC_SCHEMA_VERSION,
+      1,
     );
     assert.equal(
       typeof classifyLoopRuntimeExecutionOutcome,

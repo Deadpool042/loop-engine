@@ -1123,6 +1123,7 @@ describe("projectLoopRuntimeEscalationResult", () => {
 
       assert.strictEqual(projected.loopRunResult, result.loopRunResult);
       assert.deepEqual(projected, {
+        schemaVersion: 1,
         loopRunResult: result.loopRunResult,
         runtime: {
           outcome: "executed",
@@ -1151,6 +1152,10 @@ describe("projectLoopRuntimeEscalationResult", () => {
       assertForbiddenKeys(projected.runtime, "root.runtime");
       assertForbiddenKeys(projected.escalation, "root.escalation");
       assert.equal(JSON.stringify(projected).includes("receipt-secret"), false);
+      assert.equal(
+        JSON.stringify(projected).startsWith('{"schemaVersion":1,'),
+        true,
+      );
       assert.deepEqual(projected, before);
       assert.ok(Object.isFrozen(projected));
       assert.ok(Object.isFrozen(projected.runtime));
@@ -1180,6 +1185,7 @@ describe("projectLoopRuntimeEscalationResult", () => {
       const projectedSelected = projectLoopRuntimeEscalationResult(selected);
 
       assert.equal(projectedSelected.escalation.selectedProfileId, "agent-high");
+      assert.equal(projectedSelected.schemaVersion, 1);
       assertForbiddenKeys(projectedSelected.runtime, "root.runtime");
       assertForbiddenKeys(projectedSelected.escalation, "root.escalation");
 
@@ -1198,6 +1204,7 @@ describe("projectLoopRuntimeEscalationResult", () => {
       const projectedUnselected = projectLoopRuntimeEscalationResult(unselected);
 
       assert.equal(projectedUnselected.escalation.selectedProfileId, null);
+      assert.equal(projectedUnselected.schemaVersion, 1);
       assertForbiddenKeys(projectedUnselected.runtime, "root.runtime");
       assertForbiddenKeys(projectedUnselected.escalation, "root.escalation");
       assert.equal(
@@ -1234,6 +1241,7 @@ describe("projectLoopRuntimeEscalationResult", () => {
       );
       const projected = projectLoopRuntimeEscalationResult(result);
 
+      assert.equal(projected.schemaVersion, 1);
       assert.equal(projected.runtime.runtimeStatus, null);
       assert.equal(projected.runtime.receipt, null);
       assert.equal(projected.escalation.selectedProfileId, null);

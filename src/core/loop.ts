@@ -51,6 +51,7 @@ export type ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationResult =
   }>;
 
 export type LoopRuntimeEscalationPublicProjection = Readonly<{
+  schemaVersion: typeof LOOP_RUNTIME_ESCALATION_PUBLIC_SCHEMA_VERSION;
   loopRunResult: LoopRunResult;
   runtime: Readonly<{
     outcome: PolicyBoundLocalProcessExecutionResult["outcome"];
@@ -64,6 +65,8 @@ export type LoopRuntimeEscalationPublicProjection = Readonly<{
     selectedProfileId: string | null;
   }>;
 }>;
+
+export const LOOP_RUNTIME_ESCALATION_PUBLIC_SCHEMA_VERSION = 1 as const;
 
 export type ExecuteLoopPolicyBoundLocalProcessWithReceiptOptions = LoopRunPlanOptions &
   Readonly<{
@@ -178,6 +181,7 @@ export function projectLoopRuntimeEscalationResult(
       : null;
 
   return Object.freeze({
+    schemaVersion: LOOP_RUNTIME_ESCALATION_PUBLIC_SCHEMA_VERSION,
     loopRunResult: result.loopRunResult,
     runtime: Object.freeze({
       outcome: result.runtimeExecutionResult.outcome,
