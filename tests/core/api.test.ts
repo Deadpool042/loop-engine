@@ -28,6 +28,7 @@ import {
   generateProjectPromptReport,
   generateReviewReport,
   generateWorkspaceSummaryReport,
+  classifyLoopRuntimeExecutionOutcome,
   loadConfig,
   executeLoopPolicyBoundLocalProcessWithReceipt,
   resolveRuntime,
@@ -86,6 +87,10 @@ describe("Core public API", () => {
     );
     assert.equal(
       typeof executeLoopPolicyBoundLocalProcessWithReceipt,
+      "function",
+    );
+    assert.equal(
+      typeof classifyLoopRuntimeExecutionOutcome,
       "function",
     );
     assert.equal(typeof resolveRuntime, "function");
