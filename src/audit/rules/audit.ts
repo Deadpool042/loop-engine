@@ -10936,9 +10936,11 @@ export function inspectLoopExecutionBoundaryInvariant(source: string): readonly 
   );
 }
 
+const LOOP_EXECUTION_BOUNDARY_RULE_ID = "AUDIT-420" as const;
+
 export const LOOP_EXECUTION_BOUNDARY_RULE: AuditRule = (() => {
   const rule: AuditRule = {
-    id: "AUDIT-420",
+    id: LOOP_EXECUTION_BOUNDARY_RULE_ID,
     category: "architecture",
     severity: "error",
     title: "Loop execution boundary keeps LoopRunner plan-only",
