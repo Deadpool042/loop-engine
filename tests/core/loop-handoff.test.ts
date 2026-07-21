@@ -5,11 +5,13 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   prepareLoopPolicyBoundLocalProcessExecution,
   executeLoopPolicyBoundLocalProcessWithReceipt,
   runLoopPlan,
   type LoopPolicyBoundLocalProcessDryRunResult,
   type LoopPolicyBoundLocalProcessExecutionResult,
+  type ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationResult,
   type PolicyBoundLocalProcessBridgeInput,
 } from "../../src/core/index.js";
 import {
@@ -18,6 +20,7 @@ import {
 } from "../../src/core/runtime-execution-bridge.js";
 import type { Config, ProjectConfig } from "../../src/core/config.js";
 import type { LoopRunResult } from "../../src/loop/types.js";
+import type { RuntimeResult } from "../../src/runtime/types.js";
 
 function fixtureProject(): ProjectConfig {
   return {
@@ -305,6 +308,51 @@ function bridgeInput(
   } satisfies PolicyBoundLocalProcessBridgeInput;
 
   return defaultInput;
+}
+
+function runtimeResult(status: RuntimeResult["status"]): RuntimeResult {
+  return {
+    runtimeId: "codex",
+    status,
+    startedAt: "2026-07-21T00:00:00.000Z",
+    completedAt: "2026-07-21T00:00:01.000Z",
+    diagnostics: [],
+    output: null,
+    metadata: {},
+    exitCode: null,
+    signal: null,
+    stdout: "",
+    stderr: "",
+  };
+}
+
+function executionResult(
+  runtimeResultValue: RuntimeResult | null,
+  receiptText = "receipt-secret",
+): RuntimePolicyBoundLocalProcessExecutionResult {
+  return {
+    outcome: runtimeResultValue === null ? "resolution_failed" : "executed",
+    resolution: {},
+    runtimeResult: runtimeResultValue,
+    receipt:
+      runtimeResultValue === null
+        ? null
+        : {
+            schemaVersion: 1,
+            receiptOutput: receiptText,
+            runtimeResult: {
+              ...runtimeResultValue,
+              stdout: receiptText,
+              stderr: "receipt stderr",
+              output: {
+                exitCode: 0,
+                stdout: receiptText,
+                stderr: "receipt stderr",
+              },
+            },
+          },
+    diagnostics: [],
+  } as unknown as RuntimePolicyBoundLocalProcessExecutionResult;
 }
 
 describe("prepareLoopPolicyBoundLocalProcessExecution", () => {
@@ -680,6 +728,278 @@ describe("executeLoopPolicyBoundLocalProcessWithReceipt", () => {
       );
       assert.equal(invalidBinding.runtimeExecutionResult.runtimeResult, null);
       assert.equal(invalidBinding.runtimeExecutionResult.receipt, null);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("executeLoopPolicyBoundLocalProcessWithEscalationEvaluation", () => {
+  const eligiblePolicy = Object.freeze({
+    eligibleFailureKinds: Object.freeze(["timed_out"] as const),
+  });
+  const ineligiblePolicy = Object.freeze({
+    eligibleFailureKinds: Object.freeze([] as const),
+  });
+  const escalationRegistry = Object.freeze({
+    profiles: Object.freeze([
+      {
+        id: "agent-low",
+        runtime: "custom",
+        provider: "local",
+        model: "fixture-model",
+        effort: "low",
+        capabilities: ["code_edit"],
+        permissions: [],
+        budget: {
+          maxTokens: null,
+          maxCostUsd: null,
+          maxDurationMs: null,
+          maxCalls: null,
+          maxRepairs: null,
+        },
+      },
+      {
+        id: "agent-high",
+        runtime: "custom",
+        provider: "local",
+        model: "fixture-model",
+        effort: "high",
+        capabilities: ["code_edit"],
+        permissions: [],
+        budget: {
+          maxTokens: null,
+          maxCostUsd: null,
+          maxDurationMs: null,
+          maxCalls: null,
+          maxRepairs: null,
+        },
+      },
+    ]),
+  });
+  const escalationRequest = Object.freeze({
+    requiredCapabilities: Object.freeze(["code_edit"] as const),
+    requiredPermissions: Object.freeze([] as const),
+    minEffort: "low",
+    maxEffort: "max",
+  });
+
+  function buildEscalationInput() {
+    return Object.freeze({
+      policy: eligiblePolicy,
+      registry: escalationRegistry,
+      request: escalationRequest,
+      previousProfileId: "agent-low",
+      failureReason: "runtime_error",
+    }) satisfies Parameters<
+      typeof executeLoopPolicyBoundLocalProcessWithEscalationEvaluation
+    >[2];
+  }
+
+  function loopOptions(
+    plannedSteps: readonly string[] = ["Prepare context", "Prepare prompt"],
+  ) {
+    return {
+      ...deterministicOptions(),
+      loadConfig: () => fixtureConfig(fixtureProject()),
+      planLoopCycle: () => {
+        const project = fixtureProject();
+        const candidate = fixtureCandidate();
+        return {
+          outcome: "ready" as const,
+          candidate,
+          plannedSteps: [...plannedSteps],
+          snapshot: fixtureSnapshot(project, candidate),
+        };
+      },
+    };
+  }
+
+  it("returns the loop result, runtime execution result, and a pure escalation evaluation for a successful execution", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-handoff-escalation-")));
+    const expectedOptions = loopOptions();
+    const executionOptions = loopOptions();
+
+    try {
+      const expectedLoop = runLoopPlan(project.name, expectedOptions);
+      const original = bridgeInput(expectedLoop, root);
+      const before = structuredClone(original);
+      let calls = 0;
+      const runtimeExecution = executionResult(runtimeResult("completed"));
+
+      const result: ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationResult =
+        await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
+          project.name,
+          original,
+          buildEscalationInput(),
+          {
+            ...executionOptions,
+            executePolicyBoundLocalProcessWithReceipt: async () => {
+              calls += 1;
+              return runtimeExecution;
+            },
+          },
+        );
+
+      assert.equal(calls, 1);
+      assert.deepEqual(result.loopRunResult, expectedLoop);
+      assert.strictEqual(result.runtimeExecutionResult, runtimeExecution);
+      assert.deepEqual(result.escalationEvaluation, {
+        outcome: {
+          outcome: "succeeded",
+          runtimeStatus: "completed",
+        },
+        failure: {
+          kind: null,
+          runtimeStatus: "completed",
+        },
+        decision: {
+          action: "none",
+          reason: "no_failure",
+          failureKind: null,
+          runtimeStatus: "completed",
+        },
+        agentRequest: null,
+        agentEscalationResult: null,
+      });
+      assert.equal(
+        JSON.stringify(result.runtimeExecutionResult.receipt).includes(
+          "receipt-secret",
+        ),
+        true,
+      );
+      assert.equal(
+        JSON.stringify(result.escalationEvaluation).includes("receipt-secret"),
+        false,
+      );
+      assert.deepEqual(original, before);
+      assert.ok(Object.isFrozen(result));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("propagates eligible and ineligible failures without executing Agent code", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-handoff-escalation-failure-")));
+    const expectedOptions = loopOptions([]);
+    const executionOptions = loopOptions([]);
+
+    try {
+      const expectedLoop = runLoopPlan(project.name, expectedOptions);
+      let calls = 0;
+      const eligible = await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
+        project.name,
+        bridgeInput(expectedLoop, root),
+        buildEscalationInput(),
+        {
+          ...executionOptions,
+          executePolicyBoundLocalProcessWithReceipt: async () => {
+            calls += 1;
+            return executionResult(runtimeResult("timed_out"));
+          },
+        },
+      );
+
+      assert.equal(calls, 1);
+      assert.equal(eligible.escalationEvaluation.decision.action, "escalate");
+      assert.deepEqual(eligible.escalationEvaluation.agentRequest, {
+        registry: escalationRegistry,
+        request: escalationRequest,
+        previousProfileId: "agent-low",
+        failureReason: "runtime_error",
+      });
+      assert.deepEqual(eligible.escalationEvaluation.agentEscalationResult, {
+        outcome: "escalated",
+        profile: escalationRegistry.profiles[1],
+        rejected: [
+          {
+            profileId: "agent-low",
+            reason: "excluded: this is the profile that just failed",
+          },
+        ],
+      });
+
+      const ineligible = await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
+        project.name,
+        bridgeInput(expectedLoop, root),
+        Object.freeze({
+          ...buildEscalationInput(),
+          policy: ineligiblePolicy,
+        }),
+        {
+          ...executionOptions,
+          executePolicyBoundLocalProcessWithReceipt: async () =>
+            executionResult(runtimeResult("non_zero_exit")),
+        },
+      );
+
+      assert.deepEqual(ineligible.escalationEvaluation, {
+        outcome: {
+          outcome: "failed",
+          runtimeStatus: "non_zero_exit",
+        },
+        failure: {
+          kind: "process_failed",
+          runtimeStatus: "non_zero_exit",
+        },
+        decision: {
+          action: "none",
+          reason: "failure_not_eligible",
+          failureKind: "process_failed",
+          runtimeStatus: "non_zero_exit",
+        },
+        agentRequest: null,
+        agentEscalationResult: null,
+      });
+      assert.equal(
+        JSON.stringify(ineligible.escalationEvaluation).includes(
+          "receipt-secret",
+        ),
+        false,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves the historical receipt-only path when execution is refused before spawn", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-handoff-escalation-denied-")));
+    const expectedOptions = loopOptions([]);
+    const executionOptions = loopOptions([]);
+
+    try {
+      const expectedLoop = runLoopPlan(project.name, expectedOptions);
+      let calls = 0;
+      const denied = await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
+        project.name,
+        bridgeInput(expectedLoop, root, {
+          runtimeRequestOptions: {
+            allowedProviders: ["openai" as const],
+          },
+        }),
+        Object.freeze({
+          ...buildEscalationInput(),
+          policy: ineligiblePolicy,
+        }),
+        {
+          ...executionOptions,
+          executePolicyBoundLocalProcessWithReceipt: async (input) => {
+            calls += 1;
+            return executePolicyBoundLocalProcessWithReceipt(input);
+          },
+        },
+      );
+
+      assert.equal(calls, 1);
+      assert.equal(denied.runtimeExecutionResult.outcome, "resolution_failed");
+      assert.equal(denied.runtimeExecutionResult.runtimeResult, null);
+      assert.equal(denied.runtimeExecutionResult.receipt, null);
+      assert.equal(denied.escalationEvaluation.agentRequest, null);
+      assert.equal(denied.escalationEvaluation.agentEscalationResult, null);
+      assert.deepEqual(denied.loopRunResult, expectedLoop);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

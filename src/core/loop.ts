@@ -10,6 +10,14 @@ import {
   type PolicyBoundLocalProcessExecutionResult,
   type RuntimeExecutionPlanDryRunResult,
 } from "./runtime-execution-bridge.js";
+import type { AgentEscalationRequest } from "../agents/escalation.js";
+import type { AgentRegistry } from "../agents/registry.js";
+import type { AgentSelectionRequest } from "../agents/selector.js";
+import type { LoopRuntimeEscalationPolicy } from "./loop-runtime-outcome.js";
+import {
+  evaluatePolicyBoundRuntimeExecutionEscalation,
+  type LoopRuntimeAgentEscalationResult,
+} from "./loop-runtime-escalation.js";
 
 export type LoopPolicyBoundLocalProcessDryRunResult = Readonly<{
   loopRunResult: LoopRunResult;
@@ -21,17 +29,40 @@ export type LoopPolicyBoundLocalProcessExecutionResult = Readonly<{
   runtimeExecutionResult: PolicyBoundLocalProcessExecutionResult;
 }>;
 
+export type LoopPolicyBoundLocalProcessEscalationEvaluationResult =
+  Readonly<{
+    loopRunResult: LoopRunResult;
+    runtimeExecutionResult: PolicyBoundLocalProcessExecutionResult;
+    escalationEvaluation: LoopRuntimeAgentEscalationResult;
+  }>;
+
 export type PrepareLoopPolicyBoundLocalProcessExecutionResult =
   LoopPolicyBoundLocalProcessDryRunResult;
 
 export type ExecuteLoopPolicyBoundLocalProcessWithReceiptResult =
   LoopPolicyBoundLocalProcessExecutionResult;
 
+export type ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationResult =
+  Readonly<{
+    loopRunResult: LoopRunResult;
+    runtimeExecutionResult: PolicyBoundLocalProcessExecutionResult;
+    escalationEvaluation: LoopRuntimeAgentEscalationResult;
+  }>;
+
 export type ExecuteLoopPolicyBoundLocalProcessWithReceiptOptions = LoopRunPlanOptions &
   Readonly<{
     executePolicyBoundLocalProcessWithReceipt?: (
       input: PolicyBoundLocalProcessBridgeInput,
     ) => Promise<PolicyBoundLocalProcessExecutionResult>;
+  }>;
+
+export type ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationInput =
+  Readonly<{
+    policy: LoopRuntimeEscalationPolicy;
+    registry: AgentRegistry;
+    request: AgentSelectionRequest;
+    previousProfileId: string;
+    failureReason: AgentEscalationRequest["failureReason"];
   }>;
 
 /** Runs the plan-only LoopRunner through the stable Core boundary. */
@@ -87,6 +118,38 @@ export async function executeLoopPolicyBoundLocalProcessWithReceipt(
     loopRunResult,
     runtimeExecutionResult,
   };
+}
+
+/**
+ * Adds runtime escalation evaluation on top of the historical Loop and
+ * policy-bound local-process execution result without changing the public
+ * LoopRunResult contract.
+ */
+export async function executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
+  projectName: string,
+  bridgeInput: PolicyBoundLocalProcessBridgeInput,
+  escalationInput: ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationInput,
+  options: ExecuteLoopPolicyBoundLocalProcessWithReceiptOptions = {},
+): Promise<ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationResult> {
+  const runtimeExecutionResult = await executeLoopPolicyBoundLocalProcessWithReceipt(
+    projectName,
+    bridgeInput,
+    options,
+  );
+  const escalationEvaluation = evaluatePolicyBoundRuntimeExecutionEscalation({
+    runtimeExecutionResult: runtimeExecutionResult.runtimeExecutionResult,
+    policy: escalationInput.policy,
+    registry: escalationInput.registry,
+    request: escalationInput.request,
+    previousProfileId: escalationInput.previousProfileId,
+    failureReason: escalationInput.failureReason,
+  });
+
+  return Object.freeze({
+    loopRunResult: runtimeExecutionResult.loopRunResult,
+    runtimeExecutionResult: runtimeExecutionResult.runtimeExecutionResult,
+    escalationEvaluation,
+  });
 }
 
 /** Preserves the public execution-report JSON shape used by CLI adapters. */

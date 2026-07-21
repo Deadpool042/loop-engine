@@ -36,6 +36,7 @@ import {
   evaluateRuntimeAgentEscalation,
   evaluateLoopRuntimeEscalation,
   loadConfig,
+  executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   executeLoopPolicyBoundLocalProcessWithReceipt,
   resolveRuntime,
   resolveDeclarativeRuntimeExecution,
@@ -93,6 +94,10 @@ describe("Core public API", () => {
     );
     assert.equal(
       typeof executeLoopPolicyBoundLocalProcessWithReceipt,
+      "function",
+    );
+    assert.equal(
+      typeof executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
       "function",
     );
     assert.equal(
