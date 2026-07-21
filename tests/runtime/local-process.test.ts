@@ -379,6 +379,53 @@ describe("LocalProcessRuntime", () => {
     }
   });
 
+  it("keeps a normal exit just before timeout settled once without a termination signal", async () => {
+    const root = projectRoot();
+    try {
+      const result = await execute(request(root, {
+        args: ["-e", "setTimeout(() => process.exit(0), 20)"],
+        executionPolicy: policy(root, { timeoutMs: 150 }),
+      }));
+      assert.equal(result.status, "completed");
+      assert.equal(result.termination, undefined);
+      assert.equal(result.events?.filter((entry) => entry.type === "process_terminated").length, 0);
+      assert.equal(result.events?.filter((entry) => entry.type === "process_completed").length, 1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("settles timeout once when the child exits during the grace period and clears the force timer", async (context) => {
+    if (process.platform === "win32") {
+      context.skip("SIGTERM termination contract is POSIX-oriented");
+      return;
+    }
+    const root = projectRoot();
+    try {
+      const result = await execute(request(root, {
+        args: ["-e", "process.on('SIGTERM', () => setTimeout(() => process.exit(0), 10)); setInterval(() => {}, 1_000)"],
+        executionPolicy: policy(root, {
+          timeoutMs: 150,
+          termination: { gracefulSignal: "SIGTERM", forceSignal: "SIGKILL", gracePeriodMs: 80 },
+        }),
+      }));
+      assert.equal(result.status, "timed_out");
+      assert.deepEqual(result.termination, { timedOut: true, mode: "graceful", finalSignal: "SIGTERM" });
+      assert.deepEqual(
+        result.events?.filter((entry) => entry.type === "process_terminated").map((entry) => entry.data.signal),
+        ["SIGTERM"],
+      );
+      assert.equal(result.events?.filter((entry) => entry.type === "process_completed").length, 1);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      assert.deepEqual(
+        result.events?.filter((entry) => entry.type === "process_terminated").map((entry) => entry.data.signal),
+        ["SIGTERM"],
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("passes only explicitly allow-listed environment keys", async () => {
     const root = projectRoot();
     const secretKey = "LOOP_RUNTIME_PARENT_SECRET";
