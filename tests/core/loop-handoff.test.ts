@@ -8,11 +8,13 @@ import {
   prepareLoopPolicyBoundLocalProcessExecution,
   executeLoopPolicyBoundLocalProcessWithReceipt,
   runLoopPlan,
+  type LoopPolicyBoundLocalProcessDryRunResult,
+  type LoopPolicyBoundLocalProcessExecutionResult,
   type PolicyBoundLocalProcessBridgeInput,
 } from "../../src/core/index.js";
 import {
   executePolicyBoundLocalProcessWithReceipt,
-  type PolicyBoundLocalProcessExecutionResult,
+  type PolicyBoundLocalProcessExecutionResult as RuntimePolicyBoundLocalProcessExecutionResult,
 } from "../../src/core/runtime-execution-bridge.js";
 import type { Config, ProjectConfig } from "../../src/core/config.js";
 import type { LoopRunResult } from "../../src/loop/types.js";
@@ -340,12 +342,12 @@ describe("prepareLoopPolicyBoundLocalProcessExecution", () => {
       const expectedLoop = runLoopPlan(project.name, expectedOptions);
       const original = bridgeInput(expectedLoop, root);
       const before = structuredClone(original);
-
-      const prepared = prepareLoopPolicyBoundLocalProcessExecution(
-        project.name,
-        original,
-        preparedOptions,
-      );
+      const prepared: LoopPolicyBoundLocalProcessDryRunResult =
+        prepareLoopPolicyBoundLocalProcessExecution(
+          project.name,
+          original,
+          preparedOptions,
+        );
 
       assert.deepEqual(prepared.loopRunResult, expectedLoop);
       assert.equal(prepared.runtimeDryRunResult.outcome, "planned");
@@ -527,10 +529,9 @@ describe("executeLoopPolicyBoundLocalProcessWithReceipt", () => {
       const before = structuredClone(original);
       let calls = 0;
       let forwardedInput: PolicyBoundLocalProcessBridgeInput | null = null;
-      let forwardedRuntimeResult: PolicyBoundLocalProcessExecutionResult | null =
-        null;
+      let forwardedRuntimeResult: RuntimePolicyBoundLocalProcessExecutionResult | null = null;
 
-      const executed = await executeLoopPolicyBoundLocalProcessWithReceipt(
+      const executed: LoopPolicyBoundLocalProcessExecutionResult = await executeLoopPolicyBoundLocalProcessWithReceipt(
         project.name,
         original,
         {

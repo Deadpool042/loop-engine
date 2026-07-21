@@ -11,15 +11,21 @@ import {
   type RuntimeExecutionPlanDryRunResult,
 } from "./runtime-execution-bridge.js";
 
-export type PrepareLoopPolicyBoundLocalProcessExecutionResult = Readonly<{
+export type LoopPolicyBoundLocalProcessDryRunResult = Readonly<{
   loopRunResult: LoopRunResult;
   runtimeDryRunResult: RuntimeExecutionPlanDryRunResult;
 }>;
 
-export type ExecuteLoopPolicyBoundLocalProcessWithReceiptResult = Readonly<{
+export type LoopPolicyBoundLocalProcessExecutionResult = Readonly<{
   loopRunResult: LoopRunResult;
   runtimeExecutionResult: PolicyBoundLocalProcessExecutionResult;
 }>;
+
+export type PrepareLoopPolicyBoundLocalProcessExecutionResult =
+  LoopPolicyBoundLocalProcessDryRunResult;
+
+export type ExecuteLoopPolicyBoundLocalProcessWithReceiptResult =
+  LoopPolicyBoundLocalProcessExecutionResult;
 
 export type ExecuteLoopPolicyBoundLocalProcessWithReceiptOptions = LoopRunPlanOptions &
   Readonly<{
@@ -44,7 +50,7 @@ export function prepareLoopPolicyBoundLocalProcessExecution(
   projectName: string,
   bridgeInput: PolicyBoundLocalProcessBridgeInput,
   options: LoopRunPlanOptions = {},
-): PrepareLoopPolicyBoundLocalProcessExecutionResult {
+): LoopPolicyBoundLocalProcessDryRunResult {
   const loopRunResult = runLoopPlanImplementation(projectName, options);
   const runtimeDryRunResult = dryRunPolicyBoundLocalProcessExecution({
     ...bridgeInput,
@@ -65,7 +71,7 @@ export async function executeLoopPolicyBoundLocalProcessWithReceipt(
   projectName: string,
   bridgeInput: PolicyBoundLocalProcessBridgeInput,
   options: ExecuteLoopPolicyBoundLocalProcessWithReceiptOptions = {},
-): Promise<ExecuteLoopPolicyBoundLocalProcessWithReceiptResult> {
+): Promise<LoopPolicyBoundLocalProcessExecutionResult> {
   const {
     executePolicyBoundLocalProcessWithReceipt: executeRuntime =
       executePolicyBoundLocalProcessWithReceipt,
