@@ -1,4 +1,8 @@
-import type { AgentEscalationRequest } from "../agents/escalation.js";
+import type {
+  AgentEscalationRequest,
+  AgentEscalationResult,
+} from "../agents/escalation.js";
+import { escalateAgentProfile } from "../agents/escalation.js";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentSelectionRequest } from "../agents/selector.js";
 
@@ -25,4 +29,14 @@ export function createAgentEscalationRequestFromRuntimeDecision(
     previousProfileId: input.previousProfileId,
     failureReason: input.failureReason,
   });
+}
+
+export function evaluateRuntimeAgentEscalation(
+  request: AgentEscalationRequest | null,
+): AgentEscalationResult | null {
+  if (request === null) {
+    return null;
+  }
+
+  return escalateAgentProfile(request);
 }

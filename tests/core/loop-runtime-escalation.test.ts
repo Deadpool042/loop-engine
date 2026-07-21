@@ -7,9 +7,11 @@ import {
   classifyLoopRuntimeExecutionOutcome,
   classifyLoopRuntimeFailure,
   evaluateLoopRuntimeEscalation,
+  evaluateRuntimeAgentEscalation,
   type CreateAgentEscalationRequestFromRuntimeDecisionInput,
 } from "../../src/core/index.js";
 import type { AgentEscalationRequest } from "../../src/agents/escalation.js";
+import { createAgentRegistry } from "../../src/agents/registry.js";
 import type { AgentRegistry } from "../../src/agents/registry.js";
 import type { AgentSelectionRequest } from "../../src/agents/selector.js";
 import type { LoopRuntimeEscalationDecision } from "../../src/core/loop-runtime-outcome.js";
@@ -32,6 +34,55 @@ const request = Object.freeze({
     maxRepairs: null,
   }),
 }) satisfies AgentSelectionRequest;
+
+const escalationRequestWithoutBudgetCeiling = Object.freeze({
+  requiredCapabilities: Object.freeze(["code_edit"] as const),
+  requiredPermissions: Object.freeze([] as const),
+  minEffort: "low",
+  maxEffort: "max",
+}) satisfies AgentSelectionRequest;
+
+const escalationRegistry = createAgentRegistry([
+  {
+    id: "agent-low",
+    runtime: "custom",
+    provider: "local",
+    model: "fixture-model",
+    effort: "low",
+    capabilities: ["code_edit"],
+    permissions: [],
+    budget: {
+      maxTokens: null,
+      maxCostUsd: null,
+      maxDurationMs: null,
+      maxCalls: null,
+      maxRepairs: null,
+    },
+  },
+  {
+    id: "agent-high",
+    runtime: "custom",
+    provider: "local",
+    model: "fixture-model",
+    effort: "high",
+    capabilities: ["code_edit"],
+    permissions: [],
+    budget: {
+      maxTokens: null,
+      maxCostUsd: null,
+      maxDurationMs: null,
+      maxCalls: null,
+      maxRepairs: null,
+    },
+  },
+]);
+
+const escalationRequest: AgentEscalationRequest = Object.freeze({
+  registry: escalationRegistry,
+  request: escalationRequestWithoutBudgetCeiling,
+  previousProfileId: "agent-low",
+  failureReason: "runtime_error",
+});
 
 function runtimeResult(status: RuntimeResult["status"]): RuntimeResult {
   return {
@@ -177,7 +228,10 @@ describe("createAgentEscalationRequestFromRuntimeDecision safety boundary", () =
       "utf8",
     );
 
-    assert.doesNotMatch(source, /escalateAgentProfile\s*\(/);
+    assert.equal(
+      (source.match(/return escalateAgentProfile\(request\);/g) ?? []).length,
+      1,
+    );
     assert.doesNotMatch(source, /selectAgentProfile\s*\(/);
   });
 
@@ -207,5 +261,83 @@ describe("createAgentEscalationRequestFromRuntimeDecision safety boundary", () =
 
     assert.equal(decision.action, "escalate");
     assert.ok(escalation);
+  });
+});
+
+describe("evaluateRuntimeAgentEscalation", () => {
+  it("returns null when the request is null", () => {
+    assert.equal(evaluateRuntimeAgentEscalation(null), null);
+  });
+
+  it("returns the Agent escalation result without transformation", () => {
+    const result = evaluateRuntimeAgentEscalation(escalationRequest);
+
+    assert.deepEqual(result, {
+      outcome: "escalated",
+      profile: escalationRegistry.profiles[1],
+      rejected: [
+        {
+          profileId: "agent-low",
+          reason: "excluded: this is the profile that just failed",
+        },
+      ],
+    });
+  });
+
+  it("preserves existing Agent rules for exhausted escalation", () => {
+    const exhaustedRegistry = createAgentRegistry([
+      {
+        id: "agent-only",
+        runtime: "custom",
+        provider: "local",
+        model: "fixture-model",
+        effort: "low",
+        capabilities: ["code_edit"],
+        permissions: [],
+        budget: {
+          maxTokens: null,
+          maxCostUsd: null,
+          maxDurationMs: null,
+          maxCalls: null,
+          maxRepairs: null,
+        },
+      },
+    ]);
+    const result = evaluateRuntimeAgentEscalation(
+      Object.freeze({
+        registry: exhaustedRegistry,
+        request,
+        previousProfileId: "agent-only",
+        failureReason: "runtime_error",
+      }),
+    );
+
+    assert.deepEqual(result, {
+      outcome: "exhausted",
+      rejected: [
+        {
+          profileId: "agent-only",
+          reason: "excluded: this is the profile that just failed",
+        },
+      ],
+    });
+  });
+
+  it("does not mutate escalation inputs", () => {
+    const input = Object.freeze(escalationRequest);
+    const result = evaluateRuntimeAgentEscalation(input);
+
+    assert.deepEqual(input, escalationRequest);
+    assert.deepEqual(result?.rejected[0], {
+      profileId: "agent-low",
+      reason: "excluded: this is the profile that just failed",
+    });
+  });
+
+  it("is deterministic across repeated calls", () => {
+    const first = evaluateRuntimeAgentEscalation(escalationRequest);
+    const second = evaluateRuntimeAgentEscalation(escalationRequest);
+
+    assert.deepEqual(first, second);
   });
 });
