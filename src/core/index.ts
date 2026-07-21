@@ -1,6 +1,7 @@
 /** Stable internal integration boundary for CLI and future adapters. */
 export * from "./audit.js";
 export * from "./loop.js";
+export * from "./loop-runtime-escalation-serialization.js";
 export * from "./loop-runtime-escalation.js";
 export * from "./loop-runtime-outcome.js";
 export * from "./runtime.js";
