@@ -25,6 +25,17 @@ export type LoopRuntimeFailure = Readonly<{
   runtimeStatus: RuntimeResult["status"] | null;
 }>;
 
+export type LoopRuntimeEscalationPolicy = Readonly<{
+  eligibleFailureKinds: readonly LoopRuntimeFailureKind[];
+}>;
+
+export type LoopRuntimeEscalationDecision = Readonly<{
+  action: "none" | "escalate";
+  reason: "no_failure" | "failure_not_eligible" | "failure_eligible";
+  failureKind: LoopRuntimeFailureKind | null;
+  runtimeStatus: RuntimeResult["status"] | null;
+}>;
+
 const LOOP_RUNTIME_FAILURE_KIND_BY_STATUS: Readonly<
   Record<RuntimeResult["status"], LoopRuntimeFailureKind | null>
 > = Object.freeze({
@@ -97,5 +108,35 @@ export function classifyLoopRuntimeFailure(
   return Object.freeze({
     kind: LOOP_RUNTIME_FAILURE_KIND_BY_STATUS[outcome.runtimeStatus],
     runtimeStatus: outcome.runtimeStatus,
+  });
+}
+
+export function evaluateLoopRuntimeEscalation(
+  failure: LoopRuntimeFailure | null,
+  policy: LoopRuntimeEscalationPolicy,
+): LoopRuntimeEscalationDecision {
+  if (failure === null || failure.kind === null) {
+    return Object.freeze({
+      action: "none",
+      reason: "no_failure",
+      failureKind: null,
+      runtimeStatus: failure?.runtimeStatus ?? null,
+    });
+  }
+
+  if (policy.eligibleFailureKinds.includes(failure.kind)) {
+    return Object.freeze({
+      action: "escalate",
+      reason: "failure_eligible",
+      failureKind: failure.kind,
+      runtimeStatus: failure.runtimeStatus,
+    });
+  }
+
+  return Object.freeze({
+    action: "none",
+    reason: "failure_not_eligible",
+    failureKind: failure.kind,
+    runtimeStatus: failure.runtimeStatus,
   });
 }

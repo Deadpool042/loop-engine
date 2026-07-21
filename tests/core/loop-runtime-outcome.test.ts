@@ -4,8 +4,12 @@ import { describe, it } from "node:test";
 import {
   classifyLoopRuntimeExecutionOutcome,
   classifyLoopRuntimeFailure,
+  evaluateLoopRuntimeEscalation,
   type LoopRuntimeExecutionOutcome,
+  type LoopRuntimeEscalationDecision,
+  type LoopRuntimeEscalationPolicy,
   type LoopRuntimeFailure,
+  type LoopRuntimeFailureKind,
 } from "../../src/core/index.js";
 import type { PolicyBoundLocalProcessExecutionResult } from "../../src/core/runtime-execution-bridge.js";
 import type { RuntimeResult, RuntimeResultStatus } from "../../src/runtime/types.js";
@@ -474,5 +478,190 @@ describe("classifyLoopRuntimeFailure", () => {
       kind: "timed_out",
       runtimeStatus: "timed_out",
     } satisfies LoopRuntimeFailure);
+  });
+});
+
+describe("evaluateLoopRuntimeEscalation", () => {
+  const failureKindByStatus: Record<
+    RuntimeResultStatus,
+    LoopRuntimeFailure["kind"]
+  > = {
+    not_implemented: "unsupported",
+    unsupported: "unsupported",
+    completed: null,
+    denied: "policy_denied",
+    spawn_failed: "launch_failed",
+    non_zero_exit: "process_failed",
+    timed_out: "timed_out",
+    stdout_limit_exceeded: "output_limit",
+    stderr_limit_exceeded: "output_limit",
+  };
+
+  const eligiblePolicy = Object.freeze({
+    eligibleFailureKinds: Object.freeze([
+      "policy_denied",
+      "unsupported",
+      "launch_failed",
+      "process_failed",
+      "timed_out",
+      "output_limit",
+    ] as const),
+  }) satisfies LoopRuntimeEscalationPolicy;
+
+  const duplicatePolicy = Object.freeze({
+    eligibleFailureKinds: Object.freeze([
+      "unsupported",
+      "unsupported",
+      "timed_out",
+      "timed_out",
+    ] as const),
+  }) satisfies LoopRuntimeEscalationPolicy;
+
+  it("returns none/no_failure when there is no failure", () => {
+    const decision = evaluateLoopRuntimeEscalation(null, eligiblePolicy);
+
+    assert.deepEqual(
+      decision,
+      {
+        action: "none",
+        reason: "no_failure",
+        failureKind: null,
+        runtimeStatus: null,
+      } satisfies LoopRuntimeEscalationDecision,
+    );
+    assert.ok(Object.isFrozen(decision));
+  });
+
+  it("returns escalate/failure_eligible when the failure kind is eligible", () => {
+    const outcome = classifyLoopRuntimeExecutionOutcome(
+      executedResult("spawn_failed"),
+    );
+    const failure = classifyLoopRuntimeFailure(outcome);
+    const decision = evaluateLoopRuntimeEscalation(failure, eligiblePolicy);
+
+    assert.deepEqual(
+      decision,
+      {
+        action: "escalate",
+        reason: "failure_eligible",
+        failureKind: "launch_failed",
+        runtimeStatus: "spawn_failed",
+      } satisfies LoopRuntimeEscalationDecision,
+    );
+  });
+
+  it("returns none/failure_not_eligible when the failure kind is not eligible", () => {
+    const outcome = classifyLoopRuntimeExecutionOutcome(
+      executedResult("spawn_failed"),
+    );
+    const failure = classifyLoopRuntimeFailure(outcome);
+    const decision = evaluateLoopRuntimeEscalation(failure, {
+      eligibleFailureKinds: Object.freeze(["timed_out"] as const),
+    });
+
+    assert.deepEqual(
+      decision,
+      {
+        action: "none",
+        reason: "failure_not_eligible",
+        failureKind: "launch_failed",
+        runtimeStatus: "spawn_failed",
+      } satisfies LoopRuntimeEscalationDecision,
+    );
+  });
+
+  for (const [status, expectedKind] of Object.entries(
+    failureKindByStatus,
+  ) as Array<[RuntimeResultStatus, LoopRuntimeFailureKind | null]>) {
+    it(`preserves failure metadata for ${status}`, () => {
+      const failure = classifyLoopRuntimeFailure(
+        classifyLoopRuntimeExecutionOutcome(executedResult(status)),
+      );
+      const decision = evaluateLoopRuntimeEscalation(failure, eligiblePolicy);
+
+      assert.equal(decision.failureKind, expectedKind);
+      assert.equal(decision.runtimeStatus, status);
+    });
+  }
+
+  it("treats an empty policy as non-eligible", () => {
+    const failure = classifyLoopRuntimeFailure(
+      classifyLoopRuntimeExecutionOutcome(executedResult("timed_out")),
+    );
+    const decision = evaluateLoopRuntimeEscalation(failure, {
+      eligibleFailureKinds: [],
+    });
+
+    assert.deepEqual(
+      decision,
+      {
+        action: "none",
+        reason: "failure_not_eligible",
+        failureKind: "timed_out",
+        runtimeStatus: "timed_out",
+      } satisfies LoopRuntimeEscalationDecision,
+    );
+  });
+
+  it("accepts a readonly policy with duplicate kinds", () => {
+    const failure = classifyLoopRuntimeFailure(
+      classifyLoopRuntimeExecutionOutcome(executedResult("unsupported")),
+    );
+    const decision = evaluateLoopRuntimeEscalation(failure, duplicatePolicy);
+
+    assert.deepEqual(
+      decision,
+      {
+        action: "escalate",
+        reason: "failure_eligible",
+        failureKind: "unsupported",
+        runtimeStatus: "unsupported",
+      } satisfies LoopRuntimeEscalationDecision,
+    );
+  });
+
+  it("does not mutate the provided failure or policy", () => {
+    const policy = Object.freeze({
+      eligibleFailureKinds: Object.freeze([
+        "policy_denied",
+        "timed_out",
+      ] as const),
+    }) satisfies LoopRuntimeEscalationPolicy;
+    const failure = Object.freeze(
+      classifyLoopRuntimeFailure(
+        classifyLoopRuntimeExecutionOutcome(executedResult("timed_out")),
+      ),
+    ) as LoopRuntimeFailure;
+
+    const decision = evaluateLoopRuntimeEscalation(failure, policy);
+
+    assert.deepEqual(failure, {
+      kind: "timed_out",
+      runtimeStatus: "timed_out",
+    } satisfies LoopRuntimeFailure);
+    assert.deepEqual(policy.eligibleFailureKinds, [
+      "policy_denied",
+      "timed_out",
+    ]);
+    assert.deepEqual(decision, {
+      action: "escalate",
+      reason: "failure_eligible",
+      failureKind: "timed_out",
+      runtimeStatus: "timed_out",
+    } satisfies LoopRuntimeEscalationDecision);
+  });
+
+  it("is deterministic across repeated calls", () => {
+    const failure = classifyLoopRuntimeFailure(
+      classifyLoopRuntimeExecutionOutcome(executedResult("non_zero_exit")),
+    );
+    const policy = {
+      eligibleFailureKinds: ["process_failed"],
+    } satisfies LoopRuntimeEscalationPolicy;
+
+    const first = evaluateLoopRuntimeEscalation(failure, policy);
+    const second = evaluateLoopRuntimeEscalation(failure, policy);
+
+    assert.deepEqual(first, second);
   });
 });

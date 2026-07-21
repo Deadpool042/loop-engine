@@ -30,6 +30,7 @@ import {
   generateWorkspaceSummaryReport,
   classifyLoopRuntimeExecutionOutcome,
   classifyLoopRuntimeFailure,
+  evaluateLoopRuntimeEscalation,
   loadConfig,
   executeLoopPolicyBoundLocalProcessWithReceipt,
   resolveRuntime,
@@ -95,6 +96,7 @@ describe("Core public API", () => {
       "function",
     );
     assert.equal(typeof classifyLoopRuntimeFailure, "function");
+    assert.equal(typeof evaluateLoopRuntimeEscalation, "function");
     assert.equal(typeof resolveRuntime, "function");
     assert.equal(typeof executeRuntime, "function");
   });
