@@ -10,6 +10,10 @@ import {
   type PolicyBoundLocalProcessExecutionResult,
   type RuntimeExecutionPlanDryRunResult,
 } from "./runtime-execution-bridge.js";
+import {
+  deliverLoopRuntimeEscalationProjection,
+  type LoopRuntimeEscalationProjectionSender,
+} from "./loop-runtime-escalation-delivery.js";
 import type { AgentEscalationRequest } from "../agents/escalation.js";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentSelectionRequest } from "../agents/selector.js";
@@ -48,6 +52,12 @@ export type ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationResult =
     loopRunResult: LoopRunResult;
     runtimeExecutionResult: PolicyBoundLocalProcessExecutionResult;
     escalationEvaluation: LoopRuntimeAgentEscalationResult;
+  }>;
+
+export type ExecuteLoopPolicyBoundLocalProcessAndDeliverEscalationProjectionResult =
+  Readonly<{
+    executionResult: ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationResult;
+    projection: LoopRuntimeEscalationPublicProjection;
   }>;
 
 export type LoopRuntimeEscalationPublicProjection = Readonly<{
@@ -168,6 +178,33 @@ export async function executeLoopPolicyBoundLocalProcessWithEscalationEvaluation
     loopRunResult: runtimeExecutionResult.loopRunResult,
     runtimeExecutionResult: runtimeExecutionResult.runtimeExecutionResult,
     escalationEvaluation,
+  });
+}
+
+/**
+ * Adds explicit projection delivery on top of the policy-bound local-process
+ * execution and escalation evaluation without changing the internal result.
+ */
+export async function executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection(
+  projectName: string,
+  bridgeInput: PolicyBoundLocalProcessBridgeInput,
+  escalationInput: ExecuteLoopPolicyBoundLocalProcessWithEscalationEvaluationInput,
+  sender: LoopRuntimeEscalationProjectionSender,
+  options: ExecuteLoopPolicyBoundLocalProcessWithReceiptOptions = {},
+): Promise<ExecuteLoopPolicyBoundLocalProcessAndDeliverEscalationProjectionResult> {
+  const executionResult = await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
+    projectName,
+    bridgeInput,
+    escalationInput,
+    options,
+  );
+  const projection = projectLoopRuntimeEscalationResult(executionResult);
+
+  await deliverLoopRuntimeEscalationProjection(projection, sender);
+
+  return Object.freeze({
+    executionResult,
+    projection,
   });
 }
 

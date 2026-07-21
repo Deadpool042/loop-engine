@@ -5,10 +5,12 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import {
+  executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection,
   executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   prepareLoopPolicyBoundLocalProcessExecution,
   executeLoopPolicyBoundLocalProcessWithReceipt,
   projectLoopRuntimeEscalationResult,
+  serializeLoopRuntimeEscalationProjection,
   runLoopPlan,
   type LoopPolicyBoundLocalProcessDryRunResult,
   type LoopPolicyBoundLocalProcessExecutionResult,
@@ -1250,6 +1252,175 @@ describe("projectLoopRuntimeEscalationResult", () => {
       assert.equal(JSON.stringify(projected).includes("runtimeResult"), false);
       assert.deepEqual(projected, projectLoopRuntimeEscalationResult(result));
       assert.ok(Object.isFrozen(projected));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection", () => {
+  it("runs the loop, projects once, delivers once, and returns the execution result with the delivered projection", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-delivery-handoff-success-")));
+    const expectedOptions = loopOptions();
+    const executionOptions = loopOptions();
+    const expectedLoop = runLoopPlan(project.name, expectedOptions);
+    const original = bridgeInput(expectedLoop, root);
+    const escalationInput = defaultEscalationInput();
+    const beforeBridge = structuredClone(original);
+    const beforeEscalation = structuredClone(escalationInput);
+    const payloads: string[] = [];
+    let runtimeCalls = 0;
+    let senderCalls = 0;
+
+    try {
+      const result = await executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection(
+        project.name,
+        original,
+        escalationInput,
+        {
+          async send(payload: string) {
+            senderCalls += 1;
+            payloads.push(payload);
+          },
+        },
+        {
+          ...executionOptions,
+          executePolicyBoundLocalProcessWithReceipt: async () => {
+            runtimeCalls += 1;
+            return redactedExecutionResult(runtimeResult("completed"));
+          },
+        },
+      );
+
+      const projected = projectLoopRuntimeEscalationResult(result.executionResult);
+
+      assert.equal(runtimeCalls, 1);
+      assert.equal(senderCalls, 1);
+      assert.deepEqual(result.executionResult.loopRunResult, expectedLoop);
+      assert.deepEqual(result.projection, projected);
+      assert.equal(
+        payloads[0],
+        serializeLoopRuntimeEscalationProjection(result.projection),
+      );
+      assert.equal(
+        payloads[0],
+        serializeLoopRuntimeEscalationProjection(projected),
+      );
+      assert.equal(JSON.stringify(result.projection).includes("receipt-secret"), false);
+      assert.equal(result.projection.runtime.receipt, result.executionResult.runtimeExecutionResult.receipt);
+      assert.equal(result.projection.runtime.runtimeStatus, "completed");
+      assert.equal(result.projection.escalation.selectedProfileId, null);
+      assert.deepEqual(original, beforeBridge);
+      assert.deepEqual(escalationInput, beforeEscalation);
+      assert.ok(Object.isFrozen(result));
+      assert.ok(Object.isFrozen(result.projection));
+      assert.ok(Object.isFrozen(result.executionResult));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("delivers the projection even when execution is refused before spawn", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-delivery-handoff-denied-")));
+    const expectedOptions = loopOptions([]);
+    const executionOptions = loopOptions([]);
+    const expectedLoop = runLoopPlan(project.name, expectedOptions);
+    const original = bridgeInput(expectedLoop, root, {
+      runtimeRequestOptions: {
+        allowedProviders: ["openai" as const],
+      },
+    });
+    const escalationInput = Object.freeze({
+      ...defaultEscalationInput(),
+      policy: noEligibleEscalationPolicy(),
+    });
+    const beforeBridge = structuredClone(original);
+    const beforeEscalation = structuredClone(escalationInput);
+    const payloads: string[] = [];
+    let runtimeCalls = 0;
+    let senderCalls = 0;
+
+    try {
+      const result = await executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection(
+        project.name,
+        original,
+        escalationInput,
+        {
+          async send(payload: string) {
+            senderCalls += 1;
+            payloads.push(payload);
+          },
+        },
+        {
+          ...executionOptions,
+          executePolicyBoundLocalProcessWithReceipt: async (input) => {
+            runtimeCalls += 1;
+            return executePolicyBoundLocalProcessWithReceipt(input);
+          },
+        },
+      );
+
+      const projected = projectLoopRuntimeEscalationResult(result.executionResult);
+
+      assert.equal(runtimeCalls, 1);
+      assert.equal(senderCalls, 1);
+      assert.equal(result.executionResult.runtimeExecutionResult.outcome, "resolution_failed");
+      assert.equal(result.executionResult.runtimeExecutionResult.runtimeResult, null);
+      assert.equal(result.executionResult.runtimeExecutionResult.receipt, null);
+      assert.deepEqual(result.projection, projected);
+      assert.equal(payloads[0], serializeLoopRuntimeEscalationProjection(projected));
+      assert.equal(result.projection.runtime.receipt, null);
+      assert.equal(result.projection.escalation.selectedProfileId, null);
+      assert.deepEqual(original, beforeBridge);
+      assert.deepEqual(escalationInput, beforeEscalation);
+      assert.ok(Object.isFrozen(result));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("propagates sender rejection without retrying and keeps the internal execution result intact", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-delivery-handoff-failure-")));
+    const options = loopOptions();
+    const expectedLoop = runLoopPlan(project.name, options);
+    const original = bridgeInput(expectedLoop, root);
+    const escalationInput = defaultEscalationInput();
+    const beforeBridge = structuredClone(original);
+    const beforeEscalation = structuredClone(escalationInput);
+    const failure = new Error("sender rejected");
+    let runtimeCalls = 0;
+    let senderCalls = 0;
+
+    try {
+      await assert.rejects(
+        executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection(
+          project.name,
+          original,
+          escalationInput,
+          {
+            async send() {
+              senderCalls += 1;
+              throw failure;
+            },
+          },
+          {
+            ...options,
+            executePolicyBoundLocalProcessWithReceipt: async () => {
+              runtimeCalls += 1;
+              return redactedExecutionResult(runtimeResult("timed_out"));
+            },
+          },
+        ),
+        (error: unknown) => error === failure,
+      );
+
+      assert.equal(runtimeCalls, 1);
+      assert.equal(senderCalls, 1);
+      assert.deepEqual(original, beforeBridge);
+      assert.deepEqual(escalationInput, beforeEscalation);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
