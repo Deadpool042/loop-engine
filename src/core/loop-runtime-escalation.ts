@@ -7,6 +7,34 @@ import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentSelectionRequest } from "../agents/selector.js";
 
 import type { LoopRuntimeEscalationDecision } from "./loop-runtime-outcome.js";
+import type {
+  LoopRuntimeExecutionOutcome,
+  LoopRuntimeFailure,
+  LoopRuntimeEscalationPolicy,
+} from "./loop-runtime-outcome.js";
+import {
+  classifyLoopRuntimeExecutionOutcome,
+  classifyLoopRuntimeFailure,
+  evaluateLoopRuntimeEscalation,
+} from "./loop-runtime-outcome.js";
+import type { PolicyBoundLocalProcessExecutionResult } from "./runtime-execution-bridge.js";
+
+export type LoopRuntimeAgentEscalationResult = Readonly<{
+  outcome: LoopRuntimeExecutionOutcome;
+  failure: LoopRuntimeFailure;
+  decision: LoopRuntimeEscalationDecision;
+  agentRequest: AgentEscalationRequest | null;
+  agentEscalationResult: AgentEscalationResult | null;
+}>;
+
+export type EvaluateLoopRuntimeAgentEscalationInput = Readonly<{
+  runtimeExecutionResult: PolicyBoundLocalProcessExecutionResult | null | undefined;
+  policy: LoopRuntimeEscalationPolicy;
+  registry: AgentRegistry;
+  request: AgentSelectionRequest;
+  previousProfileId: string;
+  failureReason: AgentEscalationRequest["failureReason"];
+}>;
 
 export type CreateAgentEscalationRequestFromRuntimeDecisionInput = Readonly<{
   decision: LoopRuntimeEscalationDecision;
@@ -39,4 +67,30 @@ export function evaluateRuntimeAgentEscalation(
   }
 
   return escalateAgentProfile(request);
+}
+
+export function evaluateLoopRuntimeAgentEscalation(
+  input: EvaluateLoopRuntimeAgentEscalationInput,
+): LoopRuntimeAgentEscalationResult {
+  const outcome = classifyLoopRuntimeExecutionOutcome(
+    input.runtimeExecutionResult,
+  );
+  const failure = classifyLoopRuntimeFailure(outcome);
+  const decision = evaluateLoopRuntimeEscalation(failure, input.policy);
+  const agentRequest = createAgentEscalationRequestFromRuntimeDecision({
+    decision,
+    registry: input.registry,
+    request: input.request,
+    previousProfileId: input.previousProfileId,
+    failureReason: input.failureReason,
+  });
+  const agentEscalationResult = evaluateRuntimeAgentEscalation(agentRequest);
+
+  return Object.freeze({
+    outcome,
+    failure,
+    decision,
+    agentRequest,
+    agentEscalationResult,
+  });
 }

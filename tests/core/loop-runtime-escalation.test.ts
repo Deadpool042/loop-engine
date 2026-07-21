@@ -7,6 +7,7 @@ import {
   classifyLoopRuntimeExecutionOutcome,
   classifyLoopRuntimeFailure,
   evaluateLoopRuntimeEscalation,
+  evaluateLoopRuntimeAgentEscalation,
   evaluateRuntimeAgentEscalation,
   type CreateAgentEscalationRequestFromRuntimeDecisionInput,
 } from "../../src/core/index.js";
@@ -15,6 +16,7 @@ import { createAgentRegistry } from "../../src/agents/registry.js";
 import type { AgentRegistry } from "../../src/agents/registry.js";
 import type { AgentSelectionRequest } from "../../src/agents/selector.js";
 import type { LoopRuntimeEscalationDecision } from "../../src/core/loop-runtime-outcome.js";
+import type { PolicyBoundLocalProcessExecutionResult } from "../../src/core/runtime-execution-bridge.js";
 import type { RuntimeResult } from "../../src/runtime/types.js";
 
 const registry = Object.freeze({
@@ -98,6 +100,14 @@ function runtimeResult(status: RuntimeResult["status"]): RuntimeResult {
     stdout: "",
     stderr: "",
   };
+}
+
+function executedResult(
+  status: RuntimeResult["status"],
+): PolicyBoundLocalProcessExecutionResult {
+  return {
+    runtimeResult: runtimeResult(status),
+  } as PolicyBoundLocalProcessExecutionResult;
 }
 
 function buildDecision(
@@ -221,6 +231,234 @@ describe("createAgentEscalationRequestFromRuntimeDecision", () => {
   });
 });
 
+describe("evaluateLoopRuntimeAgentEscalation", () => {
+  const eligiblePolicy = Object.freeze({
+    eligibleFailureKinds: Object.freeze(["timed_out"] as const),
+  });
+  const nonEligiblePolicy = Object.freeze({
+    eligibleFailureKinds: Object.freeze(["timed_out"] as const),
+  });
+
+  function buildInput(
+    runtimeExecutionResult: Parameters<
+      typeof evaluateLoopRuntimeAgentEscalation
+    >[0]["runtimeExecutionResult"],
+    policy: Parameters<typeof evaluateLoopRuntimeAgentEscalation>[0]["policy"],
+    requestValue = escalationRequestWithoutBudgetCeiling,
+  ) {
+    return Object.freeze({
+      runtimeExecutionResult,
+      policy,
+      registry: escalationRegistry,
+      request: requestValue,
+      previousProfileId: "agent-low",
+      failureReason: "runtime_error",
+    }) satisfies Parameters<typeof evaluateLoopRuntimeAgentEscalation>[0];
+  }
+
+  it("returns no runtime escalation when execution never started", () => {
+    const result = evaluateLoopRuntimeAgentEscalation(
+      buildInput(null, eligiblePolicy),
+    );
+
+    assert.deepEqual(result, {
+      outcome: {
+        outcome: "not_started",
+        runtimeStatus: null,
+      },
+      failure: {
+        kind: null,
+        runtimeStatus: null,
+      },
+      decision: {
+        action: "none",
+        reason: "no_failure",
+        failureKind: null,
+        runtimeStatus: null,
+      },
+      agentRequest: null,
+      agentEscalationResult: null,
+    });
+  });
+
+  it("short-circuits on success without producing an agent request", () => {
+    const result = evaluateLoopRuntimeAgentEscalation(
+      buildInput(executedResult("completed"), eligiblePolicy),
+    );
+
+    assert.deepEqual(result, {
+      outcome: {
+        outcome: "succeeded",
+        runtimeStatus: "completed",
+      },
+      failure: {
+        kind: null,
+        runtimeStatus: "completed",
+      },
+      decision: {
+        action: "none",
+        reason: "no_failure",
+        failureKind: null,
+        runtimeStatus: "completed",
+      },
+      agentRequest: null,
+      agentEscalationResult: null,
+    });
+  });
+
+  it("short-circuits non-eligible failures before agent escalation", () => {
+    const result = evaluateLoopRuntimeAgentEscalation(
+      buildInput(executedResult("non_zero_exit"), nonEligiblePolicy),
+    );
+
+    assert.deepEqual(result, {
+      outcome: {
+        outcome: "failed",
+        runtimeStatus: "non_zero_exit",
+      },
+      failure: {
+        kind: "process_failed",
+        runtimeStatus: "non_zero_exit",
+      },
+      decision: {
+        action: "none",
+        reason: "failure_not_eligible",
+        failureKind: "process_failed",
+        runtimeStatus: "non_zero_exit",
+      },
+      agentRequest: null,
+      agentEscalationResult: null,
+    });
+  });
+
+  it("performs the pure agent escalation path when the failure is eligible", () => {
+    const result = evaluateLoopRuntimeAgentEscalation(
+      buildInput(executedResult("timed_out"), eligiblePolicy),
+    );
+
+    assert.deepEqual(result, {
+      outcome: {
+        outcome: "timed_out",
+        runtimeStatus: "timed_out",
+      },
+      failure: {
+        kind: "timed_out",
+        runtimeStatus: "timed_out",
+      },
+      decision: {
+        action: "escalate",
+        reason: "failure_eligible",
+        failureKind: "timed_out",
+        runtimeStatus: "timed_out",
+      },
+      agentRequest: {
+        registry: escalationRegistry,
+        request: escalationRequestWithoutBudgetCeiling,
+        previousProfileId: "agent-low",
+        failureReason: "runtime_error",
+      },
+      agentEscalationResult: {
+        outcome: "escalated",
+        profile: escalationRegistry.profiles[1],
+        rejected: [
+          {
+            profileId: "agent-low",
+            reason: "excluded: this is the profile that just failed",
+          },
+        ],
+      },
+    });
+  });
+
+  it("keeps the agent escalation result exhausted when no next profile exists", () => {
+    const exhaustedRegistry = createAgentRegistry([
+      {
+        id: "agent-only",
+        runtime: "custom",
+        provider: "local",
+        model: "fixture-model",
+        effort: "low",
+        capabilities: ["code_edit"],
+        permissions: [],
+        budget: {
+          maxTokens: null,
+          maxCostUsd: null,
+          maxDurationMs: null,
+          maxCalls: null,
+          maxRepairs: null,
+        },
+      },
+    ]);
+    const result = evaluateLoopRuntimeAgentEscalation(
+      Object.freeze({
+        runtimeExecutionResult: executedResult("timed_out"),
+        policy: eligiblePolicy,
+        registry: exhaustedRegistry,
+        request: escalationRequestWithoutBudgetCeiling,
+        previousProfileId: "agent-only",
+        failureReason: "runtime_error",
+      }) satisfies Parameters<typeof evaluateLoopRuntimeAgentEscalation>[0],
+    );
+
+    assert.deepEqual(result.agentRequest, {
+      registry: exhaustedRegistry,
+      request: escalationRequestWithoutBudgetCeiling,
+      previousProfileId: "agent-only",
+      failureReason: "runtime_error",
+    });
+    assert.deepEqual(result.agentEscalationResult, {
+      outcome: "exhausted",
+      rejected: [
+        {
+          profileId: "agent-only",
+          reason: "excluded: this is the profile that just failed",
+        },
+      ],
+    });
+  });
+
+  it("preserves the full five-step composition without mutating inputs", () => {
+    const runtimeExecutionResult = executedResult("timed_out");
+    const input = buildInput(runtimeExecutionResult, eligiblePolicy);
+    const result = evaluateLoopRuntimeAgentEscalation(input);
+
+    assert.deepEqual(
+      result.outcome,
+      classifyLoopRuntimeExecutionOutcome(runtimeExecutionResult),
+    );
+    assert.deepEqual(result.failure, classifyLoopRuntimeFailure(result.outcome));
+    assert.deepEqual(
+      result.decision,
+      evaluateLoopRuntimeEscalation(result.failure, eligiblePolicy),
+    );
+    assert.deepEqual(
+      result.agentRequest,
+      createAgentEscalationRequestFromRuntimeDecision({
+        decision: result.decision,
+        registry: escalationRegistry,
+        request: escalationRequestWithoutBudgetCeiling,
+        previousProfileId: "agent-low",
+        failureReason: "runtime_error",
+      }),
+    );
+    assert.deepEqual(
+      result.agentEscalationResult,
+      evaluateRuntimeAgentEscalation(result.agentRequest),
+    );
+    assert.deepEqual(input, buildInput(runtimeExecutionResult, eligiblePolicy));
+    assert.ok(Object.isFrozen(result));
+  });
+
+  it("is deterministic across repeated calls", () => {
+    const input = buildInput(executedResult("timed_out"), eligiblePolicy);
+
+    const first = evaluateLoopRuntimeAgentEscalation(input);
+    const second = evaluateLoopRuntimeAgentEscalation(input);
+
+    assert.deepEqual(first, second);
+  });
+});
+
 describe("createAgentEscalationRequestFromRuntimeDecision safety boundary", () => {
   it("does not call the Agent escalation function", () => {
     const source = readFileSync(
@@ -232,6 +470,42 @@ describe("createAgentEscalationRequestFromRuntimeDecision safety boundary", () =
       (source.match(/return escalateAgentProfile\(request\);/g) ?? []).length,
       1,
     );
+    assert.doesNotMatch(source, /selectAgentProfile\s*\(/);
+  });
+
+  it("does not introduce external execution in the composed runtime escalation pipeline", () => {
+    const source = readFileSync(
+      "src/core/loop-runtime-escalation.ts",
+      "utf8",
+    );
+
+    assert.equal(
+      (source.match(/classifyLoopRuntimeExecutionOutcome\(/g) ?? []).length,
+      1,
+    );
+    assert.equal(
+      (source.match(/classifyLoopRuntimeFailure\(/g) ?? []).length,
+      1,
+    );
+    assert.equal(
+      (source.match(/evaluateLoopRuntimeEscalation\(/g) ?? []).length,
+      1,
+    );
+    assert.equal(
+      (
+        source.match(/createAgentEscalationRequestFromRuntimeDecision\(/g) ?? []
+      ).length,
+      2,
+    );
+    assert.equal(
+      (source.match(/evaluateRuntimeAgentEscalation\(/g) ?? []).length,
+      2,
+    );
+    assert.doesNotMatch(source, /\bspawn\s*\(/);
+    assert.doesNotMatch(source, /\bexecFile\s*\(/);
+    assert.doesNotMatch(source, /\bexec\s*\(/);
+    assert.doesNotMatch(source, /\bfork\s*\(/);
+    assert.doesNotMatch(source, /\bfetch\s*\(/);
     assert.doesNotMatch(source, /selectAgentProfile\s*\(/);
   });
 
