@@ -5,7 +5,9 @@ import {
 import type { LoopRunResult } from "../loop/types.js";
 import {
   dryRunPolicyBoundLocalProcessExecution,
+  executePolicyBoundLocalProcessWithReceipt,
   type PolicyBoundLocalProcessBridgeInput,
+  type PolicyBoundLocalProcessExecutionResult,
   type RuntimeExecutionPlanDryRunResult,
 } from "./runtime-execution-bridge.js";
 
@@ -13,6 +15,18 @@ export type PrepareLoopPolicyBoundLocalProcessExecutionResult = Readonly<{
   loopRunResult: LoopRunResult;
   runtimeDryRunResult: RuntimeExecutionPlanDryRunResult;
 }>;
+
+export type ExecuteLoopPolicyBoundLocalProcessWithReceiptResult = Readonly<{
+  loopRunResult: LoopRunResult;
+  runtimeExecutionResult: PolicyBoundLocalProcessExecutionResult;
+}>;
+
+export type ExecuteLoopPolicyBoundLocalProcessWithReceiptOptions = LoopRunPlanOptions &
+  Readonly<{
+    executePolicyBoundLocalProcessWithReceipt?: (
+      input: PolicyBoundLocalProcessBridgeInput,
+    ) => Promise<PolicyBoundLocalProcessExecutionResult>;
+  }>;
 
 /** Runs the plan-only LoopRunner through the stable Core boundary. */
 export function runLoopPlan(
@@ -40,6 +54,32 @@ export function prepareLoopPolicyBoundLocalProcessExecution(
   return {
     loopRunResult,
     runtimeDryRunResult,
+  };
+}
+
+/**
+ * Runs the historical Loop plan and the explicit policy-bound local-process
+ * execution in sequence, without mutating the LoopRunResult contract.
+ */
+export async function executeLoopPolicyBoundLocalProcessWithReceipt(
+  projectName: string,
+  bridgeInput: PolicyBoundLocalProcessBridgeInput,
+  options: ExecuteLoopPolicyBoundLocalProcessWithReceiptOptions = {},
+): Promise<ExecuteLoopPolicyBoundLocalProcessWithReceiptResult> {
+  const {
+    executePolicyBoundLocalProcessWithReceipt: executeRuntime =
+      executePolicyBoundLocalProcessWithReceipt,
+    ...planOptions
+  } = options;
+  const loopRunResult = runLoopPlanImplementation(projectName, planOptions);
+  const runtimeExecutionResult = await executeRuntime({
+    ...bridgeInput,
+    loopRunResult,
+  });
+
+  return {
+    loopRunResult,
+    runtimeExecutionResult,
   };
 }
 

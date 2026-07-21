@@ -6,9 +6,14 @@ import { describe, it } from "node:test";
 
 import {
   prepareLoopPolicyBoundLocalProcessExecution,
+  executeLoopPolicyBoundLocalProcessWithReceipt,
   runLoopPlan,
   type PolicyBoundLocalProcessBridgeInput,
 } from "../../src/core/index.js";
+import {
+  executePolicyBoundLocalProcessWithReceipt,
+  type PolicyBoundLocalProcessExecutionResult,
+} from "../../src/core/runtime-execution-bridge.js";
 import type { Config, ProjectConfig } from "../../src/core/config.js";
 import type { LoopRunResult } from "../../src/loop/types.js";
 
@@ -479,6 +484,201 @@ describe("prepareLoopPolicyBoundLocalProcessExecution", () => {
       );
 
       assert.equal(missingBinding.runtimeDryRunResult.outcome, "unavailable_v10_request");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("executeLoopPolicyBoundLocalProcessWithReceipt", () => {
+  it("runs the historical loop plan and the local-process execution without transforming the runtime result", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-handoff-exec-")));
+    const expectedOptions = {
+      ...deterministicOptions(),
+      loadConfig: () => fixtureConfig(project),
+      planLoopCycle: () => {
+        const candidate = fixtureCandidate();
+        return {
+          outcome: "ready" as const,
+          candidate,
+          plannedSteps: ["Prepare context", "Prepare prompt"],
+          snapshot: fixtureSnapshot(project, candidate),
+        };
+      },
+    };
+    const executionOptions = {
+      ...deterministicOptions(),
+      loadConfig: () => fixtureConfig(project),
+      planLoopCycle: () => {
+        const candidate = fixtureCandidate();
+        return {
+          outcome: "ready" as const,
+          candidate,
+          plannedSteps: ["Prepare context", "Prepare prompt"],
+          snapshot: fixtureSnapshot(project, candidate),
+        };
+      },
+    };
+
+    try {
+      const expectedLoop = runLoopPlan(project.name, expectedOptions);
+      const original = bridgeInput(expectedLoop, root);
+      const before = structuredClone(original);
+      let calls = 0;
+      let forwardedInput: PolicyBoundLocalProcessBridgeInput | null = null;
+      let forwardedRuntimeResult: PolicyBoundLocalProcessExecutionResult | null =
+        null;
+
+      const executed = await executeLoopPolicyBoundLocalProcessWithReceipt(
+        project.name,
+        original,
+        {
+          ...executionOptions,
+          executePolicyBoundLocalProcessWithReceipt: async (input) => {
+            calls += 1;
+            forwardedInput = input;
+            forwardedRuntimeResult =
+              await executePolicyBoundLocalProcessWithReceipt(input);
+            return forwardedRuntimeResult;
+          },
+        },
+      );
+
+      assert.equal(calls, 1);
+      assert.deepEqual(executed.loopRunResult, expectedLoop);
+      assert.strictEqual(executed.runtimeExecutionResult, forwardedRuntimeResult);
+      assert.deepEqual(forwardedInput?.loopRunResult, expectedLoop);
+      assert.strictEqual(forwardedInput?.localProcessBinding, original.localProcessBinding);
+      assert.equal(executed.runtimeExecutionResult.outcome, "executed");
+      if (executed.runtimeExecutionResult.outcome !== "executed") return;
+      assert.notEqual(executed.runtimeExecutionResult.runtimeResult.output, null);
+      assert.equal(
+        executed.runtimeExecutionResult.receipt.outcome.output,
+        null,
+      );
+      assert.equal(
+        JSON.stringify(executed.runtimeExecutionResult.receipt).includes(
+          "receipt-secret",
+        ),
+        false,
+      );
+      assert.equal(
+        JSON.stringify(executed.runtimeExecutionResult.receipt).includes(
+          process.execPath,
+        ),
+        false,
+      );
+      assert.deepEqual(original, before);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps policy refusal and invalid binding from starting a process", async () => {
+    const project = fixtureProject();
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "loop-handoff-deny-exec-")));
+    const executionOptions = {
+      ...deterministicOptions(),
+      loadConfig: () => fixtureConfig(project),
+      planLoopCycle: () => {
+        const candidate = fixtureCandidate();
+        return {
+          outcome: "ready" as const,
+          candidate,
+          plannedSteps: [],
+          snapshot: fixtureSnapshot(project, candidate),
+        };
+      },
+    };
+
+    try {
+      const expectedLoop = runLoopPlan(project.name, executionOptions);
+      const denied = await executeLoopPolicyBoundLocalProcessWithReceipt(
+        project.name,
+        bridgeInput(expectedLoop, root, {
+          runtimeRequestOptions: {
+            allowedProviders: ["openai" as const],
+          },
+          admission: {
+            policy: {
+              policyId: "fixture-policy",
+              mode: "execute",
+              status: "resolved",
+              requirements: {
+                category: "code",
+                mode: "execute",
+                requiredCapabilities: ["shell_exec"],
+                requiredPermissions: ["shell_exec"],
+                minimumEffort: "low",
+                maximumEffort: "low",
+                contextBudget: {
+                  maxFiles: 1,
+                  maxCharacters: 100,
+                  maxEstimatedTokens: 25,
+                  includeFullFiles: false,
+                },
+                executionBudget: {
+                  maxTokens: null,
+                  maxCostUsd: null,
+                  maxDurationMs: null,
+                  maxCalls: 1,
+                  maxRepairs: 0,
+                },
+                rationale: ["fixture"],
+              },
+              selectionRequest: {
+                requiredCapabilities: ["shell_exec"],
+                requiredPermissions: ["shell_exec"],
+              },
+              selection: {
+                outcome: "selected",
+                profile: {
+                  id: "local.fixture",
+                  runtime: "custom",
+                  provider: "local",
+                  model: "fixture-model",
+                  effort: "low",
+                  capabilities: ["shell_exec"],
+                  permissions: ["read_only", "shell_exec"],
+                  budget: {
+                    maxTokens: null,
+                    maxCostUsd: null,
+                    maxDurationMs: null,
+                    maxCalls: 1,
+                    maxRepairs: 0,
+                  },
+                },
+                rejected: [],
+              },
+              reasons: ["fixture"],
+            },
+            provider: "local",
+            effort: "low",
+            budget: { maxCalls: 1 },
+          },
+        }),
+        executionOptions,
+      );
+
+      assert.equal(denied.runtimeExecutionResult.outcome, "resolution_failed");
+      assert.equal(denied.runtimeExecutionResult.runtimeResult, null);
+      assert.equal(denied.runtimeExecutionResult.receipt, null);
+
+      const invalidBinding = await executeLoopPolicyBoundLocalProcessWithReceipt(
+        project.name,
+        bridgeInput(expectedLoop, root, {
+          runtimeMapping: {},
+        }),
+        executionOptions,
+      );
+
+      assert.equal(
+        invalidBinding.runtimeExecutionResult.outcome,
+        "resolution_failed",
+      );
+      assert.equal(invalidBinding.runtimeExecutionResult.runtimeResult, null);
+      assert.equal(invalidBinding.runtimeExecutionResult.receipt, null);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

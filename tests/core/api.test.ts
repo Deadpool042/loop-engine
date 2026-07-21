@@ -29,6 +29,7 @@ import {
   generateReviewReport,
   generateWorkspaceSummaryReport,
   loadConfig,
+  executeLoopPolicyBoundLocalProcessWithReceipt,
   resolveRuntime,
   resolveDeclarativeRuntimeExecution,
   resolvePolicyAwareDeclarativeRuntimeExecution,
@@ -81,6 +82,10 @@ describe("Core public API", () => {
     assert.equal(typeof createRuntimeRequest, "function");
     assert.equal(
       typeof prepareLoopPolicyBoundLocalProcessExecution,
+      "function",
+    );
+    assert.equal(
+      typeof executeLoopPolicyBoundLocalProcessWithReceipt,
       "function",
     );
     assert.equal(typeof resolveRuntime, "function");
