@@ -25,8 +25,100 @@ function verifyRegistryContract(
         rule,
         messages.fail,
         missing.length > 0 ? missing : [registryPath],
-        messages.recommendation,
-      );
+      messages.recommendation,
+    );
+}
+
+function isAuditRuleId(value: string): boolean {
+  if (!value.startsWith("AUDIT-")) {
+    return false;
+  }
+
+  const digits = value.slice("AUDIT-".length);
+  return digits.length === 3 && [...digits].every((digit) => digit >= "0" && digit <= "9");
+}
+
+function parseAuditRuleId(value: string): number | null {
+  return isAuditRuleId(value) ? Number(value.slice("AUDIT-".length)) : null;
+}
+
+function formatAuditRuleId(value: number): string {
+  return `AUDIT-${String(value).padStart(3, "0")}`;
+}
+
+export type AuditRuleIdIntegrityReport = Readonly<{
+  ids: readonly string[];
+  duplicateIds: readonly string[];
+  invalidIds: readonly string[];
+  outOfOrderIds: readonly string[];
+  missingIds: readonly string[];
+  hasAudit420: boolean;
+}>;
+
+export function inspectAuditRuleIdIntegrity(
+  rules: readonly { readonly id: string }[],
+  minimumId = 1,
+): AuditRuleIdIntegrityReport {
+  const auditIds = rules
+    .map((rule) => rule.id)
+    .filter((id) => id.startsWith("AUDIT-"));
+  const invalidIds = Array.from(
+    new Set(auditIds.filter((id) => !isAuditRuleId(id))),
+  );
+  const duplicateIds = Array.from(
+    new Set(auditIds.filter((id, index) => auditIds.indexOf(id) !== index)),
+  );
+
+  const numericIds = auditIds
+    .map((id) => ({ id, value: parseAuditRuleId(id) }))
+    .filter(
+      (entry): entry is Readonly<{ id: string; value: number }> =>
+        entry.value !== null,
+    );
+
+  const outOfOrderIds: string[] = [];
+  for (let index = 1; index < numericIds.length; index += 1) {
+    const current = numericIds[index];
+    const previous = numericIds[index - 1];
+
+    if (current !== undefined && previous !== undefined && current.value < previous.value) {
+      outOfOrderIds.push(current.id);
+    }
+  }
+
+  const uniqueNumericIds = Array.from(
+    new Set(numericIds.map((entry) => entry.value)),
+  ).sort((left, right) => left - right);
+  const missingIds: string[] = [];
+
+  if (uniqueNumericIds.length > 0) {
+    const highestId = uniqueNumericIds[uniqueNumericIds.length - 1]!;
+    const presentIds = new Set(uniqueNumericIds);
+
+    for (let value = minimumId; value <= highestId; value += 1) {
+      if (!presentIds.has(value)) {
+        missingIds.push(formatAuditRuleId(value));
+      }
+    }
+  }
+
+  return Object.freeze({
+    ids: Object.freeze([...auditIds]),
+    duplicateIds: Object.freeze([...duplicateIds]),
+    invalidIds: Object.freeze([...invalidIds]),
+    outOfOrderIds: Object.freeze([...outOfOrderIds]),
+    missingIds: Object.freeze([...missingIds]),
+    hasAudit420: auditIds.includes("AUDIT-420"),
+  });
+}
+
+let registeredAuditRulesForIntegrityCheck: readonly { readonly id: string }[] | null =
+  null;
+
+export function registerAuditRulesForIntegrityCheck(
+  rules: readonly { readonly id: string }[],
+): void {
+  registeredAuditRulesForIntegrityCheck = rules;
 }
 
 export const AUDIT_SCORE_EXPOSURE_RULE: AuditRule = {
@@ -1666,58 +1758,40 @@ export const AUDIT_RULE_ID_SEQUENCE_RULE: AuditRule = {
   severity: "warning",
   title: "Audit rule ids are contiguous within the AUDIT prefix",
   description:
-    "AUDIT-prefixed rule ids should form a contiguous sequence without gaps, across every rule file — not only src/audit/rules/audit.ts, since AUDIT-prefixed architecture rules can also live in src/audit/rules/json.ts.",
+    "AUDIT-prefixed rule ids should form a contiguous sequence without gaps, in the registered audit rule inventory.",
   check: () => {
-    const ruleFiles = [
-      "src/audit/rules/json.ts",
-      "src/audit/rules/cli.ts",
-      "src/audit/rules/docs.ts",
-      "src/audit/rules/audit.ts",
-    ];
+    const registry = registeredAuditRulesForIntegrityCheck;
 
-    const missingFiles = ruleFiles.filter((file) => !existsSync(file));
-
-    if (missingFiles.length > 0) {
+    if (registry === null) {
       return fail(
         AUDIT_RULE_ID_SEQUENCE_RULE,
-        "Some audit rule files are missing.",
-        missingFiles,
-        "Restore the missing audit rule files so AUDIT rule id sequencing can be verified.",
+        "Audit rule registry is unavailable.",
+        ["registered audit inventory"],
+        "Register the audit rule inventory before evaluating AUDIT rule id continuity.",
       );
     }
 
-    const auditIds = ruleFiles
-      .flatMap((file) =>
-        Array.from(
-          readFileSync(file, "utf8").matchAll(/\bid:\s*"AUDIT-(\d{3})"/g),
-        ),
-      )
-      .map((match) => Number(match[1]))
-      .filter((id) => Number.isInteger(id))
-      .sort((left, right) => left - right);
+    const report = inspectAuditRuleIdIntegrity(registry);
+    const issues = [
+      ...report.invalidIds.map((id) => `invalid: ${id}`),
+      ...report.duplicateIds.map((id) => `duplicate: ${id}`),
+      ...report.missingIds.map((id) => `missing: ${id}`),
+      ...(report.hasAudit420 ? [] : ["missing: AUDIT-420"]),
+    ];
 
-    const expectedIds = Array.from(
-      { length: Math.max(...auditIds) },
-      (_, index) => index + 1,
-    );
-
-    const missingIds = expectedIds
-      .filter((id) => !auditIds.includes(id))
-      .map((id) => `AUDIT-${String(id).padStart(3, "0")}`);
-
-    if (missingIds.length > 0) {
+    if (issues.length > 0) {
       return fail(
         AUDIT_RULE_ID_SEQUENCE_RULE,
-        "AUDIT rule ids are not contiguous.",
-        missingIds,
-        "Keep AUDIT-prefixed rule ids contiguous when adding, removing, or renumbering audit architecture rules.",
+        "AUDIT rule ids are not valid, ordered, or contiguous in the registered inventory.",
+        issues,
+        "Keep AUDIT-prefixed rule ids unique, valid, ordered, contiguous, and inclusive of AUDIT-420 in the registered audit inventory.",
       );
     }
 
     return pass(
       AUDIT_RULE_ID_SEQUENCE_RULE,
-      "AUDIT rule ids are contiguous within the AUDIT prefix.",
-      auditIds.map((id) => `AUDIT-${String(id).padStart(3, "0")}`),
+      "AUDIT rule ids are unique, valid, ordered, contiguous, and include AUDIT-420 in the registered inventory.",
+      report.ids,
     );
   },
 };

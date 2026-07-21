@@ -413,6 +413,7 @@ import {
   LOCAL_PROCESS_TERMINATION_ORDER_RULE,
   LOCAL_PROCESS_TERMINATION_RECEIPT_RULE,
   LOCAL_PROCESS_TERMINATION_DOCUMENT_RULE,
+  registerAuditRulesForIntegrityCheck,
   LOOP_EXECUTION_BOUNDARY_RULE,
 } from "./rules/audit.js";
 import { CLI_COMMAND_COVERAGE_RULE } from "./rules/cli.js";
@@ -961,3 +962,5 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   LOCAL_PROCESS_TERMINATION_DOCUMENT_RULE,
   LOOP_EXECUTION_BOUNDARY_RULE,
 ]) satisfies readonly AuditRuleDefinition[];
+
+registerAuditRulesForIntegrityCheck(AUDIT_RULES);
