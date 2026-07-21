@@ -306,6 +306,10 @@ describe("LocalProcessRuntime", () => {
       );
       assert.equal(spawnFailure.status, "spawn_failed");
       assert.equal(spawnFailure.error?.code, "spawn_failed");
+      assert.deepEqual(
+        spawnFailure.events?.map((entry) => entry.type),
+        ["request_validated", "process_failed"],
+      );
 
       const nonZero = await execute(
         request(root, { args: ["-e", "process.exit(7)"] }),
@@ -313,6 +317,14 @@ describe("LocalProcessRuntime", () => {
       assert.equal(nonZero.status, "non_zero_exit");
       assert.equal(nonZero.exitCode, 7);
       assert.equal(nonZero.error?.code, "non_zero_exit");
+      assert.equal(
+        nonZero.events?.filter((entry) => entry.type === "process_completed").length,
+        1,
+      );
+      assert.equal(
+        nonZero.events?.filter((entry) => entry.type === "process_failed").length,
+        1,
+      );
 
       const timedOut = await execute(
         request(root, {
@@ -327,6 +339,14 @@ describe("LocalProcessRuntime", () => {
         mode: "graceful",
         finalSignal: "SIGTERM",
       });
+      assert.equal(
+        timedOut.events?.filter((entry) => entry.type === "process_terminated").length,
+        1,
+      );
+      assert.equal(
+        timedOut.events?.filter((entry) => entry.type === "process_failed").length,
+        1,
+      );
 
       const stdoutLimited = await execute(
         request(root, {
@@ -345,6 +365,10 @@ describe("LocalProcessRuntime", () => {
       );
       assert.equal(stderrLimited.status, "stderr_limit_exceeded");
       assert.equal(stderrLimited.stderr, "0123");
+      assert.equal(
+        stderrLimited.events?.filter((entry) => entry.type === "process_failed").length,
+        1,
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -390,6 +414,7 @@ describe("LocalProcessRuntime", () => {
       assert.equal(result.termination, undefined);
       assert.equal(result.events?.filter((entry) => entry.type === "process_terminated").length, 0);
       assert.equal(result.events?.filter((entry) => entry.type === "process_completed").length, 1);
+      assert.equal(result.events?.filter((entry) => entry.type === "process_failed").length, 0);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -416,6 +441,7 @@ describe("LocalProcessRuntime", () => {
         ["SIGTERM"],
       );
       assert.equal(result.events?.filter((entry) => entry.type === "process_completed").length, 1);
+      assert.equal(result.events?.filter((entry) => entry.type === "process_failed").length, 1);
       await new Promise((resolve) => setTimeout(resolve, 100));
       assert.deepEqual(
         result.events?.filter((entry) => entry.type === "process_terminated").map((entry) => entry.data.signal),
