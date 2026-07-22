@@ -12,6 +12,7 @@ import {
   createDeclarativeRuntimeRequest,
   createRuntimeRequest,
   validateLoopRuntimePublicRequest,
+  decodeLoopRuntimePublicRequest,
   dryRunPolicyAwareDeclarativeRuntimeExecution,
   prepareLoopPolicyBoundLocalProcessExecution,
   evaluateRuntimeCapability,
@@ -48,6 +49,7 @@ import {
   mapLoopRuntimeExecutionPlanToRequestOptions,
   createLoopRuntimeRequestFromPublicOptions,
   type LoopRuntimePublicRequest,
+  type LoopRuntimePublicRequestDecodeResult,
   type LoopRuntimeResolvedPolicyConfiguration,
   type LoopRuntimeResolvedProfileConfiguration,
   type LoopRuntimeResolvedRequestConfiguration,
@@ -187,6 +189,7 @@ describe("Core public API", () => {
       typeof validateLoopRuntimePublicRequest,
       "function",
     );
+    assert.equal(typeof decodeLoopRuntimePublicRequest, "function");
     assert.equal(
       typeof resolveLoopRuntimePublicRequestReferences,
       "function",
@@ -221,6 +224,33 @@ describe("Core public API", () => {
     };
 
     assert.equal(validateLoopRuntimePublicRequest(request).valid, true);
+  });
+
+  it("exports the public runtime request decoder contract", () => {
+    const result: LoopRuntimePublicRequestDecodeResult =
+      decodeLoopRuntimePublicRequest({
+        schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+        project: "loop-engine",
+        mode: "execute",
+        policyRef: "policy.loop",
+        profileRef: "profile.loop",
+        requestedMaxEffort: "low",
+        budget: {
+          maxTokens: 0,
+          maxCostUsd: 0,
+          maxDurationMs: 0,
+          maxCalls: 0,
+          maxRepairs: 0,
+        },
+      });
+
+    assert.equal(result.parsed, true);
+    if (result.parsed) {
+      assert.equal(result.request.project, "loop-engine");
+      assert.equal(Object.isFrozen(result), true);
+      assert.equal(Object.isFrozen(result.request), true);
+      assert.equal(Object.isFrozen(result.request.budget), true);
+    }
   });
 
   it("exports the public runtime request reference resolution contract", () => {
