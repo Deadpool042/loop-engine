@@ -374,4 +374,22 @@ describe("mapLoopRuntimeExecutionPlanToRequestOptions", () => {
     assert.equal(Object.isFrozen(plan), true);
     assert.equal(Object.isFrozen(plan.budget), true);
   });
+
+  it("returns unsupported_mode before other field validation for invalid modes", () => {
+    const plan = {
+      ...buildPlan({
+        project: "   ",
+        mode: "invalid-mode" as unknown as LoopRuntimeExecutionPlan["mode"],
+      }),
+      budget: Object.freeze({
+        ...buildPlan().budget,
+        maxTokens: -1,
+      }),
+    } as LoopRuntimeExecutionPlan;
+
+    assert.deepEqual(mapLoopRuntimeExecutionPlanToRequestOptions(plan), {
+      mapped: false,
+      reason: "unsupported_mode",
+    });
+  });
 });

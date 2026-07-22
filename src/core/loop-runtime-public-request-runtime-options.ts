@@ -98,8 +98,15 @@ function toFrozenLimits(
 export function mapLoopRuntimeExecutionPlanToRequestOptions(
   plan: LoopRuntimeExecutionPlan,
 ): LoopRuntimeRequestOptionsMappingResult {
+  if (!isPlainObject(plan)) {
+    return invalidExecutionPlan();
+  }
+
+  if (plan.mode !== "dry-run" && plan.mode !== "execute") {
+    return unsupportedMode();
+  }
+
   if (
-    !isPlainObject(plan) ||
     !isNonEmptyTrimmedString(plan.project) ||
     (plan.cycleId !== undefined && !isNonEmptyTrimmedString(plan.cycleId)) ||
     !isNonEmptyTrimmedString(plan.policyId) ||
@@ -108,10 +115,6 @@ export function mapLoopRuntimeExecutionPlanToRequestOptions(
     !isValidLimits(plan.budget)
   ) {
     return invalidExecutionPlan();
-  }
-
-  if (plan.mode !== "dry-run" && plan.mode !== "execute") {
-    return unsupportedMode();
   }
 
   return Object.freeze({
