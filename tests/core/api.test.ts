@@ -39,9 +39,12 @@ import {
   LOOP_RUNTIME_ESCALATION_PUBLIC_SCHEMA_VERSION,
   LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
   loadConfig,
+  resolveLoopRuntimePublicRequestReferences,
   executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection,
   type LoopRuntimePublicRequest,
+  type LoopRuntimePublicRequestReferenceCatalog,
+  type LoopRuntimePublicRequestResolution,
   projectLoopRuntimeEscalationResult,
   deliverLoopRuntimeEscalationProjection,
   serializeLoopRuntimeEscalationProjection,
@@ -153,6 +156,10 @@ describe("Core public API", () => {
       typeof validateLoopRuntimePublicRequest,
       "function",
     );
+    assert.equal(
+      typeof resolveLoopRuntimePublicRequestReferences,
+      "function",
+    );
     assert.equal(typeof evaluateRuntimeAgentEscalation, "function");
     assert.equal(typeof evaluateLoopRuntimeEscalation, "function");
     assert.equal(typeof resolveRuntime, "function");
@@ -177,6 +184,39 @@ describe("Core public API", () => {
     };
 
     assert.equal(validateLoopRuntimePublicRequest(request).valid, true);
+  });
+
+  it("exports the public runtime request reference resolution contract", () => {
+    const policy = { id: "policy-sentinel" };
+    const profile = { id: "profile-sentinel" };
+    const request: LoopRuntimePublicRequest = {
+      schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      project: "loop-engine",
+      mode: "execute",
+      policyRef: "policy.ref",
+      profileRef: "profile.ref",
+      requestedMaxEffort: "low",
+      budget: {
+        maxTokens: 0,
+        maxCostUsd: 0,
+        maxDurationMs: 0,
+        maxCalls: 0,
+        maxRepairs: 0,
+      },
+    };
+    const catalog: LoopRuntimePublicRequestReferenceCatalog<
+      typeof policy,
+      typeof profile
+    > = {
+      policies: [{ ref: "policy.ref", value: policy }],
+      profiles: [{ ref: "profile.ref", value: profile }],
+    };
+    const resolution: LoopRuntimePublicRequestResolution<
+      typeof policy,
+      typeof profile
+    > = resolveLoopRuntimePublicRequestReferences(request, catalog);
+
+    assert.equal(resolution.resolved, true);
   });
 
   it("keeps the stable report payloads identical to their CLI adapters", () => {
