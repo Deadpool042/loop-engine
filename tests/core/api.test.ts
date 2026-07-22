@@ -15,6 +15,7 @@ import {
   decodeLoopRuntimePublicRequest,
   createLoopRuntimePublicRequestAuthorizationRequest,
   evaluateLoopRuntimePublicRequestAuthorization,
+  authorizeLoopRuntimePublicRequest,
   decodeAndPrepareLoopRuntimePublicRequest,
   dryRunPolicyAwareDeclarativeRuntimeExecution,
   prepareLoopPolicyBoundLocalProcessExecution,
@@ -208,6 +209,7 @@ describe("Core public API", () => {
       typeof evaluateLoopRuntimePublicRequestAuthorization,
       "function",
     );
+    assert.equal(typeof authorizeLoopRuntimePublicRequest, "function");
     assert.equal(
       typeof decodeAndPrepareLoopRuntimePublicRequest,
       "function",
@@ -344,6 +346,46 @@ describe("Core public API", () => {
         authorizationRequest,
         authorizer,
       ),
+      { authorized: true },
+    );
+  });
+
+  it("exports the public runtime request authorization facade contract", async () => {
+    const principal: LoopRuntimeAuthenticatedPrincipal = {
+      principalId: "principal.api",
+    };
+    const request: LoopRuntimePublicRequest = {
+      schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      project: "loop-engine",
+      mode: "execute",
+      policyRef: "policy.loop",
+      profileRef: "profile.loop",
+      requestedMaxEffort: "low",
+      budget: {
+        maxTokens: 0,
+        maxCostUsd: 0,
+        maxDurationMs: 0,
+        maxCalls: 0,
+        maxRepairs: 0,
+      },
+    };
+    const authorizer: LoopRuntimePublicRequestAuthorizer = {
+      authorize(
+        authorizationRequest: LoopRuntimePublicRequestAuthorizationRequest,
+      ): LoopRuntimePublicRequestAuthorizationDecision {
+        assert.deepEqual(authorizationRequest, {
+          principalId: "principal.api",
+          project: "loop-engine",
+          policyRef: "policy.loop",
+          profileRef: "profile.loop",
+          mode: "execute",
+        });
+        return { authorized: true };
+      },
+    };
+
+    assert.deepEqual(
+      await authorizeLoopRuntimePublicRequest(principal, request, authorizer),
       { authorized: true },
     );
   });
