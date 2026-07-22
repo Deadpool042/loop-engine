@@ -14,6 +14,7 @@ import {
   validateLoopRuntimePublicRequest,
   decodeLoopRuntimePublicRequest,
   decodeAndAuthorizeLoopRuntimePublicRequest,
+  createLoopRuntimeAuthorizedEngineAssemblyRequest,
   createLoopRuntimePublicRequestAuthorizationRequest,
   evaluateLoopRuntimePublicRequestAuthorization,
   authorizeLoopRuntimePublicRequest,
@@ -56,6 +57,7 @@ import {
   type LoopRuntimePublicRequest,
   type LoopRuntimePublicRequestDecodeResult,
   type LoopRuntimePublicRequestAuthorizedEntryResult,
+  type LoopRuntimeAuthorizedEngineAssemblyRequestCreationResult,
   type LoopRuntimeAuthenticatedPrincipal,
   type LoopRuntimePublicRequestAuthorizationDecision,
   type LoopRuntimePublicRequestAuthorizationRequest,
@@ -208,6 +210,10 @@ describe("Core public API", () => {
       "function",
     );
     assert.equal(
+      typeof createLoopRuntimeAuthorizedEngineAssemblyRequest,
+      "function",
+    );
+    assert.equal(
       typeof createLoopRuntimePublicRequestAuthorizationRequest,
       "function",
     );
@@ -316,6 +322,39 @@ describe("Core public API", () => {
       assert.equal(result.request.project, "loop-engine");
       assert.equal(Object.isFrozen(result), true);
       assert.equal(Object.isFrozen(result.request), true);
+    }
+  });
+
+  it("exports the authorized engine assembly request contract", () => {
+    const request: LoopRuntimePublicRequest = {
+      schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      project: "loop-engine",
+      mode: "execute",
+      policyRef: "policy.loop",
+      profileRef: "profile.loop",
+      requestedMaxEffort: "low",
+      budget: {
+        maxTokens: 0,
+        maxCostUsd: 0,
+        maxDurationMs: 0,
+        maxCalls: 0,
+        maxRepairs: 0,
+      },
+    };
+    const result: LoopRuntimeAuthorizedEngineAssemblyRequestCreationResult =
+      createLoopRuntimeAuthorizedEngineAssemblyRequest(
+        {
+          principalId: "principal.api",
+        },
+        request,
+      );
+
+    assert.equal(result.created, true);
+    if (result.created) {
+      assert.equal(result.assemblyRequest.principalId, "principal.api");
+      assert.equal(result.assemblyRequest.request, request);
+      assert.equal(Object.isFrozen(result), true);
+      assert.equal(Object.isFrozen(result.assemblyRequest), true);
     }
   });
 
