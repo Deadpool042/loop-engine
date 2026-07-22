@@ -40,6 +40,7 @@ import {
   LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
   loadConfig,
   createLoopRuntimeResolvedRequestConfiguration,
+  createLoopRuntimeExecutionPlan,
   resolveLoopRuntimePublicRequestReferences,
   executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection,
@@ -51,6 +52,8 @@ import {
   applyLoopRuntimeInternalLimits,
   type LoopRuntimeInternalLimits,
   type LoopRuntimeLimitedRequestConfiguration,
+  type LoopRuntimeExecutionPlan,
+  type LoopRuntimeExecutionPlanResult,
   type LoopRuntimeRequestLimitResult,
   type LoopRuntimePublicRequestReferenceCatalog,
   type LoopRuntimePublicRequestResolution,
@@ -174,6 +177,7 @@ describe("Core public API", () => {
       "function",
     );
     assert.equal(typeof applyLoopRuntimeInternalLimits, "function");
+    assert.equal(typeof createLoopRuntimeExecutionPlan, "function");
     assert.equal(typeof evaluateRuntimeAgentEscalation, "function");
     assert.equal(typeof evaluateLoopRuntimeEscalation, "function");
     assert.equal(typeof resolveRuntime, "function");
@@ -358,6 +362,31 @@ describe("Core public API", () => {
         assert.equal(limitedConfiguration.effectiveBudget.maxRepairs, 25);
       }
     }
+  });
+
+  it("exports the limited runtime execution plan contract", () => {
+    const plan: LoopRuntimeExecutionPlan = {
+      project: "loop-engine",
+      mode: "dry-run",
+      policyId: "policy-id",
+      profileId: "profile-id",
+      effort: "low",
+      budget: {
+        maxTokens: 1,
+        maxCostUsd: 2,
+        maxDurationMs: 3,
+        maxCalls: 4,
+        maxRepairs: 5,
+      },
+    };
+    const result: LoopRuntimeExecutionPlanResult = {
+      planned: true,
+      plan,
+    };
+
+    assert.equal(typeof createLoopRuntimeExecutionPlan, "function");
+    assert.equal(result.planned, true);
+    assert.equal(result.plan, plan);
   });
 
   it("keeps the stable report payloads identical to their CLI adapters", () => {
