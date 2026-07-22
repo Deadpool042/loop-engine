@@ -13,6 +13,7 @@ import {
   createRuntimeRequest,
   validateLoopRuntimePublicRequest,
   decodeLoopRuntimePublicRequest,
+  decodeAndPrepareLoopRuntimePublicRequest,
   dryRunPolicyAwareDeclarativeRuntimeExecution,
   prepareLoopPolicyBoundLocalProcessExecution,
   evaluateRuntimeCapability,
@@ -50,6 +51,8 @@ import {
   createLoopRuntimeRequestFromPublicOptions,
   type LoopRuntimePublicRequest,
   type LoopRuntimePublicRequestDecodeResult,
+  type LoopRuntimePublicRequestEntryPreparationInput,
+  type LoopRuntimePublicRequestEntryPreparationResult,
   type LoopRuntimeResolvedPolicyConfiguration,
   type LoopRuntimeResolvedProfileConfiguration,
   type LoopRuntimeResolvedRequestConfiguration,
@@ -190,6 +193,10 @@ describe("Core public API", () => {
       "function",
     );
     assert.equal(typeof decodeLoopRuntimePublicRequest, "function");
+    assert.equal(
+      typeof decodeAndPrepareLoopRuntimePublicRequest,
+      "function",
+    );
     assert.equal(
       typeof resolveLoopRuntimePublicRequestReferences,
       "function",
@@ -576,6 +583,70 @@ describe("Core public API", () => {
       assert.equal(result.runtimeRequest.project, request.project);
       assert.equal(result.runtimeRequest.policyId, "policy-id");
       assert.equal(result.runtimeRequest.profileId, "profile-id");
+      assert.equal(Object.isFrozen(result), true);
+    }
+  });
+
+  it("exports the public runtime request entry preparation contract", () => {
+    const input: LoopRuntimePublicRequestEntryPreparationInput = {
+      payload: {
+        schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+        project: "loop-engine",
+        mode: "execute",
+        policyRef: "policy.ref",
+        profileRef: "profile.ref",
+        requestedMaxEffort: "high",
+        budget: {
+          maxTokens: 10,
+          maxCostUsd: 20,
+          maxDurationMs: 30,
+          maxCalls: 40,
+          maxRepairs: 50,
+        },
+      },
+      catalog: {
+        policies: [
+          {
+            ref: "policy.ref",
+            value: {
+              policyRef: "policy.ref",
+              policyId: "policy-id",
+            },
+          },
+        ],
+        profiles: [
+          {
+            ref: "profile.ref",
+            value: {
+              profileRef: "profile.ref",
+              profileId: "profile-id",
+              maxEffort: "medium",
+            },
+          },
+        ],
+      },
+      limits: {
+        maxEffort: "medium",
+        budget: {
+          maxTokens: 5,
+          maxCostUsd: 6,
+          maxDurationMs: 7,
+          maxCalls: 8,
+          maxRepairs: 9,
+        },
+      },
+      binding: {
+        runtimeId: "local-process",
+        executable: "node",
+        arguments: ["--version"],
+      },
+    };
+    const result: LoopRuntimePublicRequestEntryPreparationResult =
+      decodeAndPrepareLoopRuntimePublicRequest(input);
+
+    assert.equal(result.prepared, true);
+    if (result.prepared) {
+      assert.equal(result.runtimeRequest.runtimeId, "local-process");
       assert.equal(Object.isFrozen(result), true);
     }
   });
