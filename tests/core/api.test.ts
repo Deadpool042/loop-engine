@@ -39,10 +39,15 @@ import {
   LOOP_RUNTIME_ESCALATION_PUBLIC_SCHEMA_VERSION,
   LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
   loadConfig,
+  createLoopRuntimeResolvedRequestConfiguration,
   resolveLoopRuntimePublicRequestReferences,
   executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection,
   type LoopRuntimePublicRequest,
+  type LoopRuntimeResolvedPolicyConfiguration,
+  type LoopRuntimeResolvedProfileConfiguration,
+  type LoopRuntimeResolvedRequestConfiguration,
+  type LoopRuntimeResolvedRequestConfigurationResult,
   type LoopRuntimePublicRequestReferenceCatalog,
   type LoopRuntimePublicRequestResolution,
   projectLoopRuntimeEscalationResult,
@@ -160,6 +165,10 @@ describe("Core public API", () => {
       typeof resolveLoopRuntimePublicRequestReferences,
       "function",
     );
+    assert.equal(
+      typeof createLoopRuntimeResolvedRequestConfiguration,
+      "function",
+    );
     assert.equal(typeof evaluateRuntimeAgentEscalation, "function");
     assert.equal(typeof evaluateLoopRuntimeEscalation, "function");
     assert.equal(typeof resolveRuntime, "function");
@@ -217,6 +226,54 @@ describe("Core public API", () => {
     > = resolveLoopRuntimePublicRequestReferences(request, catalog);
 
     assert.equal(resolution.resolved, true);
+  });
+
+  it("exports the resolved public runtime request configuration contract", () => {
+    const policy = { policyId: "policy-sentinel" };
+    const profile = { profileId: "profile-sentinel", maxEffort: "medium" as const };
+    const request: LoopRuntimePublicRequest = {
+      schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      project: "loop-engine",
+      mode: "execute",
+      policyRef: "policy.ref",
+      profileRef: "profile.ref",
+      requestedMaxEffort: "low",
+      budget: {
+        maxTokens: 1,
+        maxCostUsd: 2,
+        maxDurationMs: 3,
+        maxCalls: 4,
+        maxRepairs: 5,
+      },
+    };
+    const resolution: LoopRuntimePublicRequestResolution<
+      LoopRuntimeResolvedPolicyConfiguration,
+      LoopRuntimeResolvedProfileConfiguration
+    > = {
+      resolved: true,
+      request,
+      policy: {
+        policyRef: request.policyRef,
+        policyId: policy.policyId,
+      },
+      profile: {
+        profileRef: request.profileRef,
+        profileId: profile.profileId,
+        maxEffort: profile.maxEffort,
+      },
+    };
+    const configured: LoopRuntimeResolvedRequestConfigurationResult =
+      createLoopRuntimeResolvedRequestConfiguration(resolution);
+
+    assert.equal(configured.configured, true);
+    if (configured.configured) {
+      assert.equal(configured.configuration.request, request);
+      assert.equal(configured.configuration.policy.policyId, policy.policyId);
+      assert.equal(configured.configuration.profile.profileId, profile.profileId);
+      assert.equal(configured.configuration.effectiveBudget, request.budget);
+      assert.equal(Object.isFrozen(configured), true);
+      assert.equal(Object.isFrozen(configured.configuration), true);
+    }
   });
 
   it("keeps the stable report payloads identical to their CLI adapters", () => {
