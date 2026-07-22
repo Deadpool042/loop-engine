@@ -14,6 +14,7 @@ import {
   validateLoopRuntimePublicRequest,
   decodeLoopRuntimePublicRequest,
   createLoopRuntimePublicRequestAuthorizationRequest,
+  evaluateLoopRuntimePublicRequestAuthorization,
   decodeAndPrepareLoopRuntimePublicRequest,
   dryRunPolicyAwareDeclarativeRuntimeExecution,
   prepareLoopPolicyBoundLocalProcessExecution,
@@ -53,6 +54,8 @@ import {
   type LoopRuntimePublicRequest,
   type LoopRuntimePublicRequestDecodeResult,
   type LoopRuntimeAuthenticatedPrincipal,
+  type LoopRuntimePublicRequestAuthorizationDecision,
+  type LoopRuntimePublicRequestAuthorizationRequest,
   type LoopRuntimePublicRequestAuthorizationRequestCreationResult,
   type LoopRuntimePublicRequestAuthorizer,
   type LoopRuntimePublicRequestEntryPreparationInput,
@@ -202,6 +205,10 @@ describe("Core public API", () => {
       "function",
     );
     assert.equal(
+      typeof evaluateLoopRuntimePublicRequestAuthorization,
+      "function",
+    );
+    assert.equal(
       typeof decodeAndPrepareLoopRuntimePublicRequest,
       "function",
     );
@@ -313,6 +320,32 @@ describe("Core public API", () => {
 
       void authorizer;
     }
+  });
+
+  it("exports the public runtime request authorization evaluation contract", async () => {
+    const authorizationRequest: LoopRuntimePublicRequestAuthorizationRequest = {
+      principalId: "principal.api",
+      project: "loop-engine",
+      policyRef: "policy.loop",
+      profileRef: "profile.loop",
+      mode: "execute",
+    };
+    const authorizer: LoopRuntimePublicRequestAuthorizer = {
+      authorize(
+        request: LoopRuntimePublicRequestAuthorizationRequest,
+      ): LoopRuntimePublicRequestAuthorizationDecision {
+        assert.equal(request, authorizationRequest);
+        return { authorized: true };
+      },
+    };
+
+    assert.deepEqual(
+      await evaluateLoopRuntimePublicRequestAuthorization(
+        authorizationRequest,
+        authorizer,
+      ),
+      { authorized: true },
+    );
   });
 
   it("exports the public runtime request reference resolution contract", () => {
