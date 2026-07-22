@@ -13,6 +13,7 @@ import {
   createRuntimeRequest,
   validateLoopRuntimePublicRequest,
   decodeLoopRuntimePublicRequest,
+  createLoopRuntimePublicRequestAuthorizationRequest,
   decodeAndPrepareLoopRuntimePublicRequest,
   dryRunPolicyAwareDeclarativeRuntimeExecution,
   prepareLoopPolicyBoundLocalProcessExecution,
@@ -51,6 +52,9 @@ import {
   createLoopRuntimeRequestFromPublicOptions,
   type LoopRuntimePublicRequest,
   type LoopRuntimePublicRequestDecodeResult,
+  type LoopRuntimeAuthenticatedPrincipal,
+  type LoopRuntimePublicRequestAuthorizationRequestCreationResult,
+  type LoopRuntimePublicRequestAuthorizer,
   type LoopRuntimePublicRequestEntryPreparationInput,
   type LoopRuntimePublicRequestEntryPreparationResult,
   type LoopRuntimeResolvedPolicyConfiguration,
@@ -194,6 +198,10 @@ describe("Core public API", () => {
     );
     assert.equal(typeof decodeLoopRuntimePublicRequest, "function");
     assert.equal(
+      typeof createLoopRuntimePublicRequestAuthorizationRequest,
+      "function",
+    );
+    assert.equal(
       typeof decodeAndPrepareLoopRuntimePublicRequest,
       "function",
     );
@@ -257,6 +265,53 @@ describe("Core public API", () => {
       assert.equal(Object.isFrozen(result), true);
       assert.equal(Object.isFrozen(result.request), true);
       assert.equal(Object.isFrozen(result.request.budget), true);
+    }
+  });
+
+  it("exports the public runtime request authorization contract", () => {
+    const principal: LoopRuntimeAuthenticatedPrincipal = {
+      principalId: "principal.api",
+    };
+    const request: LoopRuntimePublicRequest = {
+      schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      project: "loop-engine",
+      mode: "execute",
+      policyRef: "policy.loop",
+      profileRef: "profile.loop",
+      requestedMaxEffort: "low",
+      budget: {
+        maxTokens: 0,
+        maxCostUsd: 0,
+        maxDurationMs: 0,
+        maxCalls: 0,
+        maxRepairs: 0,
+      },
+    };
+    const result: LoopRuntimePublicRequestAuthorizationRequestCreationResult =
+      createLoopRuntimePublicRequestAuthorizationRequest(principal, request);
+
+    assert.equal(result.created, true);
+    if (result.created) {
+      assert.deepEqual(result.authorizationRequest, {
+        principalId: "principal.api",
+        project: "loop-engine",
+        policyRef: "policy.loop",
+        profileRef: "profile.loop",
+        mode: "execute",
+      });
+      assert.equal(Object.isFrozen(result), true);
+      assert.equal(Object.isFrozen(result.authorizationRequest), true);
+    }
+
+    if (false) {
+      const authorizer: LoopRuntimePublicRequestAuthorizer = {
+        authorize(authorizationRequest) {
+          void authorizationRequest;
+          return { authorized: false, reason: "not_authorized" };
+        },
+      };
+
+      void authorizer;
     }
   });
 
