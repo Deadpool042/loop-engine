@@ -45,6 +45,7 @@ import {
   executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection,
   mapLoopRuntimeExecutionPlanToRequestOptions,
+  createLoopRuntimeRequestFromPublicOptions,
   type LoopRuntimePublicRequest,
   type LoopRuntimeResolvedPolicyConfiguration,
   type LoopRuntimeResolvedProfileConfiguration,
@@ -59,6 +60,8 @@ import {
   type LoopRuntimeRequestOptionsMapping,
   type LoopRuntimeRequestOptionsMappingFailureReason,
   type LoopRuntimeRequestOptionsMappingResult,
+  type LoopRuntimeRequestBinding,
+  type LoopRuntimeRequestConstructionResult,
   type LoopRuntimePublicRequestReferenceCatalog,
   type LoopRuntimePublicRequestResolution,
   projectLoopRuntimeEscalationResult,
@@ -117,6 +120,10 @@ describe("Core public API", () => {
     assert.equal(typeof createRuntimeRequest, "function");
     assert.equal(
       typeof mapLoopRuntimeExecutionPlanToRequestOptions,
+      "function",
+    );
+    assert.equal(
+      typeof createLoopRuntimeRequestFromPublicOptions,
       "function",
     );
     assert.equal(
@@ -436,6 +443,39 @@ describe("Core public API", () => {
       assert.equal(Object.isFrozen(result), true);
       assert.equal(Object.isFrozen(options), true);
       assert.equal(Object.isFrozen(options.limits), true);
+    }
+  });
+
+  it("exports the runtime request construction contract", () => {
+    const options: LoopRuntimeRequestOptionsMapping = {
+      project: "loop-engine",
+      mode: "execute",
+      policyId: "policy-id",
+      profileId: "profile-id",
+      effort: "medium",
+      limits: {
+        maxTokens: 10,
+        maxCostUsd: 20,
+        maxDurationMs: 30,
+        maxCalls: 40,
+        maxRepairs: 50,
+      },
+    };
+    const binding: LoopRuntimeRequestBinding = {
+      runtimeId: "local-process",
+      executable: "node",
+      arguments: ["--version"],
+    };
+    const result: LoopRuntimeRequestConstructionResult =
+      createLoopRuntimeRequestFromPublicOptions(options, binding);
+
+    assert.equal(result.constructed, true);
+    if (result.constructed) {
+      assert.equal(result.request.runtimeId, binding.runtimeId);
+      assert.deepEqual(result.request.command.arguments, binding.arguments);
+      assert.equal(Object.isFrozen(result), true);
+      assert.equal(Object.isFrozen(result.request), true);
+      assert.equal(Object.isFrozen(result.request.command.arguments), true);
     }
   });
 
