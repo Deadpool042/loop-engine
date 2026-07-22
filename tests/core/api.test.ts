@@ -13,6 +13,7 @@ import {
   createRuntimeRequest,
   validateLoopRuntimePublicRequest,
   decodeLoopRuntimePublicRequest,
+  decodeAndAuthorizeLoopRuntimePublicRequest,
   createLoopRuntimePublicRequestAuthorizationRequest,
   evaluateLoopRuntimePublicRequestAuthorization,
   authorizeLoopRuntimePublicRequest,
@@ -54,6 +55,7 @@ import {
   createLoopRuntimeRequestFromPublicOptions,
   type LoopRuntimePublicRequest,
   type LoopRuntimePublicRequestDecodeResult,
+  type LoopRuntimePublicRequestAuthorizedEntryResult,
   type LoopRuntimeAuthenticatedPrincipal,
   type LoopRuntimePublicRequestAuthorizationDecision,
   type LoopRuntimePublicRequestAuthorizationRequest,
@@ -202,6 +204,10 @@ describe("Core public API", () => {
     );
     assert.equal(typeof decodeLoopRuntimePublicRequest, "function");
     assert.equal(
+      typeof decodeAndAuthorizeLoopRuntimePublicRequest,
+      "function",
+    );
+    assert.equal(
       typeof createLoopRuntimePublicRequestAuthorizationRequest,
       "function",
     );
@@ -274,6 +280,42 @@ describe("Core public API", () => {
       assert.equal(Object.isFrozen(result), true);
       assert.equal(Object.isFrozen(result.request), true);
       assert.equal(Object.isFrozen(result.request.budget), true);
+    }
+  });
+
+  it("exports the public runtime request authorized entry contract", async () => {
+    const result: LoopRuntimePublicRequestAuthorizedEntryResult =
+      await decodeAndAuthorizeLoopRuntimePublicRequest({
+        principal: {
+          principalId: "principal.api",
+        },
+        payload: {
+          schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+          project: "loop-engine",
+          mode: "execute",
+          policyRef: "policy.loop",
+          profileRef: "profile.loop",
+          requestedMaxEffort: "low",
+          budget: {
+            maxTokens: 0,
+            maxCostUsd: 0,
+            maxDurationMs: 0,
+            maxCalls: 0,
+            maxRepairs: 0,
+          },
+        },
+        authorizer: {
+          authorize() {
+            return { authorized: true };
+          },
+        },
+      });
+
+    assert.equal(result.authorized, true);
+    if (result.authorized) {
+      assert.equal(result.request.project, "loop-engine");
+      assert.equal(Object.isFrozen(result), true);
+      assert.equal(Object.isFrozen(result.request), true);
     }
   });
 

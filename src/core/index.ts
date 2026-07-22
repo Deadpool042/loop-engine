@@ -9,6 +9,7 @@ export * from "./loop-runtime-public-request-decoder.js";
 export * from "./loop-runtime-public-request-authorization.js";
 export * from "./loop-runtime-public-request-authorization-evaluation.js";
 export * from "./loop-runtime-public-request-authorization-facade.js";
+export * from "./loop-runtime-public-request-authorized-entry.js";
 export * from "./loop-runtime-public-request-resolution.js";
 export * from "./loop-runtime-public-request-configuration.js";
 export * from "./loop-runtime-public-request-limits.js";
