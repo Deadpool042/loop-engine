@@ -85,7 +85,7 @@ La partie roadmap utilise :
 ## Validation locale
 
 - `pnpm run typecheck` : vérifie le typage TypeScript.
-- `pnpm run test` : lance les tests unitaires Node.
+- `pnpm run test` : lance les tests unitaires Node sous `tests/` et `src/execution/`.
 - `pnpm run validate` : lance le typecheck, les tests et `json-check`.
 
 ## Auto-pilotage local
@@ -109,11 +109,30 @@ Cette boucle reste déterministe :
 
 - `src/cli.ts` : routeur CLI minimal.
 - `src/commands/` : commandes utilisateur et cas d'usage.
-- `src/core/` : primitives bas niveau comme config, Git, docs et résolution projet.
+- `src/core/` : primitives bas niveau comme config, Git, docs, résolution projet et surfaces internes opt-in.
 - `src/intelligence/` : états calculés, ProjectSnapshot, roadmap et sélection de candidats.
 - `src/ui/` : helpers d'affichage terminal.
 
 Les commandes doivent consommer le `ProjectSnapshot` plutôt que relire directement Git, les docs ou la roadmap.
+
+Depuis V13.15, Core expose aussi le bridge opt-in
+`resolveDeclarativeRuntimeExecution` / `executeDeclarativeRuntime`. Il compose
+la sélection déclarative V13, un mapping explicite `descriptorId -> RuntimeId`,
+et les APIs V10 existantes `createRuntimeRequest`, `resolveRuntime` et
+`executeRuntime`. Il ne modifie ni le CLI, ni le JSON public, ni
+`LoopRunResult`, et ne crée aucun provider ou adapter réel.
+
+Depuis V13.16, la variante policy-aware ajoute une admission pure et explicite
+avant V10 : `evaluateRuntimeExecutionAdmission`,
+`resolvePolicyAwareDeclarativeRuntimeExecution` et
+`executePolicyAwareDeclarativeRuntime` consomment une `AgentPolicyResolution`
+déjà fournie, refusent runtime/provider/effort/budget hors politique, puis
+délèguent seulement après admission.
+
+Depuis V13.17, `createRuntimeExecutionPlan` et
+`dryRunPolicyAwareDeclarativeRuntimeExecution` exposent un plan Runtime
+`schemaVersion: 1`, déterministe et sérialisable, pour décrire ce qui serait
+exécuté sans appeler d'adapter et sans modifier le CLI ou les JSON publics.
 
 Voir aussi :
 
@@ -139,6 +158,25 @@ Voir aussi :
 - `docs/architecture/runtime-abstraction.md`
 - `docs/architecture/provider-adapters.md`
 - `docs/architecture/transport-adapters.md`
+- `docs/architecture/openclaw-provider-protocol.md`
+- `docs/architecture/executable-mapping.md`
+- `docs/architecture/transport-intent.md`
+- `docs/architecture/capability-policy-engine.md`
+- `docs/architecture/authorization-configuration.md`
+- `docs/architecture/architecture-consolidation.md`
+- `docs/architecture/rfc-execution-architecture-v11.md`
+- `docs/architecture/transport-request.md`
+- `docs/architecture/transport-request-builder.md`
+- `docs/architecture/execution-review-gate.md`
+- `docs/architecture/approval-provenance.md`
+- `docs/architecture/handoff-eligibility.md`
+- `docs/architecture/v11-consolidation.md`
+- `docs/architecture/rfc-execution-boundary-v12.md`
+- `docs/architecture/dispatch-descriptor.md`
+- `docs/architecture/boundary-handoff.md`
+- `docs/architecture/execution-boundary-rfc.md`
+- `docs/architecture/execution-architecture-rfc.md`
+- `docs/architecture/operator-approval-rfc.md`
 
 ## Audit et CI
 
@@ -291,3 +329,5 @@ La documentation complète du contrat est disponible dans :
 ```text
 docs/architecture/execution-reporting.md
 ```
+ - [Authority Verification RFC](docs/architecture/authority-verification-rfc.md) — V13.2 declarative verification of authority and approval evidence; verification is not execution authority.
+ - [Revocation & Expiry Lifecycle RFC](docs/architecture/revocation-expiry-rfc.md) — V13.3 declarative governance lifecycle; no lifecycle state authorizes execution.

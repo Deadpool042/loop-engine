@@ -74,3 +74,29 @@ exiger la sélection explicite Runtime/Provider, l'autorisation de politique,
 l'activation du backend, l'allow-list d'exécutables et les limites de ressources.
 V10.2 n'implémente ni OpenClaw, ni Claude Code, ni Codex, ni Gemini, ni un mode
 public `execute`.
+
+## Protocole OpenClaw interne (V10.4)
+
+V10.4 ajoute sous `src/providers/openclaw/` un schéma interne de planification
+OpenClaw. Il ne décrit aucun protocole fournisseur officiel ni commande. Son
+unique opération abstraite `plan` est validée de façon pure puis reste
+`valid_non_executable`, faute de mapping exécutable documenté. L’adaptateur
+OpenClaw garde donc son plan Provider `not_implemented`, sans `transportIntent`.
+Voir `openclaw-provider-protocol.md`.
+
+V10.5 ajoute un registre de mapping séparé : il déclare seulement une
+compatibilité OpenClaw potentielle, désactivée et non configurée. Il ne modifie
+pas les adaptateurs Provider ni leurs plans inertes. Voir
+`executable-mapping.md`.
+
+V10.6 distingue aussi une intention de transport déclarative, inactive et non
+connectée au `TransportAdapter`. Elle ne modifie aucun plan Provider ni aucun
+adaptateur. Voir `transport-intent.md`.
+
+V10.7 évalue ensuite, de façon théorique et default-deny, les capacités et la
+politique d'une intention. Cette décision ne revient pas au Provider et ne
+prépare aucun plan ou payload exécutable. Voir `capability-policy-engine.md`.
+
+V10.8 ajoute une configuration d'autorisation review-required après cette
+décision. Elle reste sans effet sur les adaptateurs Provider et leurs plans
+inertes. Voir `authorization-configuration.md`.

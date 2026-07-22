@@ -7,7 +7,7 @@ import { describe, it } from "node:test";
 import {
   createProviderExecutionPlan,
   createProviderRequest,
-  createTransportRequest,
+  createTransportAdapterRequest,
   executeProviderPlan,
   executeTransport,
   normalizeProviderTransportResult,
@@ -25,7 +25,7 @@ import {
   TRANSPORT_REGISTRY,
   type TransportExecutionPolicy,
   type TransportId,
-  type TransportRequest,
+  type TransportAdapterRequest,
   type TransportResult,
 } from "../../src/transports/index.js";
 
@@ -152,7 +152,7 @@ function transportRequest(
     requiredCapabilities?: readonly ("shell_exec" | "code_edit")[];
     runtime?: RuntimeRequest;
   }> = {},
-): TransportRequest {
+): TransportAdapterRequest {
   return {
     transportId: "local-process",
     providerId: "fixture-provider",
@@ -339,7 +339,7 @@ describe("Core transport orchestration", () => {
     try {
       const runtime = runtimeRequest(root);
       const plan = providerStubPlan();
-      const created = createTransportRequest(runtime, plan, transportPolicy());
+      const created = createTransportAdapterRequest(runtime, plan, transportPolicy());
       assert.equal(created.outcome, "rejected");
       if (created.outcome === "rejected") {
         assert.equal(created.error.code, "provider_plan_not_executable");

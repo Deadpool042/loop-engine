@@ -6,11 +6,11 @@ import {
 } from "./support.js";
 import type {
   TransportAdapter,
-  TransportRequest,
+  TransportAdapterRequest,
   TransportSelection,
 } from "./types.js";
 
-function rejectionFor(adapter: TransportAdapter, request: TransportRequest) {
+function rejectionFor(adapter: TransportAdapter, request: TransportAdapterRequest) {
   return (
     getTransportAuthorizationError(request) ??
     getTransportCapabilityError(adapter, request) ??
@@ -22,7 +22,7 @@ function rejectionFor(adapter: TransportAdapter, request: TransportRequest) {
 }
 
 /** Pure, deterministic selection over the static registry. */
-export function selectTransport(request: TransportRequest): TransportSelection {
+export function selectTransport(request: TransportAdapterRequest): TransportSelection {
   const explicit = TRANSPORT_REGISTRY.adapters.find(
     (adapter) => adapter.id === request.transportId,
   );

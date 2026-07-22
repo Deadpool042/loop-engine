@@ -16,7 +16,7 @@ import type {
   TransportAdapter,
   TransportError,
   TransportErrorCode,
-  TransportRequest,
+  TransportAdapterRequest,
   TransportResult,
   TransportStatus,
 } from "./types.js";
@@ -66,7 +66,7 @@ function durationMs(startedAt: string, completedAt: string): number {
 }
 
 function normalizeLocalProcessResult(
-  request: TransportRequest,
+  request: TransportAdapterRequest,
   result: RuntimeResult,
 ): TransportResult {
   const error = result.error;
@@ -99,7 +99,7 @@ function normalizeLocalProcessResult(
   };
 }
 
-function validate(request: TransportRequest): TransportError | null {
+function validate(request: TransportAdapterRequest): TransportError | null {
   if (request.transportId !== "local-process") {
     return createTransportError(
       "invalid_transport_request",

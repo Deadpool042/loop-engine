@@ -1,0 +1,16 @@
+export {
+  createRuntimeCapability,
+  createRuntimeCapabilityRequirement,
+  evaluateRuntimeCapability,
+  evaluateRuntimeCapabilityCompatibility,
+  summarizeRuntimeCapability,
+  summarizeRuntimeCapabilityCompatibility,
+  validateRuntimeCapability,
+  validateRuntimeCapabilityRequirement,
+  type RuntimeCapabilityCompatibilityResult,
+  type RuntimeCapabilityError,
+  type RuntimeCapabilityErrorCode,
+  type RuntimeCapabilityInput,
+  type RuntimeCapabilityRequirementInput,
+  type RuntimeCapabilityResult,
+} from "../runtime/capability/index.js";

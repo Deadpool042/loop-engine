@@ -99,6 +99,9 @@ valider, résoudre et déléguer un plan exécutable au backend gardé. Ils rest
 absents du CLI et du LoopRunner : aucun transport ne crée un mode public
 d’exécution.
 
+Le protocole OpenClaw interne V10.4 reste lui aussi absent du CLI et du
+LoopRunner ; il n’ajoute ni argument, ni commande, ni sortie publique.
+
 ---
 
 ## Rôle de `intelligence/`

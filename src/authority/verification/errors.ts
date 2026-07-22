@@ -1,0 +1,4 @@
+import type { AuthorityVerificationError, AuthorityVerificationErrorCode, AuthorityVerificationMetadata, AuthorityVerificationValidation } from "./types.js";
+import { freezeAuthorityVerificationValue } from "./support.js";
+export function authorityVerificationError(code: AuthorityVerificationErrorCode, message: string): AuthorityVerificationError { return freezeAuthorityVerificationValue({ code, message, details: freezeAuthorityVerificationValue({ domain: "authority_verification" } as AuthorityVerificationMetadata), executionAllowed: false, executionStarted: false }); }
+export function validationFor(diagnostics: readonly AuthorityVerificationError[]): AuthorityVerificationValidation { return freezeAuthorityVerificationValue({ valid: diagnostics.length === 0, diagnostics: freezeAuthorityVerificationValue([...diagnostics]) }); }

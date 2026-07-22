@@ -4,7 +4,10 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import {
   LOCAL_PROCESS_RUNTIME_ID,
+  DEFAULT_LOCAL_PROCESS_TERMINATION_POLICY,
+  MAX_LOCAL_PROCESS_TERMINATION_GRACE_PERIOD_MS,
   type LocalProcessExecutionPolicy,
+  type LocalProcessTermination,
   type RuntimeAdapter,
   type RuntimeErrorCode,
   type RuntimeEvent,
@@ -83,12 +86,21 @@ function validatePolicyLimits(
     ["timeoutMs", policy.timeoutMs],
     ["maxStdoutBytes", policy.maxStdoutBytes],
     ["maxStderrBytes", policy.maxStderrBytes],
+    [
+      "termination.gracePeriodMs",
+      (policy.termination ?? DEFAULT_LOCAL_PROCESS_TERMINATION_POLICY)
+        .gracePeriodMs,
+    ],
   ] as const;
   const invalid = limits.find(([, value]) => !isPositiveInteger(value));
 
-  return invalid
-    ? error("invalid_request", `${invalid[0]} must be a positive integer.`, {
-        field: invalid[0],
+  const gracePeriodMs =
+    (policy.termination ?? DEFAULT_LOCAL_PROCESS_TERMINATION_POLICY)
+      .gracePeriodMs;
+
+  return invalid || gracePeriodMs > MAX_LOCAL_PROCESS_TERMINATION_GRACE_PERIOD_MS
+    ? error("invalid_request", `${invalid?.[0] ?? "termination.gracePeriodMs"} must be a positive bounded integer.`, {
+        field: invalid?.[0] ?? "termination.gracePeriodMs",
       })
     : null;
 }
@@ -224,6 +236,7 @@ function createResult(
     exitCode?: number | null;
     signal?: string | null;
     runtimeError?: RuntimeExecutionError;
+    termination?: LocalProcessTermination;
   }> = {},
 ): RuntimeResult {
   const stdoutText = Buffer.concat(stdout).toString("utf8");
@@ -244,6 +257,7 @@ function createResult(
     ...(options.exitCode === undefined ? {} : { exitCode: options.exitCode }),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(runtimeError === undefined ? {} : { error: runtimeError }),
+    ...(options.termination === undefined ? {} : { termination: options.termination }),
   };
 }
 
@@ -311,6 +325,12 @@ export const LocalProcessRuntime: RuntimeAdapter = {
         let processStarted = false;
         let terminalError: RuntimeExecutionError | null = null;
         let settled = false;
+        let graceTimer: ReturnType<typeof setTimeout> | null = null;
+        let termination: LocalProcessTermination = {
+          timedOut: false,
+          mode: "none",
+          finalSignal: null,
+        };
 
         const child = spawn(
           executable,
@@ -329,11 +349,13 @@ export const LocalProcessRuntime: RuntimeAdapter = {
             exitCode?: number | null;
             signal?: string | null;
             runtimeError?: RuntimeExecutionError;
+            termination?: LocalProcessTermination;
           }> = {},
         ) => {
           if (settled) return;
           settled = true;
           clearTimeout(timeout);
+          if (graceTimer) clearTimeout(graceTimer);
           complete(
             createResult(
               request,
@@ -347,11 +369,36 @@ export const LocalProcessRuntime: RuntimeAdapter = {
           );
         };
 
+        const requestSignal = (signal: "SIGTERM" | "SIGKILL") => {
+          try {
+            return child.kill(signal);
+          } catch {
+            return false;
+          }
+        };
+
         const terminate = (runtimeError: RuntimeExecutionError) => {
           if (terminalError) return;
           terminalError = runtimeError;
-          event("process_terminated", { code: runtimeError.code });
-          child.kill("SIGTERM");
+          const timedOut = runtimeError.code === "timed_out";
+          termination = { timedOut, mode: "graceful", finalSignal: "SIGTERM" };
+          event("process_terminated", { code: runtimeError.code, signal: "SIGTERM" });
+          if (!requestSignal("SIGTERM")) {
+            termination = { timedOut, mode: "failed", finalSignal: null };
+            const failed = error("spawn_failed", "Local process termination request failed.", {}, true);
+            event("process_failed", { code: failed.code });
+            finish(timedOut ? "timed_out" : runtimeError.code as RuntimeResultStatus, { runtimeError: timedOut ? runtimeError : failed, termination });
+            return;
+          }
+          graceTimer = setTimeout(() => {
+            if (settled) return;
+            termination = { timedOut, mode: "forced", finalSignal: "SIGKILL" };
+            event("process_terminated", { code: runtimeError.code, signal: "SIGKILL" });
+            if (!requestSignal("SIGKILL")) {
+              termination = { timedOut, mode: "failed", finalSignal: null };
+              event("process_failed", { code: "spawn_failed" });
+            }
+          }, (policy.termination ?? DEFAULT_LOCAL_PROCESS_TERMINATION_POLICY).gracePeriodMs);
         };
 
         const timeout = setTimeout(() => {
@@ -439,6 +486,7 @@ export const LocalProcessRuntime: RuntimeAdapter = {
                 exitCode,
                 signal,
                 runtimeError: terminalError,
+                termination,
               },
             );
             return;

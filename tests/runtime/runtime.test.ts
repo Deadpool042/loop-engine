@@ -5,8 +5,10 @@ import { describe, it } from "node:test";
 import {
   ClaudeRuntime,
   CodexRuntime,
+  createSimulatedRuntimeAdapter,
   OpenClawRuntime,
   RUNTIME_REGISTRY,
+  SimulatedRuntime,
   selectRuntime,
   type RuntimeRequest,
 } from "../../src/runtime/index.js";
@@ -17,6 +19,7 @@ function runtimeRequest(runtime: AgentRuntime = "codex"): RuntimeRequest {
     claude_code: "anthropic",
     codex: "openai",
     openclaw: "local",
+    custom: "local",
   } as const;
   const provider = providerByRuntime[runtime as keyof typeof providerByRuntime];
   assert.ok(provider, `fixture provider required for ${runtime}`);
@@ -128,7 +131,7 @@ describe("runtime registry and selector", () => {
   it("has static deterministic declaration order", () => {
     assert.deepEqual(
       RUNTIME_REGISTRY.adapters.map((adapter) => adapter.runtimeId),
-      ["openclaw", "claude_code", "codex", "local-process"],
+      ["openclaw", "claude_code", "codex", "local-process", "custom"],
     );
   });
 
@@ -163,12 +166,79 @@ describe("runtime registry and selector", () => {
       },
     );
     assert.deepEqual(
-      selectRuntime({ ...request, requestedRuntime: "custom" }),
+      selectRuntime({ ...request, requestedRuntime: "chatgpt" }),
       {
         outcome: "unsupported",
-        reason: "runtime custom is not registered",
+        reason: "runtime chatgpt is not registered",
       },
     );
+  });
+});
+
+describe("deterministic simulated runtime adapter", () => {
+  it("preserves immutable configuration and returns deterministic success output", () => {
+    const options = {
+      runtimeId: "custom" as const,
+      outcome: "success" as const,
+      output: { result: ["stable"] },
+    };
+    const before = structuredClone(options);
+    const adapter = createSimulatedRuntimeAdapter(options);
+    const request = runtimeRequest("custom");
+
+    const first = adapter.execute(request);
+    const second = adapter.execute(request);
+
+    assert.deepEqual(options, before);
+    options.output.result.push("outside");
+    assert.deepEqual(first, second);
+    assert.equal(first.status, "completed");
+    assert.deepEqual(first.output, { result: ["stable"] });
+    assert.equal(first.runtimeId, "custom");
+    assert.equal(first.startedAt, request.requestedAt);
+    assert.equal(first.completedAt, request.requestedAt);
+  });
+
+  it("returns a discriminated deterministic failure instead of throwing", () => {
+    const adapter = createSimulatedRuntimeAdapter({
+      runtimeId: "custom",
+      outcome: "failure",
+      errorCode: "runtime_disabled",
+    });
+
+    const result = adapter.execute(runtimeRequest("custom"));
+
+    assert.equal(result.status, "denied");
+    assert.equal(result.error?.code, "runtime_disabled");
+    assert.equal(result.error?.processStarted, false);
+    assert.equal(result.output, null);
+  });
+
+  it("resolves the static simulated adapter without selecting another runtime", () => {
+    const request = runtimeRequest("custom");
+    const selection = selectRuntime(request);
+
+    assert.equal(selection.outcome, "selected");
+    if (selection.outcome !== "selected") return;
+    assert.equal(selection.adapter, SimulatedRuntime);
+    assert.equal(selection.adapter.runtimeId, "custom");
+  });
+
+  it("keeps distinct simulated adapters discriminated by runtime identity", () => {
+    const selected = createSimulatedRuntimeAdapter({
+      runtimeId: "custom",
+      outcome: "success",
+    });
+    const nonSelected = createSimulatedRuntimeAdapter({
+      runtimeId: "chatgpt",
+      outcome: "failure",
+    });
+    const request = runtimeRequest("custom");
+
+    assert.equal(selected.supports(request), true);
+    assert.equal(nonSelected.supports(request), false);
+    assert.equal(selected.execute(request).runtimeId, "custom");
+    assert.equal(nonSelected.execute(request).runtimeId, "chatgpt");
   });
 });
 
@@ -179,6 +249,7 @@ describe("runtime invariants", () => {
     "src/runtime/openclaw.ts",
     "src/runtime/claude.ts",
     "src/runtime/codex.ts",
+    "src/runtime/simulated.ts",
     "src/runtime/registry.ts",
     "src/runtime/selector.ts",
   ];

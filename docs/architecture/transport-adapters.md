@@ -26,7 +26,7 @@ structurée au `LocalProcessRuntime` existant.
 
 ```text
 ProviderExecutionPlan (ready + transportIntent)
-  -> createTransportRequest(...)
+  -> createTransportAdapterRequest(...)
   -> resolveTransport(...)
   -> executeTransport(...)
   -> LocalProcessRuntime (V10.1 guarded backend)
@@ -43,7 +43,7 @@ démarrage de processus.
 
 ## Contrats
 
-`TransportRequest` porte uniquement des champs structurés : identifiant de
+`TransportAdapterRequest` porte uniquement des champs structurés : identifiant de
 transport, identité Provider/Runtime, capacités requises, exécutable absolu,
 vecteur d’arguments, répertoire de travail, limites de ressources, politique
 locale existante, politique Transport explicite et métadonnées. Il n’accepte
@@ -83,3 +83,25 @@ simples points d’extension futurs : ils ne sont ni enregistrés ni implément�
 V10.3 n’implémente aucune exécution OpenClaw, Claude Code, Codex ou Gemini, ni
 credentials, protocole de CLI fournisseur, retry, streaming ou comptabilité de
 tokens.
+
+V10.4 définit seulement un protocole Provider OpenClaw interne. Les plans issus
+de ce protocole restent non exécutables et n’atteignent pas cette couche. Voir
+`openclaw-provider-protocol.md`.
+
+V10.5 intercale un mapping exécutable déclaratif entre protocole et plan
+Provider. Ce mapping est désactivé et ne crée aucune requête Transport ; la
+frontière Transport et son comportement restent donc inchangés. Voir
+`executable-mapping.md`.
+
+V10.6 ajoute une `TransportIntent` déclarative après le mapping. Elle s'arrête
+avant cette couche : aucun intent n'est converti en requête Transport et aucun
+adaptateur ne la consomme. Voir `transport-intent.md`.
+
+V10.7 ajoute une décision de capacité et de politique en amont de cette
+frontière. Le `TransportAdapter` reste totalement inconscient de ce moteur :
+aucune décision ne devient une requête ou une exécution Transport. Voir
+`capability-policy-engine.md`.
+
+V11.1 réserve le nom `TransportRequest` au contrat déclaratif placé avant cette
+couche. Le payload exécutable historique consommé par `TransportAdapter` est
+nommé `TransportAdapterRequest`.

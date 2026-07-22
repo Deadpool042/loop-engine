@@ -12,7 +12,7 @@ import type {
   ProviderRequest,
   ProviderResult,
 } from "../providers/types.js";
-import type { TransportRequest, TransportResult } from "../transports/types.js";
+import type { TransportAdapterRequest, TransportResult } from "../transports/types.js";
 
 /** Stable options accepted by the public Core audit API. */
 export type CoreAuditOptions = Readonly<{
@@ -32,7 +32,7 @@ export type CoreRuntimeExecution = RuntimeExecution;
 export type CoreProviderRequest = ProviderRequest;
 export type CoreProviderExecutionPlan = ProviderExecutionPlan;
 export type CoreProviderResult = ProviderResult;
-export type CoreTransportRequest = TransportRequest;
+export type CoreTransportAdapterRequest = TransportAdapterRequest;
 export type CoreTransportResult = TransportResult;
 
 export type {
@@ -47,6 +47,6 @@ export type {
   ProviderRequest,
   ProviderExecutionPlan,
   ProviderResult,
-  TransportRequest,
+  TransportAdapterRequest,
   TransportResult,
 };

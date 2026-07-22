@@ -12,13 +12,13 @@ import {
   type TransportAdapter,
   type TransportError,
   type TransportExecutionPolicy,
-  type TransportRequest,
+  type TransportAdapterRequest,
   type TransportResolution,
   type TransportResult,
 } from "../transports/index.js";
 
-export type TransportRequestCreation =
-  | Readonly<{ outcome: "created"; request: TransportRequest }>
+export type TransportAdapterRequestCreation =
+  | Readonly<{ outcome: "created"; request: TransportAdapterRequest }>
   | Readonly<{ outcome: "rejected"; error: TransportError }>;
 
 /**
@@ -41,11 +41,11 @@ function snapshot<T>(value: T): T {
  * Turns a ready provider plan into a structured transport request. All current
  * provider stubs are intentionally rejected here before transport selection.
  */
-export function createTransportRequest(
+export function createTransportAdapterRequest(
   runtimeRequest: RuntimeRequest,
   providerPlan: ProviderExecutionPlan,
   transportPolicy: TransportExecutionPolicy,
-): TransportRequestCreation {
+): TransportAdapterRequestCreation {
   if (providerPlan.status !== "ready" || !providerPlan.transportIntent) {
     return {
       outcome: "rejected",
@@ -96,7 +96,7 @@ export function createTransportRequest(
 
 /** Resolves a transport without executing it. */
 export function resolveTransport(
-  request: TransportRequest,
+  request: TransportAdapterRequest,
 ): TransportResolution {
   const selection = selectTransport(request);
   return selection.outcome === "selected"
@@ -107,7 +107,7 @@ export function resolveTransport(
 /** The only Core API that invokes a selected transport adapter. */
 export async function executeTransport(
   adapter: TransportAdapter,
-  request: TransportRequest,
+  request: TransportAdapterRequest,
 ): Promise<TransportResult> {
   return await adapter.execute(request);
 }
@@ -166,7 +166,7 @@ export async function executeProviderPlan(
   providerPlan: ProviderExecutionPlan,
   transportPolicy: TransportExecutionPolicy,
 ): Promise<ProviderResult> {
-  const created = createTransportRequest(
+  const created = createTransportAdapterRequest(
     runtimeRequest,
     providerPlan,
     transportPolicy,

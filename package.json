@@ -6,7 +6,7 @@
   "scripts": {
     "loop": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "tsx --test tests/**/*.test.ts src/execution/*.test.ts src/execution/**/*.test.ts",
     "generate:report-fixtures": "tsx scripts/generate-report-fixtures.ts",
     "validate": "pnpm run typecheck && pnpm run test && pnpm run json-check",
     "json-check": "tsx src/cli.ts json-check",

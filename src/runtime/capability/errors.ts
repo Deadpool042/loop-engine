@@ -1,0 +1,1 @@
+import { freezeRuntimeCapabilityValue } from "./support.js"; import type { RuntimeCapabilityError, RuntimeCapabilityErrorCode } from "./types.js"; export const runtimeCapabilityError = (code: RuntimeCapabilityErrorCode, message: string): RuntimeCapabilityError => freezeRuntimeCapabilityValue({ code, message });

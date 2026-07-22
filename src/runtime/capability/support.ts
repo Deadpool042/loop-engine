@@ -1,0 +1,1 @@
+export function freezeRuntimeCapabilityValue<T>(value: T): T { if (Array.isArray(value)) value.forEach(freezeRuntimeCapabilityValue); else if (value && typeof value === "object" && !Object.isFrozen(value)) Object.values(value as Record<string, unknown>).forEach(freezeRuntimeCapabilityValue); if (value && typeof value === "object") Object.freeze(value); return value; }

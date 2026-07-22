@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+
+import {
+  OPERATOR_APPROVAL_RFC_DEFAULT_DENY_RULE,
+  OPERATOR_APPROVAL_RFC_LIFECYCLE_RULE,
+  OPERATOR_APPROVAL_RFC_MODULE_RULE,
+  OPERATOR_APPROVAL_RFC_NO_EXECUTION_RULE,
+  OPERATOR_APPROVAL_RFC_REVIEW_MODEL_RULE,
+  OPERATOR_APPROVAL_RFC_SECURITY_RULE,
+  OPERATOR_APPROVAL_RFC_STATE_MACHINE_RULE,
+  OPERATOR_APPROVAL_RFC_VALIDATION_RULE,
+} from "../../src/audit/rules/audit.js";
+
+const RULES = [
+  OPERATOR_APPROVAL_RFC_MODULE_RULE,
+  OPERATOR_APPROVAL_RFC_LIFECYCLE_RULE,
+  OPERATOR_APPROVAL_RFC_STATE_MACHINE_RULE,
+  OPERATOR_APPROVAL_RFC_REVIEW_MODEL_RULE,
+  OPERATOR_APPROVAL_RFC_VALIDATION_RULE,
+  OPERATOR_APPROVAL_RFC_SECURITY_RULE,
+  OPERATOR_APPROVAL_RFC_DEFAULT_DENY_RULE,
+  OPERATOR_APPROVAL_RFC_NO_EXECUTION_RULE,
+] as const;
+
+describe("operator approval RFC audit rules", () => {
+  it("covers the V13.1 RFC through contiguous deterministic checks", () => {
+    assert.deepEqual(
+      RULES.map((rule) => rule.id),
+      ["AUDIT-294", "AUDIT-295", "AUDIT-296", "AUDIT-297", "AUDIT-298", "AUDIT-299", "AUDIT-300", "AUDIT-301"],
+    );
+    assert.ok(RULES.every((rule) => rule.check().status === "pass"));
+  });
+});

@@ -46,3 +46,83 @@ seule frontière qui peut déléguer explicitement au backend `local-process`.
 Voir `docs/architecture/runtime-abstraction.md`,
 `docs/architecture/provider-adapters.md` et
 `docs/architecture/transport-adapters.md`.
+
+V10.4 ajoute un protocole de planification OpenClaw sous `src/providers/`, sans
+mapping exécutable et sans changement CLI. Voir
+`docs/architecture/openclaw-provider-protocol.md`.
+
+V11.0 établit le RFC normatif d'exécution. V11.1 ajoute le contrat
+`src/transport-request/` comme demande déclarative, inactive, non dispatchable
+et non exécutable entre l'autorisation et une future frontière de transport.
+Voir `docs/architecture/rfc-execution-architecture-v11.md` et
+`docs/architecture/transport-request.md`.
+
+V11.2 ajoute `TransportRequestBuilder`, unique mécanisme supporté pour produire
+une `TransportRequest` depuis un `ProviderExecutionPlan` et une
+`AuthorizationConfiguration`. Le builder reste pur, déterministe, sans Runtime,
+sans Transport et sans payload exécutable. Voir
+`docs/architecture/transport-request-builder.md`.
+
+V11.3 ajoute `ExecutionReviewGate`, unique mécanisme supporté pour produire une
+`ReviewedTransportRequest` déclarative depuis une `TransportRequest` et une
+`AuthorizationConfiguration`. La requête revue reste non approuvée, non
+dispatchable et non exécutable. Voir
+`docs/architecture/execution-review-gate.md`.
+
+V11.4 ajoute `ApprovalProvenance`, contrat immuable décrivant les preuves de
+revue associées à une `ReviewedTransportRequest` : identifiant abstrait,
+périmètre, statut et versions revues. La provenance reste une preuve
+descriptive, jamais une autorisation d'exécuter. Voir
+`docs/architecture/approval-provenance.md`.
+
+V11.5 ajoute `HandoffEligibility`, évaluation déclarative et immuable de la
+cohérence entre `ReviewedTransportRequest` et `ApprovalProvenance`. Le résultat
+reste une appréciation locale : aucune autorisation, aucun handoff, aucun
+`TransportAdapterRequest` et aucune exécution ne sont créés. Voir
+`docs/architecture/handoff-eligibility.md`.
+
+V11.6 consolide les couches déclaratives V11 sans changer leurs contrats :
+`TransportRequest`, `TransportRequestBuilder`, `ExecutionReviewGate`,
+`ApprovalProvenance` et `HandoffEligibility` conservent leurs responsabilités,
+mais partagent désormais les helpers techniques d'immuabilité, métadonnées,
+validation, diagnostics et résumés. Voir
+`docs/architecture/v11-consolidation.md`.
+
+V12.0 ouvre la spécification de la frontière d'exécution. Le RFC définit les
+termes normatifs, les limites de confiance, le modèle d'approbation opérateur,
+l'autorité d'exécution future, le dispatch futur, les cycles Transport/Runtime
+futurs, l'observabilité et les non-objectifs. Il reste documentaire et
+n'introduit aucune exécution. Voir
+`docs/architecture/rfc-execution-boundary-v12.md`.
+
+V12.1 ajoute `DispatchDescriptor`, artefact déclaratif et indépendant du
+transport juste avant la frontière d'exécution. Il accepte uniquement
+`HandoffEligibilityResult` et `ExecutionAuthority`, produit un descriptor
+immuable, non dispatchable et non exécutable, et ne crée aucun
+`TransportAdapterRequest`. Voir `docs/architecture/dispatch-descriptor.md`.
+
+V12.3 ajoute `BoundaryHandoff`, contrat immuable qui enveloppe le
+`DispatchDescriptor` pour représenter l'objet déclaratif pouvant être examiné
+avant une future frontière d'exécution. Il reste inactif, non accepté, non
+dispatchable et non exécutable, sans Runtime, Transport, Provider ni payload
+opérationnel. Voir `docs/architecture/boundary-handoff.md`.
+
+V12.4 ajoute `ExecutionBoundaryRFC`, contrat immuable qui formalise les
+invariants à satisfaire avant qu'un futur handoff puisse seulement être
+considéré pour une frontière opérationnelle. Il reste un catalogue de
+contraintes et de preuves : aucun `TransportAdapterRequest`, aucune exécution
+et aucun dispatch ne sont créés. Voir
+`docs/architecture/execution-boundary-rfc.md`.
+
+V13.0 gèle la chaîne déclarative dans un RFC d'architecture unique :
+responsabilités, propriété des contrats, frontière d'exécution, machine à états,
+invariants, modèle de menace, garanties de sécurité et évolution future. Il ne
+crée ni Bridge, ni exécution, ni interaction Runtime ou Transport. Voir
+`docs/architecture/execution-architecture-rfc.md`.
+
+V13.1 ajoute le RFC d'approbation opérateur et ses contrats déclaratifs :
+cycle de vie explicite, traçabilité de revue, portée, version, expiration et
+révocation. Une approbation reste une preuve et ne crée ni Bridge ni exécution.
+Voir `docs/architecture/operator-approval-rfc.md`.
+ - [Authority Verification RFC](architecture/authority-verification-rfc.md) — V13.2 deterministic consistency assessment for authority and operator-approval evidence; it never authorizes execution.
+ - [Revocation & Expiry Lifecycle RFC](architecture/revocation-expiry-rfc.md) — V13.3 declarative lifecycle evidence for expiry, revocation, supersession, and replacement.
