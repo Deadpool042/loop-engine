@@ -48,6 +48,10 @@ import {
   type LoopRuntimeResolvedProfileConfiguration,
   type LoopRuntimeResolvedRequestConfiguration,
   type LoopRuntimeResolvedRequestConfigurationResult,
+  applyLoopRuntimeInternalLimits,
+  type LoopRuntimeInternalLimits,
+  type LoopRuntimeLimitedRequestConfiguration,
+  type LoopRuntimeRequestLimitResult,
   type LoopRuntimePublicRequestReferenceCatalog,
   type LoopRuntimePublicRequestResolution,
   projectLoopRuntimeEscalationResult,
@@ -169,6 +173,7 @@ describe("Core public API", () => {
       typeof createLoopRuntimeResolvedRequestConfiguration,
       "function",
     );
+    assert.equal(typeof applyLoopRuntimeInternalLimits, "function");
     assert.equal(typeof evaluateRuntimeAgentEscalation, "function");
     assert.equal(typeof evaluateLoopRuntimeEscalation, "function");
     assert.equal(typeof resolveRuntime, "function");
@@ -268,11 +273,90 @@ describe("Core public API", () => {
     assert.equal(configured.configured, true);
     if (configured.configured) {
       assert.equal(configured.configuration.request, request);
-      assert.equal(configured.configuration.policy.policyId, policy.policyId);
-      assert.equal(configured.configuration.profile.profileId, profile.profileId);
+      assert.deepEqual(configured.configuration.policy, {
+        policyRef: request.policyRef,
+        policyId: policy.policyId,
+      });
+      assert.deepEqual(configured.configuration.profile, {
+        profileRef: request.profileRef,
+        profileId: profile.profileId,
+        maxEffort: profile.maxEffort,
+      });
       assert.equal(configured.configuration.effectiveBudget, request.budget);
       assert.equal(Object.isFrozen(configured), true);
       assert.equal(Object.isFrozen(configured.configuration), true);
+    }
+  });
+
+  it("exports the internal runtime request limits contract", () => {
+    const request: LoopRuntimePublicRequest = {
+      schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      project: "loop-engine",
+      mode: "execute",
+      policyRef: "policy.ref",
+      profileRef: "profile.ref",
+      requestedMaxEffort: "medium",
+      budget: {
+        maxTokens: 10,
+        maxCostUsd: 20,
+        maxDurationMs: 30,
+        maxCalls: 40,
+        maxRepairs: 50,
+      },
+    };
+    const resolution: LoopRuntimePublicRequestResolution<
+      LoopRuntimeResolvedPolicyConfiguration,
+      LoopRuntimeResolvedProfileConfiguration
+    > = {
+      resolved: true,
+      request,
+      policy: {
+        policyRef: request.policyRef,
+        policyId: "policy-id",
+      },
+      profile: {
+        profileRef: request.profileRef,
+        profileId: "profile-id",
+        maxEffort: "high",
+      },
+    };
+    const configuration = createLoopRuntimeResolvedRequestConfiguration(
+      resolution,
+    );
+
+    assert.equal(typeof applyLoopRuntimeInternalLimits, "function");
+    assert.equal(configuration.configured, true);
+    if (configuration.configured) {
+      const limits: LoopRuntimeInternalLimits = {
+        maxEffort: "low",
+        budget: {
+          maxTokens: 5,
+          maxCostUsd: 10,
+          maxDurationMs: 15,
+          maxCalls: 20,
+          maxRepairs: 25,
+        },
+      };
+      const limited: LoopRuntimeRequestLimitResult = applyLoopRuntimeInternalLimits(
+        configuration.configuration,
+        limits,
+      );
+
+      assert.equal(limited.limited, true);
+      if (limited.limited) {
+        const limitedConfiguration: LoopRuntimeLimitedRequestConfiguration =
+          limited.configuration;
+
+        assert.equal(limitedConfiguration.request, request);
+        assert.deepEqual(limitedConfiguration.policy, resolution.policy);
+        assert.deepEqual(limitedConfiguration.profile, resolution.profile);
+        assert.equal(limitedConfiguration.effectiveEffort, "low");
+        assert.equal(limitedConfiguration.effectiveBudget.maxTokens, 5);
+        assert.equal(limitedConfiguration.effectiveBudget.maxCostUsd, 10);
+        assert.equal(limitedConfiguration.effectiveBudget.maxDurationMs, 15);
+        assert.equal(limitedConfiguration.effectiveBudget.maxCalls, 20);
+        assert.equal(limitedConfiguration.effectiveBudget.maxRepairs, 25);
+      }
     }
   });
 

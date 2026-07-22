@@ -7,6 +7,7 @@ export * from "./loop-runtime-escalation.js";
 export * from "./loop-runtime-public-request.js";
 export * from "./loop-runtime-public-request-resolution.js";
 export * from "./loop-runtime-public-request-configuration.js";
+export * from "./loop-runtime-public-request-limits.js";
 export * from "./loop-runtime-outcome.js";
 export * from "./runtime.js";
 export * from "./runtime-execution-bridge.js";
