@@ -44,6 +44,7 @@ import {
   resolveLoopRuntimePublicRequestReferences,
   executeLoopPolicyBoundLocalProcessWithEscalationEvaluation,
   executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection,
+  mapLoopRuntimeExecutionPlanToRequestOptions,
   type LoopRuntimePublicRequest,
   type LoopRuntimeResolvedPolicyConfiguration,
   type LoopRuntimeResolvedProfileConfiguration,
@@ -55,6 +56,9 @@ import {
   type LoopRuntimeExecutionPlan,
   type LoopRuntimeExecutionPlanResult,
   type LoopRuntimeRequestLimitResult,
+  type LoopRuntimeRequestOptionsMapping,
+  type LoopRuntimeRequestOptionsMappingFailureReason,
+  type LoopRuntimeRequestOptionsMappingResult,
   type LoopRuntimePublicRequestReferenceCatalog,
   type LoopRuntimePublicRequestResolution,
   projectLoopRuntimeEscalationResult,
@@ -111,6 +115,10 @@ describe("Core public API", () => {
     assert.equal(typeof dryRunPolicyAwareDeclarativeRuntimeExecution, "function");
     assert.equal(typeof createSimulatedRuntimeAdapter, "function");
     assert.equal(typeof createRuntimeRequest, "function");
+    assert.equal(
+      typeof mapLoopRuntimeExecutionPlanToRequestOptions,
+      "function",
+    );
     assert.equal(
       typeof prepareLoopPolicyBoundLocalProcessExecution,
       "function",
@@ -387,6 +395,48 @@ describe("Core public API", () => {
     assert.equal(typeof createLoopRuntimeExecutionPlan, "function");
     assert.equal(result.planned, true);
     assert.equal(result.plan, plan);
+  });
+
+  it("exports the runtime request options mapping contract", () => {
+    const plan: LoopRuntimeExecutionPlan = {
+      project: "loop-engine",
+      mode: "execute",
+      policyId: "policy-id",
+      profileId: "profile-id",
+      effort: "medium",
+      budget: {
+        maxTokens: 10,
+        maxCostUsd: 20,
+        maxDurationMs: 30,
+        maxCalls: 40,
+        maxRepairs: 50,
+      },
+    };
+    const result: LoopRuntimeRequestOptionsMappingResult =
+      mapLoopRuntimeExecutionPlanToRequestOptions(plan);
+
+    assert.equal(result.mapped, true);
+    if (result.mapped) {
+      const options: LoopRuntimeRequestOptionsMapping = result.options;
+
+      assert.deepEqual(options, {
+        project: "loop-engine",
+        mode: "execute",
+        policyId: "policy-id",
+        profileId: "profile-id",
+        effort: "medium",
+        limits: {
+          maxTokens: 10,
+          maxCostUsd: 20,
+          maxDurationMs: 30,
+          maxCalls: 40,
+          maxRepairs: 50,
+        },
+      });
+      assert.equal(Object.isFrozen(result), true);
+      assert.equal(Object.isFrozen(options), true);
+      assert.equal(Object.isFrozen(options.limits), true);
+    }
   });
 
   it("keeps the stable report payloads identical to their CLI adapters", () => {
