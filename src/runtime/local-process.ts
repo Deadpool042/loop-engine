@@ -226,7 +226,7 @@ function appendWithinLimit(
 }
 
 function createResult(
-  request: RuntimeRequest,
+  metadata: RuntimeMetadata,
   startedAt: string,
   status: RuntimeResultStatus,
   stdout: Buffer[],
@@ -250,7 +250,7 @@ function createResult(
     completedAt: now(),
     diagnostics: runtimeError ? [runtimeError.message] : [],
     output: { stdout: stdoutText, stderr: stderrText },
-    metadata: request.metadata,
+    metadata,
     stdout: stdoutText,
     stderr: stderrText,
     events,
@@ -262,12 +262,12 @@ function createResult(
 }
 
 function deniedResult(
-  request: RuntimeRequest,
+  metadata: RuntimeMetadata,
   startedAt: string,
   runtimeError: RuntimeExecutionError,
 ): RuntimeResult {
   return createResult(
-    request,
+    metadata,
     startedAt,
     "denied",
     [],
@@ -293,6 +293,241 @@ function supportsLocalProcess(request: RuntimeRequest): boolean {
   );
 }
 
+type ValidatedLocalProcessRequest = Readonly<{
+  executable: string;
+  cwd: string;
+  environment: Readonly<Record<string, string>>;
+  policy: LocalProcessExecutionPolicy;
+  args: readonly string[];
+  stdin: string | null | undefined;
+  metadata: RuntimeMetadata;
+  startedAt: string;
+}>;
+
+/**
+ * Runs the process for an already-validated local-process request. Owns the
+ * single spawn call plus stdout/stderr accumulation, timeout, and graceful
+ * SIGTERM/SIGKILL termination. Validation itself always happens before this
+ * is invoked; a synchronous spawn failure is reported the same way it was
+ * before extraction (spawn_failed, with the request_validated event kept).
+ */
+function executeValidatedLocalProcess(
+  validated: ValidatedLocalProcessRequest,
+): Promise<RuntimeResult> | RuntimeResult {
+  const { executable, cwd, environment, policy, args, stdin, metadata, startedAt } =
+    validated;
+  const stdout: Buffer[] = [];
+  const stderr: Buffer[] = [];
+  const events: RuntimeEvent[] = [];
+  let sequence = 0;
+  const event = (type: RuntimeEventType, data: RuntimeMetadata = {}) => {
+    sequence += 1;
+    events.push({ type, sequence, data });
+  };
+  event("request_validated");
+
+  try {
+    return new Promise<RuntimeResult>((complete) => {
+      let processStarted = false;
+      let terminalError: RuntimeExecutionError | null = null;
+      let settled = false;
+      let graceTimer: ReturnType<typeof setTimeout> | null = null;
+      let termination: LocalProcessTermination = {
+        timedOut: false,
+        mode: "none",
+        finalSignal: null,
+      };
+
+      const child = spawn(executable, [...args], {
+        cwd,
+        env: environment,
+        shell: false,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+
+      const finish = (
+        status: RuntimeResultStatus,
+        options: Readonly<{
+          exitCode?: number | null;
+          signal?: string | null;
+          runtimeError?: RuntimeExecutionError;
+          termination?: LocalProcessTermination;
+        }> = {},
+      ) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        if (graceTimer) clearTimeout(graceTimer);
+        complete(
+          createResult(metadata, startedAt, status, stdout, stderr, events, options),
+        );
+      };
+
+      const requestSignal = (signal: "SIGTERM" | "SIGKILL") => {
+        try {
+          return child.kill(signal);
+        } catch {
+          return false;
+        }
+      };
+
+      const terminate = (runtimeError: RuntimeExecutionError) => {
+        if (terminalError) return;
+        terminalError = runtimeError;
+        const timedOut = runtimeError.code === "timed_out";
+        termination = { timedOut, mode: "graceful", finalSignal: "SIGTERM" };
+        event("process_terminated", { code: runtimeError.code, signal: "SIGTERM" });
+        if (!requestSignal("SIGTERM")) {
+          termination = { timedOut, mode: "failed", finalSignal: null };
+          const failed = error("spawn_failed", "Local process termination request failed.", {}, true);
+          event("process_failed", { code: failed.code });
+          finish(timedOut ? "timed_out" : runtimeError.code as RuntimeResultStatus, { runtimeError: timedOut ? runtimeError : failed, termination });
+          return;
+        }
+        graceTimer = setTimeout(() => {
+          if (settled) return;
+          termination = { timedOut, mode: "forced", finalSignal: "SIGKILL" };
+          event("process_terminated", { code: runtimeError.code, signal: "SIGKILL" });
+          if (!requestSignal("SIGKILL")) {
+            termination = { timedOut, mode: "failed", finalSignal: null };
+            event("process_failed", { code: "spawn_failed" });
+          }
+        }, (policy.termination ?? DEFAULT_LOCAL_PROCESS_TERMINATION_POLICY).gracePeriodMs);
+      };
+
+      const timeout = setTimeout(() => {
+        terminate(
+          error("timed_out", "Local process exceeded its timeout.", {}, true),
+        );
+      }, policy.timeoutMs);
+
+      child.once("spawn", () => {
+        processStarted = true;
+        event("process_started", { executable });
+      });
+      child.stdout.on("data", (value: Buffer) => {
+        const chunk = Buffer.from(value);
+        const result = appendWithinLimit(
+          stdout,
+          chunk,
+          policy.maxStdoutBytes,
+        );
+        event("stdout_received", { bytes: result.size });
+        if (result.exceeded) {
+          terminate(
+            error(
+              "stdout_limit_exceeded",
+              "Local process exceeded the stdout limit.",
+              { maxBytes: policy.maxStdoutBytes },
+              true,
+            ),
+          );
+        }
+      });
+      child.stderr.on("data", (value: Buffer) => {
+        const chunk = Buffer.from(value);
+        const result = appendWithinLimit(
+          stderr,
+          chunk,
+          policy.maxStderrBytes,
+        );
+        event("stderr_received", { bytes: result.size });
+        if (result.exceeded) {
+          terminate(
+            error(
+              "stderr_limit_exceeded",
+              "Local process exceeded the stderr limit.",
+              { maxBytes: policy.maxStderrBytes },
+              true,
+            ),
+          );
+        }
+      });
+      child.once("error", () => {
+        const runtimeError = error(
+          "spawn_failed",
+          "Local process could not be started.",
+          {},
+          processStarted,
+        );
+        event("process_failed", {
+          code: runtimeError.code,
+          processStarted,
+        });
+        finish("spawn_failed", { runtimeError });
+      });
+      child.once("close", (exitCode, signal) => {
+        event("process_completed", {
+          exitCode,
+          signal: signal ?? null,
+        });
+
+        if (terminalError) {
+          event("process_failed", { code: terminalError.code });
+          const statusByError: Readonly<
+            Record<
+              "timed_out" | "stdout_limit_exceeded" | "stderr_limit_exceeded",
+              RuntimeResultStatus
+            >
+          > = {
+            timed_out: "timed_out",
+            stdout_limit_exceeded: "stdout_limit_exceeded",
+            stderr_limit_exceeded: "stderr_limit_exceeded",
+          };
+          finish(
+            statusByError[terminalError.code as keyof typeof statusByError],
+            {
+              exitCode,
+              signal,
+              runtimeError: terminalError,
+              termination,
+            },
+          );
+          return;
+        }
+
+        if (exitCode === 0 && signal === null) {
+          finish("completed", { exitCode, signal });
+          return;
+        }
+
+        const runtimeError = error(
+          "non_zero_exit",
+          "Local process exited unsuccessfully.",
+          { exitCode, signal: signal ?? null },
+          processStarted,
+        );
+        event("process_failed", { code: runtimeError.code });
+        finish("non_zero_exit", { exitCode, signal, runtimeError });
+      });
+
+      if (stdin === undefined || stdin === null) {
+        child.stdin.end();
+      } else {
+        child.stdin.end(stdin);
+      }
+    });
+  } catch {
+    const runtimeError = error(
+      "spawn_failed",
+      "Local process could not be started.",
+    );
+    event("process_failed", {
+      code: runtimeError.code,
+      processStarted: false,
+    });
+    return createResult(
+      metadata,
+      startedAt,
+      "spawn_failed",
+      stdout,
+      stderr,
+      events,
+      { runtimeError },
+    );
+  }
+}
+
 /**
  * The only V10.1 runtime with real local execution. Validation occurs before
  * spawn; it never invokes a shell and it receives only explicitly allow-listed
@@ -306,232 +541,19 @@ export const LocalProcessRuntime: RuntimeAdapter = {
     const startedAt = now();
     const validated = validateRequest(request);
     if (validated.outcome === "invalid") {
-      return deniedResult(request, startedAt, validated.error);
+      return deniedResult(request.metadata, startedAt, validated.error);
     }
 
     const { executable, cwd, environment, policy } = validated;
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-    const events: RuntimeEvent[] = [];
-    let sequence = 0;
-    const event = (type: RuntimeEventType, data: RuntimeMetadata = {}) => {
-      sequence += 1;
-      events.push({ type, sequence, data });
-    };
-    event("request_validated");
-
-    try {
-      return new Promise<RuntimeResult>((complete) => {
-        let processStarted = false;
-        let terminalError: RuntimeExecutionError | null = null;
-        let settled = false;
-        let graceTimer: ReturnType<typeof setTimeout> | null = null;
-        let termination: LocalProcessTermination = {
-          timedOut: false,
-          mode: "none",
-          finalSignal: null,
-        };
-
-        const child = spawn(
-          executable,
-          [...request.localProcess!.command.args],
-          {
-            cwd,
-            env: environment,
-            shell: false,
-            stdio: ["pipe", "pipe", "pipe"],
-          },
-        );
-
-        const finish = (
-          status: RuntimeResultStatus,
-          options: Readonly<{
-            exitCode?: number | null;
-            signal?: string | null;
-            runtimeError?: RuntimeExecutionError;
-            termination?: LocalProcessTermination;
-          }> = {},
-        ) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeout);
-          if (graceTimer) clearTimeout(graceTimer);
-          complete(
-            createResult(
-              request,
-              startedAt,
-              status,
-              stdout,
-              stderr,
-              events,
-              options,
-            ),
-          );
-        };
-
-        const requestSignal = (signal: "SIGTERM" | "SIGKILL") => {
-          try {
-            return child.kill(signal);
-          } catch {
-            return false;
-          }
-        };
-
-        const terminate = (runtimeError: RuntimeExecutionError) => {
-          if (terminalError) return;
-          terminalError = runtimeError;
-          const timedOut = runtimeError.code === "timed_out";
-          termination = { timedOut, mode: "graceful", finalSignal: "SIGTERM" };
-          event("process_terminated", { code: runtimeError.code, signal: "SIGTERM" });
-          if (!requestSignal("SIGTERM")) {
-            termination = { timedOut, mode: "failed", finalSignal: null };
-            const failed = error("spawn_failed", "Local process termination request failed.", {}, true);
-            event("process_failed", { code: failed.code });
-            finish(timedOut ? "timed_out" : runtimeError.code as RuntimeResultStatus, { runtimeError: timedOut ? runtimeError : failed, termination });
-            return;
-          }
-          graceTimer = setTimeout(() => {
-            if (settled) return;
-            termination = { timedOut, mode: "forced", finalSignal: "SIGKILL" };
-            event("process_terminated", { code: runtimeError.code, signal: "SIGKILL" });
-            if (!requestSignal("SIGKILL")) {
-              termination = { timedOut, mode: "failed", finalSignal: null };
-              event("process_failed", { code: "spawn_failed" });
-            }
-          }, (policy.termination ?? DEFAULT_LOCAL_PROCESS_TERMINATION_POLICY).gracePeriodMs);
-        };
-
-        const timeout = setTimeout(() => {
-          terminate(
-            error("timed_out", "Local process exceeded its timeout.", {}, true),
-          );
-        }, policy.timeoutMs);
-
-        child.once("spawn", () => {
-          processStarted = true;
-          event("process_started", { executable });
-        });
-        child.stdout.on("data", (value: Buffer) => {
-          const chunk = Buffer.from(value);
-          const result = appendWithinLimit(
-            stdout,
-            chunk,
-            policy.maxStdoutBytes,
-          );
-          event("stdout_received", { bytes: result.size });
-          if (result.exceeded) {
-            terminate(
-              error(
-                "stdout_limit_exceeded",
-                "Local process exceeded the stdout limit.",
-                { maxBytes: policy.maxStdoutBytes },
-                true,
-              ),
-            );
-          }
-        });
-        child.stderr.on("data", (value: Buffer) => {
-          const chunk = Buffer.from(value);
-          const result = appendWithinLimit(
-            stderr,
-            chunk,
-            policy.maxStderrBytes,
-          );
-          event("stderr_received", { bytes: result.size });
-          if (result.exceeded) {
-            terminate(
-              error(
-                "stderr_limit_exceeded",
-                "Local process exceeded the stderr limit.",
-                { maxBytes: policy.maxStderrBytes },
-                true,
-              ),
-            );
-          }
-        });
-        child.once("error", () => {
-          const runtimeError = error(
-            "spawn_failed",
-            "Local process could not be started.",
-            {},
-            processStarted,
-          );
-          event("process_failed", {
-            code: runtimeError.code,
-            processStarted,
-          });
-          finish("spawn_failed", { runtimeError });
-        });
-        child.once("close", (exitCode, signal) => {
-          event("process_completed", {
-            exitCode,
-            signal: signal ?? null,
-          });
-
-          if (terminalError) {
-            event("process_failed", { code: terminalError.code });
-            const statusByError: Readonly<
-              Record<
-                "timed_out" | "stdout_limit_exceeded" | "stderr_limit_exceeded",
-                RuntimeResultStatus
-              >
-            > = {
-              timed_out: "timed_out",
-              stdout_limit_exceeded: "stdout_limit_exceeded",
-              stderr_limit_exceeded: "stderr_limit_exceeded",
-            };
-            finish(
-              statusByError[terminalError.code as keyof typeof statusByError],
-              {
-                exitCode,
-                signal,
-                runtimeError: terminalError,
-                termination,
-              },
-            );
-            return;
-          }
-
-          if (exitCode === 0 && signal === null) {
-            finish("completed", { exitCode, signal });
-            return;
-          }
-
-          const runtimeError = error(
-            "non_zero_exit",
-            "Local process exited unsuccessfully.",
-            { exitCode, signal: signal ?? null },
-            processStarted,
-          );
-          event("process_failed", { code: runtimeError.code });
-          finish("non_zero_exit", { exitCode, signal, runtimeError });
-        });
-
-        const input = request.localProcess!.command.stdin;
-        if (input === undefined || input === null) {
-          child.stdin.end();
-        } else {
-          child.stdin.end(input);
-        }
-      });
-    } catch {
-      const runtimeError = error(
-        "spawn_failed",
-        "Local process could not be started.",
-      );
-      event("process_failed", {
-        code: runtimeError.code,
-        processStarted: false,
-      });
-      return createResult(
-        request,
-        startedAt,
-        "spawn_failed",
-        stdout,
-        stderr,
-        events,
-        { runtimeError },
-      );
-    }
+    return executeValidatedLocalProcess({
+      executable,
+      cwd,
+      environment,
+      policy,
+      args: request.localProcess!.command.args,
+      stdin: request.localProcess!.command.stdin,
+      metadata: request.metadata,
+      startedAt,
+    });
   },
 };
