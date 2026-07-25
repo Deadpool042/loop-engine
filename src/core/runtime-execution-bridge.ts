@@ -30,6 +30,17 @@ import {
   type RuntimeCapabilitySelectionResult,
 } from "./runtime-resolution.js";
 
+function createMappedRuntimeRequest(
+  loopRunResult: LoopRunResult,
+  runtimeId: RuntimeId,
+  options: CreateRuntimeRequestOptions = {},
+): RuntimeRequest | null {
+  return createRuntimeRequest(loopRunResult, {
+    ...options,
+    requestedRuntime: runtimeId,
+  });
+}
+
 export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_ERROR_CODES = [
   "declarative_runtime_request_invalid",
   "declarative_runtime_no_compatible_descriptor",
@@ -1359,10 +1370,11 @@ export function resolveDeclarativeRuntimeExecution(
     );
   }
 
-  const runtimeRequest = createRuntimeRequest(input.loopRunResult, {
-    ...(input.runtimeRequestOptions ?? {}),
-    requestedRuntime: runtimeId,
-  });
+  const runtimeRequest = createMappedRuntimeRequest(
+    input.loopRunResult,
+    runtimeId,
+    input.runtimeRequestOptions,
+  );
 
   if (!runtimeRequest) {
     return failedResolution(
@@ -1501,10 +1513,11 @@ export function resolvePolicyAwareDeclarativeRuntimeExecution(
     }) as PolicyAwareDeclarativeRuntimeExecutionResolution;
   }
 
-  const runtimeRequest = createRuntimeRequest(input.loopRunResult, {
-    ...(input.runtimeRequestOptions ?? {}),
-    requestedRuntime: runtimeId,
-  });
+  const runtimeRequest = createMappedRuntimeRequest(
+    input.loopRunResult,
+    runtimeId,
+    input.runtimeRequestOptions,
+  );
 
   if (!runtimeRequest) {
     return failedPolicyAwareResolution(

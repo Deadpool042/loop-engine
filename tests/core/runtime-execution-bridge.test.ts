@@ -319,6 +319,22 @@ describe("Core declarative runtime execution bridge — pure resolution", () => 
     );
   });
 
+  it("keeps explicit V13 runtime mapping authoritative over runtime request options", () => {
+    const result = resolveDeclarativeRuntimeExecution(
+      bridgeInput({
+        runtimeMapping: { "runtime-a": "codex", "runtime-b": "claude-code" },
+        runtimeRequestOptions: {
+          requestedRuntime: "simulated",
+        },
+      }),
+    );
+
+    assert.equal(result.outcome, "resolved");
+    if (result.outcome !== "resolved") return;
+    assert.equal(result.runtimeId, "codex");
+    assert.equal(result.runtimeRequest.requestedRuntime, "codex");
+  });
+
   it("keeps the V13 lexical tie-break when multiple descriptors are compatible", () => {
     const result = resolveDeclarativeRuntimeExecution(
       bridgeInput({
