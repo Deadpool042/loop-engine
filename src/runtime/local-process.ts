@@ -544,12 +544,10 @@ type LocalProcessCommandInput = Readonly<{
   stdin: string | null | undefined;
 }>;
 
-type ValidatedLocalProcessFields = Readonly<{
-  executable: string;
-  cwd: string;
-  environment: Readonly<Record<string, string>>;
-  policy: LocalProcessExecutionPolicy;
-}>;
+type ValidatedLocalProcessFields = Omit<
+  Extract<ValidationResult, { outcome: "valid" }>,
+  "outcome"
+>;
 
 /**
  * Pure mapping from an already-validated local-process request to the exact
@@ -595,9 +593,8 @@ export function createLocalProcessRuntime(
         return deniedResult(request.metadata, startedAt, validated.error);
       }
 
-      const { executable, cwd, environment, policy } = validated;
       const preparedExecution = prepareValidatedLocalProcessExecution(
-        { executable, cwd, environment, policy },
+        validated,
         {
           args: request.localProcess!.command.args,
           stdin: request.localProcess!.command.stdin,
