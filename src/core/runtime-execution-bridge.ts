@@ -322,6 +322,22 @@ export type PolicyAwareDeclarativeRuntimeExecutionResult =
       diagnostics: readonly DeclarativeRuntimeExecutionBridgeError[];
     }>;
 
+type ExecutableRuntimeResolution =
+  | Extract<
+      DeclarativeRuntimeExecutionResolution,
+      { outcome: "resolved" }
+    >
+  | Extract<
+      PolicyAwareDeclarativeRuntimeExecutionResolution,
+      { outcome: "resolved" }
+    >;
+
+async function executeResolvedRuntime(
+  resolution: ExecutableRuntimeResolution,
+): Promise<RuntimeResult> {
+  return await executeRuntime(resolution.runtimeRequest);
+}
+
 export const RUNTIME_EXECUTION_PLAN_SCHEMA_VERSION = 1 as const;
 
 export type RuntimeExecutionPlanSchemaVersion =
@@ -1227,7 +1243,7 @@ export async function executePolicyBoundLocalProcessWithReceipt(
   if (resolution.outcome !== "resolved") {
     return deepFreeze({ outcome: "resolution_failed", resolution, runtimeResult: null, receipt: null, diagnostics: resolution.diagnostics }) as PolicyBoundLocalProcessExecutionResult;
   }
-  const runtimeResult = await executeRuntime(resolution.runtimeRequest);
+  const runtimeResult = await executeResolvedRuntime(resolution);
   try {
     const receipt = createRuntimeExecutionReceipt({ resolution, admission: input.admission, runtimeResult });
     return deepFreeze({ outcome: "executed", resolution, runtimeResult, receipt, diagnostics: [] }) as PolicyBoundLocalProcessExecutionResult;
@@ -1631,7 +1647,7 @@ export async function executeDeclarativeRuntime(
     }) as DeclarativeRuntimeExecutionResult;
   }
 
-  const runtimeResult = await executeRuntime(resolution.runtimeRequest);
+  const runtimeResult = await executeResolvedRuntime(resolution);
 
   if (runtimeResult.status === "completed") {
     return deepFreeze({
@@ -1674,7 +1690,7 @@ export async function executePolicyAwareDeclarativeRuntime(
     }) as PolicyAwareDeclarativeRuntimeExecutionResult;
   }
 
-  const runtimeResult = await executeRuntime(resolution.runtimeRequest);
+  const runtimeResult = await executeResolvedRuntime(resolution);
 
   if (runtimeResult.status === "completed") {
     return deepFreeze({
@@ -1722,7 +1738,7 @@ export async function executePolicyAwareDeclarativeRuntimeWithReceipt(
     }) as PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult;
   }
 
-  const runtimeResult = await executeRuntime(resolution.runtimeRequest);
+  const runtimeResult = await executeResolvedRuntime(resolution);
 
   try {
     const receipt = createRuntimeExecutionReceipt({
