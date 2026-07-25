@@ -338,6 +338,42 @@ async function executeResolvedRuntime(
   return await executeRuntime(resolution.runtimeRequest);
 }
 
+type RuntimeExecutionResultEvaluation =
+  | Readonly<{
+      succeeded: true;
+      diagnostics: readonly [];
+    }>
+  | Readonly<{
+      succeeded: false;
+      diagnostics: readonly DeclarativeRuntimeExecutionBridgeError[];
+    }>;
+
+function evaluateRuntimeExecutionResult(
+  runtimeResult: RuntimeResult,
+): RuntimeExecutionResultEvaluation {
+  if (runtimeResult.status === "completed") {
+    return {
+      succeeded: true,
+      diagnostics: [],
+    };
+  }
+
+  return {
+    succeeded: false,
+    diagnostics: [
+      bridgeError(
+        "v10_runtime_execution_failed",
+        "V10 runtime execution returned a non-success status.",
+        {
+          runtimeId: runtimeResult.runtimeId,
+          status: runtimeResult.status,
+          diagnostics: runtimeResult.diagnostics,
+        },
+      ),
+    ],
+  };
+}
+
 export const RUNTIME_EXECUTION_PLAN_SCHEMA_VERSION = 1 as const;
 
 export type RuntimeExecutionPlanSchemaVersion =
@@ -1649,30 +1685,22 @@ export async function executeDeclarativeRuntime(
 
   const runtimeResult = await executeResolvedRuntime(resolution);
 
-  if (runtimeResult.status === "completed") {
+  const evaluation = evaluateRuntimeExecutionResult(runtimeResult);
+
+  if (evaluation.succeeded) {
     return deepFreeze({
       outcome: "success",
       resolution,
       runtimeResult,
-      diagnostics: [],
+      diagnostics: evaluation.diagnostics,
     }) as DeclarativeRuntimeExecutionResult;
   }
-
-  const diagnostic = bridgeError(
-    "v10_runtime_execution_failed",
-    "V10 runtime execution returned a non-success status.",
-    {
-      runtimeId: runtimeResult.runtimeId,
-      status: runtimeResult.status,
-      diagnostics: runtimeResult.diagnostics,
-    },
-  );
 
   return deepFreeze({
     outcome: "v10_execution_failed",
     resolution,
     runtimeResult,
-    diagnostics: [diagnostic],
+    diagnostics: evaluation.diagnostics,
   }) as DeclarativeRuntimeExecutionResult;
 }
 
@@ -1692,30 +1720,22 @@ export async function executePolicyAwareDeclarativeRuntime(
 
   const runtimeResult = await executeResolvedRuntime(resolution);
 
-  if (runtimeResult.status === "completed") {
+  const evaluation = evaluateRuntimeExecutionResult(runtimeResult);
+
+  if (evaluation.succeeded) {
     return deepFreeze({
       outcome: "success",
       resolution,
       runtimeResult,
-      diagnostics: [],
+      diagnostics: evaluation.diagnostics,
     }) as PolicyAwareDeclarativeRuntimeExecutionResult;
   }
-
-  const diagnostic = bridgeError(
-    "v10_runtime_execution_failed",
-    "V10 runtime execution returned a non-success status.",
-    {
-      runtimeId: runtimeResult.runtimeId,
-      status: runtimeResult.status,
-      diagnostics: runtimeResult.diagnostics,
-    },
-  );
 
   return deepFreeze({
     outcome: "v10_execution_failed",
     resolution,
     runtimeResult,
-    diagnostics: [diagnostic],
+    diagnostics: evaluation.diagnostics,
   }) as PolicyAwareDeclarativeRuntimeExecutionResult;
 }
 
