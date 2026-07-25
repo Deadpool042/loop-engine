@@ -539,6 +539,42 @@ const nodeLocalProcessExecutor: LocalProcessExecutor = function nodeLocalProcess
   }
 };
 
+type LocalProcessCommandInput = Readonly<{
+  args: readonly string[];
+  stdin: string | null | undefined;
+}>;
+
+type ValidatedLocalProcessFields = Readonly<{
+  executable: string;
+  cwd: string;
+  environment: Readonly<Record<string, string>>;
+  policy: LocalProcessExecutionPolicy;
+}>;
+
+/**
+ * Pure mapping from an already-validated local-process request to the exact
+ * `ValidatedLocalProcessRequest` contract expected by `LocalProcessExecutor`.
+ * Performs no I/O, spawns no process, and reads no clock or global state —
+ * `startedAt` is supplied by the caller rather than computed here.
+ */
+function prepareValidatedLocalProcessExecution(
+  validated: ValidatedLocalProcessFields,
+  command: LocalProcessCommandInput,
+  metadata: RuntimeMetadata,
+  startedAt: string,
+): ValidatedLocalProcessRequest {
+  return {
+    executable: validated.executable,
+    cwd: validated.cwd,
+    environment: validated.environment,
+    policy: validated.policy,
+    args: command.args,
+    stdin: command.stdin,
+    metadata,
+    startedAt,
+  };
+}
+
 /**
  * Builds a `LocalProcessRuntime` adapter running requests through the given
  * `LocalProcessExecutor` boundary. Defaults to the real Node
@@ -560,16 +596,16 @@ export function createLocalProcessRuntime(
       }
 
       const { executable, cwd, environment, policy } = validated;
-      return executor({
-        executable,
-        cwd,
-        environment,
-        policy,
-        args: request.localProcess!.command.args,
-        stdin: request.localProcess!.command.stdin,
-        metadata: request.metadata,
+      const preparedExecution = prepareValidatedLocalProcessExecution(
+        { executable, cwd, environment, policy },
+        {
+          args: request.localProcess!.command.args,
+          stdin: request.localProcess!.command.stdin,
+        },
+        request.metadata,
         startedAt,
-      });
+      );
+      return executor(preparedExecution);
     },
   };
 }

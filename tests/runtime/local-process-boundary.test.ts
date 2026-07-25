@@ -198,6 +198,51 @@ describe("LocalProcessRuntime execution boundary", () => {
     }
   });
 
+  it("prepares exactly one boundary input, containing only the executor's expected keys", async () => {
+    const root = projectRoot();
+    try {
+      let preparedInputs: readonly ValidatedLocalProcessRequest[] = [];
+      const spy: LocalProcessExecutor = (validated) => {
+        preparedInputs = [...preparedInputs, validated];
+        return {
+          runtimeId: "local-process",
+          status: "completed",
+          startedAt: validated.startedAt,
+          completedAt: validated.startedAt,
+          diagnostics: [],
+          output: { stdout: "", stderr: "" },
+          metadata: validated.metadata,
+          stdout: "",
+          stderr: "",
+          events: [],
+          exitCode: 0,
+          signal: null,
+        } satisfies RuntimeResult;
+      };
+      const runtime = createLocalProcessRuntime(spy);
+      const req = request(root);
+
+      await runtime.execute(req);
+
+      assert.equal(preparedInputs.length, 1);
+      assert.deepEqual(
+        Object.keys(preparedInputs[0]).sort(),
+        [
+          "args",
+          "cwd",
+          "environment",
+          "executable",
+          "metadata",
+          "policy",
+          "startedAt",
+          "stdin",
+        ].sort(),
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("propagates the node executor's real RuntimeResult unchanged through the boundary", async () => {
     const root = projectRoot();
     try {
