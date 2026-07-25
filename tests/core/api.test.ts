@@ -15,6 +15,8 @@ import {
   decodeLoopRuntimePublicRequest,
   decodeAndAuthorizeLoopRuntimePublicRequest,
   createLoopRuntimeAuthorizedEngineAssemblyRequest,
+  evaluateLoopRuntimeAuthorizedEngineAssembler,
+  prepareAuthorizedLoopRuntimeRequest,
   createLoopRuntimePublicRequestAuthorizationRequest,
   evaluateLoopRuntimePublicRequestAuthorization,
   authorizeLoopRuntimePublicRequest,
@@ -58,6 +60,8 @@ import {
   type LoopRuntimePublicRequestDecodeResult,
   type LoopRuntimePublicRequestAuthorizedEntryResult,
   type LoopRuntimeAuthorizedEngineAssemblyRequestCreationResult,
+  type LoopRuntimeAuthorizedEngineAssemblyResult,
+  type LoopRuntimePreparedPublicRequestEntryResult,
   type LoopRuntimeAuthenticatedPrincipal,
   type LoopRuntimePublicRequestAuthorizationDecision,
   type LoopRuntimePublicRequestAuthorizationRequest,
@@ -214,6 +218,11 @@ describe("Core public API", () => {
       "function",
     );
     assert.equal(
+      typeof evaluateLoopRuntimeAuthorizedEngineAssembler,
+      "function",
+    );
+    assert.equal(typeof prepareAuthorizedLoopRuntimeRequest, "function");
+    assert.equal(
       typeof createLoopRuntimePublicRequestAuthorizationRequest,
       "function",
     );
@@ -355,6 +364,131 @@ describe("Core public API", () => {
       assert.equal(result.assemblyRequest.request, request);
       assert.equal(Object.isFrozen(result), true);
       assert.equal(Object.isFrozen(result.assemblyRequest), true);
+    }
+  });
+
+  it("exports the authorized engine assembly evaluation contract", async () => {
+    const request: LoopRuntimePublicRequest = {
+      schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      project: "loop-engine",
+      mode: "execute",
+      policyRef: "policy.loop",
+      profileRef: "profile.loop",
+      requestedMaxEffort: "low",
+      budget: {
+        maxTokens: 0,
+        maxCostUsd: 0,
+        maxDurationMs: 0,
+        maxCalls: 0,
+        maxRepairs: 0,
+      },
+    };
+    const assemblyRequest =
+      createLoopRuntimeAuthorizedEngineAssemblyRequest(
+        {
+          principalId: "principal.api",
+        },
+        request,
+      );
+
+    assert.equal(assemblyRequest.created, true);
+    if (assemblyRequest.created) {
+      const result: LoopRuntimeAuthorizedEngineAssemblyResult =
+        await evaluateLoopRuntimeAuthorizedEngineAssembler(
+          assemblyRequest.assemblyRequest,
+          {
+            assemble() {
+              return {
+                assembled: false,
+                reason: "assembly_unavailable",
+              };
+            },
+          },
+        );
+
+      assert.equal(result.assembled, false);
+      assert.equal(Object.isFrozen(result), true);
+    }
+  });
+
+  it("exports the prepared public runtime request entry contract", async () => {
+    const result: LoopRuntimePreparedPublicRequestEntryResult =
+      await prepareAuthorizedLoopRuntimeRequest({
+        principal: {
+          principalId: "principal.api",
+        },
+        payload: {
+          schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+          project: "loop-engine",
+          mode: "execute",
+          policyRef: "policy.loop",
+          profileRef: "profile.loop",
+          requestedMaxEffort: "low",
+          budget: {
+            maxTokens: 0,
+            maxCostUsd: 0,
+            maxDurationMs: 0,
+            maxCalls: 0,
+            maxRepairs: 0,
+          },
+        },
+        authorizer: {
+          authorize() {
+            return { authorized: true };
+          },
+        },
+        assembler: {
+          assemble() {
+            return {
+              assembled: true,
+              assembly: {
+                catalog: {
+                  policies: [
+                    {
+                      ref: "policy.loop",
+                      value: {
+                        policyRef: "policy.loop",
+                        policyId: "policy-id",
+                      },
+                    },
+                  ],
+                  profiles: [
+                    {
+                      ref: "profile.loop",
+                      value: {
+                        profileRef: "profile.loop",
+                        profileId: "profile-id",
+                        maxEffort: "low",
+                      },
+                    },
+                  ],
+                },
+                limits: {
+                  maxEffort: "low",
+                  budget: {
+                    maxTokens: 0,
+                    maxCostUsd: 0,
+                    maxDurationMs: 0,
+                    maxCalls: 0,
+                    maxRepairs: 0,
+                  },
+                },
+                binding: {
+                  runtimeId: "local-process",
+                  executable: "node",
+                  arguments: ["--version"],
+                },
+              },
+            };
+          },
+        },
+      });
+
+    assert.equal(result.prepared, true);
+    if (result.prepared) {
+      assert.equal(result.request.runtimeId, "local-process");
+      assert.equal(Object.isFrozen(result), true);
+      assert.equal(Object.isFrozen(result.request), true);
     }
   });
 
