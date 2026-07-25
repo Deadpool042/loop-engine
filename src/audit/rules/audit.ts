@@ -10866,7 +10866,7 @@ export const RUNTIME_EXECUTION_RECEIPT_INVARIANTS = {
   },
   execution: {
     file: "src/core/runtime-execution-bridge.ts",
-    requiredTokens: ["executePolicyAwareDeclarativeRuntimeWithReceipt", "const runtimeResult = await executeRuntime(resolution.runtimeRequest)", "receipt: null", "outcome: \"executed\"", "createRuntimeExecutionReceipt({"],
+    requiredTokens: ["executePolicyAwareDeclarativeRuntimeWithReceipt", "const runtimeResult = await executeResolvedRuntime(resolution)", "receipt: null", "outcome: \"executed\"", "createRuntimeExecutionReceipt({"],
     forbiddenTokens: ["JSON.parse(JSON.stringify(plan))"],
   },
   compatibility: {
