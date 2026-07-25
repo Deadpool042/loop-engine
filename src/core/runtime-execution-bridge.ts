@@ -1156,6 +1156,16 @@ export function createRuntimeExecutionReceipt(
   }
 }
 
+function receiptCreationFailureDiagnostic(
+  error: unknown,
+): DeclarativeRuntimeExecutionBridgeError {
+  return bridgeError(
+    "runtime_execution_receipt_unserializable",
+    "Runtime execution receipt could not be constructed.",
+    { reason: receiptErrorMessage(error) },
+  );
+}
+
 function localProcessBindingDiagnostic(
   resolution: PolicyAwareDeclarativeRuntimeExecutionResolution,
   binding: LocalProcessExecutionBinding | undefined,
@@ -1284,7 +1294,7 @@ export async function executePolicyBoundLocalProcessWithReceipt(
     const receipt = createRuntimeExecutionReceipt({ resolution, admission: input.admission, runtimeResult });
     return deepFreeze({ outcome: "executed", resolution, runtimeResult, receipt, diagnostics: [] }) as PolicyBoundLocalProcessExecutionResult;
   } catch (error) {
-    const diagnostic = bridgeError("runtime_execution_receipt_unserializable", "Runtime execution receipt could not be constructed.", { reason: receiptErrorMessage(error) });
+    const diagnostic = receiptCreationFailureDiagnostic(error);
     return deepFreeze({ outcome: "receipt_creation_failed", resolution, runtimeResult, receipt: null, diagnostics: [diagnostic] }) as PolicyBoundLocalProcessExecutionResult;
   }
 }
@@ -1774,13 +1784,7 @@ export async function executePolicyAwareDeclarativeRuntimeWithReceipt(
       diagnostics: [],
     }) as PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult;
   } catch (error) {
-    const diagnostic = bridgeError(
-      "runtime_execution_receipt_unserializable",
-      "Runtime execution receipt could not be constructed.",
-      {
-        reason: receiptErrorMessage(error),
-      },
-    );
+    const diagnostic = receiptCreationFailureDiagnostic(error);
     return deepFreeze({
       outcome: "receipt_creation_failed",
       resolution,
