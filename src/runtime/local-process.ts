@@ -293,7 +293,7 @@ function supportsLocalProcess(request: RuntimeRequest): boolean {
   );
 }
 
-type ValidatedLocalProcessRequest = Readonly<{
+export type ValidatedLocalProcessRequest = Readonly<{
   executable: string;
   cwd: string;
   environment: Readonly<Record<string, string>>;
@@ -305,14 +305,25 @@ type ValidatedLocalProcessRequest = Readonly<{
 }>;
 
 /**
+ * The execution boundary: the sole operation needed to run an
+ * already-validated local-process request. Never receives the full V10
+ * `RuntimeRequest` — only the minimal validated data produced by
+ * `validateRequest`.
+ */
+export type LocalProcessExecutor = (
+  validated: ValidatedLocalProcessRequest,
+) => Promise<RuntimeResult> | RuntimeResult;
+
+/**
  * Runs the process for an already-validated local-process request. Owns the
  * single spawn call plus stdout/stderr accumulation, timeout, and graceful
  * SIGTERM/SIGKILL termination. Validation itself always happens before this
  * is invoked; a synchronous spawn failure is reported the same way it was
  * before extraction (spawn_failed, with the request_validated event kept).
+ * This is the only real implementation of `LocalProcessExecutor`.
  */
-function executeValidatedLocalProcess(
-  validated: ValidatedLocalProcessRequest,
+const nodeLocalProcessExecutor: LocalProcessExecutor = function nodeLocalProcessExecutor(
+  validated,
 ): Promise<RuntimeResult> | RuntimeResult {
   const { executable, cwd, environment, policy, args, stdin, metadata, startedAt } =
     validated;
@@ -526,6 +537,41 @@ function executeValidatedLocalProcess(
       { runtimeError },
     );
   }
+};
+
+/**
+ * Builds a `LocalProcessRuntime` adapter running requests through the given
+ * `LocalProcessExecutor` boundary. Defaults to the real Node
+ * `child_process.spawn` implementation; only tests substitute a different
+ * executor, to observe the boundary without a second real spawn.
+ */
+export function createLocalProcessRuntime(
+  executor: LocalProcessExecutor = nodeLocalProcessExecutor,
+): RuntimeAdapter {
+  return {
+    runtimeId: LOCAL_PROCESS_RUNTIME_ID,
+    capabilities: ["shell_exec"],
+    supports: supportsLocalProcess,
+    execute(request): Promise<RuntimeResult> | RuntimeResult {
+      const startedAt = now();
+      const validated = validateRequest(request);
+      if (validated.outcome === "invalid") {
+        return deniedResult(request.metadata, startedAt, validated.error);
+      }
+
+      const { executable, cwd, environment, policy } = validated;
+      return executor({
+        executable,
+        cwd,
+        environment,
+        policy,
+        args: request.localProcess!.command.args,
+        stdin: request.localProcess!.command.stdin,
+        metadata: request.metadata,
+        startedAt,
+      });
+    },
+  };
 }
 
 /**
@@ -533,27 +579,4 @@ function executeValidatedLocalProcess(
  * spawn; it never invokes a shell and it receives only explicitly allow-listed
  * environment variables.
  */
-export const LocalProcessRuntime: RuntimeAdapter = {
-  runtimeId: LOCAL_PROCESS_RUNTIME_ID,
-  capabilities: ["shell_exec"],
-  supports: supportsLocalProcess,
-  execute(request): Promise<RuntimeResult> | RuntimeResult {
-    const startedAt = now();
-    const validated = validateRequest(request);
-    if (validated.outcome === "invalid") {
-      return deniedResult(request.metadata, startedAt, validated.error);
-    }
-
-    const { executable, cwd, environment, policy } = validated;
-    return executeValidatedLocalProcess({
-      executable,
-      cwd,
-      environment,
-      policy,
-      args: request.localProcess!.command.args,
-      stdin: request.localProcess!.command.stdin,
-      metadata: request.metadata,
-      startedAt,
-    });
-  },
-};
+export const LocalProcessRuntime: RuntimeAdapter = createLocalProcessRuntime();
