@@ -27,6 +27,7 @@ export * from "./runtime-execution-bridge.js";
 export * from "./runtime-execution-receipt-report.js";
 export * from "./runtime-execution-receipt-reporting-integration.js";
 export * from "./runtime-execution-receipt-reporting-serialization.js";
+export * from "./runtime-execution-public-result-facade.js";
 export {
   createRuntimeCapability,
   createRuntimeCapabilityRequirement,
