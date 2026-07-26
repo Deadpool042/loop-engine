@@ -44,6 +44,6 @@ test("AUDIT-407 rejects clock and random source fixtures", () => {
 
 test("AUDIT-408 requires the post-adapter receipt boundary", () => {
   const invariant = RUNTIME_EXECUTION_RECEIPT_INVARIANTS.execution;
-  const source = readFileSync(invariant.file, "utf8").replaceAll("createRuntimeExecutionReceipt({", "removedReceiptFactory({");
-  assert.deepEqual(inspectRuntimeExecutionReceiptInvariant(source, invariant).missing, ["createRuntimeExecutionReceipt({"]);
+  const source = readFileSync(invariant.file, "utf8").replaceAll("constructRuntimeExecutionReceipt({", "removedReceiptFactory({");
+  assert.deepEqual(inspectRuntimeExecutionReceiptInvariant(source, invariant).missing, ["constructRuntimeExecutionReceipt({"]);
 });
