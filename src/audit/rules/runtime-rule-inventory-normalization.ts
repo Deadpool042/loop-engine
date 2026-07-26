@@ -68,7 +68,7 @@ export const RUNTIME_RULE_INVENTORY_NORMALIZATION_RULE: AuditRule = (() => {
       "The composite Runtime audit inventory must pass through createAuditRuleRegistry so downstream consumers receive complete AuditRule metadata.",
     metadata: {
       introducedIn: "V13.83",
-      tags: ["architecture", "contract", "tests"],
+      tags: ["architecture", "contract", "self-audit", "ci"],
       stability: "stable",
       dependsOn: ["AUDIT-423"],
     },
