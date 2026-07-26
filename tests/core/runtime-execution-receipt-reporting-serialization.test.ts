@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   projectRuntimeExecutionReceiptReportingResult,
   RUNTIME_EXECUTION_RECEIPT_REPORTING_RESULT_SCHEMA_VERSION,
+  serializeRuntimeExecutionReceiptReportingPublicResult,
   serializeRuntimeExecutionReceiptReportingResult,
   type PolicyAwareDeclarativeRuntimeExecutionWithReceiptReportResult,
   type RuntimeExecutionReceiptReport,
@@ -85,14 +86,21 @@ test("projects only diagnostic codes for non-executed results", () => {
   });
 });
 
-test("serializes the public projection deterministically", () => {
-  const result = executedFixture();
-  const serialized = serializeRuntimeExecutionReceiptReportingResult(result);
+test("serializes an already-projected public result without recomputing it", () => {
+  const projected = projectRuntimeExecutionReceiptReportingResult(executedFixture());
 
   assert.equal(
-    serialized,
-    JSON.stringify(projectRuntimeExecutionReceiptReportingResult(result)),
+    serializeRuntimeExecutionReceiptReportingPublicResult(projected),
+    JSON.stringify(projected),
   );
+});
+
+test("serializes the integrated result through the same public projection contract", () => {
+  const result = executedFixture();
+  const projected = projectRuntimeExecutionReceiptReportingResult(result);
+  const serialized = serializeRuntimeExecutionReceiptReportingResult(result);
+
+  assert.equal(serialized, serializeRuntimeExecutionReceiptReportingPublicResult(projected));
   const parsed = JSON.parse(serialized) as Record<string, unknown>;
   assert.equal("runtimeResult" in parsed, false);
   assert.equal("resolution" in parsed, false);
