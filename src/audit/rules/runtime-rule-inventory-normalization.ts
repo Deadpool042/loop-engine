@@ -38,7 +38,9 @@ export const RUNTIME_RULE_INVENTORY_NORMALIZATION_INVARIANTS = Object.freeze({
     file: "src/core/audit.ts",
     requiredTokens: Object.freeze([
       'import { AUDIT_RULES } from "../audit/runtime-rules.js";',
-      "createAuditRuleManifest(AUDIT_RULES)",
+      "selectAuditRulesForProfile(options.profile, AUDIT_RULES)",
+      "selectAuditRules(profileRules, options.selection)",
+      "createAuditRuleManifest(rules)",
     ]),
     forbiddenTokens: Object.freeze([]),
   }),
