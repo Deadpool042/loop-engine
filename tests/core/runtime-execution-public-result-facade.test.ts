@@ -70,7 +70,7 @@ function reportFixture(): RuntimeExecutionReceiptReport {
   }) as unknown as RuntimeExecutionReceiptReport;
 }
 
-test("finalizes an integrated execution into only public result and stable JSON", () => {
+test("finalizes an integrated execution into only public result and its exact stable JSON", () => {
   const report = reportFixture();
   const integrated = Object.freeze({
     outcome: "executed",
@@ -88,6 +88,7 @@ test("finalizes an integrated execution into only public result and stable JSON"
   assert.equal(facade.result.report, report);
   assert.deepEqual(facade.result.diagnosticCodes, []);
   assert.equal(facade.serialized, JSON.stringify(facade.result));
+  assert.deepEqual(JSON.parse(facade.serialized), facade.result);
   assert.equal("runtimeResult" in facade.result, false);
   assert.equal("resolution" in facade.result, false);
   assert.ok(Object.isFrozen(facade));
@@ -116,11 +117,12 @@ test("preserves a public failure without leaking internal diagnostic fields", ()
     "runtime_execution_runtime_not_allowed",
   ]);
   assert.equal(facade.result.report, null);
+  assert.deepEqual(parsed, facade.result);
   assert.equal(JSON.stringify(parsed).includes("internal explanation"), false);
   assert.equal(JSON.stringify(parsed).includes("secret"), false);
 });
 
-test("facade composes the established V13.77 and V13.78 boundaries only", () => {
+test("facade composes once and serializes the already-projected public result", () => {
   const source = readFileSync(
     "src/core/runtime-execution-public-result-facade.ts",
     "utf8",
@@ -131,7 +133,8 @@ test("facade composes the established V13.77 and V13.78 boundaries only", () => 
     /executePolicyAwareDeclarativeRuntimeWithReceiptReport\(input\)/,
   );
   assert.match(source, /projectRuntimeExecutionReceiptReportingResult\(integrated\)/);
-  assert.match(source, /serializeRuntimeExecutionReceiptReportingResult\(integrated\)/);
+  assert.match(source, /serializeRuntimeExecutionReceiptReportingPublicResult\(result\)/);
+  assert.doesNotMatch(source, /serializeRuntimeExecutionReceiptReportingResult\(integrated\)/);
   assert.doesNotMatch(source, /executePolicyAwareDeclarativeRuntimeWithReceipt\(input\)/);
   assert.doesNotMatch(source, /src\/execution|\.\.\/execution/);
   assert.doesNotMatch(source, /runtimeResult:/);
