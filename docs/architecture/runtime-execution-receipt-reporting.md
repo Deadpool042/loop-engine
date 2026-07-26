@@ -82,3 +82,20 @@ La façade exécute exactement une fois via le chemin V13.77 déjà établi. Ell
 `finalizeRuntimeExecutionPublicResult` est une étape pure qui peut aussi être appliquée à un résultat V13.77 déjà produit. Elle ne relance aucune exécution, ne reconstruit aucun receipt et ne lit aucun état de plateforme.
 
 V13.80 reste une surface Core interne et opt-in : aucun mode CLI, transport entrant, renderer `src/execution`, provider, persistance ou nouvel effet externe n'est ajouté. Les protections `AUDIT-410`, `AUDIT-421` et `AUDIT-422` restent applicables sans modification.
+
+## V13.82 — Cohérence projection / sérialisation
+
+V13.82 supprime la double projection implicite de la façade publique. La projection publique est maintenant construite une seule fois, puis `serializeRuntimeExecutionReceiptReportingPublicResult` sérialise exactement ce même objet.
+
+```text
+integrated result
+  -> projectRuntimeExecutionReceiptReportingResult
+  -> public result
+     -> returned as result
+     -> serializeRuntimeExecutionReceiptReportingPublicResult(result)
+        -> returned as serialized
+```
+
+Ainsi, `serialized === JSON.stringify(result)` devient un invariant direct de la façade et non une simple conséquence de deux projections supposées identiques. Le serializer historique `serializeRuntimeExecutionReceiptReportingResult` reste disponible et délègue au même serializer de projection publique pour préserver la compatibilité.
+
+Cette consolidation ne modifie ni la shape publique `{ result, serialized }`, ni `schemaVersion`, ni les diagnostics exposés. Elle n'ajoute aucune exécution, aucun état, aucun CLI, transport, provider ou renderer historique. `AUDIT-423` est réaligné sur cette composition plus stricte.
