@@ -7,6 +7,8 @@ import {
   RUNTIME_AUDIT_MANIFEST_CONSISTENCY_RULE,
   registerRuntimeAuditManifestInventory,
 } from "./rules/runtime-audit-manifest-consistency.js";
+import { INBOUND_SECURITY_CONTRACT_RULE } from "./rules/inbound-security-contract.js";
+import { INBOUND_SECURITY_GATE_RULE } from "./rules/inbound-security-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -25,6 +27,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   RUNTIME_EXECUTION_PUBLIC_RESULT_FACADE_RULE,
   RUNTIME_RULE_INVENTORY_NORMALIZATION_RULE,
   RUNTIME_AUDIT_MANIFEST_CONSISTENCY_RULE,
+  INBOUND_SECURITY_CONTRACT_RULE,
+  INBOUND_SECURITY_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
