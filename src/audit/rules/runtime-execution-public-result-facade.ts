@@ -19,7 +19,7 @@ export const RUNTIME_EXECUTION_PUBLIC_RESULT_FACADE_INVARIANTS = Object.freeze({
       "executePolicyAwareDeclarativeRuntimePublicResult",
       "executePolicyAwareDeclarativeRuntimeWithReceiptReport(input)",
       "projectRuntimeExecutionReceiptReportingResult(integrated)",
-      "serializeRuntimeExecutionReceiptReportingResult(integrated)",
+      "serializeRuntimeExecutionReceiptReportingPublicResult(result)",
       "result: RuntimeExecutionReceiptReportingPublicResult",
       "serialized: string",
     ]),
