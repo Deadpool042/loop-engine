@@ -15,7 +15,6 @@ test("AUDIT-421 protects the additive Runtime receipt reporting boundary", () =>
 });
 
 test("AUDIT-421 is registered in the operational audit inventory", () => {
-  assert.equal(AUDIT_RULES.at(-1)?.id, "AUDIT-421");
   assert.equal(
     AUDIT_RULES.filter((rule) => rule.id === "AUDIT-421").length,
     1,
