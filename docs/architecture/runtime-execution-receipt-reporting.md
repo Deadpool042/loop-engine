@@ -63,3 +63,22 @@ V13.77 integrated result
 ```
 
 La sérialisation est déterministe pour un même résultat intégré et ne crée aucune nouvelle donnée temporelle ou aléatoire. Elle reste Core-only et opt-in : aucun changement n'est apporté au CLI, à `src/execution`, aux transports ou aux providers.
+
+## V13.80 — Façade publique Core
+
+V13.80 compose les frontières V13.77 et V13.78 dans une seule surface opt-in : `executePolicyAwareDeclarativeRuntimePublicResult`.
+
+```text
+Policy-aware Runtime input
+  -> executePolicyAwareDeclarativeRuntimeWithReceiptReport
+  -> finalizeRuntimeExecutionPublicResult
+     -> projectRuntimeExecutionReceiptReportingResult
+     -> serializeRuntimeExecutionReceiptReportingResult
+  -> { result, serialized }
+```
+
+La façade exécute exactement une fois via le chemin V13.77 déjà établi. Elle ne retourne ni le résultat intégré interne, ni `RuntimeResult`, ni la résolution policy-aware. Sa sortie contient uniquement la projection publique versionnée et sa représentation JSON stable.
+
+`finalizeRuntimeExecutionPublicResult` est une étape pure qui peut aussi être appliquée à un résultat V13.77 déjà produit. Elle ne relance aucune exécution, ne reconstruit aucun receipt et ne lit aucun état de plateforme.
+
+V13.80 reste une surface Core interne et opt-in : aucun mode CLI, transport entrant, renderer `src/execution`, provider, persistance ou nouvel effet externe n'est ajouté. Les protections `AUDIT-410`, `AUDIT-421` et `AUDIT-422` restent applicables sans modification.
