@@ -1166,6 +1166,36 @@ function receiptCreationFailureDiagnostic(
   );
 }
 
+type RuntimeReceiptConstructionResult =
+  | Readonly<{
+      constructed: true;
+      receipt: RuntimeExecutionReceipt;
+      diagnostics: readonly [];
+    }>
+  | Readonly<{
+      constructed: false;
+      receipt: null;
+      diagnostics: readonly DeclarativeRuntimeExecutionBridgeError[];
+    }>;
+
+function constructRuntimeExecutionReceipt(
+  input: RuntimeExecutionReceiptInput,
+): RuntimeReceiptConstructionResult {
+  try {
+    return {
+      constructed: true,
+      receipt: createRuntimeExecutionReceipt(input),
+      diagnostics: [],
+    };
+  } catch (error) {
+    return {
+      constructed: false,
+      receipt: null,
+      diagnostics: [receiptCreationFailureDiagnostic(error)],
+    };
+  }
+}
+
 function localProcessBindingDiagnostic(
   resolution: PolicyAwareDeclarativeRuntimeExecutionResolution,
   binding: LocalProcessExecutionBinding | undefined,
@@ -1290,13 +1320,29 @@ export async function executePolicyBoundLocalProcessWithReceipt(
     return deepFreeze({ outcome: "resolution_failed", resolution, runtimeResult: null, receipt: null, diagnostics: resolution.diagnostics }) as PolicyBoundLocalProcessExecutionResult;
   }
   const runtimeResult = await executeResolvedRuntime(resolution);
-  try {
-    const receipt = createRuntimeExecutionReceipt({ resolution, admission: input.admission, runtimeResult });
-    return deepFreeze({ outcome: "executed", resolution, runtimeResult, receipt, diagnostics: [] }) as PolicyBoundLocalProcessExecutionResult;
-  } catch (error) {
-    const diagnostic = receiptCreationFailureDiagnostic(error);
-    return deepFreeze({ outcome: "receipt_creation_failed", resolution, runtimeResult, receipt: null, diagnostics: [diagnostic] }) as PolicyBoundLocalProcessExecutionResult;
+  const receiptResult = constructRuntimeExecutionReceipt({
+    resolution,
+    admission: input.admission,
+    runtimeResult,
+  });
+
+  if (receiptResult.constructed) {
+    return deepFreeze({
+      outcome: "executed",
+      resolution,
+      runtimeResult,
+      receipt: receiptResult.receipt,
+      diagnostics: receiptResult.diagnostics,
+    }) as PolicyBoundLocalProcessExecutionResult;
   }
+
+  return deepFreeze({
+    outcome: "receipt_creation_failed",
+    resolution,
+    runtimeResult,
+    receipt: null,
+    diagnostics: receiptResult.diagnostics,
+  }) as PolicyBoundLocalProcessExecutionResult;
 }
 
 export function createRuntimeExecutionPlan(
@@ -1770,27 +1816,27 @@ export async function executePolicyAwareDeclarativeRuntimeWithReceipt(
 
   const runtimeResult = await executeResolvedRuntime(resolution);
 
-  try {
-    const receipt = createRuntimeExecutionReceipt({
-      resolution,
-      admission: input.admission,
-      runtimeResult,
-    });
+  const receiptResult = constructRuntimeExecutionReceipt({
+    resolution,
+    admission: input.admission,
+    runtimeResult,
+  });
+
+  if (receiptResult.constructed) {
     return deepFreeze({
       outcome: "executed",
       resolution,
       runtimeResult,
-      receipt,
-      diagnostics: [],
-    }) as PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult;
-  } catch (error) {
-    const diagnostic = receiptCreationFailureDiagnostic(error);
-    return deepFreeze({
-      outcome: "receipt_creation_failed",
-      resolution,
-      runtimeResult,
-      receipt: null,
-      diagnostics: [diagnostic],
+      receipt: receiptResult.receipt,
+      diagnostics: receiptResult.diagnostics,
     }) as PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult;
   }
+
+  return deepFreeze({
+    outcome: "receipt_creation_failed",
+    resolution,
+    runtimeResult,
+    receipt: null,
+    diagnostics: receiptResult.diagnostics,
+  }) as PolicyAwareDeclarativeRuntimeExecutionWithReceiptResult;
 }
