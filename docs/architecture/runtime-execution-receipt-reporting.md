@@ -45,3 +45,21 @@ Policy-aware Runtime input
 `attachRuntimeExecutionReceiptReport` est une projection pure : elle ne sélectionne aucun runtime, n'appelle aucun adapter et ne reconstruit aucun receipt. Le report n'existe que lorsque l'exécution a produit un receipt valide. Les échecs pré-exécution et les échecs de construction du receipt restent représentés par leur résultat Core existant avec `report: null`.
 
 Cette intégration demeure opt-in. Elle n'ajoute aucun mode CLI, aucun transport entrant, aucun renderer sous `src/execution`, aucune persistance et aucun appel fournisseur. `AUDIT-410` reste donc applicable sans modification : le reporting historique demeure séparé du reporting Runtime receipt.
+
+## V13.78 — Sérialisation du résultat intégré
+
+V13.78 ajoute une projection publique versionnée du résultat V13.77. `projectRuntimeExecutionReceiptReportingResult` réduit le résultat Core interne à quatre champs : `schemaVersion`, `outcome`, `report` et `diagnosticCodes`.
+
+La frontière exclut explicitement `RuntimeResult`, la résolution policy-aware, les adapters et les registres. Les diagnostics ne traversent cette projection que sous forme de codes stables ; leurs messages et détails internes ne sont pas sérialisés.
+
+```text
+V13.77 integrated result
+  -> projectRuntimeExecutionReceiptReportingResult
+     -> schemaVersion
+     -> outcome
+     -> report | null
+     -> diagnosticCodes[]
+  -> serializeRuntimeExecutionReceiptReportingResult
+```
+
+La sérialisation est déterministe pour un même résultat intégré et ne crée aucune nouvelle donnée temporelle ou aléatoire. Elle reste Core-only et opt-in : aucun changement n'est apporté au CLI, à `src/execution`, aux transports ou aux providers.
