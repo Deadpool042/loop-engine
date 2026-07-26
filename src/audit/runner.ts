@@ -1,5 +1,5 @@
 import type { AuditProfile, AuditReport } from "./types.js";
-import { AUDIT_RULES } from "./rules.js";
+import { AUDIT_RULES } from "./runtime-rules.js";
 import { selectAuditRulesForProfile } from "./profiles.js";
 import {
   selectAuditRules,

@@ -3,7 +3,7 @@ import {
   createAuditRuleManifest,
   selectAuditRules,
 } from "../audit/registry.js";
-import { AUDIT_RULES } from "../audit/rules.js";
+import { AUDIT_RULES } from "../audit/runtime-rules.js";
 import { runAudit as runAuditImplementation } from "../audit/runner.js";
 import type { AuditReport } from "../audit/types.js";
 import type { CoreAuditOptions } from "./types.js";
