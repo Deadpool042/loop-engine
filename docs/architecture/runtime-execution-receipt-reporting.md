@@ -28,3 +28,20 @@ Cette couche ne modifie pas :
 Le serializer est déterministe pour une même enveloppe et un même receipt. Le receipt reste la source publique de vérité pour l'identité descriptor/runtime, la décision admise et l'outcome observé ; l'enveloppe de reporting ne réinterprète pas ces données.
 
 Cette séparation maintient la frontière historique protégée par `AUDIT-410` : le reporting Runtime receipt est additif dans Core et n'injecte pas `RuntimeExecutionReceipt` dans `src/execution/report.ts`.
+
+## V13.77 — Intégration Core
+
+V13.77 relie l'enveloppe de reporting au chemin Core policy-aware existant sans modifier le bridge d'exécution lui-même. La nouvelle façade `executePolicyAwareDeclarativeRuntimeWithReceiptReport` appelle exactement la surface établie `executePolicyAwareDeclarativeRuntimeWithReceipt`, puis projette son résultat avec `attachRuntimeExecutionReceiptReport`.
+
+```text
+Policy-aware Runtime input
+  -> executePolicyAwareDeclarativeRuntimeWithReceipt
+  -> result with receipt or no receipt
+  -> attachRuntimeExecutionReceiptReport
+     -> executed: RuntimeExecutionReceiptReport
+     -> resolution/receipt failure: report = null
+```
+
+`attachRuntimeExecutionReceiptReport` est une projection pure : elle ne sélectionne aucun runtime, n'appelle aucun adapter et ne reconstruit aucun receipt. Le report n'existe que lorsque l'exécution a produit un receipt valide. Les échecs pré-exécution et les échecs de construction du receipt restent représentés par leur résultat Core existant avec `report: null`.
+
+Cette intégration demeure opt-in. Elle n'ajoute aucun mode CLI, aucun transport entrant, aucun renderer sous `src/execution`, aucune persistance et aucun appel fournisseur. `AUDIT-410` reste donc applicable sans modification : le reporting historique demeure séparé du reporting Runtime receipt.
