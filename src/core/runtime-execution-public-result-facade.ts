@@ -5,7 +5,7 @@ import {
 } from "./runtime-execution-receipt-reporting-integration.js";
 import {
   projectRuntimeExecutionReceiptReportingResult,
-  serializeRuntimeExecutionReceiptReportingResult,
+  serializeRuntimeExecutionReceiptReportingPublicResult,
   type RuntimeExecutionReceiptReportingPublicResult,
 } from "./runtime-execution-receipt-reporting-serialization.js";
 
@@ -16,7 +16,8 @@ export type RuntimeExecutionPublicResultFacade = Readonly<{
 
 /**
  * Pure finalization step over an already-integrated execution result.
- * The returned facade contains only the public projection and its stable JSON.
+ * The returned facade contains only the public projection and the exact JSON
+ * serialization of that same projection object.
  */
 export function finalizeRuntimeExecutionPublicResult(
   integrated: PolicyAwareDeclarativeRuntimeExecutionWithReceiptReportResult,
@@ -24,7 +25,7 @@ export function finalizeRuntimeExecutionPublicResult(
   const result = projectRuntimeExecutionReceiptReportingResult(integrated);
   return Object.freeze({
     result,
-    serialized: serializeRuntimeExecutionReceiptReportingResult(integrated),
+    serialized: serializeRuntimeExecutionReceiptReportingPublicResult(result),
   });
 }
 
