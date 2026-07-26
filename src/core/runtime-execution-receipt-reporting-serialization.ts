@@ -41,8 +41,17 @@ export function projectRuntimeExecutionReceiptReportingResult(
   });
 }
 
+/** Serializes an already-projected public result without recomputing it. */
+export function serializeRuntimeExecutionReceiptReportingPublicResult(
+  publicResult: RuntimeExecutionReceiptReportingPublicResult,
+): string {
+  return JSON.stringify(publicResult);
+}
+
 export function serializeRuntimeExecutionReceiptReportingResult(
   result: PolicyAwareDeclarativeRuntimeExecutionWithReceiptReportResult,
 ): string {
-  return JSON.stringify(projectRuntimeExecutionReceiptReportingResult(result));
+  return serializeRuntimeExecutionReceiptReportingPublicResult(
+    projectRuntimeExecutionReceiptReportingResult(result),
+  );
 }
