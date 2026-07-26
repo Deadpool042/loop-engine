@@ -2,6 +2,7 @@ import { createAuditRuleRegistry } from "./registry.js";
 import { RUNTIME_EXECUTION_PUBLIC_RESULT_FACADE_RULE } from "./rules/runtime-execution-public-result-facade.js";
 import { RUNTIME_EXECUTION_RECEIPT_REPORTING_RULE } from "./rules/runtime-execution-receipt-reporting.js";
 import { RUNTIME_EXECUTION_RECEIPT_REPORTING_SERIALIZATION_RULE } from "./rules/runtime-execution-receipt-reporting-serialization.js";
+import { RUNTIME_RULE_INVENTORY_NORMALIZATION_RULE } from "./rules/runtime-rule-inventory-normalization.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -18,6 +19,7 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   RUNTIME_EXECUTION_RECEIPT_REPORTING_RULE,
   RUNTIME_EXECUTION_RECEIPT_REPORTING_SERIALIZATION_RULE,
   RUNTIME_EXECUTION_PUBLIC_RESULT_FACADE_RULE,
+  RUNTIME_RULE_INVENTORY_NORMALIZATION_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
