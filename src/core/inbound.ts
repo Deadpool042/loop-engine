@@ -34,6 +34,7 @@ import { verifyInboundAuthenticationAndPrepareLoopRuntimeRequest } from "./inbou
 export const INBOUND_ENVELOPE_VALIDATION_FAILURE_REASONS = [
   "malformed_envelope",
   "request_id_mismatch",
+  "evaluation_time_mismatch",
 ] as const;
 
 export type InboundEnvelopeValidationFailureReason =
@@ -195,9 +196,20 @@ export function validateInboundLoopRuntimeRequestEnvelope(
 
   const verificationContextRequestId = readRequestId(envelope.verificationContext);
   const accessRequestRequestId = readRequestId(envelope.accessRequest);
+  const verificationContextEvaluatedAt = (
+    envelope.verificationContext as { evaluatedAt?: unknown }
+  ).evaluatedAt;
 
-  if (verificationContextRequestId === null || accessRequestRequestId === null) {
+  if (
+    verificationContextRequestId === null ||
+    accessRequestRequestId === null ||
+    !isNonEmptyString(verificationContextEvaluatedAt)
+  ) {
     return invalid("malformed_envelope");
+  }
+
+  if (envelope.evaluatedAt !== verificationContextEvaluatedAt) {
+    return invalid("evaluation_time_mismatch");
   }
 
   if (
