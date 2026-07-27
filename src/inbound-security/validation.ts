@@ -1,4 +1,8 @@
-import type { InboundAuthenticationEvidence } from "./types.js";
+import type {
+  InboundAccessPolicy,
+  InboundAccessRequest,
+  InboundAuthenticationEvidence,
+} from "./types.js";
 
 /**
  * Compares ISO 8601 instants as strings first (exact match is always valid),
@@ -41,4 +45,12 @@ export function principalMatchesEvidence(
   evidence: InboundAuthenticationEvidence,
 ): boolean {
   return principalId === evidence.subjectId;
+}
+
+
+export function isInboundOperationAllowed(
+  operation: InboundAccessRequest["operation"],
+  policy: InboundAccessPolicy,
+): boolean {
+  return policy.allowedOperations.includes(operation);
 }
