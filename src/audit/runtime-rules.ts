@@ -9,6 +9,8 @@ import {
 } from "./rules/runtime-audit-manifest-consistency.js";
 import { INBOUND_SECURITY_CONTRACT_RULE } from "./rules/inbound-security-contract.js";
 import { INBOUND_SECURITY_GATE_RULE } from "./rules/inbound-security-gate.js";
+import { INBOUND_AUTHENTICATION_VERIFICATION_RULE } from "./rules/inbound-authentication-verification.js";
+import { INBOUND_AUTHENTICATION_GATE_RULE } from "./rules/inbound-authentication-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -29,6 +31,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   RUNTIME_AUDIT_MANIFEST_CONSISTENCY_RULE,
   INBOUND_SECURITY_CONTRACT_RULE,
   INBOUND_SECURITY_GATE_RULE,
+  INBOUND_AUTHENTICATION_VERIFICATION_RULE,
+  INBOUND_AUTHENTICATION_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
