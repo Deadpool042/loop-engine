@@ -21,6 +21,8 @@ import { INBOUND_REPLAY_PROTECTED_AUTHENTICATION_NEUTRALITY_RULE } from "./rules
 import { INBOUND_REPLAY_PROTECTED_AUTHENTICATION_GATE_RULE } from "./rules/inbound-replay-protected-authentication-gate.js";
 import { INBOUND_EVALUATION_TIME_COHERENCE_RULE } from "./rules/inbound-evaluation-time-coherence.js";
 import { INBOUND_EVALUATION_TIME_COHERENCE_GATE_RULE } from "./rules/inbound-evaluation-time-coherence-gate.js";
+import { INBOUND_REPLAY_EVIDENCE_BINDING_RULE } from "./rules/inbound-replay-evidence-binding.js";
+import { INBOUND_REPLAY_EVIDENCE_BINDING_GATE_RULE } from "./rules/inbound-replay-evidence-binding-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -53,6 +55,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_REPLAY_PROTECTED_AUTHENTICATION_GATE_RULE,
   INBOUND_EVALUATION_TIME_COHERENCE_RULE,
   INBOUND_EVALUATION_TIME_COHERENCE_GATE_RULE,
+  INBOUND_REPLAY_EVIDENCE_BINDING_RULE,
+  INBOUND_REPLAY_EVIDENCE_BINDING_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
