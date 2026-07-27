@@ -2,6 +2,7 @@ import type {
   InboundAccessPolicy,
   InboundAccessRequest,
   InboundAuthenticationEvidence,
+  InboundReplayEvidence,
 } from "./types.js";
 
 /**
@@ -53,4 +54,11 @@ export function isInboundOperationAllowed(
   policy: InboundAccessPolicy,
 ): boolean {
   return policy.allowedOperations.includes(operation);
+}
+
+export function isReplayReceiptTimeAfterEvaluation(
+  replayEvidence: InboundReplayEvidence,
+  evaluatedAt: string,
+): boolean {
+  return compareInstants(replayEvidence.receivedAt, evaluatedAt) > 0;
 }
