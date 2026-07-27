@@ -239,6 +239,21 @@ describe("validateInboundLoopRuntimeRequestEnvelope", () => {
     assert.deepEqual(result, { valid: false, reason: "request_id_mismatch" });
   });
 
+  it("rejects an evaluation time mismatch", () => {
+    const result = validateInboundLoopRuntimeRequestEnvelope(
+      envelope({
+        verificationContext: Object.freeze({
+          requestId: REQUEST_ID,
+          evaluatedAt: "2026-01-01T00:00:01.000Z",
+        }),
+      }),
+    );
+    assert.deepEqual(result, {
+      valid: false,
+      reason: "evaluation_time_mismatch",
+    });
+  });
+
   it("accepts a structurally valid, identity-consistent envelope", () => {
     const result = validateInboundLoopRuntimeRequestEnvelope(envelope());
     assert.deepEqual(result, { valid: true });
@@ -286,6 +301,27 @@ describe("handleInboundLoopRuntimeRequest", () => {
 
     assert.deepEqual(result, { outcome: "invalid", reason: "request_id_mismatch" });
     assert.equal(calls.verifier, 0);
+  });
+
+  it("rejects an evaluation time mismatch before any dependency call", async () => {
+    const calls = counters();
+    const result = await handleInboundLoopRuntimeRequest(
+      envelope({
+        verificationContext: Object.freeze({
+          requestId: REQUEST_ID,
+          evaluatedAt: "2026-01-01T00:00:01.000Z",
+        }),
+      }),
+      dependencies(calls),
+    );
+
+    assert.deepEqual(result, {
+      outcome: "invalid",
+      reason: "evaluation_time_mismatch",
+    });
+    assert.equal(calls.verifier, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
   });
 
   it("fails closed on malformed authentication input", async () => {
