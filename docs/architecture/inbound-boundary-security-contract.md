@@ -1,12 +1,14 @@
 # Contrat de sécurité de la frontière entrante
 
-## Statut V14.0a–V14.0b
+## Statut V14.0a–V14.0d
 
 V14.0a introduit le contrat de sécurité déclaratif d'une future frontière
 entrante (inbound boundary). V14.0b ajoute devant ce contrat un port explicite
-de vérification d'authentification injecté. Aucun transport réel, serveur HTTP,
-socket, endpoint webhook, appel réseau, SDK de provider, backend de credentials
-ou vérification cryptographique concrète n'est ajouté.
+de vérification d'authentification injecté. V14.0c ajoute le point d'entrée
+applicatif transport-neutre. V14.0d ajoute un port d'adaptation transport autour
+de ce handler, sans implémentation de protocole concret. Aucun transport réel,
+serveur HTTP, socket, endpoint webhook, appel réseau, SDK de provider, backend de
+credentials ou vérification cryptographique concrète n'est ajouté.
 
 ```text
 Requête entrante non fiable
@@ -40,6 +42,10 @@ Requête entrante non fiable
 - `src/core/inbound-authentication.ts` — façade V14.0b
   `verifyInboundAuthenticationAndPrepareLoopRuntimeRequest`, qui interdit
   d'atteindre V14.0a avant une vérification explicite réussie.
+- `src/core/inbound.ts` — handler V14.0c `handleInboundLoopRuntimeRequest`, seul
+  point d'entrée applicatif destiné aux futurs transports.
+- `src/core/inbound-transport.ts` — port V14.0d `InboundTransportAdapter` et
+  `handleInboundTransportRequest`, sans implémentation de protocole.
 
 ## Frontière de confiance d'authentification
 
@@ -118,12 +124,12 @@ existante (`src/policy/`) : elle s'ajoute en frontière extérieure.
 
 ## Hors périmètre
 
-V14.0b n'ajoute aucun HTTP, JWT, OAuth/OIDC, API-key verifier concret, cookie,
+V14.0d n'ajoute aucun HTTP, JWT, OAuth/OIDC, API-key verifier concret, cookie,
 session store, base de données, filesystem credential store, secret
 d'environnement, rate limiter, persistance de nonce/replay, PKI, dépendance
-crypto, SDK externe, réseau ou modification de l'exécution Runtime. Une future
-implémentation de transport devra fournir explicitement le verifier et les
-adaptateurs de replay nécessaires.
+crypto, SDK externe, réseau ou modification de l'exécution Runtime. Un futur
+adaptateur concret devra fournir explicitement son décodage protocolaire, le
+verifier et les adaptateurs de replay nécessaires.
 
 ## Audit
 
@@ -207,3 +213,44 @@ sémantique d'exécution Runtime.
   non opérationnel.
 - `AUDIT-431` — le handler compose V14.0b plutôt que de contourner les portes
   d'authentification/sécurité.
+
+## V14.0d — port d'adaptation transport
+
+`InboundTransportAdapter` définit uniquement deux opérations injectées :
+
+```text
+decode(input: unknown) -> unknown
+mapResponse(handlerResult) -> InboundTransportResponse
+```
+
+Le résultat de `decode` reste non fiable et doit passer par
+`handleInboundLoopRuntimeRequest`. Une exception du decoder est normalisée en
+entrée invalide, puis traverse le handler V14.0c exactement une fois. Aucun
+chemin alternatif vers le verifier, l'inbound security, la préparation ou le
+Runtime n'existe.
+
+Après le handler, `mapResponse` reçoit uniquement
+`InboundLoopRuntimeRequestHandlerResult`, donc un résultat fermé et redacted. Il
+ne reçoit jamais la requête transport brute ni le credential brut. La réponse
+abstraite doit conserver le même `outcome`; une exception du mapper ou une
+réponse incohérente produit un échec d'adaptation fermé.
+
+Ordre imposé :
+
+```text
+transport opaque
+  -> adapter.decode
+  -> handleInboundLoopRuntimeRequest exactement une fois
+  -> adapter.mapResponse
+  -> réponse transport abstraite
+```
+
+V14.0d ne définit volontairement aucun statut HTTP, header, cookie, route,
+socket frame, topic de queue, ack/nack, connexion réseau ou framework. Ces
+éléments appartiennent à de futurs adaptateurs concrets.
+
+### Audit (V14.0d)
+
+- `AUDIT-432` — le port reste protocole-neutre et sans I/O concrète.
+- `AUDIT-433` — l'adaptation suit strictement `decode -> handler V14.0c ->
+  mapResponse` et interdit tout bypass vers authentication/security/Runtime.
