@@ -37,6 +37,8 @@ import { INBOUND_OPERATION_POLICY_ADMISSION_RULE } from "./rules/inbound-operati
 import { INBOUND_OPERATION_POLICY_ADMISSION_GATE_RULE } from "./rules/inbound-operation-policy-admission-gate.js";
 import { INBOUND_REPLAY_REQUEST_BINDING_RULE } from "./rules/inbound-replay-request-binding.js";
 import { INBOUND_REPLAY_REQUEST_BINDING_GATE_RULE } from "./rules/inbound-replay-request-binding-gate.js";
+import { INBOUND_REPLAY_STATE_REJECTION_RULE } from "./rules/inbound-replay-state-rejection.js";
+import { INBOUND_REPLAY_STATE_REJECTION_GATE_RULE } from "./rules/inbound-replay-state-rejection-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -85,6 +87,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_OPERATION_POLICY_ADMISSION_GATE_RULE,
   INBOUND_REPLAY_REQUEST_BINDING_RULE,
   INBOUND_REPLAY_REQUEST_BINDING_GATE_RULE,
+  INBOUND_REPLAY_STATE_REJECTION_RULE,
+  INBOUND_REPLAY_STATE_REJECTION_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
