@@ -11,6 +11,7 @@ import {
   isEvidenceExpired,
   isEvidenceNotYetValid,
   isEvidenceVerified,
+  isInboundOperationAllowed,
   principalMatchesEvidence,
 } from "./validation.js";
 
@@ -60,7 +61,7 @@ export function evaluateInboundSecurity(
     return denyInboundSecurity(requestId, "tenant_mismatch");
   }
 
-  if (!input.policy.allowedOperations.includes(input.accessRequest.operation)) {
+  if (!isInboundOperationAllowed(input.accessRequest.operation, input.policy)) {
     return denyInboundSecurity(requestId, "operation_not_allowed");
   }
 

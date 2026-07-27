@@ -17,6 +17,7 @@ import type { InboundSecurityEvaluationInput } from "../inbound-security/types.j
 import {
   isEvidenceExpired,
   isEvidenceNotYetValid,
+  isInboundOperationAllowed,
 } from "../inbound-security/validation.js";
 import type { LoopRuntimePublicRequestAuthorizer } from "./loop-runtime-public-request-authorization.js";
 import { decodeLoopRuntimePublicRequest } from "./loop-runtime-public-request-decoder.js";
@@ -166,6 +167,24 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
         decision: denyInboundSecurity(
           input.verificationContext.requestId,
           "operation_mismatch",
+        ),
+      }),
+    });
+  }
+
+  if (
+    !isInboundOperationAllowed(
+      input.security.accessRequest.operation,
+      input.security.policy,
+    )
+  ) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "operation_not_allowed",
         ),
       }),
     });
