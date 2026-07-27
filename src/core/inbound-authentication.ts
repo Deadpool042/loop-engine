@@ -146,6 +146,21 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
     });
   }
 
+  if (
+    input.verificationContext.requestId !== input.security.accessRequest.requestId
+  ) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "request_id_mismatch",
+        ),
+      }),
+    });
+  }
+
   const decoded = decodeLoopRuntimePublicRequest(input.payload);
 
   if (!decoded.parsed) {
