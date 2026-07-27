@@ -13,6 +13,8 @@ import { INBOUND_AUTHENTICATION_VERIFICATION_RULE } from "./rules/inbound-authen
 import { INBOUND_AUTHENTICATION_GATE_RULE } from "./rules/inbound-authentication-gate.js";
 import { INBOUND_REQUEST_HANDLER_NEUTRALITY_RULE } from "./rules/inbound-request-handler-neutrality.js";
 import { INBOUND_REQUEST_HANDLER_GATE_RULE } from "./rules/inbound-request-handler-gate.js";
+import { INBOUND_TRANSPORT_ADAPTER_NEUTRALITY_RULE } from "./rules/inbound-transport-adapter-neutrality.js";
+import { INBOUND_TRANSPORT_ADAPTER_GATE_RULE } from "./rules/inbound-transport-adapter-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -37,6 +39,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_AUTHENTICATION_GATE_RULE,
   INBOUND_REQUEST_HANDLER_NEUTRALITY_RULE,
   INBOUND_REQUEST_HANDLER_GATE_RULE,
+  INBOUND_TRANSPORT_ADAPTER_NEUTRALITY_RULE,
+  INBOUND_TRANSPORT_ADAPTER_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
