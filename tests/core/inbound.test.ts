@@ -204,6 +204,11 @@ function dependencies(
 ) {
   return {
     verifier: authVerifier,
+    replayProtectionPort: {
+      check() {
+        return { accepted: true, receivedAt: EVALUATED_AT };
+      },
+    },
     authorizer: authorizer(calls),
     assembler: assemblerStub(calls),
   };

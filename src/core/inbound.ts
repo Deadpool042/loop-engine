@@ -1,3 +1,4 @@
+import type { InboundReplayProtectionPort } from "../inbound-security/replay-protection.js";
 import type {
   InboundAccessPolicy,
   InboundAccessRequest,
@@ -60,6 +61,7 @@ export type InboundLoopRuntimeRequestEnvelope = Readonly<{
 /** Explicit, injected dependencies. No default, no registry, no discovery. */
 export type InboundLoopRuntimeRequestHandlerDependencies = Readonly<{
   verifier: InboundAuthenticationVerifier | null;
+  replayProtectionPort: InboundReplayProtectionPort | null;
   authorizer: LoopRuntimePublicRequestAuthorizer;
   assembler: LoopRuntimeAuthorizedEngineAssembler;
 }>;
@@ -244,6 +246,7 @@ export async function handleInboundLoopRuntimeRequest(
     authenticationInput: envelope.authenticationInput,
     verificationContext: envelope.verificationContext,
     verifier: dependencies.verifier,
+    replayProtectionPort: dependencies.replayProtectionPort,
     security: Object.freeze({
       principal: envelope.principal,
       accessRequest: envelope.accessRequest,

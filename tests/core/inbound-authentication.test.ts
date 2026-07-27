@@ -183,6 +183,11 @@ function input(
       evaluatedAt: EVALUATED_AT,
     }),
     verifier: authVerifier,
+    replayProtectionPort: {
+      check() {
+        return { accepted: true, receivedAt: EVALUATED_AT };
+      },
+    },
     security: Object.freeze({
       principal: principal(),
       accessRequest: accessRequest(),
@@ -279,4 +284,74 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
       assert.equal(serialized.includes(forbidden), false);
     }
   });
+
+  it("invokes replay protection exactly once after successful authentication", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 1);
+    assert.equal(result.verified, true);
+  });
+
+  it("blocks downstream preparation when replay protection rejects", async () => {
+    const calls = counters();
+    const base = input(calls);
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          return { accepted: false, reason: "replay_detected" };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "deny");
+      assert.equal(result.security.decision.reason, "replay_rejected");
+    }
+  });
+
+  it("does not invoke replay protection when authentication fails", async () => {
+    const calls = counters();
+    const base = input(
+      calls,
+      verifier(calls, { verified: false, reason: "rejected" }),
+    );
+    let replayCalls = 0;
+
+    await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+  });
+
 });

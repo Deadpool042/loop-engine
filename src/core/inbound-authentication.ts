@@ -1,3 +1,4 @@
+import { denyInboundSecurity } from "../inbound-security/errors.js";
 import {
   evaluateInboundAuthenticationVerifier,
   type InboundAuthenticationInput,
@@ -5,6 +6,10 @@ import {
   type InboundAuthenticationVerificationFailureReason,
   type InboundAuthenticationVerifier,
 } from "../inbound-security/authentication-verification.js";
+import {
+  evaluateInboundReplayProtection,
+  type InboundReplayProtectionPort,
+} from "../inbound-security/replay-protection.js";
 import type { InboundSecurityEvaluationInput } from "../inbound-security/types.js";
 import type { LoopRuntimePublicRequestAuthorizer } from "./loop-runtime-public-request-authorization.js";
 import type { LoopRuntimeAuthorizedEngineAssembler } from "./loop-runtime-public-request-engine-assembly.js";
@@ -17,6 +22,7 @@ export type InboundAuthenticationGatedPreparationInput = Readonly<{
   authenticationInput: InboundAuthenticationInput;
   verificationContext: InboundAuthenticationVerificationContext;
   verifier: InboundAuthenticationVerifier | null;
+  replayProtectionPort: InboundReplayProtectionPort | null;
   security: Omit<InboundSecurityEvaluationInput, "evidence">;
   evaluatedAt: string;
   payload: unknown;
@@ -57,6 +63,46 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
       verified: false as const,
       reason: verification.reason,
     });
+  }
+
+  if (input.security.policy.replayCheckRequired) {
+    const replayEvidence = input.security.replayEvidence;
+
+    if (replayEvidence === null) {
+      return Object.freeze({
+        verified: true as const,
+        security: Object.freeze({
+          allowed: false as const,
+          decision: denyInboundSecurity(
+            input.verificationContext.requestId,
+            "replay_evidence_missing",
+          ),
+        }),
+      });
+    }
+
+    const replay = await evaluateInboundReplayProtection(
+      Object.freeze({
+        requestId: input.verificationContext.requestId,
+        evidenceId: verification.evidence.evidenceId,
+        nonce: replayEvidence.nonce,
+        evaluatedAt: input.evaluatedAt,
+      }),
+      input.replayProtectionPort,
+    );
+
+    if (!replay.accepted) {
+      return Object.freeze({
+        verified: true as const,
+        security: Object.freeze({
+          allowed: false as const,
+          decision: denyInboundSecurity(
+            input.verificationContext.requestId,
+            "replay_rejected",
+          ),
+        }),
+      });
+    }
   }
 
   const security: InboundSecurityEvaluationInput = Object.freeze({
