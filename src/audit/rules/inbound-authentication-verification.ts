@@ -8,7 +8,7 @@ const VERIFICATION_FILE = "src/inbound-security/authentication-verification.ts";
 
 const REQUIRED_TOKENS = Object.freeze([
   "export type InboundAuthenticationInput",
-  "export type InboundAuthenticationVerifier",
+  "export type InboundAuthenticationVerifier = Readonly<{",
   "export type InboundAuthenticationVerificationResult",
   "export async function evaluateInboundAuthenticationVerifier(",
   "const verify = readVerifyFunction(verifier);",
