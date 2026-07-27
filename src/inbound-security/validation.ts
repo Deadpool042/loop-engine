@@ -56,9 +56,17 @@ export function isInboundOperationAllowed(
   return policy.allowedOperations.includes(operation);
 }
 
+/**
+ * Generalized instant comparison, reused by every receipt-time validation
+ * (pre-port evidence and post-port protection results alike).
+ */
+export function isInstantAfter(instant: string, evaluatedAt: string): boolean {
+  return compareInstants(instant, evaluatedAt) > 0;
+}
+
 export function isReplayReceiptTimeAfterEvaluation(
   replayEvidence: InboundReplayEvidence,
   evaluatedAt: string,
 ): boolean {
-  return compareInstants(replayEvidence.receivedAt, evaluatedAt) > 0;
+  return isInstantAfter(replayEvidence.receivedAt, evaluatedAt);
 }

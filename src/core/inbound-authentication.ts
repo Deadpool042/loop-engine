@@ -18,6 +18,7 @@ import {
   isEvidenceExpired,
   isEvidenceNotYetValid,
   isInboundOperationAllowed,
+  isInstantAfter,
   isReplayReceiptTimeAfterEvaluation,
 } from "../inbound-security/validation.js";
 import type { LoopRuntimePublicRequestAuthorizer } from "./loop-runtime-public-request-authorization.js";
@@ -283,6 +284,19 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
     );
 
     if (!replay.accepted) {
+      return Object.freeze({
+        verified: true as const,
+        security: Object.freeze({
+          allowed: false as const,
+          decision: denyInboundSecurity(
+            input.verificationContext.requestId,
+            "replay_rejected",
+          ),
+        }),
+      });
+    }
+
+    if (isInstantAfter(replay.receivedAt, input.evaluatedAt)) {
       return Object.freeze({
         verified: true as const,
         security: Object.freeze({
