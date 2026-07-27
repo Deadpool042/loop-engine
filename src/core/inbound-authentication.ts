@@ -65,6 +65,25 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
     });
   }
 
+  const principal = input.security.principal;
+
+  if (
+    principal !== null &&
+    (principal.principalId !== verification.evidence.subjectId ||
+      principal.principalId !== input.security.accessRequest.principalId)
+  ) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "principal_mismatch",
+        ),
+      }),
+    });
+  }
+
   if (input.security.policy.replayCheckRequired) {
     const replayEvidence = input.security.replayEvidence;
 
