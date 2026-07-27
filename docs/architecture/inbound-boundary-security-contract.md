@@ -1,18 +1,18 @@
 # Contrat de sécurité de la frontière entrante
 
-## Statut V14.0a
+## Statut V14.0a–V14.0b
 
 V14.0a introduit le contrat de sécurité déclaratif d'une future frontière
-entrante (inbound boundary). Aucun transport réel, serveur HTTP, socket,
-endpoint webhook, appel réseau, SDK de provider ou backend de credentials
-n'est ajouté. Ce lot ne fait que définir — et évaluer de façon pure — le
-modèle de données de sécurité qui devra exister avant qu'une requête externe
-non fiable puisse entrer dans le chemin existant de préparation de la requête
-publique Runtime (`decode -> authorize -> assemble -> prepare`).
+entrante (inbound boundary). V14.0b ajoute devant ce contrat un port explicite
+de vérification d'authentification injecté. Aucun transport réel, serveur HTTP,
+socket, endpoint webhook, appel réseau, SDK de provider, backend de credentials
+ou vérification cryptographique concrète n'est ajouté.
 
 ```text
 Requête entrante non fiable
-  -> Preuve d'authentification (fournie par un transport/authenticator futur)
+  -> Matériel d'authentification non fiable
+  -> InboundAuthenticationVerifier injecté
+  -> InboundAuthenticationEvidence vérifiée
   -> Principal
   -> Tenant / domaine de sécurité
   -> Décision ACL
@@ -22,28 +22,59 @@ Requête entrante non fiable
 
 ## Modules
 
-- `src/inbound-security/types.ts` — types déclaratifs : `InboundAuthenticationEvidence`,
-  `InboundPrincipal`, `InboundAccessRequest`, `InboundReplayEvidence`,
-  `InboundAccessPolicy`, `InboundSecurityDecision`.
+- `src/inbound-security/types.ts` — types déclaratifs V14.0a :
+  `InboundAuthenticationEvidence`, `InboundPrincipal`, `InboundAccessRequest`,
+  `InboundReplayEvidence`, `InboundAccessPolicy`, `InboundSecurityDecision`.
 - `src/inbound-security/errors.ts` — constructeurs purs des trois issues de
   décision (`allow` / `deny` / `indeterminate`).
 - `src/inbound-security/validation.ts` — prédicats purs (vérification,
   expiration, correspondance de principal) sans accès à l'horloge système.
 - `src/inbound-security/evaluation.ts` — `evaluateInboundSecurity(input, evaluatedAt)`,
-  l'évaluateur pur et déterministe.
-- `src/core/inbound-security.ts` — façade Core `evaluateInboundSecurityAndPrepareLoopRuntimeRequest`,
-  seule frontière autorisée à conditionner l'appel à la chaîne existante
-  `prepareAuthorizedLoopRuntimeRequest` (voir
-  `loop-runtime-public-request-prepared-entry.ts`) à une décision explicite
-  `allow`.
+  l'évaluateur ACL/replay pur et déterministe.
+- `src/inbound-security/authentication-verification.ts` — contrat V14.0b :
+  `InboundAuthenticationInput` non fiable, `InboundAuthenticationVerifier`
+  injecté et `evaluateInboundAuthenticationVerifier`, qui normalise toute issue
+  en résultat fermé et redacted.
+- `src/core/inbound-security.ts` — façade V14.0a
+  `evaluateInboundSecurityAndPrepareLoopRuntimeRequest`.
+- `src/core/inbound-authentication.ts` — façade V14.0b
+  `verifyInboundAuthenticationAndPrepareLoopRuntimeRequest`, qui interdit
+  d'atteindre V14.0a avant une vérification explicite réussie.
 
-## Preuve d'authentification externe à Core
+## Frontière de confiance d'authentification
 
-`InboundAuthenticationEvidence` représente une preuve déjà obtenue et vérifiée
-par un transport/authenticator futur. Ce type n'authentifie jamais lui-même :
-Core consomme une preuve déjà vérifiée (`verified: boolean`), avec une
-empreinte/référence de credential (`credentialFingerprint`) — jamais de jeton,
-mot de passe, clé, cookie ou secret brut.
+`InboundAuthenticationInput` est non fiable. Son champ opaque `credential` peut
+contenir du matériel secret destiné exclusivement à l'implémentation injectée
+du verifier. Core ne lit jamais ce champ, ne le journalise pas, ne le sérialise
+pas et ne le transmet jamais à l'ACL, à l'autorisation publique, à l'assembleur,
+à la préparation ou au Runtime.
+
+`InboundAuthenticationVerifier` est un port injecté sans implémentation par
+défaut, registre, fallback ou retry. `evaluateInboundAuthenticationVerifier`
+valide la forme de l'entrée et du contexte, lit le port sans exécuter de getter,
+préserve `this`, appelle `verify` exactement une fois et accepte un résultat
+sync ou async. Exception, rejection, thenable hostile ou sortie malformée sont
+normalisés vers une raison stable sans exposer message d'exception, stack ou
+credential.
+
+Un succès du verifier produit une `InboundAuthenticationEvidence` structurée et
+`verified: true`. Cette preuve est la seule valeur d'authentification autorisée
+à traverser vers la façade V14.0a. L'identité de cette preuve est conservée ; le
+matériel brut de `InboundAuthenticationInput` ne l'est jamais.
+
+La séparation reste stricte :
+
+```text
+Verifier V14.0b
+  "Cette preuve d'authentification est-elle authentique ?"
+
+Inbound security V14.0a
+  "Avec cette preuve authentique, cette requête est-elle autorisée ?"
+```
+
+Le verifier ne décide donc ni expiration ACL finale, ni tenant, ni opération,
+ni replay, ni permission Runtime. Ces contrôles restent dans V14.0a et dans les
+couches Policy/Runtime existantes.
 
 ## Décision ACL explicite et fail-closed
 
@@ -54,9 +85,8 @@ fournies explicitement par l'appelant. Le défaut est toujours `deny`. Les
 raisons de refus sont distinguées explicitement : preuve absente, preuve
 invalide, preuve expirée ou pas encore valide, principal non correspondant,
 tenant non correspondant, opération non autorisée, preuve replay absente ou
-rejetée. L'absence de principal, seule, produit une décision `indeterminate`
-plutôt qu'un `deny` typé — mais la façade Core traite tout résultat autre que
-`allow` explicite comme un refus d'accès à la chaîne existante.
+rejetée. L'absence de principal, seule, produit une décision `indeterminate`,
+mais toute issue autre que `allow` bloque la chaîne publique existante.
 
 ## État de replay externe à Core
 
@@ -64,27 +94,42 @@ plutôt qu'un `deny` typé — mais la façade Core traite tout résultat autre 
 consomme une preuve de replay fournie explicitement par un futur adaptateur
 externe ; il ne maintient aucun état de replay lui-même.
 
-## Frontière de composition
+## Frontières de composition
 
-`evaluateInboundSecurityAndPrepareLoopRuntimeRequest` est l'unique point qui
-peut conditionner la chaîne publique existante. L'invariant critique :
-qu'aucun appel à `prepareAuthorizedLoopRuntimeRequest` (et donc aucun appel à
-l'assembleur, à la résolution Runtime, ou à l'exécution) ne peut se produire
-avant qu'une décision explicite `allow` ait été retournée. Sur `deny` ou
-`indeterminate`, la façade retourne immédiatement sans invoquer la chaîne
-existante ; sur `allow`, elle l'invoque exactement une fois, avec uniquement
-le `principalId` de la décision — jamais la preuve d'authentification.
+V14.0b impose l'ordre :
+
+```text
+verifyInboundAuthenticationAndPrepareLoopRuntimeRequest
+  -> evaluateInboundAuthenticationVerifier
+  -> échec : retour immédiat
+  -> succès : preuve vérifiée uniquement
+  -> evaluateInboundSecurityAndPrepareLoopRuntimeRequest
+  -> allow uniquement
+  -> prepareAuthorizedLoopRuntimeRequest
+```
+
+Un échec de vérification provoque zéro appel à V14.0a, à l'authorizer, à
+l'assembleur, à la préparation, à la résolution Runtime ou à l'exécution. Un
+succès appelle la façade V14.0a exactement une fois ; V14.0b ne duplique jamais
+le decoder, l'autorisation, l'assemblage ou la préparation.
 
 Cette couche ne remplace ni l'Agent Policy Engine, ni l'admission Runtime
-existante (`src/policy/`) : elle s'ajoute en frontière extérieure. Aucun
-transport n'existe encore ; aucune vérification cryptographique réelle de
-credential n'existe encore — ces éléments appartiennent à de futurs lots V14.
+existante (`src/policy/`) : elle s'ajoute en frontière extérieure.
+
+## Hors périmètre
+
+V14.0b n'ajoute aucun HTTP, JWT, OAuth/OIDC, API-key verifier concret, cookie,
+session store, base de données, filesystem credential store, secret
+d'environnement, rate limiter, persistance de nonce/replay, PKI, dépendance
+crypto, SDK externe, réseau ou modification de l'exécution Runtime. Une future
+implémentation de transport devra fournir explicitement le verifier et les
+adaptateurs de replay nécessaires.
 
 ## Audit
 
-- `AUDIT-426` — le contrat (`types.ts`, `evaluation.ts`, `inbound-security.ts`,
-  export Core) reste déclaratif, sans secret, et l'évaluateur reste libre de
-  tout accès horloge/fichier/réseau/process.
-- `AUDIT-427` — la façade Core conditionne l'appel à
-  `prepareAuthorizedLoopRuntimeRequest` à la décision explicite `allow`, dans
-  cet ordre, sans appel inconditionnel.
+- `AUDIT-426` — contrat V14.0a déclaratif, sans secret et non opérationnel.
+- `AUDIT-427` — V14.0a gate la préparation publique sur `allow` explicite.
+- `AUDIT-428` — le port de vérification V14.0b reste injecté, redacted,
+  transport-neutral et sans comportement opérationnel concret.
+- `AUDIT-429` — la vérification réussie précède obligatoirement toute évaluation
+  V14.0a ; aucun bypass vers une préparation de plus bas niveau n'est admis.
