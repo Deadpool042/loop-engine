@@ -22,6 +22,7 @@ export * from "./loop-runtime-public-request-runtime-request.js";
 export * from "./loop-runtime-public-request-preparation.js";
 export * from "./loop-runtime-public-request-entry-preparation.js";
 export * from "./inbound-security.js";
+export * from "./inbound-authentication.js";
 export * from "./loop-runtime-outcome.js";
 export * from "./runtime.js";
 export * from "./runtime-execution-bridge.js";
