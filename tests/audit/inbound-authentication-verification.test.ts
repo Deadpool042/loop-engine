@@ -14,6 +14,7 @@ import { AUDIT_RULES } from "../../src/audit/runtime-rules.js";
 
 const VERIFICATION_FILE = "src/inbound-security/authentication-verification.ts";
 const GATE_FILE = "src/core/inbound-authentication.ts";
+const VERIFIER_TYPE_TOKEN = "export type InboundAuthenticationVerifier = Readonly<{";
 
 test("AUDIT-428 protects the injected authentication verification boundary", () => {
   assert.equal(INBOUND_AUTHENTICATION_VERIFICATION_RULE.id, "AUDIT-428");
@@ -42,13 +43,13 @@ test("AUDIT-428 and AUDIT-429 are registered contiguously after V14.0a", () => {
 test("AUDIT-428 detects missing and forbidden verification tokens", () => {
   const source = readFileSync(VERIFICATION_FILE, "utf8");
   const missing = inspectInboundAuthenticationVerificationInvariant(
-    source.replace("export type InboundAuthenticationVerifier", "removed-verifier"),
+    source.replace(VERIFIER_TYPE_TOKEN, "removed-verifier"),
   );
   const forbidden = inspectInboundAuthenticationVerificationInvariant(
     `${source}\nprocess.env.SECRET\n`,
   );
 
-  assert.deepEqual(missing.missing, ["export type InboundAuthenticationVerifier"]);
+  assert.deepEqual(missing.missing, [VERIFIER_TYPE_TOKEN]);
   assert.deepEqual(forbidden.forbidden, ["process.env"]);
 });
 
