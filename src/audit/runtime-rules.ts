@@ -25,6 +25,8 @@ import { INBOUND_REPLAY_EVIDENCE_BINDING_RULE } from "./rules/inbound-replay-evi
 import { INBOUND_REPLAY_EVIDENCE_BINDING_GATE_RULE } from "./rules/inbound-replay-evidence-binding-gate.js";
 import { INBOUND_PRINCIPAL_BINDING_RULE } from "./rules/inbound-principal-binding.js";
 import { INBOUND_PRINCIPAL_BINDING_GATE_RULE } from "./rules/inbound-principal-binding-gate.js";
+import { INBOUND_PRINCIPAL_PRESENCE_RULE } from "./rules/inbound-principal-presence.js";
+import { INBOUND_PRINCIPAL_PRESENCE_GATE_RULE } from "./rules/inbound-principal-presence-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -61,6 +63,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_REPLAY_EVIDENCE_BINDING_GATE_RULE,
   INBOUND_PRINCIPAL_BINDING_RULE,
   INBOUND_PRINCIPAL_BINDING_GATE_RULE,
+  INBOUND_PRINCIPAL_PRESENCE_RULE,
+  INBOUND_PRINCIPAL_PRESENCE_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
