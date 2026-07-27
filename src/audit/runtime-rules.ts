@@ -45,6 +45,8 @@ import { INBOUND_REPLAY_RECEIPT_TIME_VALIDATION_RULE } from "./rules/inbound-rep
 import { INBOUND_REPLAY_RECEIPT_TIME_VALIDATION_GATE_RULE } from "./rules/inbound-replay-receipt-time-validation-gate.js";
 import { INBOUND_REPLAY_PORT_RECEIPT_TIME_VALIDATION_RULE } from "./rules/inbound-replay-port-receipt-time-validation.js";
 import { INBOUND_REPLAY_PORT_RECEIPT_TIME_VALIDATION_GATE_RULE } from "./rules/inbound-replay-port-receipt-time-validation-gate.js";
+import { INBOUND_VERIFICATION_REQUEST_BINDING_RULE } from "./rules/inbound-verification-request-binding.js";
+import { INBOUND_VERIFICATION_REQUEST_BINDING_GATE_RULE } from "./rules/inbound-verification-request-binding-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -101,6 +103,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_REPLAY_RECEIPT_TIME_VALIDATION_GATE_RULE,
   INBOUND_REPLAY_PORT_RECEIPT_TIME_VALIDATION_RULE,
   INBOUND_REPLAY_PORT_RECEIPT_TIME_VALIDATION_GATE_RULE,
+  INBOUND_VERIFICATION_REQUEST_BINDING_RULE,
+  INBOUND_VERIFICATION_REQUEST_BINDING_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
