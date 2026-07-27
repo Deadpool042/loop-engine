@@ -4,6 +4,16 @@ export {
   indeterminateInboundSecurity,
 } from "./errors.js";
 export { evaluateInboundSecurity } from "./evaluation.js";
+export {
+  evaluateInboundAuthenticationVerifier,
+  INBOUND_AUTHENTICATION_VERIFICATION_FAILURE_REASONS,
+  type InboundAuthenticationInput,
+  type InboundAuthenticationVerificationContext,
+  type InboundAuthenticationVerificationFailureReason,
+  type InboundAuthenticationVerificationResult,
+  type InboundAuthenticationVerifier,
+  type InboundAuthenticationVerifierResult,
+} from "./authentication-verification.js";
 export type {
   InboundAccessDenyReason,
   InboundAccessIndeterminateReason,
