@@ -27,6 +27,8 @@ import { INBOUND_PRINCIPAL_BINDING_RULE } from "./rules/inbound-principal-bindin
 import { INBOUND_PRINCIPAL_BINDING_GATE_RULE } from "./rules/inbound-principal-binding-gate.js";
 import { INBOUND_PRINCIPAL_PRESENCE_RULE } from "./rules/inbound-principal-presence.js";
 import { INBOUND_PRINCIPAL_PRESENCE_GATE_RULE } from "./rules/inbound-principal-presence-gate.js";
+import { INBOUND_AUTH_EVIDENCE_VALIDITY_RULE } from "./rules/inbound-auth-evidence-validity.js";
+import { INBOUND_AUTH_EVIDENCE_VALIDITY_GATE_RULE } from "./rules/inbound-auth-evidence-validity-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -65,6 +67,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_PRINCIPAL_BINDING_GATE_RULE,
   INBOUND_PRINCIPAL_PRESENCE_RULE,
   INBOUND_PRINCIPAL_PRESENCE_GATE_RULE,
+  INBOUND_AUTH_EVIDENCE_VALIDITY_RULE,
+  INBOUND_AUTH_EVIDENCE_VALIDITY_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);

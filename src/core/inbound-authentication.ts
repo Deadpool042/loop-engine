@@ -14,6 +14,10 @@ import {
   type InboundReplayProtectionPort,
 } from "../inbound-security/replay-protection.js";
 import type { InboundSecurityEvaluationInput } from "../inbound-security/types.js";
+import {
+  isEvidenceExpired,
+  isEvidenceNotYetValid,
+} from "../inbound-security/validation.js";
 import type { LoopRuntimePublicRequestAuthorizer } from "./loop-runtime-public-request-authorization.js";
 import type { LoopRuntimeAuthorizedEngineAssembler } from "./loop-runtime-public-request-engine-assembly.js";
 import {
@@ -65,6 +69,32 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
     return Object.freeze({
       verified: false as const,
       reason: verification.reason,
+    });
+  }
+
+  if (isEvidenceNotYetValid(verification.evidence, input.evaluatedAt)) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "authentication_not_yet_valid",
+        ),
+      }),
+    });
+  }
+
+  if (isEvidenceExpired(verification.evidence, input.evaluatedAt)) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "authentication_expired",
+        ),
+      }),
     });
   }
 
