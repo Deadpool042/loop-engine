@@ -125,7 +125,7 @@ describe("handleInboundTransportRequest", () => {
     if (result.handled) {
       assert.deepEqual(result.response.payload, {
         outcome: "invalid",
-        reason: "invalid_envelope",
+        reason: "malformed_envelope",
       });
     }
     assert.deepEqual(calls, { decode: 1, mapResponse: 1, verifier: 0 });

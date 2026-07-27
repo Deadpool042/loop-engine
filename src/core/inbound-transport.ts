@@ -1,5 +1,6 @@
 import {
   handleInboundLoopRuntimeRequest,
+  type InboundLoopRuntimeRequestEnvelope,
   type InboundLoopRuntimeRequestHandlerDependencies,
   type InboundLoopRuntimeRequestHandlerResult,
 } from "./inbound.js";
@@ -118,7 +119,10 @@ export async function handleInboundTransportRequest(
     decoded = undefined;
   }
 
-  const handled = await handleInboundLoopRuntimeRequest(decoded, dependencies);
+  const handled = await handleInboundLoopRuntimeRequest(
+    decoded as InboundLoopRuntimeRequestEnvelope,
+    dependencies,
+  );
 
   let response: unknown;
   try {

@@ -58,7 +58,7 @@ test("AUDIT-433 detects handler bypasses", () => {
 
 test("AUDIT-433 detects duplicate V14.0c handler calls", () => {
   const source = readFileSync(ADAPTER_FILE, "utf8");
-  const call = "await handleInboundLoopRuntimeRequest(decoded, dependencies)";
+  const call = "await handleInboundLoopRuntimeRequest(decoded as never, dependencies)";
   const result = inspectInboundTransportAdapterGateInvariant(`${source}\n${call}\n`);
 
   assert.equal(result.handlerCallCount, 2);

@@ -6,7 +6,7 @@ import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 const ADAPTER_FILE = "src/core/inbound-transport.ts";
 const DECODE_CALL = "await Reflect.apply(decode, adapter, [input])";
-const HANDLER_CALL = "await handleInboundLoopRuntimeRequest(decoded, dependencies)";
+const HANDLER_CALL = "await handleInboundLoopRuntimeRequest(";
 const RESPONSE_CALL = "await Reflect.apply(mapResponse, adapter, [handled])";
 
 const FORBIDDEN_TOKENS = Object.freeze([
