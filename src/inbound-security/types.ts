@@ -69,6 +69,7 @@ export const INBOUND_ACCESS_DENY_REASONS = [
   "principal_mismatch",
   "tenant_mismatch",
   "operation_not_allowed",
+  "operation_mismatch",
   "replay_evidence_missing",
   "replay_rejected",
 ] as const;

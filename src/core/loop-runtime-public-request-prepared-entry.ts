@@ -12,6 +12,7 @@ import type {
   LoopRuntimeAuthenticatedPrincipal,
   LoopRuntimePublicRequestAuthorizer,
 } from "./loop-runtime-public-request-authorization.js";
+import type { LoopRuntimePublicRequest } from "./loop-runtime-public-request.js";
 import {
   prepareLoopRuntimePublicRequest,
   type LoopRuntimePublicRequestPreparationResult,
@@ -27,6 +28,12 @@ export type LoopRuntimePreparedPublicRequestEntryInput = Readonly<{
   principal: LoopRuntimeAuthenticatedPrincipal;
   payload: unknown;
   authorizer: LoopRuntimePublicRequestAuthorizer;
+  assembler: LoopRuntimeAuthorizedEngineAssembler;
+}>;
+
+export type LoopRuntimePreparedAuthorizedDecodedRequestInput = Readonly<{
+  principal: LoopRuntimeAuthenticatedPrincipal;
+  request: LoopRuntimePublicRequest;
   assembler: LoopRuntimeAuthorizedEngineAssembler;
 }>;
 
@@ -100,6 +107,44 @@ function failPreparation(
   });
 }
 
+export async function prepareAuthorizedLoopRuntimeDecodedRequest(
+  input: LoopRuntimePreparedAuthorizedDecodedRequestInput,
+): Promise<LoopRuntimePreparedPublicRequestEntryResult> {
+  const assemblyRequest = createLoopRuntimeAuthorizedEngineAssemblyRequest(
+    input.principal,
+    input.request,
+  );
+
+  if (!assemblyRequest.created) {
+    return failAssembly("invalid_assembly");
+  }
+
+  const assembly = await evaluateLoopRuntimeAuthorizedEngineAssembler(
+    assemblyRequest.assemblyRequest,
+    input.assembler,
+  );
+
+  if (!assembly.assembled) {
+    return failAssembly(assembly.reason);
+  }
+
+  const preparation = prepareLoopRuntimePublicRequest({
+    request: input.request,
+    catalog: assembly.assembly.catalog,
+    limits: assembly.assembly.limits,
+    binding: assembly.assembly.binding,
+  });
+
+  if (!preparation.prepared) {
+    return failPreparation(preparation.reason);
+  }
+
+  return Object.freeze({
+    prepared: true as const,
+    request: preparation.runtimeRequest,
+  });
+}
+
 export async function prepareAuthorizedLoopRuntimeRequest(
   input: LoopRuntimePreparedPublicRequestEntryInput,
 ): Promise<LoopRuntimePreparedPublicRequestEntryResult> {
@@ -117,37 +162,9 @@ export async function prepareAuthorizedLoopRuntimeRequest(
     return failAuthorization();
   }
 
-  const assemblyRequest = createLoopRuntimeAuthorizedEngineAssemblyRequest(
-    input.principal,
-    authorized.request,
-  );
-
-  if (!assemblyRequest.created) {
-    return failAssembly("invalid_assembly");
-  }
-
-  const assembly = await evaluateLoopRuntimeAuthorizedEngineAssembler(
-    assemblyRequest.assemblyRequest,
-    input.assembler,
-  );
-
-  if (!assembly.assembled) {
-    return failAssembly(assembly.reason);
-  }
-
-  const preparation = prepareLoopRuntimePublicRequest({
+  return prepareAuthorizedLoopRuntimeDecodedRequest({
+    principal: input.principal,
     request: authorized.request,
-    catalog: assembly.assembly.catalog,
-    limits: assembly.assembly.limits,
-    binding: assembly.assembly.binding,
-  });
-
-  if (!preparation.prepared) {
-    return failPreparation(preparation.reason);
-  }
-
-  return Object.freeze({
-    prepared: true as const,
-    request: preparation.runtimeRequest,
+    assembler: input.assembler,
   });
 }

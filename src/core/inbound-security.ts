@@ -4,12 +4,14 @@ import type {
   InboundSecurityEvaluationInput,
 } from "../inbound-security/types.js";
 import type { LoopRuntimeAuthenticatedPrincipal } from "./loop-runtime-public-request-authorization.js";
+import type { LoopRuntimePublicRequest } from "./loop-runtime-public-request.js";
 import type { LoopRuntimePublicRequestAuthorizer } from "./loop-runtime-public-request-authorization.js";
 import type { LoopRuntimeAuthorizedEngineAssembler } from "./loop-runtime-public-request-engine-assembly.js";
 import {
-  prepareAuthorizedLoopRuntimeRequest,
+  prepareAuthorizedLoopRuntimeDecodedRequest,
   type LoopRuntimePreparedPublicRequestEntryResult,
 } from "./loop-runtime-public-request-prepared-entry.js";
+import { authorizeLoopRuntimePublicRequest } from "./loop-runtime-public-request-authorization-facade.js";
 
 /**
  * Core-only inbound boundary facade (V14.0a).
@@ -18,9 +20,9 @@ import {
  * authorization/preparation chain (decode -> authorize -> assemble ->
  * prepare, see loop-runtime-public-request-prepared-entry.ts) behind an
  * explicit inbound security decision. It composes, but never duplicates,
- * that existing chain: `prepareAuthorizedLoopRuntimeRequest` is invoked
- * verbatim and exactly once, and only after `evaluateInboundSecurity`
- * returns an explicit "allow".
+ * that existing chain: the already-decoded request is authorized and then
+ * passed to the shared assembly/preparation path only after
+ * `evaluateInboundSecurity` returns an explicit "allow".
  *
  * No transport, authenticator, or replay adapter exists yet. Authentication
  * evidence, the principal, and replay evidence must all be supplied
@@ -29,7 +31,7 @@ import {
 export type InboundSecurityGatedPreparationInput = Readonly<{
   security: InboundSecurityEvaluationInput;
   evaluatedAt: string;
-  payload: unknown;
+  request: LoopRuntimePublicRequest;
   authorizer: LoopRuntimePublicRequestAuthorizer;
   assembler: LoopRuntimeAuthorizedEngineAssembler;
 }>;
@@ -61,10 +63,27 @@ export async function evaluateInboundSecurityAndPrepareLoopRuntimeRequest(
     principalId: decision.principalId,
   });
 
-  const prepared = await prepareAuthorizedLoopRuntimeRequest({
+  const authorization = await authorizeLoopRuntimePublicRequest(
     principal,
-    payload: input.payload,
-    authorizer: input.authorizer,
+    input.request,
+    input.authorizer,
+  );
+
+  if (!authorization.authorized) {
+    return Object.freeze({
+      allowed: true as const,
+      decision,
+      prepared: Object.freeze({
+        prepared: false as const,
+        stage: "authorization" as const,
+        reason: "not_authorized" as const,
+      }),
+    });
+  }
+
+  const prepared = await prepareAuthorizedLoopRuntimeDecodedRequest({
+    principal,
+    request: input.request,
     assembler: input.assembler,
   });
 
