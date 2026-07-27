@@ -159,6 +159,19 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
     });
   }
 
+  if (input.security.accessRequest.project !== decoded.request.project) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "project_mismatch",
+        ),
+      }),
+    });
+  }
+
   if (input.security.accessRequest.operation !== decoded.request.mode) {
     return Object.freeze({
       verified: true as const,
