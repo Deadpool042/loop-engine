@@ -11,6 +11,8 @@ import { INBOUND_SECURITY_CONTRACT_RULE } from "./rules/inbound-security-contrac
 import { INBOUND_SECURITY_GATE_RULE } from "./rules/inbound-security-gate.js";
 import { INBOUND_AUTHENTICATION_VERIFICATION_RULE } from "./rules/inbound-authentication-verification.js";
 import { INBOUND_AUTHENTICATION_GATE_RULE } from "./rules/inbound-authentication-gate.js";
+import { INBOUND_REQUEST_HANDLER_NEUTRALITY_RULE } from "./rules/inbound-request-handler-neutrality.js";
+import { INBOUND_REQUEST_HANDLER_GATE_RULE } from "./rules/inbound-request-handler-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -33,6 +35,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_SECURITY_GATE_RULE,
   INBOUND_AUTHENTICATION_VERIFICATION_RULE,
   INBOUND_AUTHENTICATION_GATE_RULE,
+  INBOUND_REQUEST_HANDLER_NEUTRALITY_RULE,
+  INBOUND_REQUEST_HANDLER_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
