@@ -133,3 +133,77 @@ adaptateurs de replay nécessaires.
   transport-neutral et sans comportement opérationnel concret.
 - `AUDIT-429` — la vérification réussie précède obligatoirement toute évaluation
   V14.0a ; aucun bypass vers une préparation de plus bas niveau n'est admis.
+
+## V14.0c — gestionnaire de requête entrante transport-neutre
+
+`src/core/inbound.ts` ajoute le seul point d'entrée applicatif Core qu'un
+futur adaptateur HTTP, webhook, socket ou queue doit appeler :
+
+```text
+adaptateur de transport (futur)
+        ↓
+enveloppe transport-neutre non fiable
+        ↓
+handleInboundLoopRuntimeRequest(...)
+        ↓
+verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(...)  (V14.0b)
+        ↓
+verifier V14.0b
+        ↓
+évaluation de sécurité V14.0a
+        ↓
+préparation Runtime publique existante
+```
+
+`InboundLoopRuntimeRequestEnvelope` est une enveloppe immuable et
+transport-neutre : identifiant de requête, matériel d'authentification non
+fiable, principal, requête d'accès, preuve de replay, politique d'accès, heure
+d'évaluation explicite et payload Runtime public. Elle ne contient aucun
+concept de méthode HTTP, URL, chemin, en-tête, code de statut, cookie, socket,
+fournisseur de webhook ou framework — un futur adaptateur traduit son propre
+protocole vers cette forme neutre.
+
+Avant tout appel au verifier, `validateInboundLoopRuntimeRequestEnvelope`
+vérifie de façon fail-closed la forme structurelle de l'enveloppe et la
+cohérence de l'identifiant de requête entre l'enveloppe, le contexte de
+vérification, la requête d'accès et — quand elle existe — la preuve de
+replay. Une enveloppe malformée ou incohérente est rejetée (`outcome:
+"invalid"`) sans déclencher le verifier, l'inbound security V14.0a,
+l'authorizer, l'assembleur ou la préparation Runtime. Aucun identifiant n'est
+jamais réécrit silencieusement.
+
+Le résultat du handler est un type fermé et immuable
+(`InboundLoopRuntimeRequestHandlerResult`) distinguant explicitement :
+enveloppe invalide, échec de vérification d'authentification, refus/décision
+indéterminée de l'inbound security, et résultat de préparation Runtime en aval
+(qui peut lui-même échouer après une autorisation permise). Aucun code de
+statut HTTP ni erreur spécifique à un transport n'y apparaît ; les frontières
+de rédaction existantes (aucun secret brut, aucune trace d'exception) sont
+préservées.
+
+Le handler ne fait que composer la façade V14.0b existante
+(`verifyInboundAuthenticationAndPrepareLoopRuntimeRequest`) — il n'appelle
+jamais directement `evaluateInboundAuthenticationVerifier`,
+`evaluateInboundSecurity`, `evaluateInboundSecurityAndPrepareLoopRuntimeRequest`
+ou `prepareAuthorizedLoopRuntimeRequest`. Le verifier, l'authorizer et
+l'assembleur restent des dépendances explicitement injectées — aucune
+implémentation par défaut, aucun registre, aucune découverte.
+
+Cette couche ne remplace ni l'Agent Policy Engine ni l'admission Runtime
+(`src/policy/`), qui restent des contrôles séparés en aval.
+
+### Hors périmètre (V14.0c)
+
+Aucun serveur HTTP, route, port réseau, endpoint webhook, listener réseau,
+TLS, CORS, CSRF, cookie, JWT, OAuth/OIDC, authentification API-key concrète,
+rate limiter, base de données de replay, persistance, base de données, Redis,
+stockage de secret sur système de fichiers, chargement d'identifiants
+d'environnement, transport externe concret, SDK fournisseur, ou changement de
+sémantique d'exécution Runtime.
+
+### Audit (V14.0c)
+
+- `AUDIT-430` — le handler transport-neutre reste protocole-indépendant et
+  non opérationnel.
+- `AUDIT-431` — le handler compose V14.0b plutôt que de contourner les portes
+  d'authentification/sécurité.
