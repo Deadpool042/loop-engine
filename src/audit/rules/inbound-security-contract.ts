@@ -27,6 +27,7 @@ export const INBOUND_SECURITY_CONTRACT_INVARIANTS = Object.freeze({
       '"principal_mismatch"',
       '"tenant_mismatch"',
       '"operation_not_allowed"',
+      '"operation_mismatch"',
       '"replay_evidence_missing"',
       '"replay_rejected"',
       '"insufficient_evidence"',
@@ -66,12 +67,12 @@ export const INBOUND_SECURITY_CONTRACT_INVARIANTS = Object.freeze({
     file: "src/core/inbound-security.ts",
     requiredTokens: Object.freeze([
       'import { evaluateInboundSecurity } from "../inbound-security/evaluation.js";',
-      "prepareAuthorizedLoopRuntimeRequest",
+      "authorizeLoopRuntimePublicRequest(",
+      "prepareAuthorizedLoopRuntimeDecodedRequest",
       'if (decision.kind !== "allow") {',
     ]),
     forbiddenTokens: Object.freeze([
       "decodeLoopRuntimePublicRequest(",
-      "authorizeLoopRuntimePublicRequest(",
       ".assemble(",
       "resolveLoopRuntimePublicRequestReferences(",
       "executeRuntime",

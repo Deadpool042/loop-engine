@@ -19,6 +19,7 @@ import {
   isEvidenceNotYetValid,
 } from "../inbound-security/validation.js";
 import type { LoopRuntimePublicRequestAuthorizer } from "./loop-runtime-public-request-authorization.js";
+import { decodeLoopRuntimePublicRequest } from "./loop-runtime-public-request-decoder.js";
 import type { LoopRuntimeAuthorizedEngineAssembler } from "./loop-runtime-public-request-engine-assembly.js";
 import {
   evaluateInboundSecurityAndPrepareLoopRuntimeRequest,
@@ -142,6 +143,34 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
     });
   }
 
+  const decoded = decodeLoopRuntimePublicRequest(input.payload);
+
+  if (!decoded.parsed) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "operation_mismatch",
+        ),
+      }),
+    });
+  }
+
+  if (input.security.accessRequest.operation !== decoded.request.mode) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "operation_mismatch",
+        ),
+      }),
+    });
+  }
+
   if (input.security.policy.replayCheckRequired) {
     const replayEvidence = input.security.replayEvidence;
 
@@ -206,7 +235,7 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
   const gated = await evaluateInboundSecurityAndPrepareLoopRuntimeRequest({
     security,
     evaluatedAt: input.evaluatedAt,
-    payload: input.payload,
+    request: decoded.request,
     authorizer: input.authorizer,
     assembler: input.assembler,
   });

@@ -31,6 +31,8 @@ import { INBOUND_AUTH_EVIDENCE_VALIDITY_RULE } from "./rules/inbound-auth-eviden
 import { INBOUND_AUTH_EVIDENCE_VALIDITY_GATE_RULE } from "./rules/inbound-auth-evidence-validity-gate.js";
 import { INBOUND_TENANT_BINDING_RULE } from "./rules/inbound-tenant-binding.js";
 import { INBOUND_TENANT_BINDING_GATE_RULE } from "./rules/inbound-tenant-binding-gate.js";
+import { INBOUND_OPERATION_BINDING_RULE } from "./rules/inbound-operation-binding.js";
+import { INBOUND_OPERATION_BINDING_GATE_RULE } from "./rules/inbound-operation-binding-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -73,6 +75,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_AUTH_EVIDENCE_VALIDITY_GATE_RULE,
   INBOUND_TENANT_BINDING_RULE,
   INBOUND_TENANT_BINDING_GATE_RULE,
+  INBOUND_OPERATION_BINDING_RULE,
+  INBOUND_OPERATION_BINDING_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);

@@ -39,15 +39,15 @@ test("AUDIT-427 detects a missing deny-check token", () => {
 });
 
 test("AUDIT-427 detects an unconditional downstream preparation call", () => {
-  const source = `${readFileSync(GATE_FILE, "utf8")}\nprepareAuthorizedLoopRuntimeRequest(input)\n`;
+  const source = `${readFileSync(GATE_FILE, "utf8")}\nprepareAuthorizedLoopRuntimeDecodedRequest(input)\n`;
   const result = inspectInboundSecurityGateInvariant(source);
 
-  assert.deepEqual(result.forbidden, ["prepareAuthorizedLoopRuntimeRequest(input)"]);
+  assert.deepEqual(result.forbidden, ["prepareAuthorizedLoopRuntimeDecodedRequest(input)"]);
 });
 
 test("AUDIT-427 detects downstream preparation invoked before the deny/indeterminate check", () => {
   const original = readFileSync(GATE_FILE, "utf8");
-  const reordered = `await prepareAuthorizedLoopRuntimeRequest({});\n${original}`;
+  const reordered = `await authorizeLoopRuntimePublicRequest();\n${original}`;
 
   const result = inspectInboundSecurityGateInvariant(reordered);
 

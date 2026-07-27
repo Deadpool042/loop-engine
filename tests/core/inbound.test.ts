@@ -428,7 +428,10 @@ describe("handleInboundLoopRuntimeRequest", () => {
   it("accepts and reaches downstream preparation exactly once for a dry-run operation authorized by policy", async () => {
     const calls = counters();
     const result = await handleInboundLoopRuntimeRequest(
-      envelope({ accessRequest: accessRequest({ operation: "dry-run" }) }),
+      envelope({
+        accessRequest: accessRequest({ operation: "dry-run" }),
+        payload: payload("dry-run"),
+      }),
       dependencies(calls),
     );
 
@@ -451,16 +454,21 @@ describe("handleInboundLoopRuntimeRequest", () => {
     }
   });
 
-  it("keeps a downstream preparation failure inside an accepted outcome, redacted", async () => {
+  it("rejects an undecodable public request before downstream preparation", async () => {
     const calls = counters();
     const result = await handleInboundLoopRuntimeRequest(
       envelope({ payload: { not: "a valid public request" } }),
       dependencies(calls),
     );
 
-    assert.equal(result.outcome, "accepted");
-    if (result.outcome === "accepted") {
-      assert.equal(result.prepared.prepared, false);
+    assert.equal(calls.verifier, 1);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.equal(result.outcome, "rejected");
+
+    if (result.outcome === "rejected" && result.stage === "security") {
+      assert.equal(result.decision.kind, "deny");
+      assert.equal(result.decision.reason, "operation_mismatch");
     }
   });
 

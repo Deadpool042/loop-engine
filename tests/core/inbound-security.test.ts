@@ -187,7 +187,7 @@ describe("evaluateInboundSecurityAndPrepareLoopRuntimeRequest", () => {
     const result = await evaluateInboundSecurityAndPrepareLoopRuntimeRequest({
       security: security({ evidence: null }),
       evaluatedAt: EVALUATED_AT,
-      payload: payload(),
+      request: payload(),
       authorizer: authorizer({ authorized: true }, calls),
       assembler: assemblerStub({ assembled: true, assembly: assembly() }, calls),
     });
@@ -214,7 +214,7 @@ describe("evaluateInboundSecurityAndPrepareLoopRuntimeRequest", () => {
       const result = await evaluateInboundSecurityAndPrepareLoopRuntimeRequest({
         security: security(overrides),
         evaluatedAt: EVALUATED_AT,
-        payload: payload(),
+        request: payload(),
         authorizer: authorizer({ authorized: true }, calls),
         assembler: assemblerStub(
           { assembled: true, assembly: assembly() },
@@ -233,7 +233,7 @@ describe("evaluateInboundSecurityAndPrepareLoopRuntimeRequest", () => {
     const result = await evaluateInboundSecurityAndPrepareLoopRuntimeRequest({
       security: security(),
       evaluatedAt: EVALUATED_AT,
-      payload: payload(),
+      request: payload(),
       authorizer: authorizer({ authorized: true }, calls),
       assembler: assemblerStub({ assembled: true, assembly: assembly() }, calls),
     });
@@ -251,7 +251,7 @@ describe("evaluateInboundSecurityAndPrepareLoopRuntimeRequest", () => {
     const result = await evaluateInboundSecurityAndPrepareLoopRuntimeRequest({
       security: security(),
       evaluatedAt: EVALUATED_AT,
-      payload: payload(),
+      request: payload(),
       authorizer: {
         async authorize() {
           return { authorized: true };
@@ -301,7 +301,7 @@ describe("evaluateInboundSecurityAndPrepareLoopRuntimeRequest", () => {
     const result = await evaluateInboundSecurityAndPrepareLoopRuntimeRequest({
       security: security({ principal: null }),
       evaluatedAt: EVALUATED_AT,
-      payload: payload(),
+      request: payload(),
       authorizer: authorizer({ authorized: true }, calls),
       assembler: assemblerStub(
         { assembled: true, assembly: assembly() },

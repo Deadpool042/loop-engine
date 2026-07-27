@@ -10,12 +10,13 @@ const REQUIRED_TOKENS = Object.freeze([
   'if (decision.kind !== "allow") {',
   "return Object.freeze({",
   "allowed: false as const,",
-  "await prepareAuthorizedLoopRuntimeRequest({",
+  "await authorizeLoopRuntimePublicRequest(",
+  "await prepareAuthorizedLoopRuntimeDecodedRequest({",
   "allowed: true as const,",
 ]);
 
 const FORBIDDEN_TOKENS = Object.freeze([
-  "prepareAuthorizedLoopRuntimeRequest(input)",
+  "prepareAuthorizedLoopRuntimeDecodedRequest(input)",
 ]);
 
 export function inspectInboundSecurityGateInvariant(
@@ -29,14 +30,19 @@ export function inspectInboundSecurityGateInvariant(
   const forbidden = FORBIDDEN_TOKENS.filter((token) => sourceIncludesToken(source, token));
 
   const denyCheckIndex = source.indexOf('if (decision.kind !== "allow") {');
+  const authorizationCallIndex = source.indexOf(
+    "await authorizeLoopRuntimePublicRequest(",
+  );
   const preparationCallIndex = source.indexOf(
-    "await prepareAuthorizedLoopRuntimeRequest(",
+    "await prepareAuthorizedLoopRuntimeDecodedRequest({",
   );
 
   const gatesBeforePreparation =
     denyCheckIndex !== -1 &&
+    authorizationCallIndex !== -1 &&
     preparationCallIndex !== -1 &&
-    denyCheckIndex < preparationCallIndex;
+    denyCheckIndex < authorizationCallIndex &&
+    authorizationCallIndex < preparationCallIndex;
 
   return Object.freeze({
     missing: Object.freeze(missing),
@@ -76,7 +82,7 @@ export const INBOUND_SECURITY_GATE_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Return the deny/indeterminate decision before calling prepareAuthorizedLoopRuntimeRequest, and never invoke it unconditionally.",
+            "Return the deny/indeterminate decision before authorization, then authorize before preparing the already-decoded request.",
           )
         : pass(rule, `${rule.title}.`, Object.freeze([GATE_FILE]));
     },
