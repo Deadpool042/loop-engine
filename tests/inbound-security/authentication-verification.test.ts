@@ -161,22 +161,25 @@ describe("evaluateInboundAuthenticationVerifier", () => {
 
   it("calls the verifier exactly once and preserves this", async () => {
     const trustedEvidence = evidence();
-    const verifier = {
-      calls: 0,
-      verify(this: { calls: number }) {
-        this.calls += 1;
-        return { verified: true as const, evidence: trustedEvidence };
+    let calls = 0;
+    let preservedThis = false;
+    const verifier: InboundAuthenticationVerifier = {
+      verify() {
+        calls += 1;
+        preservedThis = this === verifier;
+        return { verified: true, evidence: trustedEvidence };
       },
     };
 
     const result = await evaluateInboundAuthenticationVerifier(
       INPUT,
       CONTEXT,
-      verifier as InboundAuthenticationVerifier,
+      verifier,
     );
 
     assert.equal(result.verified, true);
-    assert.equal(verifier.calls, 1);
+    assert.equal(calls, 1);
+    assert.equal(preservedThis, true);
   });
 
   it("never serializes raw authentication material in normalized results", async () => {
