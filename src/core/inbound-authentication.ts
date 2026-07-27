@@ -1,4 +1,7 @@
-import { denyInboundSecurity } from "../inbound-security/errors.js";
+import {
+  denyInboundSecurity,
+  indeterminateInboundSecurity,
+} from "../inbound-security/errors.js";
 import {
   evaluateInboundAuthenticationVerifier,
   type InboundAuthenticationInput,
@@ -67,8 +70,20 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
 
   const principal = input.security.principal;
 
+  if (principal === null) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: indeterminateInboundSecurity(
+          input.verificationContext.requestId,
+          "insufficient_evidence",
+        ),
+      }),
+    });
+  }
+
   if (
-    principal !== null &&
     (principal.principalId !== verification.evidence.subjectId ||
       principal.principalId !== input.security.accessRequest.principalId)
   ) {

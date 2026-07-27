@@ -305,6 +305,41 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
     assert.equal(result.verified, true);
   });
 
+  it("returns insufficient evidence for missing principal before invoking replay protection", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+      security: Object.freeze({
+        ...base.security,
+        principal: null,
+      }),
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "indeterminate");
+      assert.equal(
+        result.security.decision.reason,
+        "insufficient_evidence",
+      );
+    }
+  });
+
   it("rejects principal mismatch before invoking replay protection", async () => {
     const calls = counters();
     const base = input(calls);
