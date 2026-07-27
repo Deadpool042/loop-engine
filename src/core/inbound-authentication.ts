@@ -81,6 +81,19 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
       });
     }
 
+    if (replayEvidence.evidenceId !== verification.evidence.evidenceId) {
+      return Object.freeze({
+        verified: true as const,
+        security: Object.freeze({
+          allowed: false as const,
+          decision: denyInboundSecurity(
+            input.verificationContext.requestId,
+            "replay_rejected",
+          ),
+        }),
+      });
+    }
+
     const replay = await evaluateInboundReplayProtection(
       Object.freeze({
         requestId: input.verificationContext.requestId,
