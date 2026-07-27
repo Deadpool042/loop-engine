@@ -5,6 +5,15 @@ export {
 } from "./errors.js";
 export { evaluateInboundSecurity } from "./evaluation.js";
 export {
+  evaluateInboundReplayProtection,
+  INBOUND_REPLAY_PROTECTION_FAILURE_REASONS,
+  type InboundReplayProtectionFailureReason,
+  type InboundReplayProtectionInput,
+  type InboundReplayProtectionPort,
+  type InboundReplayProtectionPortResult,
+  type InboundReplayProtectionResult,
+} from "./replay-protection.js";
+export {
   evaluateInboundAuthenticationVerifier,
   INBOUND_AUTHENTICATION_VERIFICATION_FAILURE_REASONS,
   type InboundAuthenticationInput,

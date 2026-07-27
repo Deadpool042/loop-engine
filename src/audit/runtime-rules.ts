@@ -15,6 +15,8 @@ import { INBOUND_REQUEST_HANDLER_NEUTRALITY_RULE } from "./rules/inbound-request
 import { INBOUND_REQUEST_HANDLER_GATE_RULE } from "./rules/inbound-request-handler-gate.js";
 import { INBOUND_TRANSPORT_ADAPTER_NEUTRALITY_RULE } from "./rules/inbound-transport-adapter-neutrality.js";
 import { INBOUND_TRANSPORT_ADAPTER_GATE_RULE } from "./rules/inbound-transport-adapter-gate.js";
+import { INBOUND_REPLAY_PROTECTION_NEUTRALITY_RULE } from "./rules/inbound-replay-protection-neutrality.js";
+import { INBOUND_REPLAY_PROTECTION_GATE_RULE } from "./rules/inbound-replay-protection-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -41,6 +43,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_REQUEST_HANDLER_GATE_RULE,
   INBOUND_TRANSPORT_ADAPTER_NEUTRALITY_RULE,
   INBOUND_TRANSPORT_ADAPTER_GATE_RULE,
+  INBOUND_REPLAY_PROTECTION_NEUTRALITY_RULE,
+  INBOUND_REPLAY_PROTECTION_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
