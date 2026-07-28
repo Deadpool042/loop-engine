@@ -182,6 +182,50 @@ describe("evaluateInboundAuthenticationVerifier", () => {
     assert.equal(preservedThis, true);
   });
 
+  it("rejects authentication evidence with an inverted validity window", async () => {
+    let calls = 0;
+    const verifier: InboundAuthenticationVerifier = {
+      verify() {
+        calls += 1;
+        return {
+          verified: true,
+          evidence: evidence({
+            validFrom: "2026-07-26T14:00:00.000Z",
+            expiresAt: "2026-07-26T13:00:00.000Z",
+          }),
+        };
+      },
+    };
+
+    const result = await evaluateInboundAuthenticationVerifier(
+      INPUT,
+      CONTEXT,
+      verifier,
+    );
+
+    assert.equal(calls, 1);
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
+  it("accepts authentication evidence with an equal validFrom and expiresAt bound", async () => {
+    const result = await evaluate({
+      verify() {
+        return {
+          verified: true,
+          evidence: evidence({
+            validFrom: "2026-07-26T12:00:00.000Z",
+            expiresAt: "2026-07-26T12:00:00.000Z",
+          }),
+        };
+      },
+    });
+
+    assert.equal(result.verified, true);
+  });
+
   it("never serializes raw authentication material in normalized results", async () => {
     const rejected = await evaluate({
       verify() {

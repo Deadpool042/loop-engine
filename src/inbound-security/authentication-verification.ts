@@ -1,4 +1,5 @@
 import type { InboundAuthenticationEvidence } from "./types.js";
+import { isInvalidAuthenticationEvidenceWindow } from "./validation.js";
 
 export const INBOUND_AUTHENTICATION_VERIFICATION_FAILURE_REASONS = [
   "verification_rejected",
@@ -275,6 +276,10 @@ function canonicalizeVerifierResult(
     !isEnumerableDataProperty(descriptors.evidence) ||
     !isValidEvidence(descriptors.evidence.value)
   ) {
+    return VERIFICATION_INVALID;
+  }
+
+  if (isInvalidAuthenticationEvidenceWindow(descriptors.evidence.value)) {
     return VERIFICATION_INVALID;
   }
 

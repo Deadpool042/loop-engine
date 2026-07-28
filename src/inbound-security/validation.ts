@@ -41,6 +41,17 @@ export function isEvidenceExpired(
   return compareInstants(evaluatedAt, evidence.expiresAt) > 0;
 }
 
+/**
+ * Rejects only an internally contradictory validity window
+ * (`validFrom > expiresAt`). Equal bounds remain valid. Not a general ISO
+ * timestamp validator.
+ */
+export function isInvalidAuthenticationEvidenceWindow(
+  evidence: InboundAuthenticationEvidence,
+): boolean {
+  return compareInstants(evidence.validFrom, evidence.expiresAt) > 0;
+}
+
 export function principalMatchesEvidence(
   principalId: string,
   evidence: InboundAuthenticationEvidence,
