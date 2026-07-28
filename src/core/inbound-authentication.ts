@@ -76,6 +76,19 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
     });
   }
 
+  if (input.verificationContext.evaluatedAt !== input.evaluatedAt) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "evaluation_time_mismatch",
+        ),
+      }),
+    });
+  }
+
   if (isEvidenceNotYetValid(verification.evidence, input.evaluatedAt)) {
     return Object.freeze({
       verified: true as const,
