@@ -813,6 +813,65 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
     }
   });
 
+  it("rejects a blank replay nonce before invoking replay protection", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+      security: Object.freeze({
+        ...base.security,
+        replayEvidence: Object.freeze({
+          ...base.security.replayEvidence!,
+          nonce: "   ",
+        }),
+      }),
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "deny");
+      assert.equal(result.security.decision.reason, "replay_rejected");
+    }
+  });
+
+  it("accepts a null replay nonce", async () => {
+    const calls = counters();
+    const base = input(calls);
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      security: Object.freeze({
+        ...base.security,
+        replayEvidence: Object.freeze({
+          ...base.security.replayEvidence!,
+          nonce: null,
+        }),
+      }),
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(calls.authorizer, 1);
+    assert.equal(calls.assembler, 1);
+    assert.equal(result.verified, true);
+    if (result.verified) {
+      assert.equal(result.security.allowed, true);
+    }
+  });
+
   it("rejects a replay port result received after the evaluation instant", async () => {
     const calls = counters();
     const base = input(calls);

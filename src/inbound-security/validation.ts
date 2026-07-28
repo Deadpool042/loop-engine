@@ -70,3 +70,16 @@ export function isReplayReceiptTimeAfterEvaluation(
 ): boolean {
   return isInstantAfter(replayEvidence.receivedAt, evaluatedAt);
 }
+
+/**
+ * A present-but-blank nonce is neither an explicit absence (`null`) nor a
+ * usable replay identifier. Validates only — never trims or normalizes the
+ * original value before it reaches the replay-protection port.
+ */
+export function isInvalidPresentReplayNonce(
+  replayEvidence: InboundReplayEvidence,
+): boolean {
+  return (
+    replayEvidence.nonce !== null && replayEvidence.nonce.trim().length === 0
+  );
+}

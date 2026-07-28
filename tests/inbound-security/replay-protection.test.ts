@@ -106,6 +106,34 @@ describe("evaluateInboundReplayProtection", () => {
     assert.equal(JSON.stringify(result).includes("backend-secret-detail"), false);
   });
 
+  it("rejects a blank nonce before calling the port", async () => {
+    let calls = 0;
+
+    const port: InboundReplayProtectionPort = {
+      check() {
+        calls += 1;
+        return {
+          accepted: true,
+          receivedAt: "2026-07-27T09:00:01.000Z",
+        };
+      },
+    };
+
+    const result = await evaluateInboundReplayProtection(
+      {
+        ...INPUT,
+        nonce: "   ",
+      },
+      port,
+    );
+
+    assert.equal(calls, 0);
+    assert.deepEqual(result, {
+      accepted: false,
+      reason: "replay_invalid",
+    });
+  });
+
   it("rejects malformed input before calling the port", async () => {
     let calls = 0;
 
