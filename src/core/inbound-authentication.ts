@@ -21,6 +21,7 @@ import {
   isInstantAfter,
   isInvalidEvaluationTime,
   isInvalidPresentReplayNonce,
+  isInvalidReplayProtectionReceivedAt,
   isInvalidReplayReceivedAt,
   isInvalidRequestId,
   isReplayReceiptTimeAfterEvaluation,
@@ -368,6 +369,19 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
     );
 
     if (!replay.accepted) {
+      return Object.freeze({
+        verified: true as const,
+        security: Object.freeze({
+          allowed: false as const,
+          decision: denyInboundSecurity(
+            input.verificationContext.requestId,
+            "replay_rejected",
+          ),
+        }),
+      });
+    }
+
+    if (isInvalidReplayProtectionReceivedAt(replay.receivedAt)) {
       return Object.freeze({
         verified: true as const,
         security: Object.freeze({
