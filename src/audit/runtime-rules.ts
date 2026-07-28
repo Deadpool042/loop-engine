@@ -55,6 +55,8 @@ import { INBOUND_AUTHENTICATION_EVIDENCE_WINDOW_VALIDATION_RULE } from "./rules/
 import { INBOUND_AUTHENTICATION_EVIDENCE_WINDOW_VALIDATION_GATE_RULE } from "./rules/inbound-authentication-evidence-window-validation-gate.js";
 import { INBOUND_REPLAY_RECEIVED_AT_VALIDATION_RULE } from "./rules/inbound-replay-received-at-validation.js";
 import { INBOUND_REPLAY_RECEIVED_AT_VALIDATION_GATE_RULE } from "./rules/inbound-replay-received-at-validation-gate.js";
+import { INBOUND_EVALUATION_TIME_VALIDATION_RULE } from "./rules/inbound-evaluation-time-validation.js";
+import { INBOUND_EVALUATION_TIME_VALIDATION_GATE_RULE } from "./rules/inbound-evaluation-time-validation-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -121,6 +123,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_AUTHENTICATION_EVIDENCE_WINDOW_VALIDATION_GATE_RULE,
   INBOUND_REPLAY_RECEIVED_AT_VALIDATION_RULE,
   INBOUND_REPLAY_RECEIVED_AT_VALIDATION_GATE_RULE,
+  INBOUND_EVALUATION_TIME_VALIDATION_RULE,
+  INBOUND_EVALUATION_TIME_VALIDATION_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);

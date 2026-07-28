@@ -87,6 +87,17 @@ export function isInvalidReplayReceivedAt(
   return Number.isNaN(Date.parse(replayEvidence.receivedAt));
 }
 
+/**
+ * Rejects an evaluationTime (`evaluatedAt`) that isn't itself a well-formed
+ * instant. Unlike `compareInstants`, which falls back to a lexicographic
+ * comparison for unparseable strings, this never lets a malformed value
+ * reach any temporal comparison that consumes it — evidence validity window,
+ * replay receipt time, or replay-protection port receipt time alike.
+ */
+export function isInvalidEvaluationTime(evaluatedAt: string): boolean {
+  return Number.isNaN(Date.parse(evaluatedAt));
+}
+
 export function isReplayReceiptTimeAfterEvaluation(
   replayEvidence: InboundReplayEvidence,
   evaluatedAt: string,

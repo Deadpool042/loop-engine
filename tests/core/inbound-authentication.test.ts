@@ -294,6 +294,127 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
     }
   });
 
+  it("accepts a valid ISO evaluatedAt", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 1);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, true);
+    }
+  });
+
+  it("rejects an unparseable evaluatedAt before any temporal comparison", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      evaluatedAt: "not-a-date",
+      verificationContext: Object.freeze({
+        requestId: "request-1",
+        evaluatedAt: "not-a-date",
+      }),
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "deny");
+      assert.equal(result.security.decision.reason, "evaluation_time_mismatch");
+    }
+  });
+
+  it("rejects an evaluatedAt with an impossible calendar date", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      evaluatedAt: "2026-13-45T00:00:00.000Z",
+      verificationContext: Object.freeze({
+        requestId: "request-1",
+        evaluatedAt: "2026-13-45T00:00:00.000Z",
+      }),
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "deny");
+      assert.equal(result.security.decision.reason, "evaluation_time_mismatch");
+    }
+  });
+
+  it("rejects an empty string evaluatedAt before any temporal comparison", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      evaluatedAt: "",
+      verificationContext: Object.freeze({
+        requestId: "request-1",
+        evaluatedAt: "",
+      }),
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    // An empty verificationContext.evaluatedAt is already rejected by the
+    // existing verification-context shape check (isNonEmptyString) before
+    // `isInvalidEvaluationTime` is ever reached — this asserts that earlier
+    // guarantee still holds rather than re-deriving it.
+    assert.equal(calls.verifier, 0);
+    assert.equal(replayCalls, 0);
+    assert.equal(result.verified, false);
+
+    if (!result.verified) {
+      assert.equal(result.reason, "verification_invalid");
+    }
+  });
+
   it("rejects a request identity mismatch before invoking replay protection", async () => {
     const calls = counters();
     const base = input(calls);

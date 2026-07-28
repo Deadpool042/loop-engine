@@ -19,6 +19,7 @@ import {
   isEvidenceNotYetValid,
   isInboundOperationAllowed,
   isInstantAfter,
+  isInvalidEvaluationTime,
   isInvalidPresentReplayNonce,
   isInvalidReplayReceivedAt,
   isReplayReceiptTimeAfterEvaluation,
@@ -79,6 +80,19 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
   }
 
   if (input.verificationContext.evaluatedAt !== input.evaluatedAt) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "evaluation_time_mismatch",
+        ),
+      }),
+    });
+  }
+
+  if (isInvalidEvaluationTime(input.evaluatedAt)) {
     return Object.freeze({
       verified: true as const,
       security: Object.freeze({
