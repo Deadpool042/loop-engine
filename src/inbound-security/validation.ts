@@ -59,6 +59,14 @@ export function principalMatchesEvidence(
   return principalId === evidence.subjectId;
 }
 
+/**
+ * Rejects a request identifier that is empty or whitespace-only. Never
+ * trims or otherwise normalizes the original value before it reaches any
+ * identity comparison, authorization, replay, or assembly decision.
+ */
+export function isInvalidRequestId(requestId: string): boolean {
+  return requestId.trim().length === 0;
+}
 
 export function isInboundOperationAllowed(
   operation: InboundAccessRequest["operation"],

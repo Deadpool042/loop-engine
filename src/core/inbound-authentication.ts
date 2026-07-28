@@ -22,6 +22,7 @@ import {
   isInvalidEvaluationTime,
   isInvalidPresentReplayNonce,
   isInvalidReplayReceivedAt,
+  isInvalidRequestId,
   isReplayReceiptTimeAfterEvaluation,
 } from "../inbound-security/validation.js";
 import type { LoopRuntimePublicRequestAuthorizer } from "./loop-runtime-public-request-authorization.js";
@@ -170,6 +171,19 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
         decision: denyInboundSecurity(
           input.verificationContext.requestId,
           "tenant_mismatch",
+        ),
+      }),
+    });
+  }
+
+  if (isInvalidRequestId(input.security.accessRequest.requestId)) {
+    return Object.freeze({
+      verified: true as const,
+      security: Object.freeze({
+        allowed: false as const,
+        decision: denyInboundSecurity(
+          input.verificationContext.requestId,
+          "request_id_mismatch",
         ),
       }),
     });

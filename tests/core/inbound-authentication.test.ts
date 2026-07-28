@@ -415,6 +415,130 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
     }
   });
 
+  it("accepts a valid accessRequest.requestId", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 1);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, true);
+    }
+  });
+
+  it("accepts a single-character accessRequest.requestId as a valid boundary value", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+      verificationContext: Object.freeze({
+        requestId: "x",
+        evaluatedAt: EVALUATED_AT,
+      }),
+      security: Object.freeze({
+        ...base.security,
+        accessRequest: accessRequest({ requestId: "x" }),
+        replayEvidence: Object.freeze({
+          ...base.security.replayEvidence!,
+          requestId: "x",
+        }),
+      }),
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 1);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, true);
+    }
+  });
+
+  it("rejects an empty string accessRequest.requestId before any identity comparison", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+      security: Object.freeze({
+        ...base.security,
+        accessRequest: accessRequest({ requestId: "" }),
+      }),
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "deny");
+      assert.equal(result.security.decision.reason, "request_id_mismatch");
+    }
+  });
+
+  it("rejects a whitespace-only accessRequest.requestId before any identity comparison", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+      security: Object.freeze({
+        ...base.security,
+        accessRequest: accessRequest({ requestId: "   " }),
+      }),
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "deny");
+      assert.equal(result.security.decision.reason, "request_id_mismatch");
+    }
+  });
+
   it("rejects a request identity mismatch before invoking replay protection", async () => {
     const calls = counters();
     const base = input(calls);
