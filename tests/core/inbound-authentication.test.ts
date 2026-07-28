@@ -262,6 +262,38 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
     }
   });
 
+  it("rejects an evaluation-time mismatch between verification context and Core", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+      verificationContext: Object.freeze({
+        requestId: "request-1",
+        evaluatedAt: "2026-07-26T13:00:00.000Z",
+      }),
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "deny");
+      assert.equal(result.security.decision.reason, "evaluation_time_mismatch");
+    }
+  });
+
   it("rejects a request identity mismatch before invoking replay protection", async () => {
     const calls = counters();
     const base = input(calls);
@@ -345,6 +377,10 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
     const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
       ...base,
       evaluatedAt: "2025-12-31T23:59:59Z",
+      verificationContext: Object.freeze({
+        requestId: "request-1",
+        evaluatedAt: "2025-12-31T23:59:59Z",
+      }),
       replayProtectionPort: {
         check() {
           replayCalls += 1;
@@ -377,6 +413,10 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
     const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
       ...base,
       evaluatedAt: "2027-01-01T00:00:01Z",
+      verificationContext: Object.freeze({
+        requestId: "request-1",
+        evaluatedAt: "2027-01-01T00:00:01Z",
+      }),
       replayProtectionPort: {
         check() {
           replayCalls += 1;

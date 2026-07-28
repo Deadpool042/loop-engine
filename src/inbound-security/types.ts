@@ -66,6 +66,7 @@ export const INBOUND_ACCESS_DENY_REASONS = [
   "authentication_invalid",
   "authentication_expired",
   "authentication_not_yet_valid",
+  "evaluation_time_mismatch",
   "principal_mismatch",
   "tenant_mismatch",
   "request_id_mismatch",
