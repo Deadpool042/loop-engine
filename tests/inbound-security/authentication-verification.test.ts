@@ -272,4 +272,131 @@ describe("evaluateInboundAuthenticationVerifier", () => {
     });
     assert.equal(calls, 0);
   });
+
+  it("accepts null issuerHint and subjectHint", async () => {
+    let calls = 0;
+    const verifier = {
+      verify() {
+        calls += 1;
+        return { verified: true as const, evidence: evidence() };
+      },
+    };
+
+    const result = await evaluateInboundAuthenticationVerifier(
+      { ...INPUT, issuerHint: null, subjectHint: null },
+      CONTEXT,
+      verifier,
+    );
+
+    assert.equal(calls, 1);
+    assert.equal(result.verified, true);
+  });
+
+  it("accepts a single-character hint and transmits it unchanged", async () => {
+    let received: InboundAuthenticationInput | null = null;
+    const verifier = {
+      verify(input: InboundAuthenticationInput) {
+        received = input;
+        return { verified: true as const, evidence: evidence() };
+      },
+    };
+
+    const result = await evaluateInboundAuthenticationVerifier(
+      { ...INPUT, issuerHint: "i", subjectHint: "s" },
+      CONTEXT,
+      verifier,
+    );
+
+    assert.equal(result.verified, true);
+    assert.equal(received!.issuerHint, "i");
+    assert.equal(received!.subjectHint, "s");
+  });
+
+  it("rejects an empty string issuerHint before invoking the verifier", async () => {
+    let calls = 0;
+    const verifier = {
+      verify() {
+        calls += 1;
+        return { verified: true as const, evidence: evidence() };
+      },
+    };
+
+    const result = await evaluateInboundAuthenticationVerifier(
+      { ...INPUT, issuerHint: "" },
+      CONTEXT,
+      verifier,
+    );
+
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+    assert.equal(calls, 0);
+  });
+
+  it("rejects a whitespace-only issuerHint before invoking the verifier", async () => {
+    let calls = 0;
+    const verifier = {
+      verify() {
+        calls += 1;
+        return { verified: true as const, evidence: evidence() };
+      },
+    };
+
+    const result = await evaluateInboundAuthenticationVerifier(
+      { ...INPUT, issuerHint: "   " },
+      CONTEXT,
+      verifier,
+    );
+
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+    assert.equal(calls, 0);
+  });
+
+  it("rejects an empty string subjectHint before invoking the verifier", async () => {
+    let calls = 0;
+    const verifier = {
+      verify() {
+        calls += 1;
+        return { verified: true as const, evidence: evidence() };
+      },
+    };
+
+    const result = await evaluateInboundAuthenticationVerifier(
+      { ...INPUT, subjectHint: "" },
+      CONTEXT,
+      verifier,
+    );
+
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+    assert.equal(calls, 0);
+  });
+
+  it("rejects a whitespace-only subjectHint before invoking the verifier", async () => {
+    let calls = 0;
+    const verifier = {
+      verify() {
+        calls += 1;
+        return { verified: true as const, evidence: evidence() };
+      },
+    };
+
+    const result = await evaluateInboundAuthenticationVerifier(
+      { ...INPUT, subjectHint: "   " },
+      CONTEXT,
+      verifier,
+    );
+
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+    assert.equal(calls, 0);
+  });
 });

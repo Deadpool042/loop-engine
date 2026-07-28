@@ -143,10 +143,10 @@ function isValidAuthenticationInput(value: unknown): value is InboundAuthenticat
     descriptors.credential.value === undefined ||
     !isEnumerableDataProperty(descriptors.issuerHint) ||
     (descriptors.issuerHint.value !== null &&
-      typeof descriptors.issuerHint.value !== "string") ||
+      !isNonEmptyString(descriptors.issuerHint.value)) ||
     !isEnumerableDataProperty(descriptors.subjectHint) ||
     (descriptors.subjectHint.value !== null &&
-      typeof descriptors.subjectHint.value !== "string")
+      !isNonEmptyString(descriptors.subjectHint.value))
   ) {
     return false;
   }
