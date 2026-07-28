@@ -49,6 +49,8 @@ import { INBOUND_VERIFICATION_REQUEST_BINDING_RULE } from "./rules/inbound-verif
 import { INBOUND_VERIFICATION_REQUEST_BINDING_GATE_RULE } from "./rules/inbound-verification-request-binding-gate.js";
 import { INBOUND_VERIFICATION_EVALUATION_TIME_BINDING_RULE } from "./rules/inbound-verification-evaluation-time-binding.js";
 import { INBOUND_VERIFICATION_EVALUATION_TIME_BINDING_GATE_RULE } from "./rules/inbound-verification-evaluation-time-binding-gate.js";
+import { INBOUND_REPLAY_NONCE_VALIDATION_RULE } from "./rules/inbound-replay-nonce-validation.js";
+import { INBOUND_REPLAY_NONCE_VALIDATION_GATE_RULE } from "./rules/inbound-replay-nonce-validation-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -109,6 +111,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_VERIFICATION_REQUEST_BINDING_GATE_RULE,
   INBOUND_VERIFICATION_EVALUATION_TIME_BINDING_RULE,
   INBOUND_VERIFICATION_EVALUATION_TIME_BINDING_GATE_RULE,
+  INBOUND_REPLAY_NONCE_VALIDATION_RULE,
+  INBOUND_REPLAY_NONCE_VALIDATION_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);

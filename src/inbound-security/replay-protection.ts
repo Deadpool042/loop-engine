@@ -96,7 +96,7 @@ function isValidInput(value: unknown): value is InboundReplayProtectionInput {
     isNonEmptyString(descriptors.requestId!.value) &&
     isNonEmptyString(descriptors.evidenceId!.value) &&
     (descriptors.nonce!.value === null ||
-      typeof descriptors.nonce!.value === "string") &&
+      isNonEmptyString(descriptors.nonce!.value)) &&
     isNonEmptyString(descriptors.evaluatedAt!.value)
   );
 }
