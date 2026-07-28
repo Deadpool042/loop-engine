@@ -1399,4 +1399,119 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
     assert.equal(calls.assembler, 0);
   });
 
+  it("accepts a verified evidence whose method matches the declared authentication input", async () => {
+    const calls = counters();
+    const base = input(calls);
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(base);
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(result.verified, true);
+    if (result.verified) {
+      assert.equal(result.security.allowed, true);
+    }
+  });
+
+  it("accepts a single-character method that matches exactly", async () => {
+    const calls = counters();
+    const base = input(
+      calls,
+      verifier(calls, {
+        verified: true,
+        evidence: { ...evidence(), method: "x" },
+      }),
+    );
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      authenticationInput: { ...AUTH_INPUT, method: "x" },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(result.verified, true);
+    if (result.verified) {
+      assert.equal(result.security.allowed, true);
+    }
+  });
+
+  it("rejects a verified evidence whose method differs from the declared authentication input, without invoking replay protection or Runtime preparation", async () => {
+    const calls = counters();
+    const base = input(
+      calls,
+      verifier(calls, {
+        verified: true,
+        evidence: { ...evidence(), method: "other-method" },
+      }),
+    );
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
+  it("rejects a case-different method match without any normalization", async () => {
+    const calls = counters();
+    const base = input(
+      calls,
+      verifier(calls, {
+        verified: true,
+        evidence: { ...evidence(), method: "Opaque" },
+      }),
+    );
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
+  it("returns a deterministic and stable result for a method mismatch across repeated calls", async () => {
+    const calls = counters();
+    const base = input(
+      calls,
+      verifier(calls, {
+        verified: true,
+        evidence: { ...evidence(), method: "other-method" },
+      }),
+    );
+
+    const first = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(base);
+    const second = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(base);
+
+    assert.deepEqual(first, second);
+    assert.deepEqual(first, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
 });

@@ -63,6 +63,8 @@ import { INBOUND_REPLAY_PROTECTION_RECEIVED_AT_VALIDATION_RULE } from "./rules/i
 import { INBOUND_REPLAY_PROTECTION_RECEIVED_AT_VALIDATION_GATE_RULE } from "./rules/inbound-replay-protection-received-at-validation-gate.js";
 import { INBOUND_AUTHENTICATION_HINT_VALIDATION_RULE } from "./rules/inbound-authentication-hint-validation.js";
 import { INBOUND_AUTHENTICATION_HINT_VALIDATION_GATE_RULE } from "./rules/inbound-authentication-hint-validation-gate.js";
+import { INBOUND_AUTHENTICATION_METHOD_BINDING_RULE } from "./rules/inbound-authentication-method-binding.js";
+import { INBOUND_AUTHENTICATION_METHOD_BINDING_GATE_RULE } from "./rules/inbound-authentication-method-binding-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -137,6 +139,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_REPLAY_PROTECTION_RECEIVED_AT_VALIDATION_GATE_RULE,
   INBOUND_AUTHENTICATION_HINT_VALIDATION_RULE,
   INBOUND_AUTHENTICATION_HINT_VALIDATION_GATE_RULE,
+  INBOUND_AUTHENTICATION_METHOD_BINDING_RULE,
+  INBOUND_AUTHENTICATION_METHOD_BINDING_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
