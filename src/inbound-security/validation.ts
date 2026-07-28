@@ -75,6 +75,18 @@ export function isInstantAfter(instant: string, evaluatedAt: string): boolean {
   return compareInstants(instant, evaluatedAt) > 0;
 }
 
+/**
+ * Rejects a replay `receivedAt` that isn't itself a well-formed instant.
+ * Unlike `compareInstants` (used by `isReplayReceiptTimeAfterEvaluation`),
+ * which falls back to a lexicographic comparison for unparseable strings,
+ * this never lets a malformed value reach that temporal comparison.
+ */
+export function isInvalidReplayReceivedAt(
+  replayEvidence: InboundReplayEvidence,
+): boolean {
+  return Number.isNaN(Date.parse(replayEvidence.receivedAt));
+}
+
 export function isReplayReceiptTimeAfterEvaluation(
   replayEvidence: InboundReplayEvidence,
   evaluatedAt: string,

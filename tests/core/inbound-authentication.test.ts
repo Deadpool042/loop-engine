@@ -778,6 +778,131 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
     }
   });
 
+  it("accepts replay evidence with a valid ISO receivedAt", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 1);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, true);
+    }
+  });
+
+  it("rejects replay evidence with an unparseable receivedAt before invoking replay protection", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+      security: Object.freeze({
+        ...base.security,
+        replayEvidence: Object.freeze({
+          ...base.security.replayEvidence!,
+          receivedAt: "not-a-date",
+        }),
+      }),
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "deny");
+      assert.equal(result.security.decision.reason, "replay_rejected");
+    }
+  });
+
+  it("rejects replay evidence with an impossible calendar date receivedAt", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+      security: Object.freeze({
+        ...base.security,
+        replayEvidence: Object.freeze({
+          ...base.security.replayEvidence!,
+          receivedAt: "2026-13-45T00:00:00.000Z",
+        }),
+      }),
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "deny");
+      assert.equal(result.security.decision.reason, "replay_rejected");
+    }
+  });
+
+  it("rejects replay evidence with an empty string receivedAt before invoking replay protection", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+      security: Object.freeze({
+        ...base.security,
+        replayEvidence: Object.freeze({
+          ...base.security.replayEvidence!,
+          receivedAt: "",
+        }),
+      }),
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(result.verified, true);
+
+    if (result.verified) {
+      assert.equal(result.security.allowed, false);
+      assert.equal(result.security.decision.kind, "deny");
+      assert.equal(result.security.decision.reason, "replay_rejected");
+    }
+  });
+
   it("rejects replay evidence received after the evaluation instant before invoking replay protection", async () => {
     const calls = counters();
     const base = input(calls);

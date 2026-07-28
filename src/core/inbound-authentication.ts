@@ -20,6 +20,7 @@ import {
   isInboundOperationAllowed,
   isInstantAfter,
   isInvalidPresentReplayNonce,
+  isInvalidReplayReceivedAt,
   isReplayReceiptTimeAfterEvaluation,
 } from "../inbound-security/validation.js";
 import type { LoopRuntimePublicRequestAuthorizer } from "./loop-runtime-public-request-authorization.js";
@@ -277,6 +278,19 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
     }
 
     if (replayEvidence.replayed) {
+      return Object.freeze({
+        verified: true as const,
+        security: Object.freeze({
+          allowed: false as const,
+          decision: denyInboundSecurity(
+            input.verificationContext.requestId,
+            "replay_rejected",
+          ),
+        }),
+      });
+    }
+
+    if (isInvalidReplayReceivedAt(replayEvidence)) {
       return Object.freeze({
         verified: true as const,
         security: Object.freeze({
