@@ -76,6 +76,7 @@ import { INBOUND_AUTHENTICATION_EVIDENCE_INSTANT_VALIDATION_GATE_RULE } from "./
 import { INBOUND_AUTHENTICATION_ISSUED_AT_VALIDATION_RULE } from "./rules/inbound-authentication-issued-at-validation.js";
 import { INBOUND_AUTHENTICATION_ISSUED_AT_VALIDATION_GATE_RULE } from "./rules/inbound-authentication-issued-at-validation-gate.js";
 import { PREPARED_INBOUND_RUNTIME_EXECUTION_RULE } from "./rules/prepared-inbound-runtime-execution.js";
+import { LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE } from "./rules/looprunner-execute-validation-repair.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -163,6 +164,7 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_AUTHENTICATION_ISSUED_AT_VALIDATION_RULE,
   INBOUND_AUTHENTICATION_ISSUED_AT_VALIDATION_GATE_RULE,
   PREPARED_INBOUND_RUNTIME_EXECUTION_RULE,
+  LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
