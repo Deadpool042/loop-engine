@@ -8,6 +8,10 @@ Les audits documentent l'état du projet à un moment donné.
 
 Ils ne remplacent pas les documents d'architecture actifs.
 
+## Audit courant
+
+- `architecture-delivery-readiness-v14.2u.md` — audit de readiness architecture/produit, verdict de reséquencement et définition du prochain lot V14.3.
+
 ## Audits Audit Engine
 
 - `audit-engine-cartography-v1.md` — cartographie initiale mesurée.
@@ -46,6 +50,9 @@ Ils ne remplacent pas les documents d'architecture actifs.
 
 - `architecture-v2.5-review.md` si généré.
 - `v2-consolidation-plan.md`
+- `roadmap-status-audit-v13.12.md`
+- `roadmap-status-audit-v13.67.md`
+- `architecture-delivery-readiness-v14.2u.md`
 
 ## Règle de lecture
 
