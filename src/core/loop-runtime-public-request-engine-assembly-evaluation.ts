@@ -134,11 +134,24 @@ function readAssembleFunction(
   }
 
   const descriptors = Object.getOwnPropertyDescriptors(assembler);
+  const hasBaseShape = hasExactKeys(descriptors, ["assemble"]);
+  const hasDryRunShape = hasExactKeys(descriptors, [
+    "assemble",
+    "allowDryRunPreparation",
+  ]);
 
   if (
-    !hasExactKeys(descriptors, ["assemble"]) ||
+    (!hasBaseShape && !hasDryRunShape) ||
     !isEnumerableDataProperty(descriptors.assemble) ||
     typeof descriptors.assemble.value !== "function"
+  ) {
+    return null;
+  }
+
+  if (
+    hasDryRunShape &&
+    (!isEnumerableDataProperty(descriptors.allowDryRunPreparation) ||
+      typeof descriptors.allowDryRunPreparation.value !== "boolean")
   ) {
     return null;
   }
