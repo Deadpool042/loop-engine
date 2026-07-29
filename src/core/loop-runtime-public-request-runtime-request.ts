@@ -15,7 +15,7 @@ export type LoopRuntimeConstructedRuntimeRequest = Readonly<{
   runtimeId: string;
   project: string;
   cycleId?: string;
-  mode: "execute";
+  mode: "dry-run" | "execute";
   policyId: string;
   profileId: string;
   effort: AgentEffort;
@@ -35,8 +35,7 @@ export type LoopRuntimeConstructedRuntimeRequest = Readonly<{
 
 export type LoopRuntimeRequestConstructionFailureReason =
   | "invalid_options"
-  | "invalid_binding"
-  | "unsupported_dry_run";
+  | "invalid_binding";
 
 export type LoopRuntimeRequestConstructionResult =
   | Readonly<{
@@ -79,13 +78,6 @@ function invalidBinding(): LoopRuntimeRequestConstructionResult {
   return Object.freeze({
     constructed: false,
     reason: "invalid_binding" as const,
-  });
-}
-
-function unsupportedDryRun(): LoopRuntimeRequestConstructionResult {
-  return Object.freeze({
-    constructed: false,
-    reason: "unsupported_dry_run" as const,
   });
 }
 
@@ -153,10 +145,6 @@ export function createLoopRuntimeRequestFromPublicOptions(
     return invalidOptions();
   }
 
-  if (options.mode === "dry-run") {
-    return unsupportedDryRun();
-  }
-
   if (!hasValidBinding(binding)) {
     return invalidBinding();
   }
@@ -166,7 +154,7 @@ export function createLoopRuntimeRequestFromPublicOptions(
     request: Object.freeze({
       runtimeId: binding.runtimeId,
       project: options.project,
-      mode: "execute" as const,
+      mode: options.mode,
       policyId: options.policyId,
       profileId: options.profileId,
       effort: options.effort,
