@@ -14,6 +14,7 @@ import {
   RUNTIME_RESULT_STATUSES,
   type LocalProcessExecutionPolicy,
   type RuntimeAdapter,
+  type RuntimeErrorCode,
   type RuntimeId,
   type RuntimeRequest,
   type RuntimeResult,
@@ -114,9 +115,7 @@ export type PreparedInboundRuntimeExecutionReceipt = Readonly<{
   startedAt: string;
   completedAt: string;
   diagnosticCodes: readonly string[];
-  errorCode: RuntimeResult["error"] extends infer _T
-    ? (typeof RUNTIME_ERROR_CODES)[number] | null
-    : never;
+  errorCode: RuntimeErrorCode | null;
   runtimeInvoked: true;
   effectStarted: boolean;
   termination: RuntimeResult["termination"] | null;
@@ -142,9 +141,7 @@ export type PreparedInboundRuntimeExecutionResult =
       outcome: "failed";
       requestId: string;
       stage: "runtime_execution";
-      reason:
-        | "runtime_execution_failed"
-        | "runtime_result_invalid";
+      reason: "runtime_execution_failed" | "runtime_result_invalid";
     }>
   | Readonly<{
       schemaVersion: typeof PREPARED_INBOUND_RUNTIME_EXECUTION_SCHEMA_VERSION;
@@ -163,11 +160,7 @@ function deepFreeze<T>(value: T): T {
   if (value === null || typeof value !== "object" || Object.isFrozen(value)) {
     return value;
   }
-
-  for (const child of Object.values(value)) {
-    deepFreeze(child);
-  }
-
+  for (const child of Object.values(value)) deepFreeze(child);
   return Object.freeze(value);
 }
 
@@ -175,7 +168,6 @@ function isOrdinaryObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
-
   try {
     return Object.getPrototypeOf(value) === Object.prototype;
   } catch {
@@ -213,9 +205,7 @@ function isValidTask(value: unknown): value is RoadmapCandidate {
     Number.isSafeInteger(value.line) &&
     (value.line as number) > 0 &&
     isNonEmptyString(value.text) &&
-    (value.kind === "safe" ||
-      value.kind === "warning" ||
-      value.kind === "blocked") &&
+    (value.kind === "safe" || value.kind === "warning" || value.kind === "blocked") &&
     isNonEmptyString(value.reason) &&
     (value.status === "todo" ||
       value.status === "in_progress" ||
@@ -250,15 +240,10 @@ function isValidExecutionContext(
   context: unknown,
   request: LoopRuntimeConstructedRuntimeRequest,
 ): context is PreparedInboundRuntimeExecutionContext {
-  if (!isOrdinaryObject(context)) {
+  if (!isOrdinaryObject(context) || !isOrdinaryObject(context.policy)) {
     return false;
   }
-
   const policy = context.policy;
-  if (!isOrdinaryObject(policy)) {
-    return false;
-  }
-
   const selection = policy.selection;
   if (
     policy.policyId !== request.policyId ||
@@ -276,25 +261,17 @@ function isValidExecutionContext(
   ) {
     return false;
   }
-
-  if (
-    context.localProcessExecutionPolicy !== undefined &&
-    !isOrdinaryObject(context.localProcessExecutionPolicy)
-  ) {
-    return false;
-  }
-
-  return true;
+  return (
+    context.localProcessExecutionPolicy === undefined ||
+    isOrdinaryObject(context.localProcessExecutionPolicy)
+  );
 }
 
 function isValidRuntimeResult(
   value: unknown,
   expectedRuntimeId: RuntimeId,
 ): value is RuntimeResult {
-  if (!isOrdinaryObject(value)) {
-    return false;
-  }
-
+  if (!isOrdinaryObject(value)) return false;
   if (
     value.runtimeId !== expectedRuntimeId ||
     !RUNTIME_RESULT_STATUSES.includes(
@@ -307,20 +284,14 @@ function isValidRuntimeResult(
   ) {
     return false;
   }
-
-  if (value.error !== undefined) {
-    if (
-      !isOrdinaryObject(value.error) ||
-      !RUNTIME_ERROR_CODES.includes(
-        value.error.code as (typeof RUNTIME_ERROR_CODES)[number],
-      ) ||
-      typeof value.error.processStarted !== "boolean"
-    ) {
-      return false;
-    }
-  }
-
-  return true;
+  if (value.error === undefined) return true;
+  return (
+    isOrdinaryObject(value.error) &&
+    RUNTIME_ERROR_CODES.includes(
+      value.error.code as (typeof RUNTIME_ERROR_CODES)[number],
+    ) &&
+    typeof value.error.processStarted === "boolean"
+  );
 }
 
 function rejection(
@@ -359,13 +330,9 @@ function runtimeRequestFromPrepared(
   requestId: string,
   evaluatedAt: string,
 ): RuntimeRequest | null {
-  if (!isRuntimeId(prepared.runtimeId)) {
-    return null;
-  }
-
+  if (!isRuntimeId(prepared.runtimeId)) return null;
   const localProcess = prepared.runtimeId === LOCAL_PROCESS_RUNTIME_ID;
   const executionPolicy = context.localProcessExecutionPolicy;
-
   if (
     prepared.mode === "execute" &&
     localProcess &&
@@ -373,10 +340,7 @@ function runtimeRequestFromPrepared(
   ) {
     return null;
   }
-
-  if (!localProcess && executionPolicy !== undefined) {
-    return null;
-  }
+  if (!localProcess && executionPolicy !== undefined) return null;
 
   return deepFreeze({
     task: context.task,
@@ -414,12 +378,6 @@ function runtimeRequestFromPrepared(
   }) as RuntimeRequest;
 }
 
-function budgetFromPrepared(
-  request: LoopRuntimeConstructedRuntimeRequest,
-): Partial<AgentBudget> {
-  return request.limits;
-}
-
 function createPlan(
   requestId: string,
   evaluatedAt: string,
@@ -444,12 +402,9 @@ function createPlan(
 }
 
 function didEffectStart(result: RuntimeResult): boolean {
-  if (result.error?.processStarted === true) {
-    return true;
-  }
-
   return (
-    result.events?.some((event) => event.type === "process_started") ?? false
+    result.error?.processStarted === true ||
+    (result.events?.some((event) => event.type === "process_started") ?? false)
   );
 }
 
@@ -492,32 +447,18 @@ async function resolveExecutionContext(
   try {
     const resolution = await resolver.resolve(input);
     if (!isOrdinaryObject(resolution) || typeof resolution.resolved !== "boolean") {
-      return deepFreeze({
-        resolved: false as const,
-        reason: "execution_context_invalid" as const,
-      });
+      return deepFreeze({ resolved: false as const, reason: "execution_context_invalid" as const });
     }
-
     if (!resolution.resolved) {
       return resolution.reason === "execution_context_unavailable"
         ? deepFreeze(resolution)
-        : deepFreeze({
-            resolved: false as const,
-            reason: "execution_context_invalid" as const,
-          });
+        : deepFreeze({ resolved: false as const, reason: "execution_context_invalid" as const });
     }
-
     return isValidExecutionContext(resolution.context, input.request)
       ? deepFreeze(resolution)
-      : deepFreeze({
-          resolved: false as const,
-          reason: "execution_context_invalid" as const,
-        });
+      : deepFreeze({ resolved: false as const, reason: "execution_context_invalid" as const });
   } catch {
-    return deepFreeze({
-      resolved: false as const,
-      reason: "execution_context_unavailable" as const,
-    });
+    return deepFreeze({ resolved: false as const, reason: "execution_context_unavailable" as const });
   }
 }
 
@@ -528,10 +469,7 @@ function resolveAdapter(
   try {
     return resolver(request);
   } catch {
-    return deepFreeze({
-      outcome: "unsupported" as const,
-      reason: "runtime resolver failed",
-    });
+    return deepFreeze({ outcome: "unsupported" as const, reason: "runtime resolver failed" });
   }
 }
 
@@ -555,19 +493,16 @@ export async function executePreparedInboundRuntimeRequest(
   if (inbound.outcome === "invalid") {
     return rejection(null, "inbound", inbound.reason);
   }
-
   if (inbound.outcome === "rejected") {
     if (inbound.stage === "authentication") {
       return rejection(envelope.requestId, "authentication", inbound.reason);
     }
-
-    return rejection(
-      envelope.requestId,
-      "security",
-      inbound.decision.reason,
-    );
+    const reason =
+      inbound.decision.kind === "allow"
+        ? "insufficient_evidence"
+        : inbound.decision.reason;
+    return rejection(envelope.requestId, "security", reason);
   }
-
   if (!inbound.prepared.prepared) {
     return rejection(
       envelope.requestId,
@@ -579,19 +514,10 @@ export async function executePreparedInboundRuntimeRequest(
   const prepared = inbound.prepared.request;
   const contextResolution = await resolveExecutionContext(
     dependencies.executionContextResolver,
-    {
-      requestId: envelope.requestId,
-      evaluatedAt: envelope.evaluatedAt,
-      request: prepared,
-    },
+    { requestId: envelope.requestId, evaluatedAt: envelope.evaluatedAt, request: prepared },
   );
-
   if (!contextResolution.resolved) {
-    return rejection(
-      envelope.requestId,
-      "execution_context",
-      contextResolution.reason,
-    );
+    return rejection(envelope.requestId, "execution_context", contextResolution.reason);
   }
 
   const runtimeRequest = runtimeRequestFromPrepared(
@@ -600,13 +526,8 @@ export async function executePreparedInboundRuntimeRequest(
     envelope.requestId,
     envelope.evaluatedAt,
   );
-
   if (!runtimeRequest || !isRuntimeId(prepared.runtimeId)) {
-    return rejection(
-      envelope.requestId,
-      "execution_context",
-      "execution_context_invalid",
-    );
+    return rejection(envelope.requestId, "execution_context", "execution_context_invalid");
   }
 
   const admission = evaluateRuntimeExecutionAdmission({
@@ -614,28 +535,18 @@ export async function executePreparedInboundRuntimeRequest(
     policy: contextResolution.context.policy,
     provider: contextResolution.context.provider,
     effort: prepared.effort,
-    budget: budgetFromPrepared(prepared),
+    budget: prepared.limits as Partial<AgentBudget>,
   });
-
   if (!admission.admitted) {
-    return rejection(
-      envelope.requestId,
-      "runtime_admission",
-      admission.reason,
-    );
+    return rejection(envelope.requestId, "runtime_admission", admission.reason);
   }
 
   const selection = resolveAdapter(
     dependencies.runtimeResolver ?? resolveRuntime,
     runtimeRequest,
   );
-
   if (selection.outcome !== "selected") {
-    return rejection(
-      envelope.requestId,
-      "runtime_resolution",
-      "runtime_unavailable",
-    );
+    return rejection(envelope.requestId, "runtime_resolution", "runtime_unavailable");
   }
 
   if (prepared.mode === "dry-run") {
@@ -658,7 +569,6 @@ export async function executePreparedInboundRuntimeRequest(
   if (runtimeResult === null) {
     return failure(envelope.requestId, "runtime_execution_failed");
   }
-
   if (!isValidRuntimeResult(runtimeResult, prepared.runtimeId)) {
     return failure(envelope.requestId, "runtime_result_invalid");
   }
@@ -670,7 +580,6 @@ export async function executePreparedInboundRuntimeRequest(
     contextResolution.context.provider,
     runtimeResult,
   );
-
   return deepFreeze({
     schemaVersion: PREPARED_INBOUND_RUNTIME_EXECUTION_SCHEMA_VERSION,
     outcome: "executed" as const,
