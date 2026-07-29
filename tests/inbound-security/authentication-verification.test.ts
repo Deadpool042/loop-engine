@@ -126,6 +126,30 @@ describe("evaluateInboundAuthenticationVerifier", () => {
           evidence: { ...evidence(), extra: true },
         }),
       },
+      {
+        verify: () => ({
+          verified: true,
+          evidence: evidence({ subjectId: "" }),
+        }),
+      },
+      {
+        verify: () => ({
+          verified: true,
+          evidence: evidence({ subjectId: "   " }),
+        }),
+      },
+      {
+        verify: () => ({
+          verified: true,
+          evidence: evidence({ issuerId: "" }),
+        }),
+      },
+      {
+        verify: () => ({
+          verified: true,
+          evidence: evidence({ issuerId: "   " }),
+        }),
+      },
     ]) {
       assert.deepEqual(await evaluate(verifier), {
         verified: false,
