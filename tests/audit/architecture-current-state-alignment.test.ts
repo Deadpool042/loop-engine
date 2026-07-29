@@ -13,6 +13,7 @@ type PackageJson = Readonly<{
 describe("current architecture documentation alignment", () => {
   it("documents the implemented execution layers and the V14.3 integration gap", () => {
     const content = readFileSync(RFC_PATH, "utf8");
+    const normalizedContent = content.replace(/\s+/g, " ");
 
     for (const expected of [
       "Opt-in Runtime execution flow",
@@ -24,7 +25,10 @@ describe("current architecture documentation alignment", () => {
       "V14.3 integration gap",
       "LoopRunner currently reaches planning completion only",
     ]) {
-      assert.ok(content.includes(expected), `Missing current-state term: ${expected}`);
+      assert.ok(
+        normalizedContent.includes(expected),
+        `Missing current-state term: ${expected}`,
+      );
     }
 
     for (const obsoleteClaim of [
@@ -34,7 +38,7 @@ describe("current architecture documentation alignment", () => {
       "V13.0 therefore leaves the pipeline at a declarative stop.",
     ]) {
       assert.equal(
-        content.includes(obsoleteClaim),
+        normalizedContent.includes(obsoleteClaim),
         false,
         `Obsolete current-state claim remains: ${obsoleteClaim}`,
       );
