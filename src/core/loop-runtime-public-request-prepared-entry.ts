@@ -133,6 +133,7 @@ export async function prepareAuthorizedLoopRuntimeDecodedRequest(
     catalog: assembly.assembly.catalog,
     limits: assembly.assembly.limits,
     binding: assembly.assembly.binding,
+    allowDryRun: input.assembler.allowDryRunPreparation === true,
   });
 
   if (!preparation.prepared) {

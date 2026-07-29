@@ -51,6 +51,8 @@ export type LoopRuntimeAuthorizedEngineAssemblyResult =
     }>;
 
 export type LoopRuntimeAuthorizedEngineAssembler = Readonly<{
+  /** Explicit capability used only by the V14.3 no-effect application facade. */
+  allowDryRunPreparation?: boolean;
   assemble(
     request: LoopRuntimeAuthorizedEngineAssemblyRequest,
   ):

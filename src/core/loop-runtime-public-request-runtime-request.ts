@@ -15,7 +15,7 @@ export type LoopRuntimeConstructedRuntimeRequest = Readonly<{
   runtimeId: string;
   project: string;
   cycleId?: string;
-  mode: "execute";
+  mode: "dry-run" | "execute";
   policyId: string;
   profileId: string;
   effort: AgentEffort;
@@ -47,6 +47,10 @@ export type LoopRuntimeRequestConstructionResult =
       constructed: false;
       reason: LoopRuntimeRequestConstructionFailureReason;
     }>;
+
+export type LoopRuntimeRequestConstructionOptions = Readonly<{
+  allowDryRun?: boolean;
+}>;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -148,12 +152,13 @@ function copyLimits(
 export function createLoopRuntimeRequestFromPublicOptions(
   options: LoopRuntimeRequestOptionsMapping,
   binding: LoopRuntimeRequestBinding,
+  construction: LoopRuntimeRequestConstructionOptions = {},
 ): LoopRuntimeRequestConstructionResult {
   if (!hasValidOptions(options)) {
     return invalidOptions();
   }
 
-  if (options.mode === "dry-run") {
+  if (options.mode === "dry-run" && construction.allowDryRun !== true) {
     return unsupportedDryRun();
   }
 
@@ -166,7 +171,7 @@ export function createLoopRuntimeRequestFromPublicOptions(
     request: Object.freeze({
       runtimeId: binding.runtimeId,
       project: options.project,
-      mode: "execute" as const,
+      mode: options.mode,
       policyId: options.policyId,
       profileId: options.profileId,
       effort: options.effort,
