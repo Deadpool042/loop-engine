@@ -109,7 +109,7 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function isStringRecord(value: unknown): boolean {
+function isNonEmptyStringRecord(value: unknown): boolean {
   if (!isOrdinaryObject(value)) {
     return false;
   }
@@ -119,8 +119,9 @@ function isStringRecord(value: unknown): boolean {
     const descriptor = descriptors[key];
     return (
       typeof key === "string" &&
+      isNonEmptyString(key) &&
       isEnumerableDataProperty(descriptor) &&
-      typeof descriptor.value === "string"
+      isNonEmptyString(descriptor.value)
     );
   });
 }
@@ -154,7 +155,7 @@ function isValidAuthenticationInput(value: unknown): value is InboundAuthenticat
   return (
     descriptors.metadata === undefined ||
     (isEnumerableDataProperty(descriptors.metadata) &&
-      isStringRecord(descriptors.metadata.value))
+      isNonEmptyStringRecord(descriptors.metadata.value))
   );
 }
 
@@ -208,7 +209,7 @@ function isValidEvidence(value: unknown): value is InboundAuthenticationEvidence
   return (
     descriptors.metadata === undefined ||
     (isEnumerableDataProperty(descriptors.metadata) &&
-      isStringRecord(descriptors.metadata.value))
+      isNonEmptyStringRecord(descriptors.metadata.value))
   );
 }
 
