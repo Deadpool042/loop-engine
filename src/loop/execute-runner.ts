@@ -371,6 +371,13 @@ export async function runLoopExecute(
     }
 
     repairAttempts += 1;
+    validation = createValidationResult(
+      project,
+      validationAttempt,
+      validationAttempts,
+      repairAttempts,
+    );
+
     let repairResult;
     try {
       repairResult = await dependencies.repairer(
