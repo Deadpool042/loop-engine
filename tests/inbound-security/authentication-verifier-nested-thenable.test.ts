@@ -91,7 +91,7 @@ describe("authentication verifier nested thenable assimilation", () => {
     });
   });
 
-  it("honors the first settlement of the inner thenable", async () => {
+  it("honors an unavailable first settlement of the inner thenable", async () => {
     const nested = {
       then(resolve: (value: unknown) => void) {
         resolve({
@@ -110,5 +110,26 @@ describe("authentication verifier nested thenable assimilation", () => {
       verified: false,
       reason: "verification_unavailable",
     });
+  });
+
+  it("honors a successful first settlement of the inner thenable", async () => {
+    const nested = {
+      then(resolve: (value: unknown) => void) {
+        resolve({
+          then(innerResolve: (value: unknown) => void, reject: (reason: unknown) => void) {
+            innerResolve({ verified: true, evidence: EVIDENCE });
+            reject(new Error("late rejection"));
+          },
+        });
+      },
+    };
+
+    const { calls, value } = await evaluate(nested);
+
+    assert.equal(calls, 1);
+    assert.equal(value.verified, true);
+    if (value.verified) {
+      assert.equal(value.evidence, EVIDENCE);
+    }
   });
 });
