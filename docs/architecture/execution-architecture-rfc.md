@@ -2,19 +2,48 @@
 
 ## Status and normative language
 
-This RFC freezes the declarative execution architecture at V13.0. It is the
-normative reference for future execution-boundary design. The words **MUST**,
-**MUST NOT**, **SHOULD**, and **MAY** are normative.
+This RFC freezes the **historical V13.0 declarative baseline**. It remains the
+normative reference for the responsibilities and invariants of those V13.0
+layers, but it is no longer a current-state inventory of the repository. The
+words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative within that
+historical scope.
 
-This document records architecture; it does not add an execution capability.
-The V12 execution-boundary RFC remains normative for the future crossing
-semantics. Where the two documents differ, the V12 RFC takes precedence until
-it is explicitly superseded by a reviewed RFC.
+The current operational composition is documented by
+`prepared-inbound-runtime-execution.md` and `runtime-abstraction.md`. The V12
+execution-boundary RFC remains normative for crossing semantics unless a later
+reviewed contract explicitly supersedes it.
+
+## Current implementation status — V14.3
+
+The repository now contains guarded Runtime and Transport implementations,
+Core-owned Runtime admission, execution plans and receipts, a transport-neutral
+inbound handler, and the V14.3 application service
+`executePreparedInboundRuntimeRequest(...)`.
+
+The current supported vertical slice is:
+
+```text
+inbound envelope
+-> validation/authentication/replay/security
+-> decode/authorize/assemble/prepare
+-> trusted execution-context resolution
+-> Runtime admission and resolution
+-> dry-run plan OR one bounded Runtime invocation
+-> redacted receipt
+```
+
+This does **not** make the historical declarative governance graph executable.
+Eligibility, authority, review, provenance, descriptor and boundary evidence
+still cannot create or widen operational authority. Authentication, ACL, replay
+persistence, inbound transport, provider execution and LoopRunner execute mode
+remain separate future deliveries. References to “Future Bridge”, “Future
+Transport” and “Future Runtime” in sections 1–10 below describe the frozen
+V13.0 baseline, not the repository state after V14.3.
 
 ## 1. Architecture overview
 
-The current pipeline is declarative. Each layer produces immutable evidence or
-an assessment, then stops before any operational handoff.
+At V13.0 the pipeline was declarative. Each layer produced immutable evidence
+or an assessment, then stopped before any operational handoff.
 
 ```mermaid
 flowchart TD
@@ -24,9 +53,9 @@ flowchart TD
   Handoff --> BoundaryRFC["ExecutionBoundaryRFC"]
   BoundaryRFC --> Stop["Declarative stop"]
 
-  Stop -. future, not implemented .-> Bridge["Future Bridge"]
-  Bridge -. future, not implemented .-> Transport["Future Transport"]
-  Transport -. future, not implemented .-> Runtime["Future Runtime"]
+  Stop -. future, not implemented at V13.0 .-> Bridge["Future Bridge"]
+  Bridge -. future, not implemented at V13.0 .-> Transport["Future Transport"]
+  Transport -. future, not implemented at V13.0 .-> Runtime["Future Runtime"]
 ```
 
 - **Eligibility** assesses whether review and provenance evidence is internally
@@ -39,25 +68,23 @@ flowchart TD
   remains inactive and non-executable.
 - **ExecutionBoundaryRFC** catalogues the invariants that must hold before a
   future crossing can be considered. It keeps the boundary closed.
-- **Future Bridge** is the future Core-owned conversion point from reviewed
-  declarative evidence to a transport-facing contract; it does not exist.
-- **Future Transport** is the future imperative boundary owner; it does not
-  exist in this architecture.
-- **Future Runtime** is the future bounded backend reached only after a valid
-  transport handoff; it does not exist in this architecture.
+- **Future Bridge** was the V13.0 name for a future Core-owned conversion point
+  from reviewed declarative evidence to a transport-facing contract.
+- **Future Transport** was the V13.0 future imperative boundary owner.
+- **Future Runtime** was the V13.0 future bounded backend.
 
 ## 2. Responsibility matrix
 
-| Layer | Owns | Does not own | Current state |
+| Layer | Owns | Does not own | V13.0 state |
 | --- | --- | --- | --- |
 | Eligibility | Consistency assessment and requirement outcomes | Approval, authority, handoff | Implemented, declarative |
 | Authority | Bounded future authority representation | Review, dispatch, execution | Implemented, declarative |
 | Dispatch | Transport-independent descriptor | Transport selection, payload construction | Implemented, declarative |
 | Boundary | Descriptor handoff evidence | Boundary crossing, dispatch | Implemented, declarative |
 | Boundary RFC | Invariant catalogue and boundary evaluation | Operational permission, execution | Implemented, declarative |
-| Future Bridge | One reviewed conversion into a future boundary contract | Provider interpretation, runtime execution | Future RFC |
-| Future Runtime | Bounded work after a valid transport handoff | Authority creation, transport selection | Future implementation |
-| Future Transport | Imperative handoff and start evidence | Policy interpretation, authority expansion | Future implementation |
+| Future Bridge | One reviewed conversion into a future boundary contract | Provider interpretation, runtime execution | Future RFC at V13.0 |
+| Future Runtime | Bounded work after a valid transport handoff | Authority creation, transport selection | Future implementation at V13.0 |
+| Future Transport | Imperative handoff and start evidence | Policy interpretation, authority expansion | Future implementation at V13.0 |
 
 ## 3. Ownership
 
@@ -77,20 +104,22 @@ implementation to prove that its own declarative result is valid.
 
 ## 4. Execution boundary
 
-The execution boundary is not implemented. In future work, it begins only at
-the explicit Core-owned Bridge after all declarative validation, explicit
-operator approval, valid authority, valid descriptor, valid boundary evidence,
-and audit preconditions have been verified.
+At V13.0 the execution boundary was not implemented. The historical design
+required it to begin only at the explicit Core-owned Bridge after declarative
+validation, explicit operator approval, valid authority, valid descriptor,
+valid boundary evidence, and audit preconditions.
 
 Only bounded references, correlation identifiers, reviewed version references,
-and future audited boundary metadata MAY cross. Raw CLI arguments, raw provider
+and audited boundary metadata MAY cross. Raw CLI arguments, raw provider
 payloads, inferred approval, inferred eligibility, ambient environment state,
 credentials, commands, arguments, executable paths, and unbounded output MUST NOT cross.
 
-The future Bridge owns the crossing. The Core MUST validate the crossing before
-the Bridge is called; the future Transport MUST independently validate that the
-incoming future contract is scoped to it. Neither a provider, runtime nor
-transport MAY create, widen, or forge authority.
+In the historical model, the future Bridge owns the crossing. The Core MUST
+validate the crossing before the Bridge is called; the future Transport MUST
+independently validate that the incoming contract is scoped to it. Neither a
+provider, runtime nor transport MAY create, widen, or forge authority. V14.3
+preserves that rule by accepting only trusted injected context and by applying
+Runtime admission before resolution or invocation.
 
 ```mermaid
 flowchart LR
@@ -103,8 +132,10 @@ flowchart LR
 
 ## 5. State machine
 
-The state machine defines architecture states, not current executable
-behaviour. `Crossed`, `Executed`, and `Completed` are future-only states.
+The state machine below defines the V13.0 architecture states. `Crossed`,
+`Executed`, and `Completed` were future-only states in that baseline. V14.3
+uses a separate application result (`planned`, `executed`, `rejected`,
+`failed`) and does not mutate this governance state machine.
 
 ```mermaid
 stateDiagram-v2
@@ -127,19 +158,18 @@ stateDiagram-v2
 - **Declared**: immutable declarative evidence exists; it grants nothing.
 - **Validated**: deterministic validators confirm internal consistency.
 - **Approved**: a future operator approval is explicit, scoped and recorded.
-- **BoundaryReady**: all future crossing preconditions remain valid; it is not
-  crossed, dispatchable, or executable in V13.0.
-- **Crossed**: future-only evidence that the Bridge handed a valid future
-  contract to Transport.
-- **Executed**: future-only evidence that the selected Runtime began work.
-- **Completed**: future-only normalized completion evidence.
+- **BoundaryReady**: all crossing preconditions remain valid.
+- **Crossed**: evidence that a reviewed boundary contract was handed off.
+- **Executed**: evidence that the selected Runtime began work.
+- **Completed**: normalized completion evidence.
 - **Rejected**: a validation, policy, configuration, authority, or boundary
   condition failed closed.
-- **Cancelled**: a future explicit cancellation ended the lifecycle without
-  granting replacement authority.
+- **Cancelled**: explicit cancellation ended the lifecycle without granting
+  replacement authority.
 
-No current implementation MAY transition to `Crossed`, `Executed`, or
-`Completed`.
+No V13.0 declarative result alone MAY transition to `Crossed`, `Executed`, or
+`Completed`. V14.3 requires a separate inbound decision, trusted execution
+context, policy admission and Runtime resolution.
 
 ## 6. Invariant catalogue
 
@@ -154,8 +184,8 @@ their owning layer.
 | Provenance and eligibility | Provenance is evidence only; approval is never inferred; eligibility defaults to `not_eligible`; evidence must match versions and scope |
 | Authority and dispatch descriptor | Authority is bounded; descriptor is transport-independent, immutable, non-dispatchable and non-executable |
 | Boundary handoff | Handoff is declarative, inactive, unaccepted and default-denied; it creates no adapter/runtime/transport request |
-| Boundary RFC | Authority, eligibility, descriptor, boundary, evidence, policy, review, configuration, transport-isolation and runtime-isolation invariants are evaluated deterministically; crossing remains denied |
-| All declarative layers | No shell, process APIs, filesystem, network, credentials, environment access, Runtime interaction, Transport interaction, Provider invocation, dispatch or execution |
+| Boundary RFC | Authority, eligibility, descriptor, boundary, evidence, policy, review, configuration, transport-isolation and runtime-isolation invariants are evaluated deterministically |
+| Operational V14.3 boundary | Inbound gates are reused; trusted context is injected; Runtime admission precedes resolution; dry-run does not invoke; execute invokes once; public output is redacted |
 
 Invariant validation MUST be deterministic, stable, and safe to reproduce from
 the same inputs. Missing, unknown, or inconsistent evidence MUST fail closed.
@@ -164,15 +194,15 @@ the same inputs. Missing, unknown, or inconsistent evidence MUST fail closed.
 
 | Threat | Required mitigation |
 | --- | --- |
-| Accidental execution | Default-deny flags and no imperative edge in the current graph |
+| Accidental execution | Default deny, explicit execute mode, Runtime admission and dry-run return before invocation |
 | Privilege escalation | Single-purpose ownership; no layer may widen authority or infer approval |
-| Runtime bypass | Runtime is absent from declarative dependencies and may only be reached through a future validated transport boundary |
-| Transport bypass | Transport is absent from declarative dependencies and may only receive a future Bridge-created contract |
-| Provider bypass | Providers cannot create authority, descriptors, boundary results, or future bridge contracts |
-| Descriptor forgery | Immutable descriptor evidence, deterministic reference/version checks, and future Core revalidation |
-| Authority forgery | Explicit, scoped future authority; no authority inferred from review, provenance, eligibility, or configuration |
+| Runtime bypass | Runtime is reached only through the V14.3 Core application service or another separately audited Core boundary |
+| Transport bypass | Transport adapters cannot receive raw inbound or governance payloads |
+| Provider bypass | Providers cannot create authority, descriptors, boundary results, or execution context |
+| Descriptor forgery | Immutable descriptor evidence, deterministic reference/version checks, and Core revalidation |
+| Authority forgery | Explicit scoped authority; no authority inferred from review, provenance, eligibility, configuration or payload |
 | Boundary forgery | Boundary handoff and RFC invariant verification remain declarative and default-denied |
-| Review bypass | Eligibility requires consistent reviewed request and provenance evidence; future Bridge requires explicit operator approval |
+| Review bypass | Eligibility requires consistent reviewed request and provenance evidence; operational boundaries require their own explicit admission |
 
 Threat mitigations MUST be verified at the owning layer and MUST NOT depend on
 successful execution as proof.
@@ -181,40 +211,41 @@ successful execution as proof.
 
 The architecture is default-deny. Immutable contracts prevent callers from
 mutating validated evidence after construction. Pure builders and evaluators
-make validation reproducible. Deterministic validation records stable outcomes
-instead of reading machine, process, filesystem, network, or environment state.
+make validation reproducible. Operational dependencies are injected rather
+than discovered from ambient machine, process, network or environment state.
 
-Review is mandatory evidence, not an execution permit. Approval, where future
-work introduces it, MUST be explicit, scoped, versioned, reviewable and
-revocable. Auditability requires a stable record of validation inputs,
-requirements, errors, version references and the future distinction between
-non-start and start; it MUST NOT require secret or credential disclosure.
+Review is mandatory evidence, not an execution permit. Approval MUST be
+explicit, scoped, versioned, reviewable and revocable. Auditability requires a
+stable record of validation inputs, requirements, errors, version references
+and the distinction between non-start and start; it MUST NOT require secret or
+credential disclosure.
 
 ```mermaid
 flowchart TB
-  Untrusted["Untrusted CLI, provider and ambient input"] --> Validate["Pure deterministic validation"]
-  Validate --> Evidence["Immutable declarative evidence"]
+  Untrusted["Untrusted inbound, CLI, provider and ambient input"] --> Validate["Deterministic validation"]
+  Validate --> Evidence["Immutable evidence"]
   Evidence --> Review["Review and provenance"]
   Review --> Eligibility["Default-deny eligibility"]
-  Eligibility --> Boundary["Closed execution boundary"]
-  Boundary -. "future explicit approval and authority only" .-> Bridge["Future Bridge"]
+  Eligibility --> Boundary["Core-owned boundary"]
+  Boundary --> Admission["Explicit Runtime admission"]
+  Admission --> Runtime["Selected bounded Runtime"]
 ```
 
 ## 9. Operational roadmap
 
 | Status | Scope |
 | --- | --- |
-| Already implemented | Declarative provider protocol, mapping, intent, capability/policy, authorization, transport request, review, provenance, eligibility, authority, descriptor, boundary handoff and boundary RFC evidence |
-| Future RFC | Operator approval semantics, execution authority lifecycle, Bridge contract, transport-facing contract, cancellation, recovery, observability and execution audit semantics |
-| Future implementation | A reviewed Core-owned Bridge; selected Transport; selected Runtime; bounded execution evidence; cancellation and recovery mechanisms |
+| Already implemented | Declarative governance layers; guarded Runtime/Transport; Core Runtime admission, plans and receipts; inbound neutral handler; V14.3 prepared-inbound Runtime vertical slice |
+| Future RFC | Durable cancellation, recovery, persistence, resume, operational identity/ACL and provider credential boundaries |
+| Future implementation | LoopRunner execute/validate/repair; concrete identity/ACL/replay; one inbound adapter; one verified provider pilot; controlled commit mode |
 
-Future implementation MUST follow a dedicated RFC and security/architecture
-review. It MUST preserve existing CLI, JSON, report, schema and LoopRunner
-contracts unless separately versioned.
+Future implementation MUST follow dedicated security/architecture review and
+preserve existing CLI, JSON, report, schema and LoopRunner contracts unless
+separately versioned.
 
 ## 10. Explicit non-goals
 
-This RFC does not introduce:
+The V13.0 baseline did not introduce:
 
 - `RuntimeRequest`;
 - `TransportRequest`;
@@ -227,6 +258,8 @@ This RFC does not introduce:
 - commands, arguments, binaries, shells or process APIs;
 - filesystem, network, credential, or environment access.
 
-V13.0 therefore leaves the pipeline at a declarative stop. A future eligible,
-validated, approved, or boundary-ready state is never an execution capability
-until a separately reviewed future implementation crosses the boundary.
+V14.3 introduces only the separately reviewed Core application-service
+composition documented above. It still does not add a network transport,
+concrete identity/ACL/replay implementation, provider invocation, LoopRunner
+execute mode, repair, commit, publication, persistence, resume, or ambient
+secret discovery.
