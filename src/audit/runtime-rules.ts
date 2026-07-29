@@ -67,6 +67,8 @@ import { INBOUND_AUTHENTICATION_METHOD_BINDING_RULE } from "./rules/inbound-auth
 import { INBOUND_AUTHENTICATION_METHOD_BINDING_GATE_RULE } from "./rules/inbound-authentication-method-binding-gate.js";
 import { INBOUND_AUTHENTICATION_SUBJECT_BINDING_RULE } from "./rules/inbound-authentication-subject-binding.js";
 import { INBOUND_AUTHENTICATION_SUBJECT_BINDING_GATE_RULE } from "./rules/inbound-authentication-subject-binding-gate.js";
+import { INBOUND_AUTHENTICATION_ISSUER_BINDING_RULE } from "./rules/inbound-authentication-issuer-binding.js";
+import { INBOUND_AUTHENTICATION_ISSUER_BINDING_GATE_RULE } from "./rules/inbound-authentication-issuer-binding-gate.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -145,6 +147,8 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   INBOUND_AUTHENTICATION_METHOD_BINDING_GATE_RULE,
   INBOUND_AUTHENTICATION_SUBJECT_BINDING_RULE,
   INBOUND_AUTHENTICATION_SUBJECT_BINDING_GATE_RULE,
+  INBOUND_AUTHENTICATION_ISSUER_BINDING_RULE,
+  INBOUND_AUTHENTICATION_ISSUER_BINDING_GATE_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
