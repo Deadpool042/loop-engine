@@ -240,6 +240,72 @@ describe("runLoopExecute", () => {
     assert.equal(result.publication, null);
   });
 
+  it("counts a repairer-declared failure as an attempted repair", async () => {
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      maxRepairs: 1,
+      executor: async () => ({
+        status: "completed",
+        modifiedFiles: ["src/feature.ts"],
+        details: ["Execution completed."],
+      }),
+      validator: async () => ({
+        status: "failed",
+        failedCommand: "pnpm run typecheck",
+        exitCode: 1,
+        details: ["Typecheck failed."],
+      }),
+      repairer: async () => ({
+        status: "failed",
+        modifiedFiles: ["src/partial-repair.ts"],
+        failure: {
+          code: "repair_rejected",
+          message: "Repair was rejected.",
+          details: ["Stable repair failure."],
+        },
+      }),
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "repair_rejected");
+    assert.equal(result.validation?.attempts, 1);
+    assert.equal(result.validation?.repairAttempts, 1);
+    assert.deepEqual(result.modifiedFiles, [
+      "src/feature.ts",
+      "src/partial-repair.ts",
+    ]);
+  });
+
+  it("counts a thrown repairer call without exposing its exception", async () => {
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      maxRepairs: 1,
+      executor: async () => ({
+        status: "completed",
+        modifiedFiles: ["src/feature.ts"],
+        details: ["Execution completed."],
+      }),
+      validator: async () => ({
+        status: "failed",
+        failedCommand: "pnpm run typecheck",
+        exitCode: 1,
+        details: ["Typecheck failed."],
+      }),
+      repairer: async () => {
+        throw new Error("sensitive repair stack");
+      },
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "repair_failed");
+    assert.equal(result.validation?.attempts, 1);
+    assert.equal(result.validation?.repairAttempts, 1);
+    assert.equal(
+      JSON.stringify(result).includes("sensitive repair stack"),
+      false,
+    );
+  });
+
   it("never calls the executor when execute policy admission fails", async () => {
     let executorCalls = 0;
 
