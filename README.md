@@ -10,7 +10,7 @@ Cette page constitue la source de vérité du produit et définit l'objectif fin
 
 Claude doit s’y référer avant toute évolution structurante.
 
-Loop Engine vise désormais l'orchestration autonome par petits lots. Voir `docs/architecture/autonomous-loop-runner.md` pour l'architecture du LoopRunner.
+Loop Engine vise désormais l'orchestration autonome par petits lots. Voir `docs/architecture/autonomous-loop-runner.md` pour l'architecture historique du LoopRunner et `docs/architecture/looprunner-execute-validation-repair.md` pour le contrat courant du mode `execute`.
 
 ## Objectifs V0
 
@@ -21,16 +21,18 @@ Loop Engine vise désormais l'orchestration autonome par petits lots. Voir `docs
 - limiter la consommation de tokens ;
 - garder les décisions humaines.
 
-Loop Engine ne modifie pas les dépôts pilotés.
+Le mode d'inspection et le mode `plan` ne modifient pas les dépôts pilotés. Le mode `execute` ne peut modifier que le projet explicitement ciblé, au travers d'un `LoopExecutor` injecté et admis par la politique.
 
 ## Principes
 
-- 0 IA automatique.
+- 0 IA automatique par défaut.
 - 0 token consommé par défaut.
 - Pas de commit automatique.
 - Pas de push automatique.
-- Commit et push ne surviennent que sous un mode explicitement sélectionné (`commit`, `publish`) ; le mode par défaut (`plan`) ne modifie rien.
-- Les validations locales passent avant toute revue IA, et avant tout commit ou publication.
+- Le mode par défaut (`plan`) ne modifie rien.
+- `execute` doit être demandé explicitement et nécessite un exécuteur concret injecté ; la CLI standard échoue fermée tant qu'aucun provider n'est configuré.
+- `commit` et `publish` restent non implémentés.
+- Les validations locales passent après l'exécution et avant toute future revue, réparation, commit ou publication.
 - Les projets pilotés restent indépendants.
 
 ## Commandes
@@ -52,9 +54,10 @@ Loop Engine ne modifie pas les dépôts pilotés.
 - `pnpm loop next creatyss --json` : affiche la prochaine action sûre en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop prompt creatyss` : génère un prompt court à coller dans un assistant IA.
 - `pnpm loop prompt creatyss --json` : génère le contexte de prompt en JSON pour scripts, OpenClaw, n8n ou dashboard.
-- `pnpm loop run creatyss` : lance un cycle du LoopRunner. **Seul le mode `plan` est implémenté (V7.2)** ; c'est aussi le mode par défaut. Aucun agent n'est appelé, aucune modification du worktree, aucun commit et aucun push.
-- `pnpm loop run creatyss --mode plan --json` : sortie JSON du cycle (`LoopRunResult`, `schemaVersion: 1`), incluant depuis V7.4 un champ `agentPolicy` — une sélection d'agent **prévisionnelle** (forecast) pour le candidat sélectionné, jamais un appel réel. Voir `docs/architecture/agent-policy-engine.md`. Depuis V7.5, un champ additif `contextPackage` expose un paquet de contexte local, déterministe et borné (`MinimalContextPackage`), `null` pour un cycle `blocked`/`failed`, toujours renseigné pour un cycle `completed`. Voir `docs/architecture/minimal-context-builder.md`.
-- `pnpm loop run creatyss --mode execute|commit|publish` : rejeté explicitement (`Loop run mode not implemented: <mode>`, code de sortie non nul) ; ces modes seront implémentés dans des lots ultérieurs. Voir `docs/architecture/autonomous-loop-runner.md`.
+- `pnpm loop run creatyss` : lance un cycle `plan` du LoopRunner. Le mode `plan` (V7.2) reste le défaut : aucun agent n'est appelé, aucune modification du worktree, aucun commit et aucun push.
+- `pnpm loop run creatyss --mode plan --json` : sortie JSON du cycle (`LoopRunResult`, `schemaVersion: 1`), avec la sélection d'agent prévisionnelle `agentPolicy` et le paquet borné `contextPackage`.
+- `pnpm loop run creatyss --mode execute --max-repairs 1 --json` : lance le cycle V14.4 `plan -> execute -> validate -> repair`, sans commit ni publication. La politique `execute` doit sélectionner un profil et un `LoopExecutor` concret doit être injecté. La CLI standard utilise volontairement un exécuteur indisponible et renvoie un `LoopRunResult` échoué avec `failure.code = "executor_unavailable"` jusqu'au pilote provider V14.6.
+- `pnpm loop run creatyss --mode commit|publish` : rejeté explicitement (`Loop run mode not implemented: <mode>`, code de sortie non nul).
 
 ## Configuration
 
@@ -98,17 +101,21 @@ Cela permet d'utiliser la CLI sur elle-même :
 - `pnpm loop context loop-engine`
 - `pnpm loop validate loop-engine`
 - `pnpm loop review loop-engine`
+- `pnpm loop run loop-engine --mode plan --json`
+- `pnpm loop run loop-engine --mode execute --json` — vérifie actuellement l'admission puis échoue fermée avec `executor_unavailable`, car aucun provider concret n'est configuré par défaut.
 
-Cette boucle reste déterministe :
+La boucle par défaut reste déterministe et non destructive :
 
-- aucun appel IA automatique ;
-- aucune modification automatique ;
-- aucune validation implicite hors des commandes configurées.
+- aucun appel IA automatique implicite ;
+- aucune modification en mode `plan` ;
+- aucun commit ni publication en mode `execute` ;
+- validation uniquement après une exécution admise et déclarée réussie.
 
 ## Structure du projet
 
 - `src/cli.ts` : routeur CLI minimal.
 - `src/commands/` : commandes utilisateur et cas d'usage.
+- `src/loop/` : orchestration `plan` et cycle `execute/validate/repair` par ports injectés.
 - `src/core/` : primitives bas niveau comme config, Git, docs, résolution projet et surfaces internes opt-in.
 - `src/intelligence/` : états calculés, ProjectSnapshot, roadmap et sélection de candidats.
 - `src/ui/` : helpers d'affichage terminal.
@@ -132,11 +139,23 @@ délèguent seulement après admission.
 Depuis V13.17, `createRuntimeExecutionPlan` et
 `dryRunPolicyAwareDeclarativeRuntimeExecution` exposent un plan Runtime
 `schemaVersion: 1`, déterministe et sérialisable, pour décrire ce qui serait
-exécuté sans appeler d'adapter et sans modifier le CLI ou les JSON publics.
+exécuté sans appeler d'adapter.
+
+Depuis V14.3, `executePreparedInboundRuntimeRequest(...)` compose la frontière
+inbound préparée avec l'admission Runtime, le dry-run sans effet ou une invocation
+Runtime bornée, puis une receipt publique redacted.
+
+Depuis V14.4, `runLoopExecute(...)` orchestre un `LoopExecutor`, un
+`LoopValidator` et un `LoopRepairer` injectés. La sélection de politique devient
+une admission réelle pour le cycle, les validations configurées sont exécutées
+après l'exécuteur, chaque réparation est bornée par `maxRepairs` et suivie d'une
+nouvelle validation. `commit` et `publication` restent toujours `null`.
 
 Voir aussi :
 
 - `docs/architecture/autonomous-loop-runner.md`
+- `docs/architecture/looprunner-execute-validation-repair.md`
+- `docs/architecture/prepared-inbound-runtime-execution.md`
 - `docs/architecture/commands.md`
 - `docs/architecture/json-contracts.md`
 - `docs/architecture/project-intelligence.md`
@@ -329,5 +348,6 @@ La documentation complète du contrat est disponible dans :
 ```text
 docs/architecture/execution-reporting.md
 ```
- - [Authority Verification RFC](docs/architecture/authority-verification-rfc.md) — V13.2 declarative verification of authority and approval evidence; verification is not execution authority.
- - [Revocation & Expiry Lifecycle RFC](docs/architecture/revocation-expiry-rfc.md) — V13.3 declarative governance lifecycle; no lifecycle state authorizes execution.
+
+- [Authority Verification RFC](docs/architecture/authority-verification-rfc.md) — V13.2 declarative verification of authority and approval evidence; verification is not execution authority.
+- [Revocation & Expiry Lifecycle RFC](docs/architecture/revocation-expiry-rfc.md) — V13.3 declarative governance lifecycle; no lifecycle state authorizes execution.
