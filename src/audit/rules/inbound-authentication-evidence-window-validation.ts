@@ -26,9 +26,9 @@ export const INBOUND_AUTHENTICATION_EVIDENCE_WINDOW_VALIDATION_RULE: AuditRule =
     id: "AUDIT-470",
     category: "architecture",
     severity: "error",
-    title: "Inbound authentication evidence validity window is validated by the verifier evaluator",
+    title: "Inbound authentication evidence temporal ordering is validated by the verifier evaluator",
     description:
-      "The V14.0w authentication verifier evaluator must reject evidence whose validFrom is after expiresAt before canonicalizing a verified success.",
+      "The V14.0w authentication verifier evaluator must reject evidence whose issuedAt is after validFrom, validFrom is after expiresAt, or issuedAt is after expiresAt before canonicalizing a verified success.",
     metadata: {
       introducedIn: "V14.0w",
       tags: ["architecture", "contract", "self-audit", "ci"],
