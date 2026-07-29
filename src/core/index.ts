@@ -25,6 +25,7 @@ export * from "./inbound-security.js";
 export * from "./inbound-authentication.js";
 export * from "./inbound.js";
 export * from "./inbound-transport.js";
+export * from "./prepared-inbound-runtime-execution.js";
 export * from "./loop-runtime-outcome.js";
 export * from "./runtime.js";
 export * from "./runtime-execution-bridge.js";
