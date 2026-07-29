@@ -34,6 +34,7 @@ export type InboundSecurityGatedPreparationInput = Readonly<{
   request: LoopRuntimePublicRequest;
   authorizer: LoopRuntimePublicRequestAuthorizer;
   assembler: LoopRuntimeAuthorizedEngineAssembler;
+  allowDryRun?: boolean;
 }>;
 
 export type InboundSecurityGatedPreparationResult =
@@ -85,6 +86,7 @@ export async function evaluateInboundSecurityAndPrepareLoopRuntimeRequest(
     principal,
     request: input.request,
     assembler: input.assembler,
+    allowDryRun: input.allowDryRun === true,
   });
 
   return Object.freeze({
