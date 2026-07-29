@@ -122,7 +122,7 @@ describe("inbound authentication issuedAt validation", () => {
   it("accepts issuedAt equal to expiresAt", async () => {
     const trustedEvidence = evidence({
       issuedAt: "2026-07-29T07:00:00.000Z",
-      validFrom: "2026-07-29T06:00:00.000Z",
+      validFrom: "2026-07-29T07:00:00.000Z",
       expiresAt: "2026-07-29T07:00:00.000Z",
     });
     const result = await evaluateInboundAuthenticationVerifier(
