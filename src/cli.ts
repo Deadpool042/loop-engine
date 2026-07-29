@@ -219,7 +219,33 @@ if (command === "help" || command === "--help" || command === "-h") {
     process.exit(1);
   }
 
-  const exitCode = runLoopRunCommand(project, mode, json);
+  const maxRepairsIndex = process.argv.indexOf("--max-repairs");
+  let maxRepairs = 0;
+  if (maxRepairsIndex >= 0) {
+    const value = process.argv[maxRepairsIndex + 1];
+    if (value === undefined || value.startsWith("--")) {
+      const message = "Missing value for --max-repairs";
+      if (json) {
+        printJsonError("missing_max_repairs_value", message);
+      } else {
+        terminal.error(message);
+      }
+      process.exit(1);
+    }
+
+    maxRepairs = Number(value);
+    if (!Number.isInteger(maxRepairs) || maxRepairs < 0) {
+      const message = `Invalid --max-repairs value: ${value}`;
+      if (json) {
+        printJsonError("invalid_max_repairs", message);
+      } else {
+        terminal.error(message);
+      }
+      process.exit(1);
+    }
+  }
+
+  const exitCode = await runLoopRunCommand(project, mode, json, { maxRepairs });
 
   if (exitCode !== 0) {
     process.exitCode = exitCode;
