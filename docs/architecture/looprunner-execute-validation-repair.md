@@ -112,7 +112,8 @@ validation starts. In execute mode it exposes:
 
 - `status`: `passed` or `failed`;
 - `attempts`: total validation attempts;
-- `repairAttempts`: completed repair calls;
+- `repairAttempts`: repair calls started, including calls that return a failure
+  or throw;
 - `commands`: configured project validation commands;
 - `failedCommand`: final failed command, or `null`;
 - `exitCode`: final validation exit code.
