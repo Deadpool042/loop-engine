@@ -24,7 +24,7 @@ const EXECUTION_ARCHITECTURE_RFC_RULES = [
 ] as const;
 
 describe("execution architecture RFC audit rules", () => {
-  it("covers the V13.0 RFC with contiguous deterministic checks", () => {
+  it("retains the stable V13 audit inventory against the current RFC", () => {
     assert.deepEqual(
       EXECUTION_ARCHITECTURE_RFC_RULES.map((rule) => rule.id),
       [
