@@ -66,6 +66,41 @@ describe("inbound authentication issuedAt validation", () => {
     assert.equal(calls, 1);
   });
 
+  it("rejects evidence valid before it was issued", async () => {
+    const result = await evaluateInboundAuthenticationVerifier(
+      INPUT,
+      CONTEXT,
+      verifier(
+        evidence({
+          issuedAt: "2026-07-29T05:00:00.001Z",
+          validFrom: "2026-07-29T05:00:00.000Z",
+        }),
+      ),
+    );
+
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
+  it("accepts validFrom equal to issuedAt", async () => {
+    const trustedEvidence = evidence({
+      issuedAt: "2026-07-29T05:00:00.000Z",
+      validFrom: "2026-07-29T05:00:00.000Z",
+    });
+    const result = await evaluateInboundAuthenticationVerifier(
+      INPUT,
+      CONTEXT,
+      verifier(trustedEvidence),
+    );
+
+    assert.equal(result.verified, true);
+    if (result.verified) {
+      assert.equal(result.evidence, trustedEvidence);
+    }
+  });
+
   it("rejects evidence issued after its expiry", async () => {
     const result = await evaluateInboundAuthenticationVerifier(
       INPUT,
@@ -87,7 +122,7 @@ describe("inbound authentication issuedAt validation", () => {
   it("accepts issuedAt equal to expiresAt", async () => {
     const trustedEvidence = evidence({
       issuedAt: "2026-07-29T07:00:00.000Z",
-      validFrom: "2026-07-29T06:00:00.000Z",
+      validFrom: "2026-07-29T07:00:00.000Z",
       expiresAt: "2026-07-29T07:00:00.000Z",
     });
     const result = await evaluateInboundAuthenticationVerifier(
