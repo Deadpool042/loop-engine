@@ -35,7 +35,8 @@ export type LoopRuntimeConstructedRuntimeRequest = Readonly<{
 
 export type LoopRuntimeRequestConstructionFailureReason =
   | "invalid_options"
-  | "invalid_binding";
+  | "invalid_binding"
+  | "unsupported_dry_run";
 
 export type LoopRuntimeRequestConstructionResult =
   | Readonly<{
@@ -46,6 +47,10 @@ export type LoopRuntimeRequestConstructionResult =
       constructed: false;
       reason: LoopRuntimeRequestConstructionFailureReason;
     }>;
+
+export type LoopRuntimeRequestConstructionOptions = Readonly<{
+  allowDryRun?: boolean;
+}>;
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -78,6 +83,13 @@ function invalidBinding(): LoopRuntimeRequestConstructionResult {
   return Object.freeze({
     constructed: false,
     reason: "invalid_binding" as const,
+  });
+}
+
+function unsupportedDryRun(): LoopRuntimeRequestConstructionResult {
+  return Object.freeze({
+    constructed: false,
+    reason: "unsupported_dry_run" as const,
   });
 }
 
@@ -140,9 +152,14 @@ function copyLimits(
 export function createLoopRuntimeRequestFromPublicOptions(
   options: LoopRuntimeRequestOptionsMapping,
   binding: LoopRuntimeRequestBinding,
+  construction: LoopRuntimeRequestConstructionOptions = {},
 ): LoopRuntimeRequestConstructionResult {
   if (!hasValidOptions(options)) {
     return invalidOptions();
+  }
+
+  if (options.mode === "dry-run" && construction.allowDryRun !== true) {
+    return unsupportedDryRun();
   }
 
   if (!hasValidBinding(binding)) {
