@@ -37,6 +37,15 @@ export type LoopRunFailure = Readonly<{
   details: readonly string[];
 }>;
 
+export type LoopRunValidation = Readonly<{
+  status: "passed" | "failed";
+  attempts: number;
+  repairAttempts: number;
+  commands: readonly string[];
+  failedCommand: string | null;
+  exitCode: number;
+}>;
+
 export type LoopRunResult = Readonly<{
   schemaVersion: 1;
   runId: string;
@@ -47,21 +56,17 @@ export type LoopRunResult = Readonly<{
   completedAt: string | null;
   candidate: RoadmapCandidate | null;
   steps: readonly LoopRunStep[];
-  validation: null;
+  validation: LoopRunValidation | null;
   modifiedFiles: readonly string[];
   commit: null;
   publication: null;
   failure: LoopRunFailure | null;
-  // Additive field (V7.4): a forecast-only agent policy resolution for the
-  // selected candidate, computed without ever calling the selected agent.
-  // Null whenever no candidate was ready (blocked/failed cycles). Adding
-  // this field is backward compatible: schemaVersion stays 1. See
-  // docs/architecture/agent-policy-engine.md.
+  // Additive field (V7.4): a policy resolution for the selected candidate.
+  // In plan mode it remains forecast-only. In execute mode it is the explicit
+  // admission result that must resolve before the injected executor is called.
   agentPolicy: AgentPolicyResolution | null;
-  // Additive field (V7.5): a bounded, deterministic context package built
-  // from agentPolicy.requirements.contextBudget for the selected candidate.
-  // Null whenever no candidate was ready (blocked/failed cycles) — same rule
-  // as agentPolicy. Adding this field is backward compatible: schemaVersion
-  // stays 1. See docs/architecture/minimal-context-builder.md.
+  // Additive field (V7.5): a bounded, deterministic context package built from
+  // agentPolicy.requirements.contextBudget. It remains null when planning or
+  // policy admission cannot select a safe candidate.
   contextPackage: MinimalContextPackage | null;
 }>;
