@@ -28,6 +28,7 @@ export type LoopRuntimePublicRequestPreparationInput = Readonly<{
   >;
   limits: LoopRuntimeInternalLimits;
   binding: LoopRuntimeRequestBinding;
+  allowDryRun?: boolean;
 }>;
 
 export type LoopRuntimePublicRequestPreparationFailureStage =
@@ -105,6 +106,7 @@ export function prepareLoopRuntimePublicRequest(
   const runtimeRequest = createLoopRuntimeRequestFromPublicOptions(
     requestOptions.options,
     input.binding,
+    { allowDryRun: input.allowDryRun === true },
   );
 
   if (!runtimeRequest.constructed) {
