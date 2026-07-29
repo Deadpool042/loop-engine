@@ -88,6 +88,16 @@ export async function verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(
     });
   }
 
+  if (
+    input.authenticationInput.subjectHint !== null &&
+    input.authenticationInput.subjectHint !== verification.evidence.subjectId
+  ) {
+    return Object.freeze({
+      verified: false as const,
+      reason: "verification_invalid" as const,
+    });
+  }
+
   if (input.verificationContext.evaluatedAt !== input.evaluatedAt) {
     return Object.freeze({
       verified: true as const,

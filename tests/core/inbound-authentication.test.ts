@@ -1514,4 +1514,130 @@ describe("verifyInboundAuthenticationAndPrepareLoopRuntimeRequest", () => {
     });
   });
 
+  it("accepts a null subjectHint without comparing it to the evidence subjectId", async () => {
+    const calls = counters();
+    const base = input(calls);
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      authenticationInput: { ...AUTH_INPUT, subjectHint: null },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(result.verified, true);
+    if (result.verified) {
+      assert.equal(result.security.allowed, true);
+    }
+  });
+
+  it("accepts a subjectHint identical to the evidence subjectId", async () => {
+    const calls = counters();
+    const base = input(calls);
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      authenticationInput: { ...AUTH_INPUT, subjectHint: "principal-1" },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(result.verified, true);
+    if (result.verified) {
+      assert.equal(result.security.allowed, true);
+    }
+  });
+
+  it("accepts a single-character subjectHint that matches exactly", async () => {
+    const calls = counters();
+    const base = input(
+      calls,
+      verifier(calls, {
+        verified: true,
+        evidence: { ...evidence(), subjectId: "p" },
+      }),
+    );
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      authenticationInput: { ...AUTH_INPUT, subjectHint: "p" },
+      security: {
+        ...base.security,
+        principal: { ...principal(), principalId: "p" },
+        accessRequest: accessRequest({ principalId: "p" }),
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(result.verified, true);
+    if (result.verified) {
+      assert.equal(result.security.allowed, true);
+    }
+  });
+
+  it("rejects a subjectHint that differs from the evidence subjectId, without invoking replay protection or Runtime preparation", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      authenticationInput: { ...AUTH_INPUT, subjectHint: "other-principal" },
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.equal(calls.authorizer, 0);
+    assert.equal(calls.assembler, 0);
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
+  it("rejects a case-different subjectHint match without any normalization", async () => {
+    const calls = counters();
+    const base = input(calls);
+    let replayCalls = 0;
+
+    const result = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest({
+      ...base,
+      authenticationInput: { ...AUTH_INPUT, subjectHint: "Principal-1" },
+      replayProtectionPort: {
+        check() {
+          replayCalls += 1;
+          return { accepted: true, receivedAt: EVALUATED_AT };
+        },
+      },
+    });
+
+    assert.equal(calls.verifier, 1);
+    assert.equal(replayCalls, 0);
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
+  it("returns a deterministic and stable result for a subjectHint mismatch across repeated calls", async () => {
+    const calls = counters();
+    const base = {
+      ...input(calls),
+      authenticationInput: { ...AUTH_INPUT, subjectHint: "other-principal" },
+    };
+
+    const first = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(base);
+    const second = await verifyInboundAuthenticationAndPrepareLoopRuntimeRequest(base);
+
+    assert.deepEqual(first, second);
+    assert.deepEqual(first, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
 });
