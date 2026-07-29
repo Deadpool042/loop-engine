@@ -17,7 +17,7 @@ describe("current architecture documentation alignment", () => {
 
     for (const expected of [
       "Current implementation status — V14.3",
-      "executePreparedInboundRuntimeRequest(...)\",
+      "executePreparedInboundRuntimeRequest(...)",
       "trusted execution-context resolution",
       "dry-run plan OR one bounded Runtime invocation",
       "V14.3 preserves this rule",
