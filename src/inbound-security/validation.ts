@@ -42,16 +42,18 @@ export function isEvidenceExpired(
 }
 
 /**
- * Rejects malformed validity instants and internally contradictory validity
+ * Rejects malformed evidence instants and internally contradictory validity
  * windows (`validFrom > expiresAt`). Equal bounds remain valid.
  */
 export function isInvalidAuthenticationEvidenceWindow(
   evidence: InboundAuthenticationEvidence,
 ): boolean {
+  const issuedAt = Date.parse(evidence.issuedAt);
   const validFrom = Date.parse(evidence.validFrom);
   const expiresAt = Date.parse(evidence.expiresAt);
 
   return (
+    Number.isNaN(issuedAt) ||
     Number.isNaN(validFrom) ||
     Number.isNaN(expiresAt) ||
     validFrom > expiresAt
