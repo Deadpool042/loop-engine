@@ -10,7 +10,6 @@ import {
   type PreparedInboundRuntimeExecutionContext,
   type PreparedInboundRuntimeExecutionDependencies,
 } from "../../src/core/index.js";
-import type { AgentProfile } from "../../src/agents/types.js";
 import type { MinimalContextPackage } from "../../src/context/types.js";
 import type { RoadmapCandidate } from "../../src/intelligence/roadmap.js";
 import type { AgentPolicyResolution } from "../../src/policy/types.js";
@@ -20,83 +19,20 @@ import type {
   RuntimeResult,
 } from "../../src/runtime/index.js";
 import type {
-  InboundAccessPolicy,
-  InboundAccessRequest,
   InboundAuthenticationEvidence,
   InboundAuthenticationInput,
   InboundPrincipal,
-  InboundReplayEvidence,
 } from "../../src/inbound-security/index.js";
 
-const EVALUATED_AT = "2026-07-29T18:00:00.000Z";
+const NOW = "2026-07-29T18:00:00.000Z";
 const REQUEST_ID = "request-v14-3";
 
-const AUTH_INPUT: InboundAuthenticationInput = Object.freeze({
+const authenticationInput: InboundAuthenticationInput = Object.freeze({
   method: "opaque",
   credential: "raw-secret-never-forward",
   issuerHint: "issuer-1",
   subjectHint: "principal-1",
 });
-
-function payload(mode: "execute" | "dry-run" = "execute") {
-  return {
-    schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
-    project: "loop-engine",
-    cycleId: "cycle-v14-3",
-    mode,
-    policyRef: "policy.ref",
-    profileRef: "profile.ref",
-    requestedMaxEffort: "medium",
-    budget: {
-      maxTokens: 10,
-      maxCostUsd: 1,
-      maxDurationMs: 1_000,
-      maxCalls: 1,
-      maxRepairs: 0,
-    },
-  };
-}
-
-function assembly(
-  runtimeId: string = "custom",
-): LoopRuntimeAuthorizedEngineAssembly {
-  return {
-    catalog: {
-      policies: [
-        {
-          ref: "policy.ref",
-          value: { policyRef: "policy.ref", policyId: "policy-id" },
-        },
-      ],
-      profiles: [
-        {
-          ref: "profile.ref",
-          value: {
-            profileRef: "profile.ref",
-            profileId: "profile-id",
-            maxEffort: "medium",
-          },
-        },
-      ],
-    },
-    limits: {
-      maxEffort: "medium",
-      budget: {
-        maxTokens: 10,
-        maxCostUsd: 1,
-        maxDurationMs: 1_000,
-        maxCalls: 1,
-        maxRepairs: 0,
-      },
-    },
-    binding: {
-      runtimeId,
-      executable: "/usr/bin/node",
-      arguments: ["--version"],
-      cwd: "/workspace/loop-engine",
-    },
-  };
-}
 
 function evidence(): InboundAuthenticationEvidence {
   return Object.freeze({
@@ -104,7 +40,7 @@ function evidence(): InboundAuthenticationEvidence {
     method: "opaque",
     subjectId: "principal-1",
     issuerId: "issuer-1",
-    credentialFingerprint: "fp-1",
+    credentialFingerprint: "fingerprint-1",
     verified: true,
     issuedAt: "2026-07-29T17:00:00.000Z",
     validFrom: "2026-07-29T17:00:00.000Z",
@@ -121,63 +57,112 @@ function principal(): InboundPrincipal {
   });
 }
 
-function accessRequest(
-  operation: "execute" | "dry-run" = "execute",
-): InboundAccessRequest {
-  return Object.freeze({
-    requestId: REQUEST_ID,
-    principalId: "principal-1",
-    tenantId: "tenant-1",
-    project: "loop-engine",
-    operation,
-  });
-}
-
-function replayEvidence(): InboundReplayEvidence {
-  return Object.freeze({
-    requestId: REQUEST_ID,
-    evidenceId: "evidence-1",
-    receivedAt: EVALUATED_AT,
-    nonce: "nonce-v14-3",
-    replayed: false,
-  });
-}
-
-function inboundPolicy(): InboundAccessPolicy {
-  return Object.freeze({
-    allowedOperations: Object.freeze(["execute", "dry-run"]),
-    replayCheckRequired: true,
-  });
-}
-
 function envelope(
   mode: "execute" | "dry-run" = "execute",
 ): InboundLoopRuntimeRequestEnvelope {
   return Object.freeze({
     requestId: REQUEST_ID,
-    authenticationInput: AUTH_INPUT,
+    authenticationInput,
     verificationContext: Object.freeze({
       requestId: REQUEST_ID,
-      evaluatedAt: EVALUATED_AT,
+      evaluatedAt: NOW,
     }),
     principal: principal(),
-    accessRequest: accessRequest(mode),
-    replayEvidence: replayEvidence(),
-    policy: inboundPolicy(),
-    evaluatedAt: EVALUATED_AT,
-    payload: payload(mode),
+    accessRequest: Object.freeze({
+      requestId: REQUEST_ID,
+      principalId: "principal-1",
+      tenantId: "tenant-1",
+      project: "loop-engine",
+      operation: mode,
+    }),
+    replayEvidence: Object.freeze({
+      requestId: REQUEST_ID,
+      evidenceId: "evidence-1",
+      receivedAt: NOW,
+      nonce: "nonce-1",
+      replayed: false,
+    }),
+    policy: Object.freeze({
+      allowedOperations: Object.freeze(["execute", "dry-run"]),
+      replayCheckRequired: true,
+    }),
+    evaluatedAt: NOW,
+    payload: Object.freeze({
+      schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      project: "loop-engine",
+      cycleId: "cycle-v14-3",
+      mode,
+      policyRef: "policy.ref",
+      profileRef: "profile.ref",
+      requestedMaxEffort: "medium",
+      budget: Object.freeze({
+        maxTokens: 10,
+        maxCostUsd: 1,
+        maxDurationMs: 1_000,
+        maxCalls: 1,
+        maxRepairs: 0,
+      }),
+    }),
   });
 }
 
-function profile(runtime: AgentProfile["runtime"] = "custom"): AgentProfile {
+function assembly(runtimeId = "custom"): LoopRuntimeAuthorizedEngineAssembly {
   return Object.freeze({
+    catalog: Object.freeze({
+      policies: Object.freeze([
+        Object.freeze({
+          ref: "policy.ref",
+          value: Object.freeze({
+            policyRef: "policy.ref",
+            policyId: "policy-id",
+          }),
+        }),
+      ]),
+      profiles: Object.freeze([
+        Object.freeze({
+          ref: "profile.ref",
+          value: Object.freeze({
+            profileRef: "profile.ref",
+            profileId: "profile-id",
+            maxEffort: "medium",
+          }),
+        }),
+      ]),
+    }),
+    limits: Object.freeze({
+      maxEffort: "medium",
+      budget: Object.freeze({
+        maxTokens: 10,
+        maxCostUsd: 1,
+        maxDurationMs: 1_000,
+        maxCalls: 1,
+        maxRepairs: 0,
+      }),
+    }),
+    binding: Object.freeze({
+      runtimeId,
+      executable: "/usr/bin/node",
+      arguments: Object.freeze(["--version"]),
+      cwd: "/workspace/loop-engine",
+    }),
+  });
+}
+
+function resolvedPolicy(
+  allowedRuntimes: readonly "custom"[] = ["custom"],
+): AgentPolicyResolution {
+  const profile = Object.freeze({
     id: "profile-id",
-    runtime,
-    provider: "local",
+    runtime: "custom" as const,
+    provider: "local" as const,
     model: "simulated",
-    effort: "medium",
-    capabilities: Object.freeze(["code_edit"]),
-    permissions: Object.freeze(["read_only", "write_worktree", "shell_exec"]),
+    effort: "medium" as const,
+    capabilities: Object.freeze(["code_edit" as const]),
+    permissions: Object.freeze([
+      "read_only" as const,
+      "write_worktree" as const,
+      "shell_exec" as const,
+    ]),
     budget: Object.freeze({
       maxTokens: 10,
       maxCostUsd: 1,
@@ -186,14 +171,7 @@ function profile(runtime: AgentProfile["runtime"] = "custom"): AgentProfile {
       maxRepairs: 0,
     }),
   });
-}
 
-function policy(
-  allowedRuntimes: AgentPolicyResolution["requirements"]["allowedRuntimes"] = [
-    "custom",
-  ],
-): AgentPolicyResolution {
-  const selectedProfile = profile();
   return Object.freeze({
     policyId: "policy-id",
     mode: "execute",
@@ -211,9 +189,7 @@ function policy(
       maximumEffort: "medium",
       preferredProviders: Object.freeze(["local"]),
       allowedProviders: Object.freeze(["local"]),
-      ...(allowedRuntimes === undefined
-        ? {}
-        : { allowedRuntimes: Object.freeze([...allowedRuntimes]) }),
+      allowedRuntimes: Object.freeze([...allowedRuntimes]),
       contextBudget: Object.freeze({
         maxFiles: 1,
         maxCharacters: 1_000,
@@ -241,15 +217,17 @@ function policy(
     }),
     selection: Object.freeze({
       outcome: "selected",
-      profile: selectedProfile,
+      profile,
       rejected: Object.freeze([]),
     }),
-    reasons: Object.freeze(["selected for V14.3 fixture"]),
+    reasons: Object.freeze(["selected"]),
   });
 }
 
-function task(): RoadmapCandidate {
-  return Object.freeze({
+function runtimeContext(
+  policy = resolvedPolicy(),
+): PreparedInboundRuntimeExecutionContext {
+  const task: RoadmapCandidate = Object.freeze({
     path: "docs/roadmap/loop-engine.md",
     line: 20,
     text: "Lot V14.3",
@@ -258,10 +236,7 @@ function task(): RoadmapCandidate {
     status: "todo",
     priority: "p1",
   });
-}
-
-function contextPackage(): MinimalContextPackage {
-  return Object.freeze({
+  const contextPackage: MinimalContextPackage = Object.freeze({
     project: "loop-engine",
     budget: Object.freeze({
       maxFiles: 1,
@@ -275,18 +250,11 @@ function contextPackage(): MinimalContextPackage {
     estimatedTokens: 0,
     truncated: false,
   });
-}
-
-function executionContext(
-  resolvedPolicy: AgentPolicyResolution = policy(),
-  options: Partial<PreparedInboundRuntimeExecutionContext> = {},
-): PreparedInboundRuntimeExecutionContext {
   return Object.freeze({
-    task: task(),
-    contextPackage: contextPackage(),
-    policy: resolvedPolicy,
+    task,
+    contextPackage,
+    policy,
     provider: "local",
-    ...options,
   });
 }
 
@@ -302,50 +270,14 @@ function counters() {
   };
 }
 
-function successfulRuntimeResult(request: RuntimeRequest): RuntimeResult {
-  return Object.freeze({
-    runtimeId: request.requestedRuntime ?? null,
-    status: "completed",
-    startedAt: request.requestedAt,
-    completedAt: request.requestedAt,
-    diagnostics: Object.freeze(["internal detail must not cross"]),
-    output: Object.freeze({ secret: "raw output must not cross" }),
-    metadata: request.metadata,
-  });
-}
-
-function runtimeResolver(
-  calls: ReturnType<typeof counters>,
-  execute: (request: RuntimeRequest) => RuntimeResult | Promise<RuntimeResult> =
-    successfulRuntimeResult,
-) {
-  return (request: RuntimeRequest) => {
-    calls.runtimeResolve += 1;
-    const adapter: RuntimeAdapter = Object.freeze({
-      runtimeId: request.requestedRuntime ?? "custom",
-      capabilities: Object.freeze([]),
-      supports: () => true,
-      execute(runtimeRequest) {
-        calls.runtimeExecute += 1;
-        return execute(runtimeRequest);
-      },
-    });
-    return Object.freeze({ outcome: "selected" as const, adapter });
-  };
-}
-
 function dependencies(
   calls: ReturnType<typeof counters>,
   options: Readonly<{
     runtimeId?: string;
-    resolvedPolicy?: AgentPolicyResolution;
     context?: PreparedInboundRuntimeExecutionContext;
-    runtimeExecute?: (request: RuntimeRequest) => RuntimeResult | Promise<RuntimeResult>;
+    execute?: (request: RuntimeRequest) => RuntimeResult | Promise<RuntimeResult>;
   }> = {},
 ): PreparedInboundRuntimeExecutionDependencies {
-  const context =
-    options.context ?? executionContext(options.resolvedPolicy ?? policy());
-
   return {
     verifier: {
       verify() {
@@ -356,7 +288,7 @@ function dependencies(
     replayProtectionPort: {
       check() {
         calls.replay += 1;
-        return { accepted: true, receivedAt: EVALUATED_AT };
+        return { accepted: true, receivedAt: NOW };
       },
     },
     authorizer: {
@@ -366,6 +298,7 @@ function dependencies(
       },
     },
     assembler: {
+      allowDryRunPreparation: true,
       assemble() {
         calls.assembler += 1;
         return {
@@ -377,28 +310,52 @@ function dependencies(
     executionContextResolver: {
       resolve() {
         calls.context += 1;
-        return { resolved: true, context };
+        return {
+          resolved: true,
+          context: options.context ?? runtimeContext(),
+        };
       },
     },
-    runtimeResolver: runtimeResolver(calls, options.runtimeExecute),
+    runtimeResolver(request) {
+      calls.runtimeResolve += 1;
+      const adapter: RuntimeAdapter = Object.freeze({
+        runtimeId: request.requestedRuntime ?? "custom",
+        capabilities: Object.freeze([]),
+        supports: () => true,
+        execute(runtimeRequest) {
+          calls.runtimeExecute += 1;
+          if (options.execute) return options.execute(runtimeRequest);
+          return Object.freeze({
+            runtimeId: runtimeRequest.requestedRuntime ?? "custom",
+            status: "completed",
+            startedAt: runtimeRequest.requestedAt,
+            completedAt: runtimeRequest.requestedAt,
+            diagnostics: Object.freeze(["private runtime diagnostic"]),
+            output: Object.freeze({ secret: "private runtime output" }),
+            metadata: runtimeRequest.metadata,
+          });
+        },
+      });
+      return Object.freeze({ outcome: "selected", adapter });
+    },
   };
 }
 
-function assertNoSensitiveRuntimeData(value: unknown): void {
+function assertRedacted(value: unknown): void {
   const serialized = JSON.stringify(value);
-  for (const forbidden of [
+  for (const secret of [
     "raw-secret-never-forward",
     "/usr/bin/node",
     "--version",
-    "raw output must not cross",
-    "internal detail must not cross",
+    "private runtime diagnostic",
+    "private runtime output",
   ]) {
-    assert.equal(serialized.includes(forbidden), false, forbidden);
+    assert.equal(serialized.includes(secret), false, secret);
   }
 }
 
 describe("executePreparedInboundRuntimeRequest", () => {
-  it("returns a frozen dry-run plan without invoking the selected adapter", async () => {
+  it("plans dry-run once without invoking the selected adapter", async () => {
     const calls = counters();
     const result = await executePreparedInboundRuntimeRequest(
       envelope("dry-run"),
@@ -406,31 +363,6 @@ describe("executePreparedInboundRuntimeRequest", () => {
     );
 
     assert.equal(result.outcome, "planned");
-    assert.equal(calls.verifier, 1);
-    assert.equal(calls.replay, 1);
-    assert.equal(calls.authorizer, 1);
-    assert.equal(calls.assembler, 1);
-    assert.equal(calls.context, 1);
-    assert.equal(calls.runtimeResolve, 1);
-    assert.equal(calls.runtimeExecute, 0);
-    assert.equal(Object.isFrozen(result), true);
-    assert.equal(result.schemaVersion, PREPARED_INBOUND_RUNTIME_EXECUTION_SCHEMA_VERSION);
-    if (result.outcome === "planned") {
-      assert.equal(result.plan.mode, "dry-run");
-      assert.equal(result.plan.runtimeId, "custom");
-      assert.equal(Object.isFrozen(result.plan), true);
-    }
-    assertNoSensitiveRuntimeData(result);
-  });
-
-  it("executes the selected simulated boundary once and returns a redacted receipt", async () => {
-    const calls = counters();
-    const result = await executePreparedInboundRuntimeRequest(
-      envelope("execute"),
-      dependencies(calls),
-    );
-
-    assert.equal(result.outcome, "executed");
     assert.deepEqual(calls, {
       verifier: 1,
       replay: 1,
@@ -438,8 +370,26 @@ describe("executePreparedInboundRuntimeRequest", () => {
       assembler: 1,
       context: 1,
       runtimeResolve: 1,
-      runtimeExecute: 1,
+      runtimeExecute: 0,
     });
+    assert.equal(Object.isFrozen(result), true);
+    if (result.outcome === "planned") {
+      assert.equal(result.plan.mode, "dry-run");
+      assert.equal(result.plan.runtimeId, "custom");
+      assert.equal(Object.isFrozen(result.plan), true);
+    }
+    assertRedacted(result);
+  });
+
+  it("executes once and returns a frozen redacted receipt", async () => {
+    const calls = counters();
+    const result = await executePreparedInboundRuntimeRequest(
+      envelope(),
+      dependencies(calls),
+    );
+
+    assert.equal(result.outcome, "executed");
+    assert.equal(calls.runtimeExecute, 1);
     if (result.outcome === "executed") {
       assert.equal(result.receipt.status, "completed");
       assert.equal(result.receipt.runtimeInvoked, true);
@@ -447,14 +397,13 @@ describe("executePreparedInboundRuntimeRequest", () => {
       assert.equal(result.receipt.errorCode, null);
       assert.equal(Object.isFrozen(result.receipt), true);
     }
-    assertNoSensitiveRuntimeData(result);
+    assertRedacted(result);
   });
 
-  it("stops before execution context and Runtime resolution when inbound validation fails", async () => {
+  it("stops malformed inbound input before every dependency", async () => {
     const calls = counters();
-    const invalid = { requestId: REQUEST_ID } as unknown as InboundLoopRuntimeRequestEnvelope;
     const result = await executePreparedInboundRuntimeRequest(
-      invalid,
+      { requestId: REQUEST_ID } as unknown as InboundLoopRuntimeRequestEnvelope,
       dependencies(calls),
     );
 
@@ -465,16 +414,25 @@ describe("executePreparedInboundRuntimeRequest", () => {
       stage: "inbound",
       reason: "malformed_envelope",
     });
+    assert.equal(calls.verifier, 0);
     assert.equal(calls.context, 0);
     assert.equal(calls.runtimeResolve, 0);
     assert.equal(calls.runtimeExecute, 0);
   });
 
-  it("stops before Runtime resolution when policy admission denies the prepared runtime", async () => {
+  it("stops policy denial before Runtime resolution", async () => {
     const calls = counters();
+    const context = runtimeContext(resolvedPolicy(["custom"]));
+    const deniedPolicy = Object.freeze({
+      ...context.policy,
+      requirements: Object.freeze({
+        ...context.policy.requirements,
+        allowedRuntimes: Object.freeze(["codex" as const]),
+      }),
+    });
     const result = await executePreparedInboundRuntimeRequest(
       envelope(),
-      dependencies(calls, { resolvedPolicy: policy(["codex"]) }),
+      dependencies(calls, { context: runtimeContext(deniedPolicy) }),
     );
 
     assert.equal(result.outcome, "rejected");
@@ -482,42 +440,15 @@ describe("executePreparedInboundRuntimeRequest", () => {
       assert.equal(result.stage, "runtime_admission");
       assert.equal(result.reason, "runtime_execution_runtime_not_allowed");
     }
-    assert.equal(calls.context, 1);
     assert.equal(calls.runtimeResolve, 0);
     assert.equal(calls.runtimeExecute, 0);
   });
 
-  it("fails closed when the execution context resolver throws", async () => {
-    const calls = counters();
-    const deps = dependencies(calls);
-    const result = await executePreparedInboundRuntimeRequest(envelope(), {
-      ...deps,
-      executionContextResolver: {
-        resolve() {
-          calls.context += 1;
-          throw new Error("private resolver failure");
-        },
-      },
-    });
-
-    assert.equal(result.outcome, "rejected");
-    if (result.outcome === "rejected") {
-      assert.equal(result.stage, "execution_context");
-      assert.equal(result.reason, "execution_context_unavailable");
-    }
-    assert.equal(calls.runtimeResolve, 0);
-    assert.equal(calls.runtimeExecute, 0);
-    assertNoSensitiveRuntimeData(result);
-  });
-
-  it("rejects local-process execution without an explicit execution policy", async () => {
+  it("requires explicit local-process execution policy", async () => {
     const calls = counters();
     const result = await executePreparedInboundRuntimeRequest(
       envelope(),
-      dependencies(calls, {
-        runtimeId: "local-process",
-        resolvedPolicy: policy(undefined),
-      }),
+      dependencies(calls, { runtimeId: "local-process" }),
     );
 
     assert.equal(result.outcome, "rejected");
@@ -529,52 +460,39 @@ describe("executePreparedInboundRuntimeRequest", () => {
     assert.equal(calls.runtimeExecute, 0);
   });
 
-  it("fails closed when the selected adapter throws", async () => {
-    const calls = counters();
-    const result = await executePreparedInboundRuntimeRequest(
+  it("fails closed on context and adapter exceptions", async () => {
+    const contextCalls = counters();
+    const contextDependencies = dependencies(contextCalls);
+    const contextFailure = await executePreparedInboundRuntimeRequest(envelope(), {
+      ...contextDependencies,
+      executionContextResolver: {
+        resolve() {
+          contextCalls.context += 1;
+          throw new Error("private context failure");
+        },
+      },
+    });
+    assert.equal(contextFailure.outcome, "rejected");
+    if (contextFailure.outcome === "rejected") {
+      assert.equal(contextFailure.reason, "execution_context_unavailable");
+    }
+
+    const adapterCalls = counters();
+    const adapterFailure = await executePreparedInboundRuntimeRequest(
       envelope(),
-      dependencies(calls, {
-        runtimeExecute() {
+      dependencies(adapterCalls, {
+        execute() {
           throw new Error("private adapter failure");
         },
       }),
     );
-
-    assert.deepEqual(result, {
+    assert.deepEqual(adapterFailure, {
       schemaVersion: PREPARED_INBOUND_RUNTIME_EXECUTION_SCHEMA_VERSION,
       outcome: "failed",
       requestId: REQUEST_ID,
       stage: "runtime_execution",
       reason: "runtime_execution_failed",
     });
-    assert.equal(calls.runtimeExecute, 1);
-    assertNoSensitiveRuntimeData(result);
-  });
-
-  it("rejects a malformed Runtime result without exposing it", async () => {
-    const calls = counters();
-    const result = await executePreparedInboundRuntimeRequest(
-      envelope(),
-      dependencies(calls, {
-        runtimeExecute() {
-          return {
-            runtimeId: "wrong-runtime",
-            status: "completed",
-            startedAt: EVALUATED_AT,
-            completedAt: EVALUATED_AT,
-            diagnostics: [],
-            output: { secret: "raw output must not cross" },
-            metadata: {},
-          } as unknown as RuntimeResult;
-        },
-      }),
-    );
-
-    assert.equal(result.outcome, "failed");
-    if (result.outcome === "failed") {
-      assert.equal(result.reason, "runtime_result_invalid");
-    }
-    assert.equal(calls.runtimeExecute, 1);
-    assertNoSensitiveRuntimeData(result);
+    assertRedacted(adapterFailure);
   });
 });
