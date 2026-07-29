@@ -29,12 +29,14 @@ export type LoopRuntimePreparedPublicRequestEntryInput = Readonly<{
   payload: unknown;
   authorizer: LoopRuntimePublicRequestAuthorizer;
   assembler: LoopRuntimeAuthorizedEngineAssembler;
+  allowDryRun?: boolean;
 }>;
 
 export type LoopRuntimePreparedAuthorizedDecodedRequestInput = Readonly<{
   principal: LoopRuntimeAuthenticatedPrincipal;
   request: LoopRuntimePublicRequest;
   assembler: LoopRuntimeAuthorizedEngineAssembler;
+  allowDryRun?: boolean;
 }>;
 
 export type LoopRuntimePreparedPublicRequestEntryResult =
@@ -133,6 +135,7 @@ export async function prepareAuthorizedLoopRuntimeDecodedRequest(
     catalog: assembly.assembly.catalog,
     limits: assembly.assembly.limits,
     binding: assembly.assembly.binding,
+    allowDryRun: input.allowDryRun === true,
   });
 
   if (!preparation.prepared) {
@@ -166,5 +169,6 @@ export async function prepareAuthorizedLoopRuntimeRequest(
     principal: input.principal,
     request: authorized.request,
     assembler: input.assembler,
+    allowDryRun: input.allowDryRun === true,
   });
 }
