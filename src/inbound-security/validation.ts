@@ -27,11 +27,19 @@ export function isEvidenceVerified(
   return evidence.verified === true;
 }
 
+/**
+ * Rejects evidence that is not usable at the explicit evaluation instant,
+ * either because its validity window has not started or because it claims to
+ * have been issued after that instant. Equal instants remain valid.
+ */
 export function isEvidenceNotYetValid(
   evidence: InboundAuthenticationEvidence,
   evaluatedAt: string,
 ): boolean {
-  return compareInstants(evaluatedAt, evidence.validFrom) < 0;
+  return (
+    compareInstants(evaluatedAt, evidence.validFrom) < 0 ||
+    compareInstants(evidence.issuedAt, evaluatedAt) > 0
+  );
 }
 
 export function isEvidenceExpired(
