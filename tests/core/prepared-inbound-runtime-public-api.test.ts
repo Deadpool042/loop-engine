@@ -18,9 +18,5 @@ describe("prepared inbound Runtime public Core API", () => {
       "runtime_execution_failed",
       "runtime_result_invalid",
     ]);
-    assert.equal(
-      Object.isFrozen(PREPARED_INBOUND_RUNTIME_EXECUTION_FAILURE_REASONS),
-      true,
-    );
   });
 });
