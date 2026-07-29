@@ -1,0 +1,112 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+
+import {
+  evaluateInboundAuthenticationVerifier,
+  type InboundAuthenticationEvidence,
+  type InboundAuthenticationVerifier,
+} from "../../src/inbound-security/index.js";
+
+const INPUT = Object.freeze({
+  method: "opaque",
+  credential: "secret",
+  issuerHint: "issuer-1",
+  subjectHint: "subject-1",
+});
+
+const CONTEXT = Object.freeze({
+  requestId: "request-1",
+  evaluatedAt: "2026-07-29T10:00:00.000Z",
+});
+
+const EVIDENCE: InboundAuthenticationEvidence = Object.freeze({
+  evidenceId: "evidence-1",
+  method: "opaque",
+  subjectId: "subject-1",
+  issuerId: "issuer-1",
+  credentialFingerprint: "fingerprint-1",
+  verified: true,
+  issuedAt: "2026-07-29T09:00:00.000Z",
+  validFrom: "2026-07-29T09:00:00.000Z",
+  expiresAt: "2026-07-29T11:00:00.000Z",
+});
+
+async function evaluateResult(value: unknown) {
+  let calls = 0;
+  const verifier: InboundAuthenticationVerifier = {
+    verify() {
+      calls += 1;
+      return value as ReturnType<InboundAuthenticationVerifier["verify"]>;
+    },
+  };
+
+  const result = await evaluateInboundAuthenticationVerifier(INPUT, CONTEXT, verifier);
+  return { calls, result };
+}
+
+describe("authentication verifier result descriptors", () => {
+  it("rejects an accessor-backed verified discriminator without invoking it", async () => {
+    let getterCalls = 0;
+    const value = Object.defineProperty({ evidence: EVIDENCE }, "verified", {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return true;
+      },
+    });
+
+    const { calls, result } = await evaluateResult(value);
+
+    assert.equal(calls, 1);
+    assert.equal(getterCalls, 0);
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
+  it("rejects a non-enumerable evidence property", async () => {
+    const value = { verified: true } as Record<string, unknown>;
+    Object.defineProperty(value, "evidence", {
+      enumerable: false,
+      value: EVIDENCE,
+    });
+
+    const { calls, result } = await evaluateResult(value);
+
+    assert.equal(calls, 1);
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
+  it("rejects a symbol-keyed result extension", async () => {
+    const value = {
+      verified: true,
+      evidence: EVIDENCE,
+      [Symbol("extra")]: true,
+    };
+
+    const { calls, result } = await evaluateResult(value);
+
+    assert.equal(calls, 1);
+    assert.deepEqual(result, {
+      verified: false,
+      reason: "verification_invalid",
+    });
+  });
+
+  it("preserves valid evidence identity", async () => {
+    const { calls, result } = await evaluateResult({
+      verified: true,
+      evidence: EVIDENCE,
+    });
+
+    assert.equal(calls, 1);
+    assert.equal(result.verified, true);
+    if (result.verified) {
+      assert.equal(result.evidence, EVIDENCE);
+    }
+  });
+});
