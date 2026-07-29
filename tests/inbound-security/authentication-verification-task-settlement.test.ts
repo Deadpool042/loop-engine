@@ -79,11 +79,13 @@ describe("authentication verifier task settlement", () => {
     assert.deepEqual(value, INVALID);
   });
 
-  it("keeps the first settlement across later tasks", async () => {
+  it("keeps the first settlement across nested later tasks", async () => {
     const result = {
       then(resolve: (value: unknown) => void, reject: (reason: unknown) => void) {
-        setImmediate(() => resolve({ verified: true, evidence: EVIDENCE }));
-        setTimeout(() => reject(new Error("late task rejection")), 0);
+        setImmediate(() => {
+          resolve({ verified: true, evidence: EVIDENCE });
+          setImmediate(() => reject(new Error("late task rejection")));
+        });
       },
     };
 
