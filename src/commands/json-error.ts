@@ -4,6 +4,8 @@ export type JsonErrorCode =
   | "missing_query"
   | "missing_index"
   | "missing_mode_value"
+  | "missing_max_repairs_value"
+  | "invalid_max_repairs"
   | "unknown_mode"
   | "mode_not_implemented";
 
