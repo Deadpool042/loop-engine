@@ -42,14 +42,20 @@ export function isEvidenceExpired(
 }
 
 /**
- * Rejects only an internally contradictory validity window
- * (`validFrom > expiresAt`). Equal bounds remain valid. Not a general ISO
- * timestamp validator.
+ * Rejects malformed validity instants and internally contradictory validity
+ * windows (`validFrom > expiresAt`). Equal bounds remain valid.
  */
 export function isInvalidAuthenticationEvidenceWindow(
   evidence: InboundAuthenticationEvidence,
 ): boolean {
-  return compareInstants(evidence.validFrom, evidence.expiresAt) > 0;
+  const validFrom = Date.parse(evidence.validFrom);
+  const expiresAt = Date.parse(evidence.expiresAt);
+
+  return (
+    Number.isNaN(validFrom) ||
+    Number.isNaN(expiresAt) ||
+    validFrom > expiresAt
+  );
 }
 
 export function principalMatchesEvidence(
