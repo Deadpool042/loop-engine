@@ -12,138 +12,172 @@ Claude doit s’y référer avant toute évolution structurante.
 
 ## What this is
 
-Loop Engine is a local, deterministic CLI orchestrator that reads and inspects a small set of local projects declared in `projects.yaml` (Creatyss, lp-infra, n8n, and itself). It reports Git state, checks required docs, surfaces roadmap candidates, and prepares short context/prompt payloads — all without ever touching the projects it inspects. It now also covers:
+Loop Engine is a local CLI orchestrator for projects declared in `projects.yaml`. It exposes project inspection, roadmap selection, bounded context, validation, audit, declarative Runtime contracts, guarded inbound execution and a bounded LoopRunner cycle.
+
+Current user-facing capabilities include:
 
 - project piloting (`summary`, `status`, `doctor`, `context`, `validate`, `review`, `next`);
-- context and handoff generation (`context`, `handoff`, `prompt`) for pasting into an assistant;
-- a local RAG index and search (`rag-index`, `rag-search`);
-- an executable Audit Engine with human and JSON reports, profiles, and a strict CI mode (`audit`);
-- human-readable and JSON reports across the CLI (`--json` on most commands).
+- context and handoff generation (`context`, `handoff`, `prompt`);
+- local RAG (`rag-index`, `rag-search`);
+- the executable Audit Engine (`audit`, strict mode and profiles);
+- stable human and JSON outputs;
+- LoopRunner `plan` and V14.4 `execute/validate/repair` orchestration.
 
-Loop Engine now also targets autonomous orchestration by small lots — see `docs/architecture/autonomous-loop-runner.md` for the LoopRunner architecture (planning → executing → validating → repairing → completed/blocked/failed/cancelled, and the `plan`/`execute`/`commit`/`publish` modes). As of V7.2, `pnpm loop run <project>` implements only the `plan` mode (default mode): it plans a cycle via `runLoopPlan` (`src/loop/runner.ts`) without calling any agent, without modifying the worktree, and without committing or pushing. `execute`, `commit`, and `publish` are rejected explicitly and remain for later lots.
+The historical LoopRunner contract is in `docs/architecture/autonomous-loop-runner.md`. The current execute-mode contract is `docs/architecture/looprunner-execute-validation-repair.md`.
 
-As of V7.4, `runLoopPlan` additionally resolves a **forecast-only** agent policy for the selected candidate via `src/policy/` (see `docs/architecture/agent-policy-engine.md`): which capabilities/permissions/effort/budget the lot would need, and which registered agent profile would be selected — exposed as `LoopRunResult.agentPolicy`, never used to call an agent.
+### LoopRunner status
 
-As of V7.5, `runLoopPlan` additionally builds a bounded, deterministic **Minimal Context Package** via `src/context/` (see `docs/architecture/minimal-context-builder.md`) whenever a plan cycle reaches `completed`, using `agentPolicy.requirements.contextBudget` — sources are limited to `snapshot.docs.required` and `snapshot.roadmap.paths`, every read stays confined under `snapshot.project.path`, and the result never exceeds `maxFiles`/`maxCharacters`/`maxEstimatedTokens`. Exposed as `LoopRunResult.contextPackage`, `null` for `blocked`/`failed` cycles exactly like `agentPolicy`.
+- **V7.2 `plan`** — `runLoopPlan(...)` is the default and remains synchronous, forecast-only and non-destructive. It calls no agent, modifies no file, commits nothing and publishes nothing.
+- **V7.4/V7.5 planning evidence** — plan mode exposes a forecast `agentPolicy` and bounded `contextPackage`.
+- **V14.4 `execute`** — `runLoopExecute(...)` resolves policy with `mode: "execute"`, builds bounded context, calls one injected `LoopExecutor`, validates through an injected `LoopValidator`, and may call an injected `LoopRepairer` within a finite `maxRepairs` budget.
+- **CLI safety** — no concrete provider is configured by default. `pnpm loop run <project> --mode execute` therefore fails closed with `failure.code = "executor_unavailable"`; it must never pretend execution happened.
+- **Closed modes** — `commit` and `publish` remain rejected with `Loop run mode not implemented: <mode>`.
 
-**Core philosophy (non-negotiable, enforced throughout the codebase):**
+### Core philosophy
 
-- No automatic AI calls by default — Loop Engine only prepares context for a human to paste into an assistant.
-- No automatic commit, no automatic push.
-- Commit and push only happen under an explicitly selected mode (`commit`, `publish`); the default mode (`plan`) never commits or pushes.
-- No modification of watched projects (Creatyss, lp-infra, n8n) — read-only.
+- No automatic AI call by default.
 - Zero token consumption by default.
-- Local validations always come before any AI review, and always before any commit or publication.
-- Human stays in control of decisions; the roadmap reader is deliberately naive/conservative rather than clever.
+- `plan` is the default and cannot modify a worktree.
+- `execute` must be selected explicitly and can act only through an injected, policy-admitted executor on the explicitly targeted project.
+- No automatic commit, push, tag or publication.
+- Validation follows execution and every repair is followed by validation.
+- Repair budgets are finite; exhaustion fails closed.
+- Human decisions define mode, permissions, provider configuration and limits.
 
-When adding a feature, do not silently violate any of the above — if a task seems to require it, flag it instead of implementing it.
+Do not silently widen any authority or replace an unavailable dependency with a fake success.
 
 ## Commands
 
 ```bash
 pnpm loop <command>            # run the CLI (tsx src/cli.ts)
 pnpm run typecheck             # tsc --noEmit
-pnpm run test                  # tsx --test tests/**/*.test.ts src/execution/*.test.ts src/execution/**/*.test.ts
+pnpm run test                  # full Node test inventory
 pnpm run validate              # typecheck + test + json-check
-pnpm run audit:strict          # tsx src/cli.ts audit --json --strict
-pnpm run audit:profiles        # scripts/audit-profile-check.ts (checks all public audit profiles)
-pnpm run audit:release-check   # scripts/audit-release-check.ts (release worktree check)
-pnpm run ci                    # validate + audit:strict + audit:profiles — the full reference validation
+pnpm run audit:strict          # strict JSON audit
+pnpm run audit:profiles        # all public audit profiles
+pnpm run audit:release-check   # release worktree check
+pnpm run ci                    # complete reference validation
 ```
 
-Run a single test file directly: `pnpm exec tsx --test tests/intelligence/roadmap.test.ts`
+Run a single test directly with `pnpm exec tsx --test <test-file>`.
 
-`pnpm run ci` is the full reference validation and must pass before any commit or release.
+`pnpm run ci` must pass before merge or release.
 
-CLI commands (see `src/cli.ts` for the full routing table): `help`, `summary [--json]`, `status`, `doctor`, `json-check`, `rag-index`, `rag-search`, `audit [--json] [--strict] [--profile <name>]`, `handoff <project> [--json]`, `context <project> [--json]`, `validate <project>`, `review <project> [--json]`, `next <project> [--json]`, `prompt <project> [--json]`, `run <project> [--mode plan] [--json]` (V7.2: only `--mode plan`, the default, is implemented; `execute`/`commit`/`publish` are rejected with a non-zero exit code).
+CLI routing includes:
 
-Loop Engine is self-hosted: it's declared in `projects.yaml` as project `loop-engine` (path `.`), so `pnpm loop context loop-engine`, `pnpm loop validate loop-engine`, etc. all work against this repo itself.
+```text
+help
+summary [--json]
+status
+doctor
+json-check
+rag-index
+rag-search
+audit [--json] [--strict] [--profile <name>]
+handoff <project> [--json]
+context <project> [--json]
+validate <project>
+review <project> [--json]
+next <project> [--json]
+prompt <project> [--json]
+run <project> [--mode plan|execute|commit|publish] [--max-repairs <n>] [--json]
+```
+
+Loop Engine is self-hosted as project `loop-engine` with path `.`.
 
 ## Architecture
 
-Layering is strict and one-directional: `cli.ts` → `commands/` → `loop/` → `intelligence/` → `core/`. Never skip a layer.
+Layering remains explicit: `cli.ts` routes, `commands/` adapts, domain modules implement contracts, and Core exposes reviewed integration boundaries.
 
-- **`src/cli.ts`** — routes argv to a command handler. Contains no business logic, no direct Git/doc/roadmap access. Just: read command → resolve project (if needed) → call the command.
-- **`src/commands/`** — one file per user-facing command (`summary`, `status`, `doctor`, `context`, `validate`, `review`, `next`, `prompt`, `run`, `help`). Each command loads a `ProjectSnapshot` (or, for `run`, a `LoopRunResult`) and renders it (text or `--json`); it must not re-derive information that layer below already computes.
-- **`src/loop/`** — the LoopRunner core (V7.2, `plan` mode only): `types.ts` (`LoopRunMode`, `LoopRunStatus`, `LoopRunResult`, …), `state-machine.ts` (`canTransition`), `planner.ts` (`planLoopCycle`, composes `intelligence/project-snapshot.ts` without duplicating it), `runner.ts` (`runLoopPlan`). See `docs/architecture/autonomous-loop-runner.md`.
-- **`src/intelligence/`** — the engine. `project-snapshot.ts` builds the central `ProjectSnapshot` (see `src/intelligence/snapshot.ts` for the type) by merging declarative config (`projects.yaml`) with computed state (Git, docs, roadmap). `roadmap.ts` is the roadmap reader (see below). **This is the single source of truth commands must consume — never have a command re-read Git/docs/roadmap directly.**
-- **`src/core/`** — small, deterministic low-level primitives: `config.ts` (loads/parses `projects.yaml`), `git.ts` (shells out to `git`, always fails soft to `"unknown"`/`null`), `docs.ts` (file existence checks), `project.ts` (project lookup/arg parsing). V10.9's root `src/registry.ts` is a shared immutable declaration-order/uniqueness primitive with no domain or execution knowledge; it is not a Core integration boundary. Since V13.15, `runtime-execution-bridge.ts` is an opt-in Core bridge that composes V13 declarative capability selection, an explicit `descriptorId -> RuntimeId` mapping, and the existing V10 `createRuntimeRequest` / `resolveRuntime` / `executeRuntime` APIs. Since V13.16, the policy-aware variant requires an explicit `AgentPolicyResolution`, applies pure runtime/provider/effort/budget admission before V10, and stops before V10 request/resolution/execution on denial. Since V13.17, it can produce a `schemaVersion: 1` `RuntimeExecutionPlan` through a pure dry-run; the public plan is serializable descriptive data and never stores an adapter, closure, command, cwd, environment, timestamp generation, or execution result. It must not change CLI/JSON/LoopRunResult, create providers/adapters, infer a provider, resolve policy defaults, or duplicate compatibility/execution logic.
-- **`src/agents/`** — the agent orchestration layer (V7.3, local/deterministic only): `types.ts` (`AgentRuntime`, `AgentProvider`, `AgentCapability`, `AgentPermission`, `AgentEffort`, `AgentBudget`, `AgentProfile`), `registry.ts` (`AgentRegistry`), `selector.ts` (`selectAgentProfile`, smallest-capable-first with rejection explainability), `escalation.ts` (`escalateAgentProfile`, triggered only by an explicit failure). No network calls, no provider SDK, no `execute` mode, not wired into any CLI command; consumed only by `src/policy/` and a future `LoopExecutor`, never the reverse. See `docs/architecture/agent-orchestration.md`.
-- **`src/policy/`** — the Agent Policy Engine (V7.4, local/deterministic only): `types.ts` (`AgentPolicyMode`, `LoopTaskCategory`, `ContextBudget`, `LoopTaskRequirements`, `AgentPolicy`, `AgentPolicyResolution`), `defaults.ts` (per-mode permission ceilings and budgets, restrictive-merge helpers, context budget by effort), `resolver.ts` (`classifyLoopTaskCategory`, `deriveTaskRequirements`, `resolvePolicy`). Depends on `src/agents/` and, read-only, on `src/intelligence/roadmap.js`'s `RoadmapCandidate` type; never depends on `src/loop/`, `src/commands/`, or `src/cli.ts` — the `LoopRunner` consumes it, never the reverse. No network calls, no `execute` mode: `resolvePolicy` only ever produces a forecast selection, never an invocation. See `docs/architecture/agent-policy-engine.md`.
-- **`src/context/`** — the Minimal Context Builder (V7.5, local/deterministic only): `types.ts` (`MinimalContextPackage`, `ContextFile`, `ContextOmission`, reusing `ContextBudget` from `src/policy/types.ts`), `path.ts` (`resolveContextPath`, confinement under `snapshot.project.path`), `sources.ts` (`collectContextSources`, limited to `docs.required` and `roadmap.paths`, stable order), `context-cost-estimator.ts` (`estimateTokens`, a documented `ceil(length/4)` approximation), `builder.ts` (`buildMinimalContext`, deduplication + strict budget enforcement + deterministic truncation). Depends on `src/intelligence/snapshot.js` and `src/policy/types.js` (types only); never depends on `src/commands/`, `src/loop/`, or `src/cli.ts` — the `LoopRunner` consumes it, never the reverse, and `src/policy/`/`src/agents/` never depend on it either. No network calls, no file writes. See `docs/architecture/minimal-context-builder.md`.
-- **`src/providers/`** — Provider Adapter contracts (V10.2, Core-only and inert): static OpenClaw, Claude Code and Codex stubs translate a `RuntimeRequest` to a normalized `ProviderExecutionPlan` without calling a transport. They depend only on Runtime/agent/policy types, cannot bypass policy, spawn a process, access network/secrets/environment, or appear in CLI/LoopRunner. `src/runtime/local-process.ts` remains a provider-agnostic transport primitive. See `docs/architecture/provider-adapters.md`.
-- **`src/transports/`** — Transport Adapter contracts (V10.3, Core-only): the static `local-process` transport validates explicit transport authorization, then delegates exclusively to the guarded V10.1 backend and normalizes its result. It does not know Provider protocols, spawn independently, load secrets/environment, access the network, or appear in CLI/LoopRunner. See `docs/architecture/transport-adapters.md`.
-- **`src/providers/openclaw/`** — OpenClaw protocol design (V10.4): a typed Loop Engine internal planning schema for the abstract `plan` operation. It validates a safe envelope and emits deterministic non-executable diagnostics only; it has no official executable mapping, command, credentials, network, Runtime/Transport dependency, CLI, or LoopRunner integration. See `docs/architecture/openclaw-provider-protocol.md`.
-- **`src/providers/mapping/`** — Executable Mapping contracts (V10.5, Core-only): immutable compatibility declarations between a validated Provider protocol and a future transport-neutral intent. The sole OpenClaw declaration is disabled and unconfigured; mappings have no commands, executable metadata, transport invocation, process/network/environment access, CLI, or LoopRunner exposure. See `docs/architecture/executable-mapping.md`.
-- **`src/providers/intent/`** — Transport Intent contracts (V10.6, Core-only): immutable desired-transport declarations with Provider/Runtime/Mapping/policy requirements. The sole OpenClaw intent is inactive and unconfigured; it creates no TransportRequest and is not consumed by the TransportAdapter, CLI, or LoopRunner. See `docs/architecture/transport-intent.md`.
-- **`src/policy/`** — Capability & Policy Engine (V10.7, Core-only): extends the existing forecast policy module with immutable capability, policy, and authorization-decision contracts for transport intents. Its static `default-deny` rule evaluates compatibility only; it creates no TransportRequest and invokes no Provider, Runtime, or Transport. See `docs/architecture/capability-policy-engine.md`.
-- **`src/authorization/`** — Authorization Configuration contracts (V10.8, Core-only): immutable reviewable requirements after an AuthorizationDecision. The sole OpenClaw configuration is inactive, unapproved and review-required; it creates no TransportRequest or RuntimeRequest and invokes no Provider, Runtime, or Transport. See `docs/architecture/authorization-configuration.md`.
-- **`src/inbound-security/`** — Inbound Boundary Security Contract (V14.0a, declarative and pure): authentication evidence, principal, access request, replay evidence, and a fail-closed (`deny`-default) ACL decision (`allow` / `deny` / `indeterminate`), evaluated by `evaluateInboundSecurity` without clock, randomness, filesystem, network, or process access. `src/core/inbound-security.ts` composes it into a single Core facade, `evaluateInboundSecurityAndPrepareLoopRuntimeRequest`, that is the sole seam allowed to gate the existing `prepareAuthorizedLoopRuntimeRequest` chain behind an explicit `allow`. No transport, credential verification, or execution exists yet. See `docs/architecture/inbound-boundary-security-contract.md`.
-- **`src/ui/terminal.ts`** — the only place that formats terminal output; commands call `terminal.*` rather than inlining styling.
+- **`src/cli.ts`** — argv parsing and routing only. It validates `--mode` and `--max-repairs`, then delegates.
+- **`src/commands/`** — user-facing adapters. `run.ts` renders a `LoopRunResult`; it does not implement execution or validation logic.
+- **`src/loop/`** — LoopRunner domain:
+  - `types.ts` — `LoopRunMode`, states, steps, failures, validation evidence and `LoopRunResult`;
+  - `state-machine.ts` — the only legal transition table;
+  - `planner.ts` / `runner.ts` — deterministic `plan` mode;
+  - `execution.ts` — `LoopExecutor`, `LoopValidator`, `LoopRepairer`, default configured-validation adapter and unavailable executor;
+  - `execute-runner.ts` — V14.4 execute/validate/repair orchestration.
+- **`src/intelligence/`** — `ProjectSnapshot`, roadmap reading and candidate selection. Commands and runners consume this source of truth instead of re-reading project state ad hoc.
+- **`src/core/`** — low-level primitives and reviewed integration surfaces. `loop-execution-cycle.ts` exports the V14.4 application boundary. `prepared-inbound-runtime-execution.ts` owns the V14.3 inbound-to-Runtime vertical slice.
+- **`src/agents/`** — profile types, registry, smallest-capable-first selector and explicit escalation. Profiles are declarations, not executable provider integrations.
+- **`src/policy/`** — derives requirements and resolves policy. In plan mode the resolution is forecast evidence; in execute mode V14.4 treats a resolved selected profile as mandatory admission before calling the injected executor. The policy module itself never invokes a provider.
+- **`src/context/`** — bounded deterministic context construction with path confinement and stable truncation.
+- **`src/runtime/`** and **`src/transports/`** — guarded Runtime/Transport contracts and opt-in implementations.
+- **`src/providers/`** — provider planning contracts and static declarations. V14.4 does not make these a concrete LoopExecutor.
+- **`src/inbound-security/`** — pure fail-closed inbound security contracts. Concrete identity, ACL, replay persistence and the first inbound adapter are V14.5 scope.
+- **`src/audit/`** — executable architecture and contract checks. AUDIT-495 guards the complete V14.4 boundary rather than individual helper tokens.
+- **`src/ui/terminal.ts`** — terminal formatting only.
 
-Before adding a new command: check whether the data already exists on `ProjectSnapshot`; if not, extend `intelligence/` rather than computing it ad hoc inside the command.
+Before adding a command, check whether its data already exists on `ProjectSnapshot` or another reviewed Core result. Extend the owning layer instead of deriving data in the command.
+
+### V14.4 invariants
+
+- Policy rejection causes zero executor calls.
+- The executor has one call site and is invoked at most once per cycle.
+- Validation starts only after executor completion.
+- Repair requires an injected `LoopRepairer`, consumes a finite budget and is followed by revalidation.
+- Executor, validator and repairer exceptions are converted to stable redacted failures.
+- Modified-file paths are normalized, deduplicated and sorted.
+- `commit` and `publication` remain `null` on every V14.4 outcome.
+- No direct network, environment-secret discovery, provider SDK, commit, push, tag or force operation belongs in `src/loop/execute-runner.ts`.
 
 ### Roadmap reader (`src/intelligence/roadmap.ts`)
 
-Deterministic, keyword-based, intentionally naive — no NLP, no dependency resolution between lots.
+The reader is deterministic and keyword-based. It intentionally does not perform NLP or dependency resolution.
 
-- A line becomes a **candidate** if it matches patterns like `- [ ]`, `TODO`, `Prochain`, `Lot `, `H1-L`/`H2-L`/`H3-L`, `⏳`, etc. (`CANDIDATE_PATTERNS`).
-- Each candidate gets a **status**: `todo` / `in_progress` (`⏳`, "en cours") / `done` (`- [x]`) / `unknown`.
-- Each candidate gets a **kind** via keyword matching on the lowercased line:
-  - `blocked`: `production finale`, `mise en production`, `paiement`, `migration`, `delete`, `supprimer`. Note `prod` alone is _not_ blocking (avoids false positives on `produit`).
-  - `warning`: `déploiement`/`deploiement`, `vps`, `dns`, `bascule`, `sécurité`/`securite`.
-  - otherwise `safe`.
-- `selectRoadmapCandidate` ignores `done` candidates, then prefers `safe` > `warning` > `blocked` (a `blocked`-only result should never be presented as a safe next micro-lot — the `next` command must make that distinction, not silently recommend it).
+- Candidates come from explicit roadmap markers such as unchecked tasks, TODO, lot identifiers and in-progress markers.
+- Status is `todo`, `in_progress`, `done` or `unknown`.
+- Risk kind is `safe`, `warning` or `blocked` based on conservative keywords.
+- Selection ignores completed candidates and prefers `safe`, then `warning`, then `blocked`.
 
-When adjusting keyword lists, favor precision (avoid blocking ordinary work) over recall, and keep any new pattern covered by a test in `tests/intelligence/roadmap.test.ts`.
+Keep keyword changes precise and covered by `tests/intelligence/roadmap.test.ts`.
 
 ## JSON output contract
 
-`summary`, `context`, `next`, `prompt`, and `review` support `--json` for external consumers (scripts, OpenClaw, n8n, a future dashboard). Rules:
+Public JSON payloads use `schemaVersion: 1`.
 
-- Every JSON payload includes `schemaVersion: 1`.
-- Never remove a field without bumping `schemaVersion`; prefer adding optional fields.
-- Any new/changed JSON output must be covered in `tests/commands/json-output.test.ts`.
-- JSON consumers are read-only by contract: they must never trigger a commit, push, deletion, or automatic AI call. See `docs/integrations/json-consumers.md` for consumer-specific usage (OpenClaw, n8n).
+- Prefer additive fields; do not remove a field without a schema bump.
+- New or changed public JSON must be covered by command tests and `json-check`.
+- `run --mode execute --json` returns a `LoopRunResult` even on an execution-cycle failure such as `executor_unavailable`.
+- Argument and unsupported-mode errors use the separate `{ schemaVersion, ok: false, error }` envelope.
+- JSON consumers cannot infer permission to commit, publish or call a provider.
 
 ## Docs worth reading before structural changes
 
-- `docs/architecture/final-objective.md` — final objective and product source of truth (see top of this file).
-- `docs/architecture/autonomous-loop-runner.md` — LoopRunner architecture and contracts for the autonomous small-lot cycle (plan/execute/commit/publish modes, state machine, `LoopRunResult`).
-- `docs/architecture/agent-orchestration.md` — agent orchestration layer (`src/agents/`): types, registry, selector, escalation strategy — local and deterministic, no execute mode.
-- `docs/architecture/agent-policy-engine.md` — Agent Policy Engine (`src/policy/`): requirements derivation, per-mode permission ceilings, restrictive budget/provider/runtime merging, forecast-only selection integrated into the LoopRunner's plan mode.
-- `docs/architecture/minimal-context-builder.md` — Minimal Context Builder (`src/context/`): bounded/deterministic context package construction, path confinement, deduplication, truncation rules, integrated into the LoopRunner's plan mode.
-- `docs/architecture/provider-adapters.md` — Provider Adapter contracts (`src/providers/`): inert provider planning, static registry/selection and the transport boundary.
-- `docs/architecture/transport-adapters.md` — Transport Adapter contracts (`src/transports/`): explicit Core-only execution boundary, local-process delegation and result normalization.
-- `docs/architecture/openclaw-provider-protocol.md` — OpenClaw internal planning schema (`src/providers/openclaw/`): protocol validation, non-executable plans and missing mapping evidence.
-- `docs/architecture/executable-mapping.md` — Executable mapping contracts (`src/providers/mapping/`): disabled capability declarations, policy gates and transport separation.
-- `docs/architecture/transport-intent.md` — Transport intent contracts (`src/providers/intent/`): inactive declarations and the intentional Adapter boundary.
-- `docs/architecture/capability-policy-engine.md` — Capability & Policy Engine (`src/policy/`): default-deny theoretical authorization after transport intent and before any future transport boundary.
-- `docs/architecture/authorization-configuration.md` — Authorization Configuration (`src/authorization/`): inactive, review-required requirements after theoretical authorization and before any future execution review.
-- `docs/architecture/architecture-consolidation.md` — V10.9 consolidation: shared static-registry invariants without a new execution layer or public contract.
-- `docs/architecture/inbound-boundary-security-contract.md` — Inbound Boundary Security Contract (`src/inbound-security/`, `src/core/inbound-security.ts`): declarative fail-closed ACL evaluation and the single gate over the existing public-runtime preparation chain, ahead of any future transport.
-- `docs/architecture/rfc-execution-architecture-v11.md` — V11 normative execution architecture RFC: future boundary, trust, security, lifecycle and review requirements; no implementation authorization.
-- `docs/architecture/commands.md` — layering rules for `cli.ts` / `commands/` / `core/` / `intelligence/` / `ui/`.
-- `docs/architecture/project-intelligence.md` — `ProjectSnapshot` contract and roadmap candidate classification.
-- `docs/architecture/roadmap-reader.md` — roadmap reader formats, states, and keyword refinement history.
-- `docs/architecture/audit-engine.md` — Audit Engine architecture, profiles, and CI integration.
-- `docs/audits/release-checklist.md` — release checklist to follow before publishing an audit tag.
-- `docs/audits/stable-tags.md` — source of truth for the current stable audit tags.
-- `docs/integrations/json-consumers.md` — JSON contract and per-consumer (OpenClaw/n8n) expectations.
+- `docs/architecture/final-objective.md`
+- `docs/architecture/autonomous-loop-runner.md`
+- `docs/architecture/looprunner-execute-validation-repair.md`
+- `docs/architecture/prepared-inbound-runtime-execution.md`
+- `docs/architecture/execution-architecture-rfc.md`
+- `docs/architecture/agent-orchestration.md`
+- `docs/architecture/agent-policy-engine.md`
+- `docs/architecture/minimal-context-builder.md`
+- `docs/architecture/provider-adapters.md`
+- `docs/architecture/transport-adapters.md`
+- `docs/architecture/inbound-boundary-security-contract.md`
+- `docs/architecture/commands.md`
+- `docs/architecture/project-intelligence.md`
+- `docs/architecture/roadmap-reader.md`
+- `docs/architecture/audit-engine.md`
+- `docs/audits/release-checklist.md`
+- `docs/audits/stable-tags.md`
+- `docs/integrations/json-consumers.md`
 
 ## Working method
 
-Work in small, reversible lots.
+Work in coherent, reversible capability lots.
 
 Before a significant change:
 
-- read the relevant docs and source files;
-- prefer an audit/design lot when architecture is unclear;
-- avoid broad refactors unless explicitly requested.
+- read the relevant current contract and implementation;
+- verify that the roadmap candidate is still active;
+- prefer one vertical slice over adapter/facade/test micro-lots;
+- avoid broad refactors without a demonstrated need.
 
 For every code lot:
 
-- keep the patch minimal;
-- run `pnpm run validate`;
-- list modified files;
-- do not commit unless explicitly asked.
+- preserve default-deny behavior;
+- add adversarial coverage with the capability;
+- run `pnpm run ci`;
+- review the complete diff;
+- do not commit or publish a targeted project unless an explicitly implemented mode authorizes it.
