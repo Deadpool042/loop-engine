@@ -35,7 +35,7 @@ The historical LoopRunner contract is in `docs/architecture/autonomous-loop-runn
 
 ### Core philosophy
 
-- No automatic AI call by default.
+- No automatic AI calls by default.
 - Zero token consumption by default.
 - `plan` is the default and cannot modify a worktree.
 - `execute` must be selected explicitly and can act only through an injected, policy-admitted executor on the explicitly targeted project.
