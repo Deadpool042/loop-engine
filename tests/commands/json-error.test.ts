@@ -51,7 +51,7 @@ describe("json errors", () => {
     assert.equal(json.error?.message, "Missing project argument for context");
   });
 
-  it("rejects mode execute for the run command", () => {
+  it("returns a failed LoopRunResult when execute has no concrete executor", () => {
     const output = runFailingCommand([
       "run",
       "loop-engine",
@@ -62,14 +62,19 @@ describe("json errors", () => {
 
     const json = JSON.parse(output) as {
       schemaVersion?: unknown;
-      ok?: unknown;
-      error?: { code?: unknown; message?: unknown };
+      mode?: unknown;
+      status?: unknown;
+      failure?: { code?: unknown; message?: unknown };
+      commit?: unknown;
+      publication?: unknown;
     };
 
     assert.equal(json.schemaVersion, 1);
-    assert.equal(json.ok, false);
-    assert.equal(json.error?.code, "mode_not_implemented");
-    assert.equal(json.error?.message, "Loop run mode not implemented: execute");
+    assert.equal(json.mode, "execute");
+    assert.equal(json.status, "failed");
+    assert.equal(json.failure?.code, "executor_unavailable");
+    assert.equal(json.commit, null);
+    assert.equal(json.publication, null);
   });
 
   it("rejects mode commit for the run command", () => {
@@ -142,5 +147,40 @@ describe("json errors", () => {
 
     assert.equal(json.error?.code, "missing_mode_value");
     assert.equal(json.error?.message, "Missing value for --mode");
+  });
+
+  it("rejects --max-repairs with no value", () => {
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "execute",
+      "--json",
+      "--max-repairs",
+    ]);
+    const json = JSON.parse(output) as {
+      error?: { code?: unknown; message?: unknown };
+    };
+
+    assert.equal(json.error?.code, "missing_max_repairs_value");
+    assert.equal(json.error?.message, "Missing value for --max-repairs");
+  });
+
+  it("rejects a negative --max-repairs value", () => {
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "execute",
+      "--json",
+      "--max-repairs",
+      "-1",
+    ]);
+    const json = JSON.parse(output) as {
+      error?: { code?: unknown; message?: unknown };
+    };
+
+    assert.equal(json.error?.code, "invalid_max_repairs");
+    assert.equal(json.error?.message, "Invalid --max-repairs value: -1");
   });
 });
