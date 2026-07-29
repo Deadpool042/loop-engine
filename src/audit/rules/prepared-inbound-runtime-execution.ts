@@ -87,7 +87,7 @@ export const PREPARED_INBOUND_RUNTIME_EXECUTION_RULE: AuditRule = (() => {
       "The V14.3 Core application service must reuse the existing inbound handler, apply Runtime admission, keep dry-run non-invoking, resolve exactly one Runtime boundary, expose a redacted receipt, and remain free of direct lower-level authentication/replay/authorization preparation or ambient effects.",
     metadata: {
       introducedIn: "V14.3",
-      tags: ["architecture", "contract", "runtime", "security", "ci"],
+      tags: ["architecture", "contract", "execution", "policy", "ci"],
       stability: "stable",
       dependsOn: ["AUDIT-430", "AUDIT-431", "AUDIT-423"],
     },
