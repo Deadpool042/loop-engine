@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   evaluateInboundAuthenticationVerifier,
+  type InboundAuthenticationEvidence,
   type InboundAuthenticationVerifier,
 } from "../../src/inbound-security/index.js";
 
@@ -18,9 +19,16 @@ const CONTEXT = Object.freeze({
   evaluatedAt: "2026-07-29T12:00:00.000Z",
 });
 
-const INVALID = Object.freeze({
-  verified: false as const,
-  reason: "verification_invalid" as const,
+const EVIDENCE: InboundAuthenticationEvidence = Object.freeze({
+  evidenceId: "evidence-1",
+  method: "opaque",
+  subjectId: "subject-1",
+  issuerId: "issuer-1",
+  credentialFingerprint: "fingerprint-1",
+  verified: true,
+  issuedAt: "2026-07-29T11:00:00.000Z",
+  validFrom: "2026-07-29T11:00:00.000Z",
+  expiresAt: "2026-07-29T13:00:00.000Z",
 });
 
 async function evaluate(result: unknown) {
@@ -36,13 +44,17 @@ async function evaluate(result: unknown) {
   return { verifierCalls, value };
 }
 
-describe("authentication verifier then accessor settlement", () => {
-  it("canonicalizes a throwing then accessor", async () => {
+describe("authentication verifier then accessor capture semantics", () => {
+  it("invokes an accessor-provided then function with the thenable as receiver", async () => {
     let thenReads = 0;
+    let receiverMatches = false;
     const result = Object.defineProperty({}, "then", {
       get() {
         thenReads += 1;
-        throw new Error("then accessor failure");
+        return function (this: unknown, resolve: (value: unknown) => void) {
+          receiverMatches = this === result;
+          resolve({ verified: true, evidence: EVIDENCE });
+        };
       },
     });
 
@@ -50,39 +62,65 @@ describe("authentication verifier then accessor settlement", () => {
 
     assert.equal(verifierCalls, 1);
     assert.equal(thenReads, 1);
-    assert.deepEqual(value, INVALID);
+    assert.equal(receiverMatches, true);
+    assert.equal(value.verified, true);
+    if (value.verified) {
+      assert.equal(value.evidence, EVIDENCE);
+    }
   });
 
-  it("canonicalizes a nested throwing then accessor", async () => {
+  it("uses the then function captured by the first accessor read", async () => {
     let thenReads = 0;
-    const inner = Object.defineProperty({}, "then", {
+    let replacementCalls = 0;
+    let result: object;
+
+    result = Object.defineProperty({}, "then", {
+      configurable: true,
       get() {
         thenReads += 1;
-        throw new Error("nested then accessor failure");
+        Object.defineProperty(result, "then", {
+          configurable: true,
+          value() {
+            replacementCalls += 1;
+            throw new Error("replacement then must not run");
+          },
+        });
+        return (resolve: (value: unknown) => void) => {
+          resolve({ verified: true, evidence: EVIDENCE });
+        };
       },
     });
-    const outer = {
-      then(resolve: (value: unknown) => void) {
-        resolve(inner);
-      },
-    };
 
-    const { verifierCalls, value } = await evaluate(outer);
+    const { verifierCalls, value } = await evaluate(result);
 
     assert.equal(verifierCalls, 1);
     assert.equal(thenReads, 1);
-    assert.deepEqual(value, INVALID);
+    assert.equal(replacementCalls, 0);
+    assert.equal(value.verified, true);
+    if (value.verified) {
+      assert.equal(value.evidence, EVIDENCE);
+    }
   });
 
-  it("keeps verifier invocation exactly once when reading then throws", async () => {
+  it("ignores a throw after an accessor-provided then function resolves", async () => {
+    let thenReads = 0;
     const result = Object.defineProperty({}, "then", {
       get() {
-        throw new Error("then accessor failure");
+        thenReads += 1;
+        return (resolve: (value: unknown) => void) => {
+          resolve({ verified: true, evidence: EVIDENCE });
+          throw new Error("late accessor-provided then throw");
+        };
       },
     });
 
-    const { verifierCalls } = await evaluate(result);
+    const { verifierCalls, value } = await evaluate(result);
 
     assert.equal(verifierCalls, 1);
+    assert.equal(thenReads, 1);
+    assert.equal(value.verified, true);
+    if (value.verified) {
+      assert.equal(value.evidence, EVIDENCE);
+    }
   });
 });
