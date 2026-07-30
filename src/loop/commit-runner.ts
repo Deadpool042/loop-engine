@@ -19,6 +19,7 @@ function failedCommitResult(
     mode: "commit" as const,
     status: "failed" as const,
     commit: null,
+    publication: null,
     failure: Object.freeze({
       code,
       message,
@@ -36,7 +37,11 @@ export async function runLoopCommit(
     execution.status !== "completed" ||
     execution.validation?.status !== "passed"
   ) {
-    return Object.freeze({ ...execution, mode: "commit" as const });
+    return Object.freeze({
+      ...execution,
+      mode: "commit" as const,
+      publication: null,
+    });
   }
   if (execution.modifiedFiles.length === 0) {
     return failedCommitResult(
@@ -69,5 +74,6 @@ export async function runLoopCommit(
     ...execution,
     mode: "commit" as const,
     commit: Object.freeze({ sha: result.sha, message: result.message }),
+    publication: null,
   });
 }
