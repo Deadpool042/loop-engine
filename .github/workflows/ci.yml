@@ -20,10 +20,6 @@ defaults:
   run:
     shell: bash
 
-# AUDIT-012 compatibility marker: run: pnpm run ci
-# The command is decomposed into the parallel jobs below; CI gate preserves
-# the same fail-closed outcome without rerunning the full suite serially.
-
 jobs:
   quality:
     name: Quality
