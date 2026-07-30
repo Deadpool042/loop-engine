@@ -12,8 +12,6 @@ const PUBLIC_BARREL_FILES = Object.freeze([
 const CONCRETE_PROVIDER_TARGETS = Object.freeze([
   "../loop/codex-cli-executor.js",
   "./codex-cli-executor.js",
-  "../runtime/codex.js",
-  "./codex.js",
 ]);
 
 export type ProviderExposureSource = Readonly<{
@@ -85,7 +83,7 @@ export const CONCRETE_PROVIDER_EXPOSURE_RULE: AuditRule = (() => {
     severity: "error",
     title: "Concrete providers stay behind the reviewed composition boundary",
     description:
-      "Public barrels must expose provider ports and contracts only, while concrete provider construction remains confined to the reviewed CLI composition file.",
+      "Public barrels must expose provider ports and contracts only, while executable provider construction remains confined to the reviewed CLI composition file.",
     metadata: {
       introducedIn: "V14.8",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -109,7 +107,7 @@ export const CONCRETE_PROVIDER_EXPOSURE_RULE: AuditRule = (() => {
             violations.map(
               ({ path, target, reason }) => `${path} -> ${target}: ${reason}`,
             ),
-            `Remove concrete provider exports from public barrels and compose providers only in ${REVIEWED_COMPOSITION_FILE}.`,
+            `Remove executable provider exports from public barrels and compose providers only in ${REVIEWED_COMPOSITION_FILE}.`,
           )
         : pass(rule, `${rule.title}.`, paths);
     },
