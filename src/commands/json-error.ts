@@ -12,6 +12,7 @@ export type JsonErrorCode =
   | "unsupported_provider"
   | "missing_provider_executable"
   | "invalid_provider_executable"
+  | "agent_policy_rejected"
   | "missing_commit_message";
 
 export function printJsonError(code: JsonErrorCode, message: string): void {
