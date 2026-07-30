@@ -88,7 +88,7 @@ export const COMPOSITION_ROOT_DIRECTION_RULE: AuditRule = (() => {
       "Composition modules may assemble Core and infrastructure implementations, but must not depend on CLI commands, UI rendering, or audit machinery.",
     metadata: {
       introducedIn: "V14.11",
-      tags: ["architecture", "composition", "dependency-direction", "ci"],
+      tags: ["architecture", "contract", "ci"],
       stability: "stable",
       dependsOn: ["AUDIT-500"],
     },
