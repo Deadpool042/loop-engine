@@ -23,7 +23,7 @@ import {
   loadConfig,
   runConfiguredValidations,
   runLoopCommit,
-  runLoopExecute,
+  runLoopExecuteWithProviderFailoverEvidence,
   runLoopPlan,
   type AuditProfile,
   type AuditReport,
@@ -87,7 +87,7 @@ export type LoopApplicationAssembly = Readonly<{
   loopRunModes: typeof LOOP_RUN_MODES;
   runConfiguredValidations: typeof runConfiguredValidations;
   runLoopCommit: typeof runLoopCommit;
-  runLoopExecute: typeof runLoopExecute;
+  runLoopExecute: typeof runLoopExecuteWithProviderFailoverEvidence;
   runLoopPlan: typeof runLoopPlan;
 }>;
 
@@ -176,7 +176,7 @@ export function createLoopApplicationAssembly(
     loopRunModes: LOOP_RUN_MODES,
     runConfiguredValidations,
     runLoopCommit,
-    runLoopExecute,
+    runLoopExecute: runLoopExecuteWithProviderFailoverEvidence,
     runLoopPlan,
   });
 }
