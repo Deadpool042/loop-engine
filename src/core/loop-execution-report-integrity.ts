@@ -12,7 +12,11 @@ import {
   type LoopExecutionPlanFingerprint,
 } from "../loop/execution-plan-evidence-fingerprint.js";
 import type { LoopExecutionPlanEvidence } from "../loop/execution-plan-evidence.js";
-import type { LoopRunResult } from "../loop/types.js";
+import {
+  LOOP_RUN_MODES,
+  LOOP_RUN_STATUSES,
+  type LoopRunResult,
+} from "../loop/types.js";
 
 export type LoopExecutionReportIntegrityFailureCode =
   | "invalid_report"
@@ -43,12 +47,21 @@ function isStringArray(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.every(isNonEmptyString);
 }
 
-function isMember<T extends string>(values: readonly T[], value: unknown): value is T {
-  return typeof value === "string" && (values as readonly string[]).includes(value);
+function isMember<T extends string>(
+  values: readonly T[],
+  value: unknown,
+): value is T {
+  return (
+    typeof value === "string" &&
+    (values as readonly string[]).includes(value)
+  );
 }
 
 function isBudgetValue(value: unknown): value is number | null {
-  return value === null || (typeof value === "number" && Number.isFinite(value) && value >= 0);
+  return (
+    value === null ||
+    (typeof value === "number" && Number.isFinite(value) && value >= 0)
+  );
 }
 
 function isAgentBudget(value: unknown): value is AgentBudget {
@@ -62,8 +75,16 @@ function isAgentBudget(value: unknown): value is AgentBudget {
   );
 }
 
-function isExecutionPlanEvidence(value: unknown): value is LoopExecutionPlanEvidence {
-  if (!isRecord(value) || value.schemaVersion !== 1 || !isRecord(value.policy)) return false;
+function isExecutionPlanEvidence(
+  value: unknown,
+): value is LoopExecutionPlanEvidence {
+  if (
+    !isRecord(value) ||
+    value.schemaVersion !== 1 ||
+    !isRecord(value.policy)
+  ) {
+    return false;
+  }
   return (
     isMember(AGENT_PROVIDERS, value.provider) &&
     isMember(AGENT_RUNTIMES, value.runtime) &&
@@ -74,14 +95,20 @@ function isExecutionPlanEvidence(value: unknown): value is LoopExecutionPlanEvid
     isNonEmptyString(value.policy.id) &&
     (value.policy.mode === "execute" || value.policy.mode === "commit") &&
     Array.isArray(value.policy.requiredCapabilities) &&
-    value.policy.requiredCapabilities.every((item) => isMember(AGENT_CAPABILITIES, item)) &&
+    value.policy.requiredCapabilities.every((item) =>
+      isMember(AGENT_CAPABILITIES, item),
+    ) &&
     Array.isArray(value.policy.requiredPermissions) &&
-    value.policy.requiredPermissions.every((item) => isMember(AGENT_PERMISSIONS, item)) &&
+    value.policy.requiredPermissions.every((item) =>
+      isMember(AGENT_PERMISSIONS, item),
+    ) &&
     isStringArray(value.policy.rationale)
   );
 }
 
-function isExecutionPlanFingerprint(value: unknown): value is LoopExecutionPlanFingerprint {
+function isExecutionPlanFingerprint(
+  value: unknown,
+): value is LoopExecutionPlanFingerprint {
   return (
     isRecord(value) &&
     value.algorithm === LOOP_EXECUTION_PLAN_FINGERPRINT_ALGORITHM &&
@@ -90,11 +117,31 @@ function isExecutionPlanFingerprint(value: unknown): value is LoopExecutionPlanF
   );
 }
 
+function isExecutionReportEnvelope(value: UnknownRecord): boolean {
+  return (
+    value.schemaVersion === 1 &&
+    isNonEmptyString(value.runId) &&
+    isNonEmptyString(value.project) &&
+    isMember(LOOP_RUN_MODES, value.mode) &&
+    isMember(LOOP_RUN_STATUSES, value.status) &&
+    isNonEmptyString(value.startedAt) &&
+    (value.completedAt === null || isNonEmptyString(value.completedAt)) &&
+    Array.isArray(value.steps) &&
+    Array.isArray(value.modifiedFiles) &&
+    value.modifiedFiles.every(isNonEmptyString) &&
+    value.publication === null
+  );
+}
+
 function rejected(
   code: LoopExecutionReportIntegrityFailureCode,
   ...details: string[]
 ): LoopExecutionReportIntegrityResult {
-  return Object.freeze({ status: "rejected" as const, code, details: Object.freeze(details) });
+  return Object.freeze({
+    status: "rejected" as const,
+    code,
+    details: Object.freeze(details),
+  });
 }
 
 /**
@@ -105,8 +152,11 @@ function rejected(
 export function verifyLoopExecutionReportIntegrity(
   value: unknown,
 ): LoopExecutionReportIntegrityResult {
-  if (!isRecord(value) || value.schemaVersion !== 1 || !isNonEmptyString(value.runId)) {
-    return rejected("invalid_report", "Expected a schemaVersion 1 execution report with a runId.");
+  if (!isRecord(value) || !isExecutionReportEnvelope(value)) {
+    return rejected(
+      "invalid_report",
+      "Expected a structurally valid schemaVersion 1 execution report.",
+    );
   }
 
   const evidence = value.executionPlanEvidence;
@@ -122,13 +172,22 @@ export function verifyLoopExecutionReportIntegrity(
   }
 
   if (evidenceAbsent) {
-    return Object.freeze({ status: "accepted" as const, report: value as LoopRunResult });
+    return Object.freeze({
+      status: "accepted" as const,
+      report: value as unknown as LoopRunResult,
+    });
   }
   if (!isExecutionPlanEvidence(evidence)) {
-    return rejected("invalid_execution_plan_evidence", "Execution-plan evidence does not match schema version 1.");
+    return rejected(
+      "invalid_execution_plan_evidence",
+      "Execution-plan evidence does not match schema version 1.",
+    );
   }
   if (!isExecutionPlanFingerprint(fingerprint)) {
-    return rejected("invalid_execution_plan_fingerprint", "Execution-plan fingerprint must be a SHA-256 hex digest.");
+    return rejected(
+      "invalid_execution_plan_fingerprint",
+      "Execution-plan fingerprint must be a SHA-256 hex digest.",
+    );
   }
   if (!verifyLoopExecutionPlanEvidenceFingerprint(evidence, fingerprint)) {
     return rejected(
@@ -137,5 +196,8 @@ export function verifyLoopExecutionReportIntegrity(
     );
   }
 
-  return Object.freeze({ status: "accepted" as const, report: value as LoopRunResult });
+  return Object.freeze({
+    status: "accepted" as const,
+    report: value as unknown as LoopRunResult,
+  });
 }
