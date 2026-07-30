@@ -2,13 +2,14 @@
 
 ## Status
 
-V14.17 — implemented.
+V14.18 — implemented.
 
 ## Goal
 
 Execution reports must expose enough information to prove which admitted provider,
 runtime, profile, model, effort, budget and policy constraints governed a run,
-without publishing the internal execution plan.
+without publishing the internal execution plan. Equivalent evidence must also be
+comparable through one deterministic integrity fingerprint.
 
 ## Public projection
 
@@ -30,7 +31,19 @@ provider diagnostics.
 
 `generateExecutionReportWithEvidence(...)` preserves every historical execution
 report field and adds `executionPlanEvidence`, using `null` when no execution was
-admitted. The application assembly exposes this projection to CLI JSON output.
+admitted. It also emits `executionPlanFingerprint` using SHA-256 over a canonical,
+versioned representation of the bounded evidence.
+
+## Fingerprint contract
+
+`canonicalizeLoopExecutionPlanEvidence(...)` fixes property order and sorts
+set-like capability and permission arrays. Rationale order remains significant
+because it records the decision path. The resulting UTF-8 JSON is hashed with
+SHA-256 and represented as a lowercase 64-character hexadecimal value.
+
+`verifyLoopExecutionPlanEvidenceFingerprint(...)` recomputes the fingerprint and
+fails closed for unsupported algorithms or any evidence drift. The fingerprint
+is an integrity and correlation identifier, not a signature or proof of origin.
 
 ## Boundary
 
@@ -38,7 +51,8 @@ admitted. The application assembly exposes this projection to CLI JSON output.
 LoopRunResult + admitted AgentPolicyResolution
   -> projectLoopExecutionPlanEvidence(...)
   -> bounded public evidence
-  -> execution report JSON
+  -> canonicalize + SHA-256
+  -> evidence + fingerprint in execution report JSON
 ```
 
 The internal `LoopExecutionPlan` remains the sole executor input and is never
