@@ -8,7 +8,7 @@ import {
   defaultLoopProviderRegistry,
 } from "../../src/composition/provider-registry.js";
 
- describe("LoopProviderRegistry", () => {
+describe("LoopProviderRegistry", () => {
   it("registers Codex once and assembles an executor with its matching agent profile", () => {
     const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
       id: "codex",
