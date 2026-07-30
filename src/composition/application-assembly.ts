@@ -4,7 +4,7 @@ import {
   generateAuditReport,
   generateAuditRuleManifest,
   generateDoctorReport,
-  generateExecutionReport,
+  generateExecutionReportWithEvidence,
   generateNextProjectActionReport,
   generateProjectContextReport,
   generateProjectHandoffReport,
@@ -52,18 +52,13 @@ export type LoopApplicationAssemblyOptions = Readonly<{
   codexProvider?: LoopApplicationCodexProviderOptions;
 }>;
 
-/**
- * Public application boundary consumed by the CLI command layer.
- *
- * The contract exposes Core application services and abstract execution ports,
- * never concrete provider constructors.
- */
+/** Public application boundary consumed by the CLI command layer. */
 export type LoopApplicationAssembly = Readonly<{
   findProject: typeof findProject;
   generateAuditReport: typeof generateAuditReport;
   generateAuditRuleManifest: typeof generateAuditRuleManifest;
   generateDoctorReport: typeof generateDoctorReport;
-  generateExecutionReport: typeof generateExecutionReport;
+  generateExecutionReport: typeof generateExecutionReportWithEvidence;
   generateNextProjectActionReport: typeof generateNextProjectActionReport;
   generateProjectContextReport: typeof generateProjectContextReport;
   generateProjectHandoffReport: typeof generateProjectHandoffReport;
@@ -90,12 +85,9 @@ export type LoopApplicationAssembly = Readonly<{
   runLoopPlan: typeof runLoopPlan;
 }>;
 
-export type LoopApplicationConfig = ReturnType<
-  LoopApplicationAssembly["loadConfig"]
->;
+export type LoopApplicationConfig = ReturnType<LoopApplicationAssembly["loadConfig"]>;
 export type LoopApplicationProject = LoopApplicationConfig["projects"][number];
-export type LoopApplicationRunMode =
-  LoopApplicationAssembly["loopRunModes"][number];
+export type LoopApplicationRunMode = LoopApplicationAssembly["loopRunModes"][number];
 export type LoopApplicationAuditProfile = AuditProfile;
 export type LoopApplicationAuditSelection = AuditRuleSelection;
 export type LoopApplicationAuditReport = AuditReport;
@@ -104,14 +96,10 @@ function resolveProviderConfiguration(
   options: LoopApplicationAssemblyOptions,
 ): LoopProviderConfiguration | undefined {
   if (options.provider && options.codexProvider) {
-    throw new Error(
-      "Configure either provider or codexProvider, never both.",
-    );
+    throw new Error("Configure either provider or codexProvider, never both.");
   }
-
   if (options.provider) return options.provider;
   if (!options.codexProvider) return undefined;
-
   return Object.freeze({ id: "codex", ...options.codexProvider });
 }
 
@@ -132,7 +120,7 @@ export function createLoopApplicationAssembly(
     generateAuditReport,
     generateAuditRuleManifest,
     generateDoctorReport,
-    generateExecutionReport,
+    generateExecutionReport: generateExecutionReportWithEvidence,
     generateNextProjectActionReport,
     generateProjectContextReport,
     generateProjectHandoffReport,
