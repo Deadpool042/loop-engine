@@ -77,6 +77,22 @@ describe("json errors", () => {
     assert.equal(json.error?.code, "mode_not_implemented");
   });
 
+  it("rejects publish before attempting provider assembly", () => {
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "publish",
+      "--provider",
+      "codex",
+      "--provider-executable",
+      "/usr/local/bin/not-codex",
+      "--json",
+    ]);
+    const json = JSON.parse(output) as { error?: { code?: unknown } };
+    assert.equal(json.error?.code, "mode_not_implemented");
+  });
+
   it("rejects an unrecognized --mode value distinctly from a known but unimplemented mode", () => {
     const output = runFailingCommand([
       "run", "loop-engine", "--mode", "banana", "--json",

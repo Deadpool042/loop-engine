@@ -1,22 +1,21 @@
-import {
-  generateExecutionReport,
-  LOOP_RUN_MODES,
-  runLoopCommit,
-  runLoopExecute,
-  runLoopPlan,
-  type LoopRunMode,
-  type LoopRunResult,
-  type ProjectConfig,
-} from "../core/index.js";
-import { composeCodexProvider } from "../composition/codex-provider.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationProject,
+  LoopApplicationRunMode,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 import { printJsonError } from "./json-error.js";
 
-export function isLoopRunMode(value: string): value is LoopRunMode {
-  return (LOOP_RUN_MODES as readonly string[]).includes(value);
+export function isLoopRunMode(
+  application: LoopApplicationAssembly,
+  value: string,
+): value is LoopApplicationRunMode {
+  return (application.loopRunModes as readonly string[]).includes(value);
 }
 
-function printLoopRunResult(result: LoopRunResult): void {
+function printLoopRunResult(
+  result: Awaited<ReturnType<LoopApplicationAssembly["runLoopExecute"]>>,
+): void {
   terminal.header(`Run • ${result.project}`);
   terminal.info(`Run id: ${result.runId}`);
   terminal.info(`Mode: ${result.mode}`);
@@ -33,9 +32,13 @@ function printLoopRunResult(result: LoopRunResult): void {
     for (const detail of step.details) terminal.info(`  ${detail}`);
   }
 
-  terminal.section(result.mode === "plan" ? "Agent policy (forecast)" : "Agent policy");
+  terminal.section(
+    result.mode === "plan" ? "Agent policy (forecast)" : "Agent policy",
+  );
   if (result.agentPolicy?.selection?.outcome === "selected") {
-    terminal.info(`Selected: ${result.agentPolicy.selection.profile.id} (effort ${result.agentPolicy.selection.profile.effort})`);
+    terminal.info(
+      `Selected: ${result.agentPolicy.selection.profile.id} (effort ${result.agentPolicy.selection.profile.effort})`,
+    );
   } else if (result.mode === "plan") terminal.info("No agent was called.");
 
   terminal.section("Validation");
@@ -46,9 +49,12 @@ function printLoopRunResult(result: LoopRunResult): void {
   } else terminal.info("No validation executed.");
 
   terminal.section("Worktree");
-  if (result.modifiedFiles.length === 0) terminal.info("No modified file reported.");
+  if (result.modifiedFiles.length === 0)
+    terminal.info("No modified file reported.");
   else for (const file of result.modifiedFiles) terminal.info(file);
-  terminal.info(result.commit ? `Commit: ${result.commit.sha}` : "Commit: not performed.");
+  terminal.info(
+    result.commit ? `Commit: ${result.commit.sha}` : "Commit: not performed.",
+  );
   terminal.info("Publication: not performed.");
 
   if (result.failure) {
@@ -60,9 +66,6 @@ function printLoopRunResult(result: LoopRunResult): void {
 export type RunLoopRunCommandOptions = Readonly<{
   maxRepairs?: number;
   provider?: "codex";
-  providerExecutable?: string;
-  providerModel?: string;
-  providerTimeoutMs?: number;
   commitMessage?: string;
 }>;
 
@@ -77,8 +80,9 @@ function printCommandError(
 }
 
 export async function runLoopRunCommand(
-  project: ProjectConfig,
-  mode: LoopRunMode,
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+  mode: LoopApplicationRunMode,
   json: boolean,
   options: RunLoopRunCommandOptions = {},
 ): Promise<number> {
@@ -90,7 +94,7 @@ export async function runLoopRunCommand(
     );
   }
 
-  if (options.provider === "codex" && !options.providerExecutable) {
+  if (options.provider === "codex" && !application.loopExecutor) {
     return printCommandError(
       json,
       "missing_provider_executable",
@@ -98,30 +102,16 @@ export async function runLoopRunCommand(
     );
   }
 
-  let executor;
-  if (options.provider === "codex" && options.providerExecutable) {
-    try {
-      executor = composeCodexProvider({
-        executable: options.providerExecutable,
-        ...(options.providerModel ? { model: options.providerModel } : {}),
-        ...(options.providerTimeoutMs ? { timeoutMs: options.providerTimeoutMs } : {}),
-      });
-    } catch {
-      return printCommandError(
-        json,
-        "invalid_provider_executable",
-        "Codex provider executable must resolve to a command named codex.",
-      );
-    }
-  }
-
-  let result: LoopRunResult;
+  const { runLoopCommit, runLoopExecute, runLoopPlan } = application;
+  let result: Awaited<ReturnType<typeof runLoopExecute>>;
   if (mode === "plan") {
     result = runLoopPlan(project.name);
   } else if (mode === "execute") {
     result = await runLoopExecute(project.name, {
       maxRepairs: options.maxRepairs ?? 0,
-      ...(executor ? { executor } : {}),
+      ...(application.loopExecutor
+        ? { executor: application.loopExecutor }
+        : {}),
     });
   } else {
     if (!options.commitMessage) {
@@ -134,11 +124,14 @@ export async function runLoopRunCommand(
     result = await runLoopCommit(project.name, {
       maxRepairs: options.maxRepairs ?? 0,
       commitMessage: options.commitMessage,
-      ...(executor ? { executor } : {}),
+      ...(application.loopExecutor
+        ? { executor: application.loopExecutor }
+        : {}),
     });
   }
 
-  if (json) console.log(JSON.stringify(generateExecutionReport(result)));
-  else printLoopRunResult(result);
+  if (json) {
+    console.log(JSON.stringify(application.generateExecutionReport(result)));
+  } else printLoopRunResult(result);
   return result.status === "failed" ? 1 : 0;
 }

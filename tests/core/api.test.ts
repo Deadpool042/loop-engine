@@ -1045,7 +1045,7 @@ describe("Core public API", () => {
     assert.deepEqual(generateExecutionReport(result), result);
   });
 
-  it("keeps CLI adapters behind the Core boundary", () => {
+  it("keeps CLI adapters behind the application assembly boundary", () => {
     const commandFiles = [
       "audit.ts",
       "context.ts",
@@ -1064,15 +1064,16 @@ describe("Core public API", () => {
 
     for (const file of commandFiles) {
       const source = readFileSync(`src/commands/${file}`, "utf8");
-      assert.match(source, /\.\.\/core\/index\.js/);
+      assert.match(source, /\.\.\/composition\/index\.js/);
       assert.doesNotMatch(
         source,
-        /\.\.\/(audit|loop|execution|intelligence|policy|context)\//,
+        /\.\.\/(core|audit|loop|execution|intelligence|policy|context)\//,
       );
     }
 
     const cli = readFileSync("src/cli.ts", "utf8");
-    assert.match(cli, /from "\.\/core\/index\.js"/);
+    assert.match(cli, /from "\.\/composition\/index\.js"/);
+    assert.doesNotMatch(cli, /from "\.\/core\/index\.js"/);
     assert.doesNotMatch(cli, /from "\.\/core\/(config|project)\.js"/);
   });
 });

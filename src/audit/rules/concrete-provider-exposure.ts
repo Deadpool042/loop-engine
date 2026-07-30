@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fail, pass } from "../findings.js";
 import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
-const REVIEWED_COMPOSITION_FILE = "src/composition/codex-provider.ts";
+const REVIEWED_COMPOSITION_FILE = "src/composition/application-assembly.ts";
 const PUBLIC_BARREL_FILES = Object.freeze([
   "src/core/index.ts",
   "src/loop/index.ts",
@@ -22,13 +22,16 @@ export type ProviderExposureSource = Readonly<{
 export type ProviderExposureViolation = Readonly<{
   path: string;
   target: string;
-  reason: "concrete_provider_publicly_exposed" | "unreviewed_provider_composition";
+  reason:
+    "concrete_provider_publicly_exposed" | "unreviewed_provider_composition";
 }>;
 
 const MODULE_SPECIFIER_PATTERN =
   /(?:\b(?:import|export)\s+(?:[^"']*?\s+from\s+)?|\bimport\s*\()\s*["']([^"']+)["']/g;
 
-export function extractProviderModuleSpecifiers(source: string): readonly string[] {
+export function extractProviderModuleSpecifiers(
+  source: string,
+): readonly string[] {
   const specifiers: string[] = [];
   let match: RegExpExecArray | null;
 
@@ -97,7 +100,9 @@ export const CONCRETE_PROVIDER_EXPOSURE_RULE: AuditRule = (() => {
       ]);
       const files = paths
         .filter((path) => existsSync(path))
-        .map((path) => Object.freeze({ path, source: readFileSync(path, "utf8") }));
+        .map((path) =>
+          Object.freeze({ path, source: readFileSync(path, "utf8") }),
+        );
       const violations = inspectConcreteProviderExposure(files);
 
       return violations.length > 0

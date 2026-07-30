@@ -1,11 +1,14 @@
-import {
-  generateProjectContextReport,
-  generateProjectReport,
-  type ProjectConfig,
-} from "../core/index.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationProject,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 
-export function printProjectContext(project: ProjectConfig): void {
+export function printProjectContext(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): void {
+  const { generateProjectReport } = application;
   const snapshot = generateProjectReport(project);
 
   terminal.header(`Context • ${snapshot.project.name}`);
@@ -55,6 +58,11 @@ export function printProjectContext(project: ProjectConfig): void {
   terminal.info("Lancer les validations avant review ou commit.");
 }
 
-export function printProjectContextJson(project: ProjectConfig): void {
-  console.log(JSON.stringify(generateProjectContextReport(project)));
+export function printProjectContextJson(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): void {
+  console.log(
+    JSON.stringify(application.generateProjectContextReport(project)),
+  );
 }

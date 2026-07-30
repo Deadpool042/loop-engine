@@ -23,7 +23,7 @@ test("allows Core and infrastructure dependencies from composition", () => {
   assert.deepEqual(
     inspectCompositionRootDirection([
       {
-        path: "src/composition/codex-provider.ts",
+        path: "src/composition/application-assembly.ts",
         source: `
           import type { LoopExecutor } from "../core/index.js";
           import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";

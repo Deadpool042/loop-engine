@@ -1,8 +1,7 @@
-import {
-  generateProjectReport,
-  generateReviewReport,
-  type ProjectConfig,
-} from "../core/index.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationProject,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 
 function printBlock(title: string, content: string): void {
@@ -16,7 +15,11 @@ function printBlock(title: string, content: string): void {
   console.log(content);
 }
 
-export function printReviewContext(project: ProjectConfig): void {
+export function printReviewContext(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): void {
+  const { generateProjectReport, generateReviewReport } = application;
   const snapshot = generateProjectReport(project);
   const report = generateReviewReport(project);
 
@@ -49,8 +52,11 @@ export function printReviewContext(project: ProjectConfig): void {
   terminal.info("Prefer small, reversible changes.");
 }
 
-export function printReviewContextJson(project: ProjectConfig): void {
-  const { diff, ...report } = generateReviewReport(project);
+export function printReviewContextJson(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): void {
+  const { diff, ...report } = application.generateReviewReport(project);
   void diff;
   console.log(JSON.stringify(report));
 }

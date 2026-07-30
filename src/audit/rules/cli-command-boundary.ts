@@ -6,6 +6,7 @@ import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 const COMMANDS_ROOT = "src/commands";
 const FORBIDDEN_INTERNAL_LAYERS = Object.freeze([
+  "core",
   "audit",
   "loop",
   "execution",
@@ -28,7 +29,9 @@ export type CliCommandBoundaryViolation = Readonly<{
 const MODULE_SPECIFIER_PATTERN =
   /(?:\b(?:import|export)\s+(?:[^"']*?\s+from\s+)?|\bimport\s*\()\s*["']([^"']+)["']/g;
 
-export function extractCliCommandModuleSpecifiers(source: string): readonly string[] {
+export function extractCliCommandModuleSpecifiers(
+  source: string,
+): readonly string[] {
   const targets: string[] = [];
   let match: RegExpExecArray | null;
 
@@ -88,9 +91,9 @@ export const CLI_COMMAND_BOUNDARY_RULE: AuditRule = (() => {
     id: "AUDIT-500",
     category: "architecture",
     severity: "error",
-    title: "CLI commands stay behind the Core boundary",
+    title: "CLI commands stay behind the application assembly boundary",
     description:
-      "CLI command modules may depend on Core, UI, composition roots, and local command modules, but never directly on internal implementation layers.",
+      "CLI command modules may depend on the application assembly contract, UI, and local command modules, but never directly on Core or internal implementation layers.",
     metadata: {
       introducedIn: "V14.9",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -112,7 +115,7 @@ export const CLI_COMMAND_BOUNDARY_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             violations.map(({ path, target }) => `${path} -> ${target}`),
-            "Route command behavior through src/core or an explicit src/composition root.",
+            "Route all application behavior through LoopApplicationAssembly in src/composition.",
           )
         : pass(rule, `${rule.title}.`, paths);
     },

@@ -1,9 +1,8 @@
 import { spawn } from "node:child_process";
-import {
-  generateProjectValidationReport,
-  runConfiguredValidations,
-  type ProjectConfig,
-} from "../core/index.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationProject,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 
 function formatDuration(startedAt: number): string {
@@ -62,9 +61,12 @@ function runValidationCommand(command: string, cwd: string): Promise<number> {
   });
 }
 
-export async function validateProject(project: ProjectConfig): Promise<void> {
+export async function validateProject(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): Promise<void> {
   const startedAt = Date.now();
-  const report = generateProjectValidationReport(project);
+  const report = application.generateProjectValidationReport(project);
 
   terminal.header("Validate");
   terminal.info(`Project: ${project.name}`);
@@ -77,7 +79,10 @@ export async function validateProject(project: ProjectConfig): Promise<void> {
 
   terminal.section("Validation");
 
-  const result = await runConfiguredValidations(project, runValidationCommand);
+  const result = await application.runConfiguredValidations(
+    project,
+    runValidationCommand,
+  );
   if (result.failedCommand) {
     terminal.error(`Validation failed: ${result.failedCommand}`);
     process.exit(result.exitCode);
