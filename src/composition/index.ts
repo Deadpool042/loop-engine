@@ -13,6 +13,11 @@ export {
 } from "./application-assembly.js";
 
 export {
+  createDurableExecutionControlPlane,
+  type DurableExecutionControlPlane,
+} from "./durable-execution-control-plane.js";
+
+export {
   createFallbackExecutionPlan,
   createLoopProviderFailoverAssembly,
   type LoopProviderFailoverAssembly,
