@@ -5,9 +5,6 @@ import { fail, pass } from "../findings.js";
 import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 const COMMANDS_ROOT = "src/commands";
-const REVIEWED_COMPOSITION_FILES = Object.freeze([
-  "src/commands/codex-provider.ts",
-]);
 const FORBIDDEN_INTERNAL_LAYERS = Object.freeze([
   "audit",
   "loop",
@@ -55,8 +52,6 @@ export function inspectCliCommandBoundary(
   const violations: CliCommandBoundaryViolation[] = [];
 
   for (const file of files) {
-    if (REVIEWED_COMPOSITION_FILES.includes(file.path)) continue;
-
     for (const target of extractCliCommandModuleSpecifiers(file.source)) {
       if (!isForbiddenInternalTarget(target)) continue;
       violations.push(
@@ -95,7 +90,7 @@ export const CLI_COMMAND_BOUNDARY_RULE: AuditRule = (() => {
     severity: "error",
     title: "CLI commands stay behind the Core boundary",
     description:
-      "CLI command modules may depend on Core, UI, and local command modules, while direct dependencies on internal layers require an explicitly reviewed composition file.",
+      "CLI command modules may depend on Core, UI, composition roots, and local command modules, but never directly on internal implementation layers.",
     metadata: {
       introducedIn: "V14.9",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -117,7 +112,7 @@ export const CLI_COMMAND_BOUNDARY_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             violations.map(({ path, target }) => `${path} -> ${target}`),
-            "Route command behavior through src/core or add a narrowly reviewed composition boundary.",
+            "Route command behavior through src/core or an explicit src/composition root.",
           )
         : pass(rule, `${rule.title}.`, paths);
     },
