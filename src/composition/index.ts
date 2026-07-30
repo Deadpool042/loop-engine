@@ -12,6 +12,12 @@ export {
 } from "./application-assembly.js";
 
 export {
+  createFallbackExecutionPlan,
+  createLoopProviderFailoverAssembly,
+  type LoopProviderFailoverAssembly,
+} from "./provider-failover-assembly.js";
+
+export {
   LOOP_PROVIDER_IDS,
   assembleLoopProvider,
   codexProviderRegistration,
