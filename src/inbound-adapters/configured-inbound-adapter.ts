@@ -76,12 +76,14 @@ export type ConfiguredInboundAdapterResult =
     }>;
 
 function isOrdinaryObject(value: unknown): value is Record<PropertyKey, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  try {
+    return Object.getPrototypeOf(value) === Object.prototype;
+  } catch {
+    return false;
+  }
 }
 
 function isEnumerableDataProperty(
@@ -156,12 +158,10 @@ function aclRejection(
   });
 }
 
-function unknownIdentityReference(credentialId: string, requestId: string): string {
+function unknownIdentityReference(credentialId: string): string {
   return createHash("sha256")
     .update("loop-engine:unknown-inbound-identity:v1\0", "utf8")
     .update(credentialId, "utf8")
-    .update("\0", "utf8")
-    .update(requestId, "utf8")
     .digest("hex");
 }
 
@@ -207,12 +207,9 @@ export async function executeConfiguredInboundAdapterRequest(
     operation: request.operation,
     rules: dependencies.aclRules,
   });
-  const unknownReference = unknownIdentityReference(
-    request.credentialId,
-    request.requestId,
-  );
+  const unknownReference = unknownIdentityReference(request.credentialId);
   const evidenceId = record
-    ? deriveConfiguredApiKeyEvidenceId(record, request.requestId)
+    ? deriveConfiguredApiKeyEvidenceId(record)
     : unknownReference;
 
   const envelope: InboundLoopRuntimeRequestEnvelope = Object.freeze({
