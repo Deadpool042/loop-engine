@@ -6,22 +6,29 @@ import { runConfiguredValidations } from "../core/reports.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import type { AgentPolicyResolution } from "../policy/types.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
+import type { LoopProviderFailoverEvidence } from "./provider-failover.js";
 import type { LoopRunFailure } from "./types.js";
 
 /** Compatibility name retained for callers; the executor now receives only the plan. */
 export type LoopExecutorInput = LoopExecutionPlan;
 
+type LoopExecutorEvidence = Readonly<{
+  providerFailoverEvidence?: LoopProviderFailoverEvidence;
+}>;
+
 export type LoopExecutorResult =
-  | Readonly<{
+  | (Readonly<{
       status: "completed";
       modifiedFiles: readonly string[];
       details: readonly string[];
-    }>
-  | Readonly<{
+    }> &
+      LoopExecutorEvidence)
+  | (Readonly<{
       status: "failed";
       modifiedFiles: readonly string[];
       failure: LoopRunFailure;
-    }>;
+    }> &
+      LoopExecutorEvidence);
 
 export type LoopExecutor = (
   plan: LoopExecutionPlan,
