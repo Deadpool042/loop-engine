@@ -1,3 +1,4 @@
+import { loadConfig } from "../core/config.js";
 import { gitLoopCommitter, type LoopCommitter } from "./git-committer.js";
 import { runLoopExecute, type LoopRunExecuteOptions } from "./execute-runner.js";
 import type { LoopRunResult } from "./types.js";
@@ -21,9 +22,7 @@ export async function runLoopCommit(
     return Object.freeze({ ...execution, mode: "commit" as const });
   }
 
-  const config = (options.loadConfig ?? (() => {
-    throw new Error("loadConfig dependency unavailable after execution");
-  }))();
+  const config = (options.loadConfig ?? loadConfig)();
   const project = config.projects.find((candidate) => candidate.name === projectName);
   if (!project) return Object.freeze({ ...execution, mode: "commit" as const });
 
