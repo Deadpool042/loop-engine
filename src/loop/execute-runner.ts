@@ -9,6 +9,7 @@ import { findProject } from "../core/project.js";
 import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
 import { resolvePolicy } from "../policy/resolver.js";
 import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
+import { createLoopExecutionPlan } from "./execution-plan.js";
 import { planLoopCycle, type LoopPlan } from "./planner.js";
 import { canTransition } from "./state-machine.js";
 import {
@@ -247,26 +248,28 @@ export async function runLoopExecute(
     cycle.snapshot,
     agentPolicy.requirements.contextBudget,
   );
+  const executionPlan = createLoopExecutionPlan(
+    Object.freeze({
+      runId,
+      project,
+      candidate: cycle.candidate,
+      agentPolicy,
+      contextPackage,
+    }),
+  );
 
   transition("ready", "ready", "completed", [
     `Selected candidate: ${cycle.candidate.text}`,
-    `Selected executor profile: ${agentPolicy.selection.profile.id}`,
+    `Selected executor profile: ${executionPlan.profileId}`,
+    `Execution plan: ${executionPlan.provider}/${executionPlan.runtime}/${executionPlan.model}`,
   ]);
   transition("executing", "executing", "completed", [
-    "Calling the injected LoopExecutor once.",
+    "Calling the injected LoopExecutor once with the immutable execution plan.",
   ]);
 
   let executionResult;
   try {
-    executionResult = await dependencies.executor(
-      Object.freeze({
-        runId,
-        project,
-        candidate: cycle.candidate,
-        agentPolicy,
-        contextPackage,
-      }),
-    );
+    executionResult = await dependencies.executor(executionPlan);
   } catch {
     transition("failed", "failed", "failed", [
       "The injected LoopExecutor threw an error.",
