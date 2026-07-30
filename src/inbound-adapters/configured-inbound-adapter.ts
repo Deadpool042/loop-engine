@@ -104,32 +104,37 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isValidRequest(value: unknown): value is ConfiguredInboundAdapterRequest {
   if (!isOrdinaryObject(value)) return false;
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const expected = [
-    "requestId",
-    "evaluatedAt",
-    "credentialId",
-    "credentialSecret",
-    "nonce",
-    "project",
-    "operation",
-    "payload",
-  ] as const;
-  const keys = Reflect.ownKeys(descriptors);
-  return (
-    keys.length === expected.length &&
-    expected.every((key) => keys.includes(key)) &&
-    expected.every((key) => isEnumerableDataProperty(descriptors[key])) &&
-    isNonEmptyString(descriptors.requestId!.value) &&
-    isNonEmptyString(descriptors.evaluatedAt!.value) &&
-    Number.isFinite(Date.parse(descriptors.evaluatedAt!.value)) &&
-    isNonEmptyString(descriptors.credentialId!.value) &&
-    isNonEmptyString(descriptors.credentialSecret!.value) &&
-    isNonEmptyString(descriptors.nonce!.value) &&
-    isNonEmptyString(descriptors.project!.value) &&
-    (descriptors.operation!.value === "dry-run" ||
-      descriptors.operation!.value === "execute")
-  );
+
+  try {
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const expected = [
+      "requestId",
+      "evaluatedAt",
+      "credentialId",
+      "credentialSecret",
+      "nonce",
+      "project",
+      "operation",
+      "payload",
+    ] as const;
+    const keys = Reflect.ownKeys(descriptors);
+    return (
+      keys.length === expected.length &&
+      expected.every((key) => keys.includes(key)) &&
+      expected.every((key) => isEnumerableDataProperty(descriptors[key])) &&
+      isNonEmptyString(descriptors.requestId!.value) &&
+      isNonEmptyString(descriptors.evaluatedAt!.value) &&
+      Number.isFinite(Date.parse(descriptors.evaluatedAt!.value)) &&
+      isNonEmptyString(descriptors.credentialId!.value) &&
+      isNonEmptyString(descriptors.credentialSecret!.value) &&
+      isNonEmptyString(descriptors.nonce!.value) &&
+      isNonEmptyString(descriptors.project!.value) &&
+      (descriptors.operation!.value === "dry-run" ||
+        descriptors.operation!.value === "execute")
+    );
+  } catch {
+    return false;
+  }
 }
 
 function adapterRejection(
