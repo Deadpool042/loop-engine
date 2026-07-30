@@ -2,10 +2,10 @@ import { createAgentRegistry, type AgentRegistry } from "../agents/registry.js";
 import type { AgentBudget, AgentProfile } from "../agents/types.js";
 import {
   createProviderFailoverLoopExecutor,
-  type LoopExecutionPlan,
   type LoopExecutor,
   type LoopProviderFailoverAttempt,
 } from "../core/index.js";
+import type { LoopExecutionPlan } from "../loop/execution-plan.js";
 import type { LoopProviderAssembly } from "./provider-registry.js";
 
 export type LoopProviderFailoverAssembly = Readonly<{
@@ -115,15 +115,16 @@ function resolveAttempts(
   );
   if (primaryIndex < 0) return Object.freeze([]);
 
+  const primaryAssembly = assemblies[primaryIndex];
+  if (!primaryAssembly) return Object.freeze([]);
   const ordered = [
-    assemblies[primaryIndex],
+    primaryAssembly,
     ...assemblies.slice(0, primaryIndex),
     ...assemblies.slice(primaryIndex + 1),
   ];
   const attempts: LoopProviderFailoverAttempt[] = [];
 
   for (const assembly of ordered) {
-    if (!assembly) continue;
     if (attempts.length === 0) {
       attempts.push(Object.freeze({ plan: primaryPlan, executor: assembly.executor }));
       continue;
@@ -161,15 +162,16 @@ export function createLoopProviderFailoverAssembly(
     ...assembly.agentRegistry.profiles,
   ]);
   const agentRegistry = createAgentRegistry(profiles);
+  const boundedMaxAttempts = Math.min(maxAttempts, assemblies.length);
   const executor = createProviderFailoverLoopExecutor(
     (primaryPlan) => resolveAttempts(assemblies, primaryPlan),
-    { maxAttempts: Math.min(maxAttempts, assemblies.length) },
+    { maxAttempts: boundedMaxAttempts },
   );
 
   return Object.freeze({
     executor,
     agentRegistry,
     providerIds: Object.freeze([...providerIds]),
-    maxAttempts: Math.min(maxAttempts, assemblies.length),
+    maxAttempts: boundedMaxAttempts,
   });
 }
