@@ -7,7 +7,7 @@ import {
 } from "../../src/audit/rules/application-assembly-contract.js";
 import { AUDIT_RULES } from "../../src/audit/runtime-rules.js";
 
-test("allows commands through assembly and concrete wiring inside its factory", () => {
+test("allows commands through assembly and concrete wiring inside the provider registry", () => {
   assert.deepEqual(
     inspectApplicationAssemblyContract(
       [
@@ -25,7 +25,7 @@ test("allows commands through assembly and concrete wiring inside its factory", 
       ],
       [
         {
-          path: "src/composition/application-assembly.ts",
+          path: "src/composition/provider-registry.ts",
           source:
             'import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";',
         },
@@ -73,7 +73,7 @@ test("rejects command bypasses, Core inversion, and provider wiring elsewhere", 
       {
         path: "src/cli-provider.ts",
         target: "../loop/codex-cli-executor.js",
-        reason: "concrete_provider_wired_outside_assembly",
+        reason: "concrete_provider_wired_outside_composition",
       },
     ],
   );
