@@ -103,6 +103,13 @@ export {
   type AuditRuleSelection,
 } from "../audit/registry.js";
 export { LOOP_RUN_MODES, type LoopRunMode, type LoopRunResult } from "../loop/types.js";
+export {
+  canonicalizeLoopExecutionPlanEvidence,
+  fingerprintLoopExecutionPlanEvidence,
+  verifyLoopExecutionPlanEvidenceFingerprint,
+  LOOP_EXECUTION_PLAN_FINGERPRINT_ALGORITHM,
+  type LoopExecutionPlanFingerprint,
+} from "../loop/execution-plan-evidence-fingerprint.js";
 export { runLoopExecute, type LoopRunExecuteOptions } from "../loop/execute-runner.js";
 export { runLoopCommit, type LoopRunCommitOptions } from "../loop/commit-runner.js";
 export { gitLoopCommitter, type LoopCommitter, type LoopCommitResult } from "../loop/git-committer.js";
