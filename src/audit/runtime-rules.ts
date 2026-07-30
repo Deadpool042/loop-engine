@@ -83,12 +83,8 @@ import { AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE } from "./rules/github-actions-pa
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
-const BASE_AUDIT_RULES_WITH_PARALLEL_CI = BASE_AUDIT_RULES.map((rule) =>
-  rule.id === "AUDIT-012" ? AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE : rule,
-);
-
 export const AUDIT_RULES = createAuditRuleRegistry([
-  ...BASE_AUDIT_RULES_WITH_PARALLEL_CI,
+  ...BASE_AUDIT_RULES,
   RUNTIME_EXECUTION_RECEIPT_REPORTING_RULE,
   RUNTIME_EXECUTION_RECEIPT_REPORTING_SERIALIZATION_RULE,
   RUNTIME_EXECUTION_PUBLIC_RESULT_FACADE_RULE,
@@ -166,7 +162,9 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE,
   CONFIGURED_INBOUND_SECURITY_ADAPTER_RULE,
   CODEX_PROVIDER_CONTROLLED_COMMIT_RULE,
-]);
+].map((rule) =>
+  rule.id === "AUDIT-012" ? AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE : rule,
+));
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);
 registerRuntimeAuditManifestInventory(AUDIT_RULES);
