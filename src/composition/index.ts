@@ -10,3 +10,17 @@ export {
   type LoopApplicationProject,
   type LoopApplicationRunMode,
 } from "./application-assembly.js";
+
+export {
+  LOOP_PROVIDER_IDS,
+  assembleLoopProvider,
+  codexProviderRegistration,
+  createLoopProviderRegistry,
+  defaultLoopProviderRegistry,
+  type CodexProviderConfiguration,
+  type LoopProviderAssembly,
+  type LoopProviderConfiguration,
+  type LoopProviderId,
+  type LoopProviderRegistration,
+  type LoopProviderRegistry,
+} from "./provider-registry.js";
