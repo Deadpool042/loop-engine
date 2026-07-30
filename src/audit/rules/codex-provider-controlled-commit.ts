@@ -13,7 +13,9 @@ const ARCHITECTURE_FILE =
 
 const REQUIRED_PROVIDER_TOKENS = Object.freeze([
   'basename(options.executable.trim()) !== "codex"',
-  'const args = ["exec", "--full-auto"]',
+  'const args = ["exec", "--full-auto", "--model", plan.model]',
+  "createLoopExecutionPlan(input)",
+  'plan.provider !== "openai" || plan.runtime !== "codex"',
   "shell: false",
   "maxOutputBytes",
   "worktree_not_clean",
@@ -75,7 +77,12 @@ export function inspectCodexProviderControlledCommitInvariant(
       ? [`${ARCHITECTURE_FILE} -> missing architecture contract`]
       : []),
   ];
-  const combined = [providerSource, committerSource, runnerSource, commandSource].join("\n");
+  const combined = [
+    providerSource,
+    committerSource,
+    runnerSource,
+    commandSource,
+  ].join("\n");
   const forbidden = FORBIDDEN_TOKENS.filter((token) =>
     sourceIncludesToken(combined, token),
   );
@@ -92,7 +99,7 @@ export const CODEX_PROVIDER_CONTROLLED_COMMIT_RULE: AuditRule = (() => {
     severity: "error",
     title: "Codex provider and controlled commit remain bounded and explicit",
     description:
-      "The V14.6 pilot must select only an explicit Codex CLI executable, start from a clean worktree, bound and redact provider execution, validate before commit, commit only exact safe files, and never push or publish.",
+      "The Codex pilot must consume an admitted execution plan, select only an explicit Codex CLI executable, start from a clean worktree, bound and redact provider execution, validate before commit, commit only exact safe files, and never push or publish.",
     metadata: {
       introducedIn: "V14.6",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -111,14 +118,16 @@ export const CODEX_PROVIDER_CONTROLLED_COMMIT_RULE: AuditRule = (() => {
       );
       const details = [
         ...result.missing,
-        ...result.forbidden.map((token) => `V14.6 boundary -> forbidden: ${token}`),
+        ...result.forbidden.map(
+          (token) => `V14.6 boundary -> forbidden: ${token}`,
+        ),
       ];
       return details.length > 0
         ? fail(
             rule,
             `${rule.title}.`,
             details,
-            "Keep V14.6 to one explicit Codex CLI provider and one validation-gated exact-file Git commit; retain clean-worktree, shell-false, limits, redaction and no-publish guarantees.",
+            "Keep the Codex provider bound to one admitted execution plan and one validation-gated exact-file Git commit; retain clean-worktree, shell-false, limits, redaction and no-publish guarantees.",
           )
         : pass(
             rule,

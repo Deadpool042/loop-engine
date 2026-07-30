@@ -1,7 +1,11 @@
 import { spawn } from "node:child_process";
 import { basename, resolve } from "node:path";
 
-import type { LoopExecutor, LoopExecutorInput, LoopExecutorResult } from "./execution.js";
+import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
+import {
+  createLoopExecutionPlan,
+  type LoopExecutionPlan,
+} from "./execution-plan.js";
 
 export type CodexCliLoopExecutorOptions = Readonly<{
   executable: string;
@@ -14,12 +18,13 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function buildPrompt(input: LoopExecutorInput): string {
-  const files = input.contextPackage.files.map((file) => file.path).join(", ");
+function buildPrompt(plan: LoopExecutionPlan): string {
+  const files = plan.contextPackage.files.map((file) => file.path).join(", ");
   return [
     "Implement exactly one reviewed Loop Engine roadmap candidate in the current repository.",
-    `Candidate: ${input.candidate.text}`,
-    `Project: ${input.project.name}`,
+    `Candidate: ${plan.candidate.text}`,
+    `Project: ${plan.project.name}`,
+    `Execution plan: provider=${plan.provider}, runtime=${plan.runtime}, profile=${plan.profileId}, model=${plan.model}, effort=${plan.effort}`,
     `Allowed context files: ${files || "none"}`,
     "Stay inside the current worktree. Do not commit, push, tag, publish, or expose secrets.",
     "Finish by leaving the intended source changes in the worktree.",
@@ -33,7 +38,9 @@ function failure(code: string, message: string): LoopExecutorResult {
     failure: Object.freeze({
       code,
       message,
-      details: Object.freeze(["Provider output and process diagnostics are redacted."]),
+      details: Object.freeze([
+        "Provider output and process diagnostics are redacted.",
+      ]),
     }),
   });
 }
@@ -95,7 +102,9 @@ function parsePorcelainFiles(output: string): readonly string[] {
   return Object.freeze([...files].sort());
 }
 
-async function readModifiedFiles(cwd: string): Promise<readonly string[] | null> {
+async function readModifiedFiles(
+  cwd: string,
+): Promise<readonly string[] | null> {
   const result = await runProcess(
     "git",
     ["status", "--porcelain=v1", "-z"],
@@ -109,8 +118,13 @@ async function readModifiedFiles(cwd: string): Promise<readonly string[] | null>
 export function createCodexCliLoopExecutor(
   options: CodexCliLoopExecutorOptions,
 ): LoopExecutor {
-  if (!isNonEmptyString(options.executable) || basename(options.executable.trim()) !== "codex") {
-    throw new TypeError("Codex executable must resolve to a command named codex.");
+  if (
+    !isNonEmptyString(options.executable) ||
+    basename(options.executable.trim()) !== "codex"
+  ) {
+    throw new TypeError(
+      "Codex executable must resolve to a command named codex.",
+    );
   }
   const timeoutMs = options.timeoutMs ?? 300_000;
   const maxOutputBytes = options.maxOutputBytes ?? 1_000_000;
@@ -122,24 +136,74 @@ export function createCodexCliLoopExecutor(
   }
 
   return async (input): Promise<LoopExecutorResult> => {
-    const cwd = resolve(input.project.path);
-    const before = await readModifiedFiles(cwd);
-    if (before === null) return failure("worktree_status_failed", "Unable to verify the provider worktree.");
-    if (before.length > 0) return failure("worktree_not_clean", "Codex execution requires a clean worktree.");
+    let plan: LoopExecutionPlan;
+    try {
+      plan = createLoopExecutionPlan(input);
+    } catch {
+      return failure(
+        "execution_plan_invalid",
+        "Codex execution requires a valid admitted execution plan.",
+      );
+    }
 
-    const args = ["exec", "--full-auto"];
-    if (isNonEmptyString(options.model)) args.push("--model", options.model.trim());
-    args.push(buildPrompt(input));
-    const result = await runProcess(options.executable.trim(), args, cwd, timeoutMs, maxOutputBytes);
-    if (result.exitCode === 124) return failure("provider_limit_exceeded", "Codex execution exceeded a configured limit.");
-    if (result.exitCode !== 0) return failure("provider_failed", "Codex CLI execution failed.");
+    if (plan.provider !== "openai" || plan.runtime !== "codex") {
+      return failure(
+        "execution_plan_provider_mismatch",
+        "The execution plan is not assigned to the Codex provider.",
+      );
+    }
+    if (
+      isNonEmptyString(options.model) &&
+      options.model.trim() !== plan.model
+    ) {
+      return failure(
+        "execution_plan_model_mismatch",
+        "The configured Codex model does not match the execution plan.",
+      );
+    }
+
+    const cwd = resolve(plan.project.path);
+    const before = await readModifiedFiles(cwd);
+    if (before === null)
+      return failure(
+        "worktree_status_failed",
+        "Unable to verify the provider worktree.",
+      );
+    if (before.length > 0)
+      return failure(
+        "worktree_not_clean",
+        "Codex execution requires a clean worktree.",
+      );
+
+    const args = ["exec", "--full-auto", "--model", plan.model];
+    args.push(buildPrompt(plan));
+    const result = await runProcess(
+      options.executable.trim(),
+      args,
+      cwd,
+      timeoutMs,
+      maxOutputBytes,
+    );
+    if (result.exitCode === 124)
+      return failure(
+        "provider_limit_exceeded",
+        "Codex execution exceeded a configured limit.",
+      );
+    if (result.exitCode !== 0)
+      return failure("provider_failed", "Codex CLI execution failed.");
 
     const modifiedFiles = await readModifiedFiles(cwd);
-    if (modifiedFiles === null) return failure("worktree_status_failed", "Unable to inspect provider modifications.");
+    if (modifiedFiles === null)
+      return failure(
+        "worktree_status_failed",
+        "Unable to inspect provider modifications.",
+      );
     return Object.freeze({
       status: "completed" as const,
       modifiedFiles,
-      details: Object.freeze(["Codex CLI completed through the guarded local-process pilot."]),
+      details: Object.freeze([
+        `Codex CLI completed execution plan for ${plan.profileId} (${plan.model}).`,
+      ]),
     });
   };
 }
