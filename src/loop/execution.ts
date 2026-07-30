@@ -5,15 +5,11 @@ import type { ProjectConfig } from "../core/config.js";
 import { runConfiguredValidations } from "../core/reports.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import type { AgentPolicyResolution } from "../policy/types.js";
+import type { LoopExecutionPlan } from "./execution-plan.js";
 import type { LoopRunFailure } from "./types.js";
 
-export type LoopExecutorInput = Readonly<{
-  runId: string;
-  project: ProjectConfig;
-  candidate: RoadmapCandidate;
-  agentPolicy: AgentPolicyResolution;
-  contextPackage: MinimalContextPackage;
-}>;
+/** Compatibility name retained for callers; the executor now receives only the plan. */
+export type LoopExecutorInput = LoopExecutionPlan;
 
 export type LoopExecutorResult =
   | Readonly<{
@@ -28,7 +24,7 @@ export type LoopExecutorResult =
     }>;
 
 export type LoopExecutor = (
-  input: LoopExecutorInput,
+  plan: LoopExecutionPlan,
 ) => Promise<LoopExecutorResult>;
 
 export type LoopValidatorInput = Readonly<{
@@ -122,7 +118,7 @@ export async function validateLoopExecution(
   });
 }
 
-/** Fail-closed CLI default until V14.6 supplies a concrete provider adapter. */
+/** Fail-closed CLI default until a concrete provider adapter is injected. */
 export async function unavailableLoopExecutor(): Promise<LoopExecutorResult> {
   return Object.freeze({
     status: "failed",
