@@ -41,6 +41,16 @@ function optionValue(name: string): string | undefined {
   return value && !value.startsWith("--") ? value : undefined;
 }
 
+function hasOption(name: string): boolean {
+  return process.argv.includes(name);
+}
+
+function failOption(json: boolean, code: Parameters<typeof printJsonError>[0], message: string): never {
+  if (json) printJsonError(code, message);
+  else terminal.error(message);
+  process.exit(1);
+}
+
 const command = process.argv[2] ?? "help";
 if (command === "help" || command === "--help" || command === "-h") printHelp();
 else if (command === "summary" && process.argv.includes("--json")) printWorkspaceSummaryJson(loadConfig());
@@ -92,32 +102,43 @@ else if (command === "review") {
 } else if (command === "run") {
   const project = resolveProjectOrExit("run");
   const json = process.argv.includes("--json");
-  const mode = optionValue("--mode") ?? "plan";
-  if (!isLoopRunMode(mode)) {
-    const message = `Unknown loop run mode: ${mode}`;
-    json ? printJsonError("unknown_mode", message) : terminal.error(message);
-    process.exit(1);
+
+  const modeValue = optionValue("--mode");
+  if (hasOption("--mode") && modeValue === undefined) {
+    failOption(json, "missing_mode_value", "Missing value for --mode");
   }
-  const maxRepairsValue = optionValue("--max-repairs") ?? "0";
+  const mode = modeValue ?? "plan";
+  if (!isLoopRunMode(mode)) {
+    failOption(json, "unknown_mode", `Unknown loop run mode: ${mode}`);
+  }
+
+  const maxRepairsOption = optionValue("--max-repairs");
+  if (hasOption("--max-repairs") && maxRepairsOption === undefined) {
+    failOption(json, "missing_max_repairs_value", "Missing value for --max-repairs");
+  }
+  const maxRepairsValue = maxRepairsOption ?? "0";
   const maxRepairs = Number(maxRepairsValue);
   if (!Number.isInteger(maxRepairs) || maxRepairs < 0) {
-    const message = `Invalid --max-repairs value: ${maxRepairsValue}`;
-    json ? printJsonError("invalid_max_repairs", message) : terminal.error(message);
-    process.exit(1);
+    failOption(json, "invalid_max_repairs", `Invalid --max-repairs value: ${maxRepairsValue}`);
   }
+
   const timeoutValue = optionValue("--provider-timeout-ms");
+  if (hasOption("--provider-timeout-ms") && timeoutValue === undefined) {
+    failOption(json, "invalid_provider_timeout", "Missing value for --provider-timeout-ms");
+  }
   const providerTimeoutMs = timeoutValue === undefined ? undefined : Number(timeoutValue);
   if (providerTimeoutMs !== undefined && (!Number.isInteger(providerTimeoutMs) || providerTimeoutMs <= 0)) {
-    const message = `Invalid --provider-timeout-ms value: ${timeoutValue}`;
-    json ? printJsonError("invalid_provider_timeout", message) : terminal.error(message);
-    process.exit(1);
+    failOption(json, "invalid_provider_timeout", `Invalid --provider-timeout-ms value: ${timeoutValue}`);
   }
+
   const providerValue = optionValue("--provider");
-  if (providerValue !== undefined && providerValue !== "codex") {
-    const message = `Unsupported provider: ${providerValue}`;
-    json ? printJsonError("unsupported_provider", message) : terminal.error(message);
-    process.exit(1);
+  if (hasOption("--provider") && providerValue === undefined) {
+    failOption(json, "unsupported_provider", "Missing value for --provider");
   }
+  if (providerValue !== undefined && providerValue !== "codex") {
+    failOption(json, "unsupported_provider", `Unsupported provider: ${providerValue}`);
+  }
+
   const providerExecutable = optionValue("--provider-executable");
   const providerModel = optionValue("--provider-model");
   const commitMessage = optionValue("--commit-message");
