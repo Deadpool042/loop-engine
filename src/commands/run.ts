@@ -1,5 +1,4 @@
 import {
-  createCodexCliLoopExecutor,
   generateExecutionReport,
   LOOP_RUN_MODES,
   runLoopCommit,
@@ -9,6 +8,7 @@ import {
   type LoopRunResult,
   type ProjectConfig,
 } from "../core/index.js";
+import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";
 import { terminal } from "../ui/terminal.js";
 import { printJsonError } from "./json-error.js";
 
