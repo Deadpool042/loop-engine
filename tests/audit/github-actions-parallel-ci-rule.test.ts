@@ -8,8 +8,13 @@ import { AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE } from "../../src/audit/rules/git
 test("AUDIT-012 uses the parallel CI contract in the runtime registry", () => {
   const registered = AUDIT_RULES.find((rule) => rule.id === "AUDIT-012");
 
-  assert.equal(registered, AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE);
-  assert.equal(registered?.check().status, "pass");
+  assert.ok(registered);
+  assert.equal(registered.title, AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE.title);
+  assert.equal(
+    registered.description,
+    AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE.description,
+  );
+  assert.equal(registered.check().status, "pass");
 });
 
 test("parallel CI no longer carries the legacy serial compatibility marker", () => {
