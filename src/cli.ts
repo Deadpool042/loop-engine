@@ -1,258 +1,133 @@
-import {
-  printProjectContext,
-  printProjectContextJson,
-} from "./commands/context.js";
-import {
-  printProjectHandoff,
-  printProjectHandoffJson,
-} from "./commands/handoff.js";
+import { printProjectContext, printProjectContextJson } from "./commands/context.js";
+import { printProjectHandoff, printProjectHandoffJson } from "./commands/handoff.js";
 import { validateProject } from "./commands/validate.js";
-import {
-  printReviewContext,
-  printReviewContextJson,
-} from "./commands/review.js";
-import {
-  printWorkspaceSummary,
-  printWorkspaceSummaryJson,
-} from "./commands/summary.js";
+import { printReviewContext, printReviewContextJson } from "./commands/review.js";
+import { printWorkspaceSummary, printWorkspaceSummaryJson } from "./commands/summary.js";
 import { printHelp } from "./commands/help.js";
 import { runJsonCheck } from "./commands/json-check.js";
 import { runRagIndex } from "./commands/rag-index.js";
 import { runRagSearch } from "./commands/rag-search.js";
-import {
-  printNextProjectAction,
-  printNextProjectActionJson,
-} from "./commands/next.js";
-import {
-  printProjectPrompt,
-  printProjectPromptJson,
-} from "./commands/prompt.js";
+import { printNextProjectAction, printNextProjectActionJson } from "./commands/next.js";
+import { printProjectPrompt, printProjectPromptJson } from "./commands/prompt.js";
 import { printStatus } from "./commands/status.js";
 import { printDoctor } from "./commands/doctor.js";
-import {
-  printAuditReport,
-  printAuditReportJson,
-  printAuditRuleManifest,
-} from "./commands/audit.js";
+import { printAuditReport, printAuditReportJson, printAuditRuleManifest } from "./commands/audit.js";
 import { isLoopRunMode, runLoopRunCommand } from "./commands/run.js";
-import {
-  findProject,
-  getRequiredProjectName,
-  loadConfig,
-} from "./core/index.js";
+import { findProject, getRequiredProjectName, loadConfig } from "./core/index.js";
 import { terminal } from "./ui/terminal.js";
 import { printJsonError } from "./commands/json-error.js";
 
 function resolveProjectOrExit(commandName: string) {
   const config = loadConfig();
-
   if (!process.argv[3] || process.argv[3].startsWith("--")) {
-    if (process.argv.includes("--json")) {
-      printJsonError(
-        "missing_project",
-        `Missing project argument for ${commandName}`,
-      );
-    } else {
-      terminal.error(`Missing project argument for ${commandName}`);
-    }
+    if (process.argv.includes("--json")) printJsonError("missing_project", `Missing project argument for ${commandName}`);
+    else terminal.error(`Missing project argument for ${commandName}`);
     process.exit(1);
   }
-
   const projectName = getRequiredProjectName(process.argv, commandName);
   const project = findProject(config, projectName);
-
   if (!project) {
-    if (process.argv.includes("--json")) {
-      printJsonError("unknown_project", `Unknown project: ${projectName}`);
-    } else {
-      terminal.error(`Unknown project: ${projectName}`);
-    }
+    if (process.argv.includes("--json")) printJsonError("unknown_project", `Unknown project: ${projectName}`);
+    else terminal.error(`Unknown project: ${projectName}`);
     process.exit(1);
   }
-
   return project;
 }
 
+function optionValue(name: string): string | undefined {
+  const index = process.argv.indexOf(name);
+  if (index < 0) return undefined;
+  const value = process.argv[index + 1];
+  return value && !value.startsWith("--") ? value : undefined;
+}
+
 const command = process.argv[2] ?? "help";
-
-if (command === "help" || command === "--help" || command === "-h") {
-  printHelp();
-} else if (command === "summary" && process.argv.includes("--json")) {
-  printWorkspaceSummaryJson(loadConfig());
-} else if (command === "status") {
-  printStatus(loadConfig());
-} else if (command === "summary") {
-  printWorkspaceSummary(loadConfig());
-} else if (command === "json-check") {
-  runJsonCheck();
-} else if (command === "rag-index") {
-  runRagIndex();
-} else if (command === "rag-search") {
+if (command === "help" || command === "--help" || command === "-h") printHelp();
+else if (command === "summary" && process.argv.includes("--json")) printWorkspaceSummaryJson(loadConfig());
+else if (command === "status") printStatus(loadConfig());
+else if (command === "summary") printWorkspaceSummary(loadConfig());
+else if (command === "json-check") runJsonCheck();
+else if (command === "rag-index") runRagIndex();
+else if (command === "rag-search") {
   const json = process.argv.includes("--json");
-  const limitIndex = process.argv.indexOf("--limit");
-  const limit =
-    limitIndex >= 0
-      ? Number.parseInt(process.argv[limitIndex + 1] ?? "", 10)
-      : undefined;
-  const pathIndex = process.argv.indexOf("--path");
-  const pathPrefix = pathIndex >= 0 ? process.argv[pathIndex + 1] : undefined;
-
-  const query = process.argv
-    .slice(3)
-    .filter((argument, index, argumentsList) => {
-      if (
-        argument === "--" ||
-        argument === "--json" ||
-        argument === "--limit" ||
-        argument === "--path"
-      ) {
-        return false;
-      }
-
-      return (
-        argumentsList[index - 1] !== "--limit" &&
-        argumentsList[index - 1] !== "--path"
-      );
-    })
-    .join(" ");
-
+  const limitValue = optionValue("--limit");
+  const pathPrefix = optionValue("--path");
+  const query = process.argv.slice(3).filter((argument, index, list) =>
+    !["--", "--json", "--limit", "--path"].includes(argument) &&
+    !["--limit", "--path"].includes(list[index - 1] ?? ""),
+  ).join(" ");
   runRagSearch(query, {
     ...(json ? { json } : {}),
-    ...(limit === undefined ? {} : { limit }),
-    ...(pathPrefix === undefined ? {} : { pathPrefix }),
+    ...(limitValue ? { limit: Number.parseInt(limitValue, 10) } : {}),
+    ...(pathPrefix ? { pathPrefix } : {}),
   });
-} else if (command === "doctor") {
-  printDoctor(loadConfig());
-} else if (command === "audit") {
+} else if (command === "doctor") printDoctor(loadConfig());
+else if (command === "audit") {
   if (process.argv.includes("--manifest")) {
     if (process.argv.includes("--strict")) {
       terminal.error("--strict cannot be used with --manifest");
       process.exit(1);
     }
-
     printAuditRuleManifest();
-    process.exitCode = 0;
   } else {
-    const strict = process.argv.includes("--strict");
-    const report = process.argv.includes("--json")
-      ? printAuditReportJson()
-      : printAuditReport();
-
-    if (strict && report.summary.status !== "pass") {
-      process.exitCode = 1;
-    }
+    const report = process.argv.includes("--json") ? printAuditReportJson() : printAuditReport();
+    if (process.argv.includes("--strict") && report.summary.status !== "pass") process.exitCode = 1;
   }
 } else if (command === "handoff") {
   const project = resolveProjectOrExit("handoff");
-
-  if (process.argv.includes("--json")) {
-    printProjectHandoffJson(project);
-  } else {
-    printProjectHandoff(project);
-  }
+  process.argv.includes("--json") ? printProjectHandoffJson(project) : printProjectHandoff(project);
 } else if (command === "context") {
   const project = resolveProjectOrExit("context");
-
-  if (process.argv.includes("--json")) {
-    printProjectContextJson(project);
-  } else {
-    printProjectContext(project);
-  }
-} else if (command === "validate") {
-  const project = resolveProjectOrExit("validate");
-
-  await validateProject(project);
-} else if (command === "review") {
+  process.argv.includes("--json") ? printProjectContextJson(project) : printProjectContext(project);
+} else if (command === "validate") await validateProject(resolveProjectOrExit("validate"));
+else if (command === "review") {
   const project = resolveProjectOrExit("review");
-
-  if (process.argv.includes("--json")) {
-    printReviewContextJson(project);
-  } else {
-    printReviewContext(project);
-  }
+  process.argv.includes("--json") ? printReviewContextJson(project) : printReviewContext(project);
 } else if (command === "next") {
   const project = resolveProjectOrExit("next");
-
-  if (process.argv.includes("--json")) {
-    printNextProjectActionJson(project);
-  } else {
-    printNextProjectAction(project);
-  }
+  process.argv.includes("--json") ? printNextProjectActionJson(project) : printNextProjectAction(project);
 } else if (command === "prompt") {
   const project = resolveProjectOrExit("prompt");
-
-  if (process.argv.includes("--json")) {
-    printProjectPromptJson(project);
-  } else {
-    printProjectPrompt(project);
-  }
+  process.argv.includes("--json") ? printProjectPromptJson(project) : printProjectPrompt(project);
 } else if (command === "run") {
   const project = resolveProjectOrExit("run");
   const json = process.argv.includes("--json");
-
-  const modeIndex = process.argv.indexOf("--mode");
-  let mode = "plan";
-
-  if (modeIndex >= 0) {
-    const modeArgument = process.argv[modeIndex + 1];
-
-    if (modeArgument === undefined || modeArgument.startsWith("--")) {
-      const message = "Missing value for --mode";
-      if (json) {
-        printJsonError("missing_mode_value", message);
-      } else {
-        terminal.error(message);
-      }
-      process.exit(1);
-    }
-
-    mode = modeArgument;
-  }
-
+  const mode = optionValue("--mode") ?? "plan";
   if (!isLoopRunMode(mode)) {
     const message = `Unknown loop run mode: ${mode}`;
-    if (json) {
-      printJsonError("unknown_mode", message);
-    } else {
-      terminal.error(message);
-    }
+    json ? printJsonError("unknown_mode", message) : terminal.error(message);
     process.exit(1);
   }
-
-  const maxRepairsIndex = process.argv.indexOf("--max-repairs");
-  let maxRepairs = 0;
-  if (maxRepairsIndex >= 0) {
-    const value = process.argv[maxRepairsIndex + 1];
-    if (value === undefined || value.startsWith("--")) {
-      const message = "Missing value for --max-repairs";
-      if (json) {
-        printJsonError("missing_max_repairs_value", message);
-      } else {
-        terminal.error(message);
-      }
-      process.exit(1);
-    }
-
-    maxRepairs = Number(value);
-    if (!Number.isInteger(maxRepairs) || maxRepairs < 0) {
-      const message = `Invalid --max-repairs value: ${value}`;
-      if (json) {
-        printJsonError("invalid_max_repairs", message);
-      } else {
-        terminal.error(message);
-      }
-      process.exit(1);
-    }
+  const maxRepairsValue = optionValue("--max-repairs") ?? "0";
+  const maxRepairs = Number(maxRepairsValue);
+  if (!Number.isInteger(maxRepairs) || maxRepairs < 0) {
+    const message = `Invalid --max-repairs value: ${maxRepairsValue}`;
+    json ? printJsonError("invalid_max_repairs", message) : terminal.error(message);
+    process.exit(1);
   }
-
-  const exitCode = await runLoopRunCommand(project, mode, json, { maxRepairs });
-
-  if (exitCode !== 0) {
-    process.exitCode = exitCode;
+  const timeoutValue = optionValue("--provider-timeout-ms");
+  const providerTimeoutMs = timeoutValue === undefined ? undefined : Number(timeoutValue);
+  if (providerTimeoutMs !== undefined && (!Number.isInteger(providerTimeoutMs) || providerTimeoutMs <= 0)) {
+    const message = `Invalid --provider-timeout-ms value: ${timeoutValue}`;
+    json ? printJsonError("invalid_provider_timeout", message) : terminal.error(message);
+    process.exit(1);
   }
+  const providerValue = optionValue("--provider");
+  if (providerValue !== undefined && providerValue !== "codex") {
+    const message = `Unsupported provider: ${providerValue}`;
+    json ? printJsonError("unsupported_provider", message) : terminal.error(message);
+    process.exit(1);
+  }
+  const exitCode = await runLoopRunCommand(project, mode, json, {
+    maxRepairs,
+    ...(providerValue === "codex" ? { provider: "codex" as const } : {}),
+    ...(optionValue("--provider-executable") ? { providerExecutable: optionValue("--provider-executable") } : {}),
+    ...(optionValue("--provider-model") ? { providerModel: optionValue("--provider-model") } : {}),
+    ...(providerTimeoutMs ? { providerTimeoutMs } : {}),
+    ...(optionValue("--commit-message") ? { commitMessage: optionValue("--commit-message") } : {}),
+  });
+  if (exitCode !== 0) process.exitCode = exitCode;
 } else {
-  terminal.error(
-    "Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>",
-  );
+  terminal.error("Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>");
   process.exit(1);
 }
