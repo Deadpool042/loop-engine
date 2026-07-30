@@ -31,10 +31,12 @@ import {
   type LoopExecutor,
 } from "../core/index.js";
 import type { AgentRegistry } from "../agents/registry.js";
+import { createLoopProviderFailoverAssembly } from "./provider-failover-assembly.js";
 import {
   assembleLoopProvider,
   defaultLoopProviderRegistry,
   type CodexProviderConfiguration,
+  type LoopProviderAssembly,
   type LoopProviderConfiguration,
   type LoopProviderId,
   type LoopProviderRegistry,
@@ -48,6 +50,8 @@ export type LoopApplicationCodexProviderOptions = Omit<
 export type LoopApplicationAssemblyOptions = Readonly<{
   provider?: LoopProviderConfiguration;
   providerRegistry?: LoopProviderRegistry;
+  providerAssemblies?: readonly LoopProviderAssembly[];
+  maxProviderAttempts?: number;
   /** @deprecated Prefer provider: { id: "codex", ... }. */
   codexProvider?: LoopApplicationCodexProviderOptions;
 }>;
@@ -78,6 +82,8 @@ export type LoopApplicationAssembly = Readonly<{
   loopAgentRegistry?: AgentRegistry;
   loopExecutor?: LoopExecutor;
   loopProviderId?: LoopProviderId;
+  loopProviderIds?: readonly LoopProviderId[];
+  loopProviderMaxAttempts?: number;
   loopRunModes: typeof LOOP_RUN_MODES;
   runConfiguredValidations: typeof runConfiguredValidations;
   runLoopCommit: typeof runLoopCommit;
@@ -103,16 +109,37 @@ function resolveProviderConfiguration(
   return Object.freeze({ id: "codex", ...options.codexProvider });
 }
 
+function resolveProviderAssemblies(
+  options: LoopApplicationAssemblyOptions,
+): readonly LoopProviderAssembly[] {
+  const providerConfiguration = resolveProviderConfiguration(options);
+  if (options.providerAssemblies && providerConfiguration) {
+    throw new Error(
+      "Configure providerAssemblies or a single provider configuration, never both.",
+    );
+  }
+  if (options.providerAssemblies) {
+    return Object.freeze([...options.providerAssemblies]);
+  }
+  if (!providerConfiguration) return Object.freeze([]);
+  return Object.freeze([
+    assembleLoopProvider(
+      options.providerRegistry ?? defaultLoopProviderRegistry,
+      providerConfiguration,
+    ),
+  ]);
+}
+
 export function createLoopApplicationAssembly(
   options: LoopApplicationAssemblyOptions = {},
 ): LoopApplicationAssembly {
-  const providerConfiguration = resolveProviderConfiguration(options);
-  const providerAssembly =
-    providerConfiguration === undefined
+  const providerAssemblies = resolveProviderAssemblies(options);
+  const providerDependency =
+    providerAssemblies.length === 0
       ? undefined
-      : assembleLoopProvider(
-          options.providerRegistry ?? defaultLoopProviderRegistry,
-          providerConfiguration,
+      : createLoopProviderFailoverAssembly(
+          providerAssemblies,
+          options.maxProviderAttempts ?? providerAssemblies.length,
         );
 
   return Object.freeze({
@@ -137,12 +164,14 @@ export function createLoopApplicationAssembly(
     isAuditRuleStability,
     isAuditRuleTag,
     loadConfig,
-    ...(providerAssembly === undefined
+    ...(providerDependency === undefined
       ? {}
       : {
-          loopAgentRegistry: providerAssembly.agentRegistry,
-          loopExecutor: providerAssembly.executor,
-          loopProviderId: providerAssembly.id,
+          loopAgentRegistry: providerDependency.agentRegistry,
+          loopExecutor: providerDependency.executor,
+          loopProviderId: providerDependency.providerIds[0] as LoopProviderId,
+          loopProviderIds: providerDependency.providerIds as readonly LoopProviderId[],
+          loopProviderMaxAttempts: providerDependency.maxAttempts,
         }),
     loopRunModes: LOOP_RUN_MODES,
     runConfiguredValidations,
