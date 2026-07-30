@@ -198,6 +198,17 @@ function hashesMatch(actual: string, expected: string): boolean {
   );
 }
 
+function deriveConfiguredApiKeyCredentialFingerprint(
+  record: ConfiguredApiKeyCredentialRecord,
+): string {
+  return createHash("sha256")
+    .update("loop-engine:configured-api-key-fingerprint:v1\0", "utf8")
+    .update(record.credentialId, "utf8")
+    .update("\0", "utf8")
+    .update(record.secretSha256, "utf8")
+    .digest("hex");
+}
+
 export function hashConfiguredApiKeySecret(secret: string): string {
   if (!isNonEmptyString(secret)) {
     throw new TypeError("Configured API key secret must be a non-empty string.");
@@ -271,7 +282,7 @@ export function createConfiguredApiKeyVerifier(
         method: CONFIGURED_API_KEY_METHOD,
         subjectId: record.subjectId,
         issuerId: record.issuerId,
-        credentialFingerprint: record.secretSha256,
+        credentialFingerprint: deriveConfiguredApiKeyCredentialFingerprint(record),
         verified: true,
         issuedAt: record.issuedAt,
         validFrom: record.validFrom,
