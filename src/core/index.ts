@@ -126,6 +126,17 @@ export {
   type LoopProviderFailoverOptions,
   type LoopProviderFailoverResult,
 } from "../loop/provider-failover.js";
+export {
+  createEvidenceAwareProviderFailoverLoopExecutor,
+  type LoopProviderFailoverAttemptResolver,
+} from "../loop/provider-failover-evidence-executor.js";
+export {
+  canonicalizeLoopProviderFailoverEvidence,
+  fingerprintLoopProviderFailoverEvidence,
+  verifyLoopProviderFailoverEvidenceFingerprint,
+  LOOP_PROVIDER_FAILOVER_EVIDENCE_FINGERPRINT_ALGORITHM,
+  type LoopProviderFailoverEvidenceFingerprint,
+} from "../loop/provider-failover-evidence-integrity.js";
 export { runLoopExecute, type LoopRunExecuteOptions } from "../loop/execute-runner.js";
 export { runLoopCommit, type LoopRunCommitOptions } from "../loop/commit-runner.js";
 export { gitLoopCommitter, type LoopCommitter, type LoopCommitResult } from "../loop/git-committer.js";

@@ -1,11 +1,11 @@
 import { createAgentRegistry, type AgentRegistry } from "../agents/registry.js";
 import type { AgentBudget, AgentProfile } from "../agents/types.js";
-import {
-  createProviderFailoverLoopExecutor,
-  type LoopExecutor,
-  type LoopProviderFailoverAttempt,
+import type {
+  LoopExecutor,
+  LoopProviderFailoverAttempt,
 } from "../core/index.js";
 import type { LoopExecutionPlan } from "../loop/execution-plan.js";
+import { createEvidenceAwareProviderFailoverLoopExecutor } from "../loop/provider-failover-evidence-executor.js";
 import type { LoopProviderAssembly } from "./provider-registry.js";
 
 export type LoopProviderFailoverAssembly = Readonly<{
@@ -163,7 +163,7 @@ export function createLoopProviderFailoverAssembly(
   ]);
   const agentRegistry = createAgentRegistry(profiles);
   const boundedMaxAttempts = Math.min(maxAttempts, assemblies.length);
-  const executor = createProviderFailoverLoopExecutor(
+  const executor = createEvidenceAwareProviderFailoverLoopExecutor(
     (primaryPlan) => resolveAttempts(assemblies, primaryPlan),
     { maxAttempts: boundedMaxAttempts },
   );
