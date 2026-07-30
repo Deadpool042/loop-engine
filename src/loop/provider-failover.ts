@@ -1,8 +1,5 @@
 import type { LoopExecutionPlan } from "./execution-plan.js";
-import type {
-  LoopExecutor,
-  LoopExecutorResult,
-} from "./execution.js";
+import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
 import type { LoopRunFailure } from "./types.js";
 
 export const LOOP_PROVIDER_FAILOVER_SCHEMA_VERSION = 1 as const;
@@ -156,9 +153,8 @@ export async function executeLoopProviderFailover(
   const evidence: LoopProviderFailoverAttemptEvidence[] = [];
   const modifiedFiles = new Set<string>();
 
-  for (let index = 0; index < boundedAttempts.length; index += 1) {
+  for (const [index, attempt] of boundedAttempts.entries()) {
     const attemptNumber = index + 1;
-    const attempt = boundedAttempts[index];
     let result: LoopExecutorResult;
 
     try {
@@ -278,7 +274,9 @@ export function createProviderFailoverLoopExecutor(
     const outcome = await executeLoopProviderFailover({
       attempts,
       maxAttempts: options.maxAttempts,
-      isRecoverableFailure: options.isRecoverableFailure,
+      ...(options.isRecoverableFailure === undefined
+        ? {}
+        : { isRecoverableFailure: options.isRecoverableFailure }),
     });
     return outcome.result;
   };
