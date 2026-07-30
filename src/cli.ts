@@ -118,13 +118,16 @@ else if (command === "review") {
     json ? printJsonError("unsupported_provider", message) : terminal.error(message);
     process.exit(1);
   }
+  const providerExecutable = optionValue("--provider-executable");
+  const providerModel = optionValue("--provider-model");
+  const commitMessage = optionValue("--commit-message");
   const exitCode = await runLoopRunCommand(project, mode, json, {
     maxRepairs,
     ...(providerValue === "codex" ? { provider: "codex" as const } : {}),
-    ...(optionValue("--provider-executable") ? { providerExecutable: optionValue("--provider-executable") } : {}),
-    ...(optionValue("--provider-model") ? { providerModel: optionValue("--provider-model") } : {}),
-    ...(providerTimeoutMs ? { providerTimeoutMs } : {}),
-    ...(optionValue("--commit-message") ? { commitMessage: optionValue("--commit-message") } : {}),
+    ...(providerExecutable !== undefined ? { providerExecutable } : {}),
+    ...(providerModel !== undefined ? { providerModel } : {}),
+    ...(providerTimeoutMs !== undefined ? { providerTimeoutMs } : {}),
+    ...(commitMessage !== undefined ? { commitMessage } : {}),
   });
   if (exitCode !== 0) process.exitCode = exitCode;
 } else {
