@@ -1,8 +1,19 @@
-import type { AgentBudget, AgentCapability, AgentEffort, AgentPermission, AgentProvider, AgentRuntime } from "../agents/types.js";
+import type {
+  AgentBudget,
+  AgentCapability,
+  AgentEffort,
+  AgentPermission,
+  AgentProfile,
+  AgentProvider,
+  AgentRuntime,
+} from "../agents/types.js";
 import type { MinimalContextPackage } from "../context/types.js";
 import type { ProjectConfig } from "../core/config.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
-import type { AgentPolicyMode, AgentPolicyResolution } from "../policy/types.js";
+import type {
+  AgentPolicyMode,
+  AgentPolicyResolution,
+} from "../policy/types.js";
 import type { LoopExecutorInput } from "./execution.js";
 
 export type LoopExecutionPlan = Readonly<{
@@ -27,29 +38,36 @@ export type LoopExecutionPlan = Readonly<{
   }>;
 }>;
 
+type SelectedAgentPolicyResolution = AgentPolicyResolution &
+  Readonly<{
+    status: "resolved";
+    selection: Readonly<{
+      outcome: "selected";
+      profile: AgentProfile;
+      rejected: readonly unknown[];
+    }>;
+  }>;
+
 function selectedResolution(
   resolution: AgentPolicyResolution,
-): resolution is AgentPolicyResolution & Readonly<{
-  status: "resolved";
-  selection: Readonly<{
-    outcome: "selected";
-    profile: NonNullable<AgentPolicyResolution["selection"]> extends infer Selection
-      ? Selection extends Readonly<{ outcome: "selected"; profile: infer Profile }>
-        ? Profile
-        : never
-      : never;
-  }>;
-}> {
-  return resolution.status === "resolved" && resolution.selection?.outcome === "selected";
+): resolution is SelectedAgentPolicyResolution {
+  return (
+    resolution.status === "resolved" &&
+    resolution.selection?.outcome === "selected"
+  );
 }
 
 /**
  * Converts an admitted LoopExecutor request into one immutable, serializable
  * execution decision. This function performs no I/O and never widens policy.
  */
-export function createLoopExecutionPlan(input: LoopExecutorInput): LoopExecutionPlan {
+export function createLoopExecutionPlan(
+  input: LoopExecutorInput,
+): LoopExecutionPlan {
   if (!selectedResolution(input.agentPolicy)) {
-    throw new TypeError("Loop execution plan requires a resolved selected agent policy.");
+    throw new TypeError(
+      "Loop execution plan requires a resolved selected agent policy.",
+    );
   }
 
   const profile = input.agentPolicy.selection.profile;
