@@ -90,83 +90,103 @@ function isUniqueNonEmptyStringArray(value: unknown): value is readonly string[]
 
 function isValidPrincipal(value: unknown): value is InboundPrincipal {
   if (!isOrdinaryObject(value)) return false;
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  if (
-    !hasExactKeys(descriptors, [
-      "principalId",
-      "principalType",
-      "tenantId",
-      "roles",
-    ]) ||
-    !isEnumerableDataProperty(descriptors.principalId) ||
-    !isNonEmptyString(descriptors.principalId.value) ||
-    !isEnumerableDataProperty(descriptors.principalType) ||
-    !isNonEmptyString(descriptors.principalType.value) ||
-    !isEnumerableDataProperty(descriptors.tenantId) ||
-    (descriptors.tenantId.value !== null &&
-      !isNonEmptyString(descriptors.tenantId.value)) ||
-    !isEnumerableDataProperty(descriptors.roles) ||
-    !isUniqueNonEmptyStringArray(descriptors.roles.value)
-  ) {
+
+  try {
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    return (
+      hasExactKeys(descriptors, [
+        "principalId",
+        "principalType",
+        "tenantId",
+        "roles",
+      ]) &&
+      isEnumerableDataProperty(descriptors.principalId) &&
+      isNonEmptyString(descriptors.principalId.value) &&
+      isEnumerableDataProperty(descriptors.principalType) &&
+      isNonEmptyString(descriptors.principalType.value) &&
+      isEnumerableDataProperty(descriptors.tenantId) &&
+      (descriptors.tenantId.value === null ||
+        isNonEmptyString(descriptors.tenantId.value)) &&
+      isEnumerableDataProperty(descriptors.roles) &&
+      isUniqueNonEmptyStringArray(descriptors.roles.value)
+    );
+  } catch {
     return false;
   }
-  return true;
 }
 
 function isValidCredentialRecord(
   value: unknown,
 ): value is ConfiguredApiKeyCredentialRecord {
   if (!isOrdinaryObject(value)) return false;
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  const expected = [
-    "credentialId",
-    "secretSha256",
-    "issuerId",
-    "subjectId",
-    "principal",
-    "issuedAt",
-    "validFrom",
-    "expiresAt",
-  ] as const;
-  if (
-    !hasExactKeys(descriptors, expected) ||
-    expected.some((key) => !isEnumerableDataProperty(descriptors[key])) ||
-    !isNonEmptyString(descriptors.credentialId!.value) ||
-    !isSha256(descriptors.secretSha256!.value) ||
-    !isNonEmptyString(descriptors.issuerId!.value) ||
-    !isNonEmptyString(descriptors.subjectId!.value) ||
-    !isValidPrincipal(descriptors.principal!.value) ||
-    !isParseableInstant(descriptors.issuedAt!.value) ||
-    !isParseableInstant(descriptors.validFrom!.value) ||
-    !isParseableInstant(descriptors.expiresAt!.value)
-  ) {
+
+  try {
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const expected = [
+      "credentialId",
+      "secretSha256",
+      "issuerId",
+      "subjectId",
+      "principal",
+      "issuedAt",
+      "validFrom",
+      "expiresAt",
+    ] as const;
+    if (
+      !hasExactKeys(descriptors, expected) ||
+      expected.some((key) => !isEnumerableDataProperty(descriptors[key])) ||
+      !isNonEmptyString(descriptors.credentialId!.value) ||
+      !isSha256(descriptors.secretSha256!.value) ||
+      !isNonEmptyString(descriptors.issuerId!.value) ||
+      !isNonEmptyString(descriptors.subjectId!.value) ||
+      !isValidPrincipal(descriptors.principal!.value) ||
+      !isParseableInstant(descriptors.issuedAt!.value) ||
+      !isParseableInstant(descriptors.validFrom!.value) ||
+      !isParseableInstant(descriptors.expiresAt!.value)
+    ) {
+      return false;
+    }
+
+    const principalDescriptors = Object.getOwnPropertyDescriptors(
+      descriptors.principal!.value as InboundPrincipal,
+    );
+    const subjectId = descriptors.subjectId!.value as string;
+    const principalId = principalDescriptors.principalId?.value;
+    const issuedAt = descriptors.issuedAt!.value as string;
+    const validFrom = descriptors.validFrom!.value as string;
+    const expiresAt = descriptors.expiresAt!.value as string;
+
+    return (
+      subjectId === principalId &&
+      Date.parse(issuedAt) <= Date.parse(validFrom) &&
+      Date.parse(validFrom) < Date.parse(expiresAt)
+    );
+  } catch {
     return false;
   }
-
-  const record = value as ConfiguredApiKeyCredentialRecord;
-  return (
-    record.subjectId === record.principal.principalId &&
-    Date.parse(record.issuedAt) <= Date.parse(record.validFrom) &&
-    Date.parse(record.validFrom) < Date.parse(record.expiresAt)
-  );
 }
 
 function readCredential(value: unknown): ConfiguredApiKeyCredentialInput | null {
   if (!isOrdinaryObject(value)) return null;
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  if (
-    !hasExactKeys(descriptors, ["credentialId", "secret"]) ||
-    !isEnumerableDataProperty(descriptors.credentialId) ||
-    !isNonEmptyString(descriptors.credentialId.value) ||
-    !isEnumerableDataProperty(descriptors.secret) ||
-    !isNonEmptyString(descriptors.secret.value)
-  ) {
+
+  try {
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    if (
+      !hasExactKeys(descriptors, ["credentialId", "secret"]) ||
+      !isEnumerableDataProperty(descriptors.credentialId) ||
+      !isNonEmptyString(descriptors.credentialId.value) ||
+      !isEnumerableDataProperty(descriptors.secret) ||
+      !isNonEmptyString(descriptors.secret.value)
+    ) {
+      return null;
+    }
+    return Object.freeze({
+      credentialId: descriptors.credentialId.value,
+      secret: descriptors.secret.value,
+    });
+  } catch {
     return null;
   }
-  return Object.freeze({
-    credentialId: descriptors.credentialId.value,
-    secret: descriptors.secret.value,
-  });
 }
 
 function hashesMatch(actual: string, expected: string): boolean {
@@ -203,12 +223,16 @@ export function deriveConfiguredApiKeyEvidenceId(
 export function validateConfiguredApiKeyCredentialRecords(
   records: unknown,
 ): records is readonly ConfiguredApiKeyCredentialRecord[] {
-  return (
-    Array.isArray(records) &&
-    records.length > 0 &&
-    records.every(isValidCredentialRecord) &&
-    new Set(records.map((record) => record.credentialId)).size === records.length
-  );
+  try {
+    return (
+      Array.isArray(records) &&
+      records.length > 0 &&
+      records.every(isValidCredentialRecord) &&
+      new Set(records.map((record) => record.credentialId)).size === records.length
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function createConfiguredApiKeyVerifier(
