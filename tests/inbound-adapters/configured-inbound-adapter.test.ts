@@ -58,13 +58,14 @@ function aclRule(requiredRoles: readonly string[] = ["operator"]): ConfiguredInb
 function adapterRequest(
   requestId = "request-v14-5",
   secret = SECRET,
+  nonce = `nonce-${requestId}`,
 ): ConfiguredInboundAdapterRequest {
   return Object.freeze({
     requestId,
     evaluatedAt: NOW,
     credentialId: "credential-1",
     credentialSecret: secret,
-    nonce: `nonce-${requestId}`,
+    nonce,
     project: "loop-engine",
     operation: "execute",
     payload: Object.freeze({
@@ -350,6 +351,36 @@ describe("executeConfiguredInboundAdapterRequest", () => {
         reason: "replay_rejected",
       });
       assert.equal(calls.authorizer, 1);
+      assert.equal(calls.runtimeExecute, 1);
+      assertRedacted(second);
+    });
+  });
+
+  it("rejects a reused nonce for the same credential across request ids", async () => {
+    await withReplayDirectory(async (directory) => {
+      const calls = counters();
+      const nonce = "shared-credential-nonce";
+      const first = await executeConfiguredInboundAdapterRequest(
+        adapterRequest("request-nonce-a", SECRET, nonce),
+        dependencies(directory, calls),
+      );
+      assert.equal(first.outcome, "executed");
+
+      const second = await executeConfiguredInboundAdapterRequest(
+        adapterRequest("request-nonce-b", SECRET, nonce),
+        dependencies(directory, calls),
+      );
+      assert.deepEqual(second, {
+        schemaVersion: 1,
+        outcome: "rejected",
+        requestId: "request-nonce-b",
+        stage: "security",
+        reason: "replay_rejected",
+      });
+      assert.equal(calls.authorizer, 1);
+      assert.equal(calls.assembler, 1);
+      assert.equal(calls.context, 1);
+      assert.equal(calls.runtimeResolve, 1);
       assert.equal(calls.runtimeExecute, 1);
       assertRedacted(second);
     });
