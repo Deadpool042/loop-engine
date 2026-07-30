@@ -8,12 +8,12 @@ import {
 import type { LoopExecutionPlan } from "../../src/loop/execution-plan.js";
 import type { LoopExecutor } from "../../src/loop/execution.js";
 
-function plan(provider: "codex" | "claude-code", model: string): LoopExecutionPlan {
+function plan(provider: "openai" | "anthropic", model: string): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1,
     runId: "run-failover-1",
     provider,
-    runtime: provider === "codex" ? "codex-cli" : "claude-code-cli",
+    runtime: provider === "openai" ? "codex" : "claude_code",
     profileId: `${provider}-profile`,
     model,
   }) as LoopExecutionPlan;
@@ -42,29 +42,22 @@ function completed(file: string): LoopExecutor {
 }
 
 test("falls back after a recoverable provider failure", async () => {
-  const primary = plan("codex", "gpt-5-codex");
-  const fallback = plan("claude-code", "claude-sonnet");
-
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
     attempts: [
-      { plan: primary, executor: failed("provider_timeout") },
-      { plan: fallback, executor: completed("src/result.ts") },
+      { plan: plan("openai", "gpt-5-codex"), executor: failed("provider_timeout") },
+      { plan: plan("anthropic", "claude-sonnet"), executor: completed("src/result.ts") },
     ],
   });
 
   assert.equal(outcome.result.status, "completed");
-  assert.equal(outcome.evidence.selectedProvider, "claude-code");
-  assert.deepEqual(outcome.evidence.attemptedProviders, ["codex", "claude-code"]);
+  assert.equal(outcome.evidence.selectedProvider, "anthropic");
+  assert.deepEqual(outcome.evidence.attemptedProviders, ["openai", "anthropic"]);
   assert.deepEqual(
-    outcome.evidence.attempts.map((attempt) => [
-      attempt.provider,
-      attempt.status,
-      attempt.recoverable,
-    ]),
+    outcome.evidence.attempts.map((attempt) => [attempt.provider, attempt.status, attempt.recoverable]),
     [
-      ["codex", "failed", true],
-      ["claude-code", "completed", false],
+      ["openai", "failed", true],
+      ["anthropic", "completed", false],
     ],
   );
 });
@@ -79,39 +72,35 @@ test("stops immediately on a terminal provider failure", async () => {
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
     attempts: [
-      { plan: plan("codex", "gpt-5-codex"), executor: failed("policy_rejected") },
-      { plan: plan("claude-code", "claude-sonnet"), executor: fallback },
+      { plan: plan("openai", "gpt-5-codex"), executor: failed("policy_rejected") },
+      { plan: plan("anthropic", "claude-sonnet"), executor: fallback },
     ],
   });
 
   assert.equal(outcome.result.status, "failed");
   assert.equal(fallbackCalls, 0);
   assert.equal(outcome.evidence.attempts.length, 1);
-  assert.equal(outcome.evidence.attempts[0].recoverable, false);
+  assert.equal(outcome.evidence.attempts[0]?.recoverable, false);
 });
 
 test("enforces the global attempt budget", async () => {
-  let thirdCalls = 0;
-  const third: LoopExecutor = async () => {
-    thirdCalls += 1;
-    return completed("third.ts")({} as LoopExecutionPlan);
+  let fallbackCalls = 0;
+  const fallback: LoopExecutor = async () => {
+    fallbackCalls += 1;
+    return completed("fallback.ts")({} as LoopExecutionPlan);
   };
 
   const outcome = await executeLoopProviderFailover({
-    maxAttempts: 2,
+    maxAttempts: 1,
     attempts: [
-      { plan: plan("codex", "a"), executor: failed("provider_timeout") },
-      { plan: plan("claude-code", "b"), executor: failed("provider_unavailable") },
-      { plan: plan("codex", "c"), executor: third },
+      { plan: plan("openai", "a"), executor: failed("provider_timeout") },
+      { plan: plan("anthropic", "b"), executor: fallback },
     ],
   });
 
   assert.equal(outcome.result.status, "failed");
-  assert.equal(thirdCalls, 0);
-  assert.equal(outcome.evidence.attempts.length, 0);
-  if (outcome.result.status === "failed") {
-    assert.equal(outcome.result.failure.code, "provider_attempt_duplicate");
-  }
+  assert.equal(fallbackCalls, 0);
+  assert.equal(outcome.evidence.attempts.length, 1);
 });
 
 test("rejects duplicate providers before any effect", async () => {
@@ -124,8 +113,8 @@ test("rejects duplicate providers before any effect", async () => {
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
     attempts: [
-      { plan: plan("codex", "a"), executor },
-      { plan: plan("codex", "b"), executor },
+      { plan: plan("openai", "a"), executor },
+      { plan: plan("openai", "b"), executor },
     ],
   });
 
@@ -136,18 +125,17 @@ test("rejects duplicate providers before any effect", async () => {
   }
 });
 
-test("redacts thrown provider errors and may recover through an explicit classifier", async () => {
+test("redacts thrown provider errors and permits reviewed recovery", async () => {
   const throwing: LoopExecutor = async () => {
     throw new Error("secret provider diagnostic");
   };
 
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
-    isRecoverableFailure: (failure) =>
-      failure.code === "provider_executor_exception",
+    isRecoverableFailure: (failure) => failure.code === "provider_executor_exception",
     attempts: [
-      { plan: plan("codex", "a"), executor: throwing },
-      { plan: plan("claude-code", "b"), executor: completed("safe.ts") },
+      { plan: plan("openai", "a"), executor: throwing },
+      { plan: plan("anthropic", "b"), executor: completed("safe.ts") },
     ],
   });
 
@@ -156,8 +144,8 @@ test("redacts thrown provider errors and may recover through an explicit classif
 });
 
 test("LoopExecutor facade preserves the admitted primary plan as attempt one", async () => {
-  const primary = plan("codex", "a");
-  const replacement = plan("codex", "b");
+  const primary = plan("openai", "a");
+  const replacement = plan("openai", "b");
   const executor = createProviderFailoverLoopExecutor(
     () => [{ plan: replacement, executor: completed("file.ts") }],
     { maxAttempts: 1 },
@@ -173,9 +161,7 @@ test("LoopExecutor facade preserves the admitted primary plan as attempt one", a
 test("freezes bounded public evidence", async () => {
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 1,
-    attempts: [
-      { plan: plan("codex", "a"), executor: completed("file.ts") },
-    ],
+    attempts: [{ plan: plan("openai", "a"), executor: completed("file.ts") }],
   });
 
   assert.equal(Object.isFrozen(outcome), true);
