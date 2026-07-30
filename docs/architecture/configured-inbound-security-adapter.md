@@ -74,13 +74,15 @@ The verifier:
 1. requires an exact `{ credentialId, secret }` opaque credential shape;
 2. resolves only the explicit configured record;
 3. hashes the supplied secret with SHA-256;
-4. compares equal-length digests with `timingSafeEqual`;
-5. emits verified evidence derived from the configured issuer, subject and
-   validity window.
+4. compares equal-length digests with `timingSafeEqual`, including a dummy
+   digest comparison when the credential id is unknown;
+5. emits stable verified evidence derived from the configured credential,
+   issuer, subject and validity window.
 
-Unknown ids and incorrect secrets return a generic authentication rejection.
-The verifier performs no environment lookup, file lookup, network request,
-retry, fallback or credential discovery.
+The evidence identity is stable for a configured credential and does not depend
+on an untrusted request id. Unknown ids and incorrect secrets return the same
+generic authentication rejection. The verifier performs no environment lookup,
+file lookup, network request, retry, fallback or credential discovery.
 
 ## ACL
 
@@ -110,14 +112,20 @@ Runtime execution. The adapter maps this stop to the stable `acl` stage.
 ## Replay persistence
 
 `createFileInboundReplayProtectionPort(...)` provides the concrete replay port.
-It derives a SHA-256 claim key from request id, evidence id and nonce, then
-creates `<digest>.json` with exclusive `wx` semantics.
+For a present nonce, it derives a SHA-256 claim key from the stable authentication
+evidence id and nonce. The request id is deliberately excluded, so changing the
+request id cannot make the same credential/nonce pair reusable. The generic port
+uses evidence id plus request id only as a fallback when nonce is explicitly
+`null`; the V14.5 adapter itself always requires a non-empty nonce.
+
+The port creates `<digest>.json` with exclusive `wx` semantics.
 
 Properties:
 
 - claim creation is atomic across concurrent processes sharing the directory;
 - an existing claim returns `replayed`;
 - the claim survives process restart;
+- nonce reuse for one credential is rejected across different request ids;
 - directories and files request owner-only modes (`0700` and `0600`);
 - persisted claims contain only schema version, digest and claim instant;
 - raw credential, nonce, subject, tenant, project and payload are not persisted;
@@ -192,8 +200,9 @@ V14.5 does not add:
    claims.
 4. ACL requires exact tenant, every required role, project and operation.
 5. ACL denial occurs before replay and does not consume the nonce.
-6. The first valid replay claim is accepted and the same claim is rejected
-   across a recreated port/process boundary.
+6. The first valid credential/nonce replay claim is accepted and reuse is
+   rejected across a recreated port/process boundary and across different
+   request ids.
 7. Replay files contain only a digest and claim time.
 8. The V14.3 application service is invoked exactly once.
 9. Runtime resolution is explicit; no provider or Runtime fallback exists.
