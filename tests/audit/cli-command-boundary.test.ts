@@ -19,7 +19,7 @@ test("extractCliCommandModuleSpecifiers detects imports, exports, and dynamic im
   );
 });
 
-test("allows Core, UI, and local command dependencies", () => {
+test("allows Core, UI, composition-root, and local command dependencies", () => {
   assert.deepEqual(
     inspectCliCommandBoundary([
       {
@@ -27,7 +27,8 @@ test("allows Core, UI, and local command dependencies", () => {
         source: `
           import { runLoop } from "../core/index.js";
           import { terminal } from "../ui/terminal.js";
-          import { createProvider } from "./codex-provider.js";
+          import { createProvider } from "../composition/codex-provider.js";
+          import { printError } from "./json-error.js";
         `,
       },
     ]),
@@ -61,7 +62,7 @@ test("rejects direct internal layer imports from commands", () => {
   );
 });
 
-test("allows the reviewed provider composition file", () => {
+test("does not allow command-local composition exceptions", () => {
   assert.deepEqual(
     inspectCliCommandBoundary([
       {
@@ -70,7 +71,13 @@ test("allows the reviewed provider composition file", () => {
           'import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";',
       },
     ]),
-    [],
+    [
+      {
+        path: "src/commands/codex-provider.ts",
+        target: "../loop/codex-cli-executor.js",
+        reason: "command_bypasses_core_boundary",
+      },
+    ],
   );
 });
 
