@@ -23,6 +23,27 @@ export {
   type InboundAuthenticationVerifier,
   type InboundAuthenticationVerifierResult,
 } from "./authentication-verification.js";
+export {
+  CONFIGURED_API_KEY_METHOD,
+  createConfiguredApiKeyVerifier,
+  deriveConfiguredApiKeyEvidenceId,
+  hashConfiguredApiKeySecret,
+  validateConfiguredApiKeyCredentialRecords,
+  type ConfiguredApiKeyCredentialRecord,
+} from "./configured-api-key.js";
+export {
+  CONFIGURED_INBOUND_ACL_DENY_REASONS,
+  evaluateConfiguredInboundAcl,
+  validateConfiguredInboundAclRules,
+  type ConfiguredInboundAclDecision,
+  type ConfiguredInboundAclDenyReason,
+  type ConfiguredInboundAclRule,
+} from "./configured-acl.js";
+export {
+  FILE_REPLAY_PROTECTION_SCHEMA_VERSION,
+  createFileInboundReplayProtectionPort,
+  type FileInboundReplayProtectionOptions,
+} from "./file-replay-protection.js";
 export type {
   InboundAccessDenyReason,
   InboundAccessIndeterminateReason,
