@@ -2,10 +2,7 @@ import { spawn } from "node:child_process";
 import { basename, resolve } from "node:path";
 
 import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
-import {
-  createLoopExecutionPlan,
-  type LoopExecutionPlan,
-} from "./execution-plan.js";
+import type { LoopExecutionPlan } from "./execution-plan.js";
 
 export type CodexCliLoopExecutorOptions = Readonly<{
   executable: string;
@@ -135,17 +132,7 @@ export function createCodexCliLoopExecutor(
     throw new TypeError("Codex output limit must be a positive integer.");
   }
 
-  return async (input): Promise<LoopExecutorResult> => {
-    let plan: LoopExecutionPlan;
-    try {
-      plan = createLoopExecutionPlan(input);
-    } catch {
-      return failure(
-        "execution_plan_invalid",
-        "Codex execution requires a valid admitted execution plan.",
-      );
-    }
-
+  return async (plan): Promise<LoopExecutorResult> => {
     if (plan.provider !== "openai" || plan.runtime !== "codex") {
       return failure(
         "execution_plan_provider_mismatch",

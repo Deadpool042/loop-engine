@@ -14,7 +14,14 @@ import type {
   AgentPolicyMode,
   AgentPolicyResolution,
 } from "../policy/types.js";
-import type { LoopExecutorInput } from "./execution.js";
+
+export type CreateLoopExecutionPlanInput = Readonly<{
+  runId: string;
+  project: ProjectConfig;
+  candidate: RoadmapCandidate;
+  agentPolicy: AgentPolicyResolution;
+  contextPackage: MinimalContextPackage;
+}>;
 
 export type LoopExecutionPlan = Readonly<{
   schemaVersion: 1;
@@ -58,11 +65,11 @@ function selectedResolution(
 }
 
 /**
- * Converts an admitted LoopExecutor request into one immutable, serializable
- * execution decision. This function performs no I/O and never widens policy.
+ * Converts one admitted policy decision into an immutable, serializable
+ * execution plan. This function performs no I/O and never widens policy.
  */
 export function createLoopExecutionPlan(
-  input: LoopExecutorInput,
+  input: CreateLoopExecutionPlanInput,
 ): LoopExecutionPlan {
   if (!selectedResolution(input.agentPolicy)) {
     throw new TypeError(

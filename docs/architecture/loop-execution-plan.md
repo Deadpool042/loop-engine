@@ -2,17 +2,17 @@
 
 ## Status
 
-V14.15 — implemented.
+V14.16 — executor boundary implemented.
 
 ## Goal
 
-A concrete provider must execute one explicit, immutable decision rather than
+A concrete provider executes one explicit, immutable decision rather than
 re-deriving provider, model, effort, budget or policy data from unrelated
 configuration.
 
-`createLoopExecutionPlan(...)` converts the admitted `LoopExecutorInput` into a
-serializable `LoopExecutionPlan` after candidate selection, policy resolution
-and minimal-context construction have completed.
+`createLoopExecutionPlan(...)` converts the admitted candidate, policy and
+context decision into a serializable `LoopExecutionPlan` after candidate
+selection, policy resolution and minimal-context construction have completed.
 
 ## Contract
 
@@ -27,30 +27,37 @@ The plan records:
   resolution.
 
 The factory is pure. It performs no filesystem, process, network, environment,
-clock or random access. It rejects any request whose policy is not both
+clock or random access. It rejects any decision whose policy is not both
 `resolved` and `selected`.
 
 ## Execution boundary
 
-The Codex adapter creates the plan before inspecting or modifying the worktree.
-It then fails closed unless the plan targets provider `openai` and runtime
-`codex`. The model passed to the executable comes from the plan, not from a
-second independent decision.
+The execute runner creates the plan before invoking the abstract executor port.
+`LoopExecutor` accepts only `LoopExecutionPlan`; it no longer receives the raw
+policy resolution and context fields as an unstructured request.
+
+The Codex adapter consumes that prebuilt plan directly and fails closed unless
+it targets provider `openai` and runtime `codex`. The model passed to the
+executable comes from the plan, not from a second independent decision.
 
 ```text
 candidate + policy + context
         -> createLoopExecutionPlan(...)
         -> immutable LoopExecutionPlan
+        -> LoopExecutor port
         -> provider compatibility checks
         -> provider process
 ```
 
-This removes policy/provider drift: the provider invocation cannot silently use
-a model or runtime different from the admitted agent profile.
+This removes policy/provider drift and closes the reconstruction gap: a provider
+cannot silently recalculate, widen or replace the admitted execution identity.
+The runner's `ready` evidence records the selected profile and the
+provider/runtime/model tuple without exposing executable paths or provider
+output.
 
 ## Compatibility
 
-V14.15 does not change public CLI arguments, execution-report schema, commit
-behavior, validation limits or publication guarantees. `LoopExecutor` remains
-the injected port; the concrete adapter now consumes a deterministic plan
-internally before performing effects.
+V14.16 does not change public CLI arguments, execution-report schema, commit
+behavior, validation limits or publication guarantees. Existing injected
+executors retain the same port name, but their single argument is now the
+immutable execution plan.
