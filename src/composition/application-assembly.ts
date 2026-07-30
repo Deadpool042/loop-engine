@@ -30,21 +30,25 @@ import {
   type AuditRuleSelection,
   type LoopExecutor,
 } from "../core/index.js";
+import type { AgentRegistry } from "../agents/registry.js";
 import {
-  createAgentRegistry,
-  defaultAgentRegistry,
-  type AgentRegistry,
-} from "../agents/registry.js";
-import type { AgentProfile } from "../agents/types.js";
-import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";
+  assembleLoopProvider,
+  defaultLoopProviderRegistry,
+  type CodexProviderConfiguration,
+  type LoopProviderConfiguration,
+  type LoopProviderId,
+  type LoopProviderRegistry,
+} from "./provider-registry.js";
 
-export type LoopApplicationCodexProviderOptions = Readonly<{
-  executable: string;
-  model?: string;
-  timeoutMs?: number;
-}>;
+export type LoopApplicationCodexProviderOptions = Omit<
+  CodexProviderConfiguration,
+  "id"
+>;
 
 export type LoopApplicationAssemblyOptions = Readonly<{
+  provider?: LoopProviderConfiguration;
+  providerRegistry?: LoopProviderRegistry;
+  /** @deprecated Prefer provider: { id: "codex", ... }. */
   codexProvider?: LoopApplicationCodexProviderOptions;
 }>;
 
@@ -78,6 +82,7 @@ export type LoopApplicationAssembly = Readonly<{
   loadConfig: typeof loadConfig;
   loopAgentRegistry?: AgentRegistry;
   loopExecutor?: LoopExecutor;
+  loopProviderId?: LoopProviderId;
   loopRunModes: typeof LOOP_RUN_MODES;
   runConfiguredValidations: typeof runConfiguredValidations;
   runLoopCommit: typeof runLoopCommit;
@@ -95,48 +100,32 @@ export type LoopApplicationAuditProfile = AuditProfile;
 export type LoopApplicationAuditSelection = AuditRuleSelection;
 export type LoopApplicationAuditReport = AuditReport;
 
-function createConfiguredCodexProfile(
-  options: LoopApplicationCodexProviderOptions,
-): AgentProfile {
-  const defaultProfile = defaultAgentRegistry.profiles.find(
-    (profile) => profile.runtime === "codex" && profile.provider === "openai",
-  );
-
-  if (!defaultProfile) {
-    throw new Error("No Codex agent profile is registered.");
+function resolveProviderConfiguration(
+  options: LoopApplicationAssemblyOptions,
+): LoopProviderConfiguration | undefined {
+  if (options.provider && options.codexProvider) {
+    throw new Error(
+      "Configure either provider or codexProvider, never both.",
+    );
   }
 
-  return Object.freeze({
-    ...defaultProfile,
-    id: "configured.codex",
-    model: options.model ?? defaultProfile.model,
-    capabilities: Object.freeze([...defaultProfile.capabilities]),
-    permissions: Object.freeze([...defaultProfile.permissions]),
-    budget: Object.freeze({ ...defaultProfile.budget }),
-  });
+  if (options.provider) return options.provider;
+  if (!options.codexProvider) return undefined;
+
+  return Object.freeze({ id: "codex", ...options.codexProvider });
 }
 
 export function createLoopApplicationAssembly(
   options: LoopApplicationAssemblyOptions = {},
 ): LoopApplicationAssembly {
-  const loopExecutor =
-    options.codexProvider === undefined
+  const providerConfiguration = resolveProviderConfiguration(options);
+  const providerAssembly =
+    providerConfiguration === undefined
       ? undefined
-      : createCodexCliLoopExecutor({
-          executable: options.codexProvider.executable,
-          ...(options.codexProvider.model
-            ? { model: options.codexProvider.model }
-            : {}),
-          ...(options.codexProvider.timeoutMs
-            ? { timeoutMs: options.codexProvider.timeoutMs }
-            : {}),
-        });
-  const loopAgentRegistry =
-    options.codexProvider === undefined
-      ? undefined
-      : createAgentRegistry([
-          createConfiguredCodexProfile(options.codexProvider),
-        ]);
+      : assembleLoopProvider(
+          options.providerRegistry ?? defaultLoopProviderRegistry,
+          providerConfiguration,
+        );
 
   return Object.freeze({
     findProject,
@@ -160,8 +149,13 @@ export function createLoopApplicationAssembly(
     isAuditRuleStability,
     isAuditRuleTag,
     loadConfig,
-    ...(loopAgentRegistry === undefined ? {} : { loopAgentRegistry }),
-    ...(loopExecutor === undefined ? {} : { loopExecutor }),
+    ...(providerAssembly === undefined
+      ? {}
+      : {
+          loopAgentRegistry: providerAssembly.agentRegistry,
+          loopExecutor: providerAssembly.executor,
+          loopProviderId: providerAssembly.id,
+        }),
     loopRunModes: LOOP_RUN_MODES,
     runConfiguredValidations,
     runLoopCommit,
