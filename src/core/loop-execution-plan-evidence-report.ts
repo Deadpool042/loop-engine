@@ -1,21 +1,31 @@
 import { generateExecutionReport } from "./loop.js";
 import { projectLoopExecutionPlanEvidence } from "../loop/execution-plan-evidence.js";
 import { fingerprintLoopExecutionPlanEvidence } from "../loop/execution-plan-evidence-fingerprint.js";
+import { fingerprintLoopProviderFailoverEvidence } from "../loop/provider-failover-evidence-integrity.js";
 import type { LoopRunResult } from "../loop/types.js";
 
 /**
- * Produces the CLI-facing execution report with one bounded execution-plan
- * evidence projection and its deterministic integrity fingerprint. Historical
- * report fields remain unchanged.
+ * Produces the CLI-facing execution report with bounded execution-plan and
+ * provider-failover evidence plus deterministic integrity fingerprints.
+ * Historical report fields remain unchanged.
  */
 export function generateExecutionReportWithEvidence(
   result: LoopRunResult,
 ): LoopRunResult {
-  const evidence = projectLoopExecutionPlanEvidence(result.agentPolicy);
+  const executionPlanEvidence = projectLoopExecutionPlanEvidence(result.agentPolicy);
+  const providerFailoverEvidence = result.providerFailoverEvidence ?? null;
+
   return Object.freeze({
     ...generateExecutionReport(result),
-    executionPlanEvidence: evidence,
+    executionPlanEvidence,
     executionPlanFingerprint:
-      evidence === null ? null : fingerprintLoopExecutionPlanEvidence(evidence),
+      executionPlanEvidence === null
+        ? null
+        : fingerprintLoopExecutionPlanEvidence(executionPlanEvidence),
+    providerFailoverEvidence,
+    providerFailoverFingerprint:
+      providerFailoverEvidence === null
+        ? null
+        : fingerprintLoopProviderFailoverEvidence(providerFailoverEvidence),
   });
 }
