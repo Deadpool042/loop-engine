@@ -15,9 +15,11 @@ const ARCHITECTURE_FILE =
 const REQUIRED_CREDENTIAL_TOKENS = Object.freeze([
   'CONFIGURED_API_KEY_METHOD = "api-key-sha256"',
   "timingSafeEqual",
+  "UNKNOWN_CREDENTIAL_HASH",
   "hashConfiguredApiKeySecret",
   "deriveConfiguredApiKeyEvidenceId",
-  "record.subjectId === record.principal.principalId",
+  "deriveConfiguredApiKeyCredentialFingerprint",
+  "subjectId === principalId",
 ]);
 const REQUIRED_ACL_TOKENS = Object.freeze([
   "tenant_not_authorized",
