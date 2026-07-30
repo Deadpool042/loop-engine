@@ -109,6 +109,10 @@ export {
   type AuditRuleSelection,
 } from "../audit/registry.js";
 export { LOOP_RUN_MODES, type LoopRunMode, type LoopRunResult } from "../loop/types.js";
+export * from "../loop/durable-execution.js";
+export * from "../loop/durable-execution-controller.js";
+export * from "../loop/durable-execution-integrity.js";
+export * from "../loop/in-memory-durable-execution-store.js";
 export {
   canonicalizeLoopExecutionPlanEvidence,
   fingerprintLoopExecutionPlanEvidence,
