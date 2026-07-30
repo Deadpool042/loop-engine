@@ -1,10 +1,11 @@
-import { generateRagSearchReport } from "../core/index.js";
+import type { LoopApplicationAssembly } from "../composition/index.js";
 
 export function runRagSearch(
+  application: LoopApplicationAssembly,
   query: string | undefined,
   options?: { json?: boolean; limit?: number; pathPrefix?: string },
 ): void {
-  const report = generateRagSearchReport(query, options);
+  const report = application.generateRagSearchReport(query, options);
 
   if (report.error === "missing_query") {
     if (options?.json) {

@@ -1,10 +1,18 @@
-import { generateWorkspaceReports, type Config } from "../core/index.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationConfig,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 
-export function printStatus(config: Config): void {
+export function printStatus(
+  application: LoopApplicationAssembly,
+  config: LoopApplicationConfig,
+): void {
   terminal.header("Status");
 
-  for (const [index, snapshot] of generateWorkspaceReports(config).entries()) {
+  for (const [index, snapshot] of application
+    .generateWorkspaceReports(config)
+    .entries()) {
     const project = config.projects[index]!;
 
     terminal.section(snapshot.project.name);

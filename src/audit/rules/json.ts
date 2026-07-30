@@ -35,7 +35,9 @@ export const JSON_SCHEMA_VERSION_RULE: AuditRule = {
         file === "src/commands/run.ts" ? loopSource : reportsSource;
 
       return (
-        !commandSource.includes("../core/index.js") ||
+        !commandSource.includes(
+          "../composition/index.js",
+        ) ||
         !coreSource.includes("schemaVersion")
       );
     });
@@ -51,7 +53,7 @@ export const JSON_SCHEMA_VERSION_RULE: AuditRule = {
 
     return pass(
       JSON_SCHEMA_VERSION_RULE,
-      "All public JSON command adapters delegate to Core reports exposing schemaVersion.",
+      "All public JSON command adapters delegate through LoopApplicationAssembly to Core reports exposing schemaVersion.",
       files,
     );
   },

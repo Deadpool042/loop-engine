@@ -1,11 +1,14 @@
-import {
-  generateProjectPromptReport,
-  generateProjectReport,
-  type ProjectConfig,
-} from "../core/index.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationProject,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 
-export function printProjectPrompt(project: ProjectConfig): void {
+export function printProjectPrompt(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): void {
+  const { generateProjectReport } = application;
   const snapshot = generateProjectReport(project);
 
   terminal.header(`Prompt • ${snapshot.project.name}`);
@@ -101,6 +104,9 @@ export function printProjectPrompt(project: ProjectConfig): void {
   console.log("- Lancer les validations configurées avant review ou commit.");
 }
 
-export function printProjectPromptJson(project: ProjectConfig): void {
-  console.log(JSON.stringify(generateProjectPromptReport(project)));
+export function printProjectPromptJson(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): void {
+  console.log(JSON.stringify(application.generateProjectPromptReport(project)));
 }

@@ -8,7 +8,7 @@ import {
 } from "../../src/audit/rules/concrete-provider-exposure.js";
 import { AUDIT_RULES } from "../../src/audit/runtime-rules.js";
 
-const COMPOSITION_PATH = "src/composition/codex-provider.ts";
+const COMPOSITION_PATH = "src/composition/application-assembly.ts";
 
 test("extractProviderModuleSpecifiers detects imports, exports and dynamic imports", () => {
   assert.deepEqual(
@@ -74,8 +74,7 @@ test("rejects executable provider composition outside the explicit root", () => 
     inspectConcreteProviderExposure([
       {
         path: "src/commands/codex-provider.ts",
-        source:
-          'const provider = import("../loop/codex-cli-executor.js");',
+        source: 'const provider = import("../loop/codex-cli-executor.js");',
       },
     ]),
     [

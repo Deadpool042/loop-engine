@@ -88,10 +88,13 @@ Loop Engine is self-hosted as project `loop-engine` with path `.`.
 
 ## Architecture
 
-Layering remains explicit: `cli.ts` routes, `commands/` adapts, domain modules implement contracts, and Core exposes reviewed integration boundaries.
+Layering remains explicit: `cli.ts` routes, `commands/` consume the application
+assembly contract, `composition/` wires concrete implementations, domain
+modules implement contracts, and Core exposes reviewed integration boundaries.
 
 - **`src/cli.ts`** — argv parsing and routing only. It validates `--mode` and `--max-repairs`, then delegates.
-- **`src/commands/`** — user-facing adapters. `run.ts` renders a `LoopRunResult`; it does not implement execution or validation logic.
+- **`src/commands/`** — user-facing adapters injected with `LoopApplicationAssembly`. They never import Core or concrete implementations directly. `run.ts` renders a `LoopRunResult`; it does not implement execution or validation logic.
+- **`src/composition/`** — the single deterministic application assembly layer. `createLoopApplicationAssembly(...)` wires Core services and optional concrete providers behind the immutable public contract; Core never depends on composition.
 - **`src/loop/`** — LoopRunner domain:
   - `types.ts` — `LoopRunMode`, states, steps, failures, validation evidence and `LoopRunResult`;
   - `state-machine.ts` — the only legal transition table;

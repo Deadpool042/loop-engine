@@ -67,14 +67,31 @@ Une commande ne doit pas :
 
 ---
 
+## Rôle de `composition/`
+
+`src/composition/application-assembly.ts` est le point d'assemblage unique de
+l'application CLI.
+
+La factory `createLoopApplicationAssembly(...)` construit les implémentations
+concrètes autorisées et retourne le contrat public immuable
+`LoopApplicationAssembly`.
+
+Les commandes CLI consomment uniquement ce contrat pour déclencher les
+opérations de domaine et obtenir les rapports : audit, planification LoopRunner,
+snapshots, rapports JSON, RAG et validations configurées. Elles conservent
+seulement le parsing des arguments, le rendu terminal et les codes de sortie.
+
+La construction d'un provider concret est interdite dans `commands/`, `cli.ts`
+et `core/`. Core ne dépend jamais de `composition/`.
+
+Voir [`application-assembly-contract.md`](application-assembly-contract.md).
+
+---
+
 ## Rôle de `core/`
 
-`core/index.ts` est le point d'entrée interne stable entre les adaptateurs et le moteur.
-
-Les commandes CLI importent uniquement ce façcade pour déclencher les opérations
-de domaine et obtenir les rapports : audit, planification LoopRunner, snapshots,
-rapports JSON, RAG et validations configurées. Elles conservent seulement le
-parsing des arguments, le rendu terminal et les codes de sortie.
+`core/index.ts` reste le point d'entrée interne stable que la composition
+assemble derrière le contrat d'application.
 
 Les implémentations restent réparties dans les couches spécialisées. `core/`
 contient également les primitives bas niveau :
@@ -86,8 +103,9 @@ contient également les primitives bas niveau :
 
 Ces modules restent petits et déterministes.
 
-Les adaptateurs futurs doivent consommer `core/index.ts`, sans importer
-directement `audit/`, `loop/`, `intelligence/`, `policy/` ou `context/`.
+Les adaptateurs CLI consomment `LoopApplicationAssembly`. Les autres adaptateurs
+internes peuvent consommer les contrats Core sans importer `commands/` ou
+`composition/`.
 La couche [`runtime`](runtime-abstraction.md) reste elle aussi derrière ce
 façcade : elle ne change aucune sortie CLI. Depuis V10.1, son unique backend
 réel `local-process` reste accessible seulement par un appel Core explicite et

@@ -115,6 +115,7 @@ La boucle par défaut reste déterministe et non destructive :
 
 - `src/cli.ts` : routeur CLI minimal.
 - `src/commands/` : commandes utilisateur et cas d'usage.
+- `src/composition/` : contrat d'assemblage applicatif et câblage concret unique.
 - `src/loop/` : orchestration `plan` et cycle `execute/validate/repair` par ports injectés.
 - `src/core/` : primitives bas niveau comme config, Git, docs, résolution projet et surfaces internes opt-in.
 - `src/intelligence/` : états calculés, ProjectSnapshot, roadmap et sélection de candidats.

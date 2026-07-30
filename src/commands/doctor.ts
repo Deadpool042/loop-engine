@@ -1,8 +1,14 @@
-import { generateDoctorReport, type Config } from "../core/index.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationConfig,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 
-export function printDoctor(config: Config): void {
-  const report = generateDoctorReport(config);
+export function printDoctor(
+  application: LoopApplicationAssembly,
+  config: LoopApplicationConfig,
+): void {
+  const report = application.generateDoctorReport(config);
 
   terminal.header("Doctor");
 

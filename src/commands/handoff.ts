@@ -1,11 +1,14 @@
-import {
-  generateProjectHandoffReport,
-  generateProjectReport,
-  type ProjectConfig,
-} from "../core/index.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationProject,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 
-export function printProjectHandoff(project: ProjectConfig): void {
+export function printProjectHandoff(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): void {
+  const { generateProjectReport } = application;
   const snapshot = generateProjectReport(project);
   const selectedCandidate = snapshot.roadmap.selectedCandidate;
 
@@ -53,6 +56,11 @@ export function printProjectHandoff(project: ProjectConfig): void {
   );
 }
 
-export function printProjectHandoffJson(project: ProjectConfig): void {
-  console.log(JSON.stringify(generateProjectHandoffReport(project)));
+export function printProjectHandoffJson(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): void {
+  console.log(
+    JSON.stringify(application.generateProjectHandoffReport(project)),
+  );
 }

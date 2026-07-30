@@ -57,10 +57,13 @@ Loop Engine is self-hosted: it's declared in `projects.yaml` as project `loop-en
 
 ## Architecture
 
-Layering is strict and one-directional: `cli.ts` → `commands/` → `loop/` → `intelligence/` → `core/`. Never skip a layer.
+Layering is strict and one-directional: `cli.ts` → `commands/` →
+`composition/` → Core application services and internal domain layers. Never
+skip the application assembly boundary from a command.
 
 - **`src/cli.ts`** — routes argv to a command handler. Contains no business logic, no direct Git/doc/roadmap access. Just: read command → resolve project (if needed) → call the command.
-- **`src/commands/`** — one file per user-facing command (`summary`, `status`, `doctor`, `context`, `validate`, `review`, `next`, `prompt`, `run`, `help`). Each command loads a `ProjectSnapshot` (or, for `run`, a `LoopRunResult`) and renders it (text or `--json`); it must not re-derive information that layer below already computes.
+- **`src/commands/`** — one file per user-facing command (`summary`, `status`, `doctor`, `context`, `validate`, `review`, `next`, `prompt`, `run`, `help`). Each command consumes only the injected `LoopApplicationAssembly`, loads a `ProjectSnapshot` (or, for `run`, a `LoopRunResult`) through that contract, and renders it (text or `--json`); it must not import Core or internal implementation layers directly.
+- **`src/composition/`** — the single concrete application assembly layer. `createLoopApplicationAssembly(...)` wires Core application services and optional concrete providers behind the immutable `LoopApplicationAssembly` contract. Core must never depend on this layer.
 - **`src/loop/`** — the LoopRunner core (V7.2, `plan` mode only): `types.ts` (`LoopRunMode`, `LoopRunStatus`, `LoopRunResult`, …), `state-machine.ts` (`canTransition`), `planner.ts` (`planLoopCycle`, composes `intelligence/project-snapshot.ts` without duplicating it), `runner.ts` (`runLoopPlan`). See `docs/architecture/autonomous-loop-runner.md`.
 - **`src/intelligence/`** — the engine. `project-snapshot.ts` builds the central `ProjectSnapshot` (see `src/intelligence/snapshot.ts` for the type) by merging declarative config (`projects.yaml`) with computed state (Git, docs, roadmap). `roadmap.ts` is the roadmap reader (see below). **This is the single source of truth commands must consume — never have a command re-read Git/docs/roadmap directly.**
 - **`src/core/`** — small, deterministic low-level primitives: `config.ts` (loads/parses `projects.yaml`), `git.ts` (shells out to `git`, always fails soft to `"unknown"`/`null`), `docs.ts` (file existence checks), `project.ts` (project lookup/arg parsing).
@@ -95,7 +98,8 @@ When adjusting keyword lists, favor precision (avoid blocking ordinary work) ove
 
 - `docs/architecture/final-objective.md` — final objective and product source of truth (see top of this file).
 - `docs/architecture/autonomous-loop-runner.md` — LoopRunner architecture and contracts for the autonomous small-lot cycle (plan/execute/commit/publish modes, state machine, `LoopRunResult`).
-- `docs/architecture/commands.md` — layering rules for `cli.ts` / `commands/` / `core/` / `intelligence/` / `ui/`.
+- `docs/architecture/application-assembly-contract.md` — application assembly contract, provider wiring and dependency direction.
+- `docs/architecture/commands.md` — layering rules for `cli.ts` / `commands/` / `composition/` / Core / `ui/`.
 - `docs/architecture/project-intelligence.md` — `ProjectSnapshot` contract and roadmap candidate classification.
 - `docs/architecture/roadmap-reader.md` — roadmap reader formats, states, and keyword refinement history.
 - `docs/architecture/audit-engine.md` — Audit Engine architecture, profiles, and CI integration.

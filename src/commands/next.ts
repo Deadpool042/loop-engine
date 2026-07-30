@@ -1,11 +1,14 @@
-import {
-  generateNextProjectActionReport,
-  generateProjectReport,
-  type ProjectConfig,
-} from "../core/index.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationProject,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 
-export function printNextProjectAction(project: ProjectConfig): void {
+export function printNextProjectAction(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): void {
+  const { generateProjectReport } = application;
   const snapshot = generateProjectReport(project);
 
   terminal.header(`Next • ${snapshot.project.name}`);
@@ -133,6 +136,11 @@ export function printNextProjectAction(project: ProjectConfig): void {
   terminal.info("5. Run review before commit.");
 }
 
-export function printNextProjectActionJson(project: ProjectConfig): void {
-  console.log(JSON.stringify(generateNextProjectActionReport(project)));
+export function printNextProjectActionJson(
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
+): void {
+  console.log(
+    JSON.stringify(application.generateNextProjectActionReport(project)),
+  );
 }

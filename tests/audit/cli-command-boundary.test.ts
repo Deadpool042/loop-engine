@@ -19,15 +19,14 @@ test("extractCliCommandModuleSpecifiers detects imports, exports, and dynamic im
   );
 });
 
-test("allows Core, UI, composition-root, and local command dependencies", () => {
+test("allows application assembly, UI, and local command dependencies", () => {
   assert.deepEqual(
     inspectCliCommandBoundary([
       {
         path: "src/commands/run.ts",
         source: `
-          import { runLoop } from "../core/index.js";
           import { terminal } from "../ui/terminal.js";
-          import { createProvider } from "../composition/codex-provider.js";
+          import type { LoopApplicationAssembly } from "../composition/index.js";
           import { printError } from "./json-error.js";
         `,
       },
@@ -42,12 +41,18 @@ test("rejects direct internal layer imports from commands", () => {
       {
         path: "src/commands/run.ts",
         source: `
+          import { core } from "../core/index.js";
           import { execute } from "../loop/execute-runner.js";
           const policy = import("../policy/index.js");
         `,
       },
     ]),
     [
+      {
+        path: "src/commands/run.ts",
+        target: "../core/index.js",
+        reason: "command_bypasses_core_boundary",
+      },
       {
         path: "src/commands/run.ts",
         target: "../loop/execute-runner.js",

@@ -1,18 +1,15 @@
-import {
-  generateAuditReport,
-  generateAuditRuleManifest,
-  isAuditRuleStability,
-  isAuditRuleTag,
-  isAuditProfile,
-  type AuditProfile,
-  type AuditReport,
-  type AuditRuleSelection,
-} from "../core/index.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationAuditProfile,
+  LoopApplicationAuditReport,
+  LoopApplicationAuditSelection,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 
 export function parseAuditProfileOption(
+  application: LoopApplicationAssembly,
   args: readonly string[],
-): AuditProfile | undefined {
+): LoopApplicationAuditProfile | undefined {
   const profileIndex = args.indexOf("--profile");
 
   if (profileIndex === -1) {
@@ -21,7 +18,11 @@ export function parseAuditProfileOption(
 
   const value = args[profileIndex + 1];
 
-  if (value === undefined || value.startsWith("--") || !isAuditProfile(value)) {
+  if (
+    value === undefined ||
+    value.startsWith("--") ||
+    !application.isAuditProfile(value)
+  ) {
     throw new Error(`Invalid audit profile: ${value ?? "<missing>"}`);
   }
 
@@ -52,26 +53,27 @@ function parseRepeatedOption(
 }
 
 export type AuditCommandOptions = Readonly<{
-  profile?: AuditProfile;
-  selection: AuditRuleSelection;
+  profile?: LoopApplicationAuditProfile;
+  selection: LoopApplicationAuditSelection;
 }>;
 
 export function parseAuditCommandOptions(
+  application: LoopApplicationAssembly,
   args: readonly string[],
 ): AuditCommandOptions {
-  const profile = parseAuditProfileOption(args);
+  const profile = parseAuditProfileOption(application, args);
   const ruleIds = parseRepeatedOption(args, "--rule");
   const tags = parseRepeatedOption(args, "--tag");
   const stabilities = parseRepeatedOption(args, "--stability");
 
   const validTags = tags.map((tag) => {
-    if (!isAuditRuleTag(tag)) {
+    if (!application.isAuditRuleTag(tag)) {
       throw new Error(`Invalid audit tag: ${tag}`);
     }
     return tag;
   });
   const validStabilities = stabilities.map((stability) => {
-    if (!isAuditRuleStability(stability)) {
+    if (!application.isAuditRuleStability(stability)) {
       throw new Error(`Invalid audit stability: ${stability}`);
     }
     return stability;
@@ -89,9 +91,11 @@ export function parseAuditCommandOptions(
   };
 }
 
-export function printAuditReport(): AuditReport {
-  const options = parseAuditCommandOptions(process.argv);
-  const report = generateAuditReport(options);
+export function printAuditReport(
+  application: LoopApplicationAssembly,
+): LoopApplicationAuditReport {
+  const options = parseAuditCommandOptions(application, process.argv);
+  const report = application.generateAuditReport(options);
 
   terminal.header("Audit");
 
@@ -165,14 +169,18 @@ export function printAuditReport(): AuditReport {
   return report;
 }
 
-export function printAuditReportJson(): AuditReport {
-  const options = parseAuditCommandOptions(process.argv);
-  const report = generateAuditReport(options);
+export function printAuditReportJson(
+  application: LoopApplicationAssembly,
+): LoopApplicationAuditReport {
+  const options = parseAuditCommandOptions(application, process.argv);
+  const report = application.generateAuditReport(options);
   console.log(JSON.stringify(report));
   return report;
 }
 
-export function printAuditRuleManifest(): void {
-  const options = parseAuditCommandOptions(process.argv);
-  console.log(JSON.stringify(generateAuditRuleManifest(options)));
+export function printAuditRuleManifest(
+  application: LoopApplicationAssembly,
+): void {
+  const options = parseAuditCommandOptions(application, process.argv);
+  console.log(JSON.stringify(application.generateAuditRuleManifest(options)));
 }

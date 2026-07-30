@@ -512,11 +512,11 @@ export const AUDIT_STRICT_MODE_RULE: AuditRule = {
       },
       {
         file: "src/commands/audit.ts",
-        token: "export function printAuditReport(): AuditReport",
+        token: "export function printAuditReport(",
       },
       {
         file: "src/commands/audit.ts",
-        token: "export function printAuditReportJson(): AuditReport",
+        token: "export function printAuditReportJson(",
       },
     ];
 
@@ -2066,8 +2066,8 @@ export const AUDIT_CLI_PROFILE_PARSING_RULE: AuditRule = {
       'args.indexOf("--profile")',
       "isAuditProfile(value)",
       "Invalid audit profile",
-      "const profile = parseAuditProfileOption(args)",
-      "const options = parseAuditCommandOptions(process.argv)",
+      "const profile = parseAuditProfileOption(application, args)",
+      "const options = parseAuditCommandOptions(application, process.argv)",
       "generateAuditReport(options)",
     ];
 
@@ -2078,7 +2078,7 @@ export const AUDIT_CLI_PROFILE_PARSING_RULE: AuditRule = {
         AUDIT_CLI_PROFILE_PARSING_RULE,
         "Audit CLI profile parsing is incomplete.",
         missing,
-        "Parse --profile in the audit command and pass the validated profile to the Core audit report generator.",
+        "Parse --profile in the audit command and pass the validated profile through LoopApplicationAssembly to the Core audit report generator.",
       );
     }
 

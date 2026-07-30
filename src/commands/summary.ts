@@ -1,14 +1,16 @@
-import {
-  generateWorkspaceReports,
-  generateWorkspaceSummaryReport,
-  type Config,
-} from "../core/index.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationConfig,
+} from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 
-export function printWorkspaceSummary(config: Config): void {
+export function printWorkspaceSummary(
+  application: LoopApplicationAssembly,
+  config: LoopApplicationConfig,
+): void {
   terminal.header("Summary");
 
-  for (const snapshot of generateWorkspaceReports(config)) {
+  for (const snapshot of application.generateWorkspaceReports(config)) {
     const git = snapshot.git.requiresGit
       ? snapshot.git.clean
         ? "clean"
@@ -39,6 +41,11 @@ export function printWorkspaceSummary(config: Config): void {
   }
 }
 
-export function printWorkspaceSummaryJson(config: Config): void {
-  console.log(JSON.stringify(generateWorkspaceSummaryReport(config)));
+export function printWorkspaceSummaryJson(
+  application: LoopApplicationAssembly,
+  config: LoopApplicationConfig,
+): void {
+  console.log(
+    JSON.stringify(application.generateWorkspaceSummaryReport(config)),
+  );
 }
