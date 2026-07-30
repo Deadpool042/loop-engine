@@ -8,7 +8,7 @@ import {
 } from "../../src/audit/rules/concrete-provider-exposure.js";
 import { AUDIT_RULES } from "../../src/audit/runtime-rules.js";
 
-const COMPOSITION_PATH = "src/commands/codex-provider.ts";
+const COMPOSITION_PATH = "src/composition/codex-provider.ts";
 
 test("extractProviderModuleSpecifiers detects imports, exports and dynamic imports", () => {
   assert.deepEqual(
@@ -25,7 +25,7 @@ test("extractProviderModuleSpecifiers detects imports, exports and dynamic impor
   );
 });
 
-test("allows executable provider composition in the reviewed command boundary", () => {
+test("allows executable provider composition in the explicit composition root", () => {
   assert.deepEqual(
     inspectConcreteProviderExposure([
       {
@@ -69,18 +69,18 @@ test("rejects executable provider exports from the Core public barrel", () => {
   );
 });
 
-test("rejects executable provider composition outside the reviewed boundary", () => {
+test("rejects executable provider composition outside the explicit root", () => {
   assert.deepEqual(
     inspectConcreteProviderExposure([
       {
-        path: "src/core/provider-factory.ts",
+        path: "src/commands/codex-provider.ts",
         source:
           'const provider = import("../loop/codex-cli-executor.js");',
       },
     ]),
     [
       {
-        path: "src/core/provider-factory.ts",
+        path: "src/commands/codex-provider.ts",
         target: "../loop/codex-cli-executor.js",
         reason: "unreviewed_provider_composition",
       },
