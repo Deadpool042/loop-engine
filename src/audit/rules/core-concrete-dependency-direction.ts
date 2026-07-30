@@ -118,7 +118,7 @@ export const CORE_CONCRETE_DEPENDENCY_DIRECTION_RULE: AuditRule = (() => {
       "Core modules must not depend on concrete inbound adapters or configured security implementations except through the single reviewed compatibility facade.",
     metadata: {
       introducedIn: "V14.7",
-      tags: ["architecture", "dependencies", "core", "adapters", "ci"],
+      tags: ["architecture", "contract", "execution", "policy", "ci"],
       stability: "stable",
       dependsOn: ["AUDIT-496", "AUDIT-497"],
     },
