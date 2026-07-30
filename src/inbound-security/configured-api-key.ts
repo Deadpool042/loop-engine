@@ -29,13 +29,19 @@ type ConfiguredApiKeyCredentialInput = Readonly<{
   secret: string;
 }>;
 
+const UNKNOWN_CREDENTIAL_HASH = createHash("sha256")
+  .update("loop-engine:configured-api-key:unknown:v1", "utf8")
+  .digest("hex");
+
 function isOrdinaryObject(value: unknown): value is Record<PropertyKey, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
-  );
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  try {
+    return Object.getPrototypeOf(value) === Object.prototype;
+  } catch {
+    return false;
+  }
 }
 
 function isEnumerableDataProperty(
@@ -232,12 +238,10 @@ export function createConfiguredApiKeyVerifier(
       }
 
       const record = registry.get(credential.credentialId);
-      if (record === undefined) {
-        return Object.freeze({ verified: false as const, reason: "rejected" as const });
-      }
-
       const actualHash = hashConfiguredApiKeySecret(credential.secret);
-      if (!hashesMatch(actualHash, record.secretSha256)) {
+      const expectedHash = record?.secretSha256 ?? UNKNOWN_CREDENTIAL_HASH;
+      const matched = hashesMatch(actualHash, expectedHash);
+      if (record === undefined || !matched) {
         return Object.freeze({ verified: false as const, reason: "rejected" as const });
       }
 
