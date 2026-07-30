@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 
 import type { LoopExecutor, LoopExecutorInput, LoopExecutorResult } from "./execution.js";
 
@@ -50,15 +50,15 @@ function runProcess(
       cwd,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
     });
     let stdout = "";
     let observedBytes = 0;
     let settled = false;
+    let timer: NodeJS.Timeout | null = null;
     const settle = (exitCode: number): void => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      if (timer !== null) clearTimeout(timer);
       resolvePromise(Object.freeze({ exitCode, stdout }));
     };
     const consume = (chunk: Buffer, capture: boolean): void => {
@@ -74,29 +74,43 @@ function runProcess(
     child.stderr.on("data", (chunk: Buffer) => consume(chunk, false));
     child.once("error", () => settle(127));
     child.once("close", (code) => settle(code ?? 1));
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       child.kill("SIGTERM");
       settle(124);
     }, timeoutMs);
   });
 }
 
-async function readModifiedFiles(cwd: string): Promise<readonly string[]> {
-  const result = await runProcess("git", ["status", "--porcelain=v1", "-z"], cwd, 10_000, 1_000_000);
-  if (result.exitCode !== 0) return Object.freeze([]);
-  const files = result.stdout
-    .split("\0")
-    .filter(Boolean)
-    .map((entry) => entry.slice(3).trim())
-    .filter(Boolean);
-  return Object.freeze([...new Set(files)].sort());
+function parsePorcelainFiles(output: string): readonly string[] {
+  const entries = output.split("\0");
+  const files = new Set<string>();
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    if (!entry) continue;
+    const status = entry.slice(0, 2);
+    const path = entry.slice(3);
+    if (path.length > 0) files.add(path);
+    if (status.includes("R") || status.includes("C")) index += 1;
+  }
+  return Object.freeze([...files].sort());
+}
+
+async function readModifiedFiles(cwd: string): Promise<readonly string[] | null> {
+  const result = await runProcess(
+    "git",
+    ["status", "--porcelain=v1", "-z"],
+    cwd,
+    10_000,
+    1_000_000,
+  );
+  return result.exitCode === 0 ? parsePorcelainFiles(result.stdout) : null;
 }
 
 export function createCodexCliLoopExecutor(
   options: CodexCliLoopExecutorOptions,
 ): LoopExecutor {
-  if (!isNonEmptyString(options.executable)) {
-    throw new TypeError("Codex executable must be a non-empty string.");
+  if (!isNonEmptyString(options.executable) || basename(options.executable.trim()) !== "codex") {
+    throw new TypeError("Codex executable must resolve to a command named codex.");
   }
   const timeoutMs = options.timeoutMs ?? 300_000;
   const maxOutputBytes = options.maxOutputBytes ?? 1_000_000;
@@ -109,13 +123,19 @@ export function createCodexCliLoopExecutor(
 
   return async (input): Promise<LoopExecutorResult> => {
     const cwd = resolve(input.project.path);
+    const before = await readModifiedFiles(cwd);
+    if (before === null) return failure("worktree_status_failed", "Unable to verify the provider worktree.");
+    if (before.length > 0) return failure("worktree_not_clean", "Codex execution requires a clean worktree.");
+
     const args = ["exec", "--full-auto"];
     if (isNonEmptyString(options.model)) args.push("--model", options.model.trim());
     args.push(buildPrompt(input));
-    const result = await runProcess(options.executable, args, cwd, timeoutMs, maxOutputBytes);
+    const result = await runProcess(options.executable.trim(), args, cwd, timeoutMs, maxOutputBytes);
     if (result.exitCode === 124) return failure("provider_limit_exceeded", "Codex execution exceeded a configured limit.");
     if (result.exitCode !== 0) return failure("provider_failed", "Codex CLI execution failed.");
+
     const modifiedFiles = await readModifiedFiles(cwd);
+    if (modifiedFiles === null) return failure("worktree_status_failed", "Unable to inspect provider modifications.");
     return Object.freeze({
       status: "completed" as const,
       modifiedFiles,
