@@ -2,6 +2,7 @@
 export * from "./audit.js";
 export * from "./loop.js";
 export * from "./loop-execution-plan-evidence-report.js";
+export * from "./loop-execution-report-integrity.js";
 export * from "./loop-execution-cycle.js";
 export * from "./loop-runtime-escalation-serialization.js";
 export * from "./loop-runtime-escalation-delivery.js";
