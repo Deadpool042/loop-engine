@@ -7,17 +7,17 @@ export type JsonErrorCode =
   | "missing_max_repairs_value"
   | "invalid_max_repairs"
   | "unknown_mode"
-  | "mode_not_implemented";
+  | "mode_not_implemented"
+  | "invalid_provider_timeout"
+  | "unsupported_provider"
+  | "missing_commit_message";
 
 export function printJsonError(code: JsonErrorCode, message: string): void {
   console.log(
     JSON.stringify({
       schemaVersion: 1,
       ok: false,
-      error: {
-        code,
-        message,
-      },
+      error: { code, message },
     }),
   );
 }
