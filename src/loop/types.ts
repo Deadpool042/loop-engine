@@ -1,6 +1,7 @@
 import type { MinimalContextPackage } from "../context/types.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import type { AgentPolicyResolution } from "../policy/types.js";
+import type { LoopExecutionPlanEvidence } from "./execution-plan-evidence.js";
 
 export const LOOP_RUN_MODES = ["plan", "execute", "commit", "publish"] as const;
 export type LoopRunMode = (typeof LOOP_RUN_MODES)[number];
@@ -49,4 +50,5 @@ export type LoopRunResult = Readonly<{
   failure: LoopRunFailure | null;
   agentPolicy: AgentPolicyResolution | null;
   contextPackage: MinimalContextPackage | null;
+  executionPlanEvidence?: LoopExecutionPlanEvidence | null;
 }>;
