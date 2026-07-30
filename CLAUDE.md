@@ -14,16 +14,17 @@ Claude doit s’y référer avant toute évolution structurante.
 
 Loop Engine is a local CLI orchestrator for projects declared in `projects.yaml`. It exposes project inspection, roadmap selection, bounded context, validation, audit, declarative Runtime contracts, guarded inbound execution and a bounded LoopRunner cycle.
 
-Current user-facing capabilities include:
+Current user-facing and Core capabilities include:
 
 - project piloting (`summary`, `status`, `doctor`, `context`, `validate`, `review`, `next`);
 - context and handoff generation (`context`, `handoff`, `prompt`);
 - local RAG (`rag-index`, `rag-search`);
 - the executable Audit Engine (`audit`, strict mode and profiles);
 - stable human and JSON outputs;
-- LoopRunner `plan` and V14.4 `execute/validate/repair` orchestration.
+- LoopRunner `plan` and V14.4 `execute/validate/repair` orchestration;
+- the V14.5 configured inbound identity/ACL/replay adapter Core boundary.
 
-The historical LoopRunner contract is in `docs/architecture/autonomous-loop-runner.md`. The current execute-mode contract is `docs/architecture/looprunner-execute-validation-repair.md`.
+The historical LoopRunner contract is in `docs/architecture/autonomous-loop-runner.md`. The current execute-mode contract is `docs/architecture/looprunner-execute-validation-repair.md`. The configured inbound pilot is documented in `docs/architecture/configured-inbound-security-adapter.md`.
 
 ### LoopRunner status
 
@@ -98,14 +99,15 @@ Layering remains explicit: `cli.ts` routes, `commands/` adapts, domain modules i
   - `execution.ts` — `LoopExecutor`, `LoopValidator`, `LoopRepairer`, default configured-validation adapter and unavailable executor;
   - `execute-runner.ts` — V14.4 execute/validate/repair orchestration.
 - **`src/intelligence/`** — `ProjectSnapshot`, roadmap reading and candidate selection. Commands and runners consume this source of truth instead of re-reading project state ad hoc.
-- **`src/core/`** — low-level primitives and reviewed integration surfaces. `loop-execution-cycle.ts` exports the V14.4 application boundary. `prepared-inbound-runtime-execution.ts` owns the V14.3 inbound-to-Runtime vertical slice.
+- **`src/core/`** — low-level primitives and reviewed integration surfaces. `loop-execution-cycle.ts` exports the V14.4 application boundary. `prepared-inbound-runtime-execution.ts` owns the V14.3 inbound-to-Runtime vertical slice. `configured-inbound-security-adapter.ts` exports the V14.5 pilot without adding CLI routing.
 - **`src/agents/`** — profile types, registry, smallest-capable-first selector and explicit escalation. Profiles are declarations, not executable provider integrations.
 - **`src/policy/`** — derives requirements and resolves policy. In plan mode the resolution is forecast evidence; in execute mode V14.4 treats a resolved selected profile as mandatory admission before calling the injected executor. The policy module itself never invokes a provider.
 - **`src/context/`** — bounded deterministic context construction with path confinement and stable truncation.
 - **`src/runtime/`** and **`src/transports/`** — guarded Runtime/Transport contracts and opt-in implementations.
-- **`src/providers/`** — provider planning contracts and static declarations. V14.4 does not make these a concrete LoopExecutor.
-- **`src/inbound-security/`** — pure fail-closed inbound security contracts. Concrete identity, ACL, replay persistence and the first inbound adapter are V14.5 scope.
-- **`src/audit/`** — executable architecture and contract checks. AUDIT-495 guards the complete V14.4 boundary rather than individual helper tokens.
+- **`src/providers/`** — provider planning contracts and static declarations. V14.5 still does not make these a concrete LoopExecutor or inbound Runtime provider.
+- **`src/inbound-security/`** — fail-closed inbound security contracts plus the configured API-key verifier, explicit ACL and atomic file-backed replay port. No credential discovery, listener or remote identity integration exists.
+- **`src/inbound-adapters/`** — the single V14.5 configured DTO adapter. It builds one neutral envelope and delegates once to V14.3 with a mandatory explicit Runtime resolver.
+- **`src/audit/`** — executable architecture and contract checks. AUDIT-495 guards V14.4 and AUDIT-496 guards the complete V14.5 vertical rather than individual micro-lots.
 - **`src/ui/terminal.ts`** — terminal formatting only.
 
 Before adding a command, check whether its data already exists on `ProjectSnapshot` or another reviewed Core result. Extend the owning layer instead of deriving data in the command.
@@ -120,6 +122,18 @@ Before adding a command, check whether its data already exists on `ProjectSnapsh
 - Modified-file paths are normalized, deduplicated and sorted.
 - `commit` and `publication` remain `null` on every V14.4 outcome.
 - No direct network, environment-secret discovery, provider SDK, commit, push, tag or force operation belongs in `src/loop/execute-runner.ts`.
+
+### V14.5 invariants
+
+- Credential records are explicit configuration containing digests, identity, roles, tenant and validity windows; raw configured secrets are prohibited.
+- Unknown credential ids and wrong secrets produce the same generic rejection and both execute a digest comparison.
+- Principal identity comes only from the configured credential record, never from the payload.
+- ACL admission requires exact tenant, every required role, project and operation; no wildcard or default allow exists.
+- ACL denial happens before replay and therefore does not consume a nonce.
+- A nonce is scoped to stable credential evidence, so changing `requestId` cannot bypass replay protection.
+- Replay claims use exclusive file creation, survive process restart and persist no raw credential or nonce.
+- The configured adapter delegates exactly once to `executePreparedInboundRuntimeRequest(...)` and requires an explicit Runtime resolver.
+- No HTTP server, provider inference, environment credential lookup, commit, push or publication is part of V14.5.
 
 ### Roadmap reader (`src/intelligence/roadmap.ts`)
 
@@ -148,6 +162,7 @@ Public JSON payloads use `schemaVersion: 1`.
 - `docs/architecture/autonomous-loop-runner.md`
 - `docs/architecture/looprunner-execute-validation-repair.md`
 - `docs/architecture/prepared-inbound-runtime-execution.md`
+- `docs/architecture/configured-inbound-security-adapter.md`
 - `docs/architecture/execution-architecture-rfc.md`
 - `docs/architecture/agent-orchestration.md`
 - `docs/architecture/agent-policy-engine.md`
