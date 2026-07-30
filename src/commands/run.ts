@@ -8,8 +8,8 @@ import {
   type LoopRunResult,
   type ProjectConfig,
 } from "../core/index.js";
+import { composeCodexProvider } from "../composition/codex-provider.js";
 import { terminal } from "../ui/terminal.js";
-import { composeCodexProvider } from "./codex-provider.js";
 import { printJsonError } from "./json-error.js";
 
 export function isLoopRunMode(value: string): value is LoopRunMode {

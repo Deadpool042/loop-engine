@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fail, pass } from "../findings.js";
 import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
-const REVIEWED_COMPOSITION_FILE = "src/commands/codex-provider.ts";
+const REVIEWED_COMPOSITION_FILE = "src/composition/codex-provider.ts";
 const PUBLIC_BARREL_FILES = Object.freeze([
   "src/core/index.ts",
   "src/loop/index.ts",
@@ -83,7 +83,7 @@ export const CONCRETE_PROVIDER_EXPOSURE_RULE: AuditRule = (() => {
     severity: "error",
     title: "Concrete providers stay behind the reviewed composition boundary",
     description:
-      "Public barrels must expose provider ports and contracts only, while executable provider construction remains confined to the reviewed CLI composition file.",
+      "Public barrels must expose provider ports and contracts only, while executable provider construction remains confined to the explicit composition root.",
     metadata: {
       introducedIn: "V14.8",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
