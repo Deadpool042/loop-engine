@@ -80,6 +80,7 @@ import { LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE } from "./rules/looprunner-e
 import { CONFIGURED_INBOUND_SECURITY_ADAPTER_RULE } from "./rules/configured-inbound-security-adapter.js";
 import { CODEX_PROVIDER_CONTROLLED_COMMIT_RULE } from "./rules/codex-provider-controlled-commit.js";
 import { AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE } from "./rules/github-actions-parallel-ci.js";
+import { CORE_CONCRETE_DEPENDENCY_DIRECTION_RULE } from "./rules/core-concrete-dependency-direction.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -162,6 +163,7 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE,
   CONFIGURED_INBOUND_SECURITY_ADAPTER_RULE,
   CODEX_PROVIDER_CONTROLLED_COMMIT_RULE,
+  CORE_CONCRETE_DEPENDENCY_DIRECTION_RULE,
 ].map((rule) =>
   rule.id === "AUDIT-012" ? AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE : rule,
 ));
