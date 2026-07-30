@@ -104,5 +104,4 @@ export {
 export { LOOP_RUN_MODES, type LoopRunMode, type LoopRunResult } from "../loop/types.js";
 export { runLoopExecute, type LoopRunExecuteOptions } from "../loop/execute-runner.js";
 export { runLoopCommit, type LoopRunCommitOptions } from "../loop/commit-runner.js";
-export { createCodexCliLoopExecutor, type CodexCliLoopExecutorOptions } from "../loop/codex-cli-executor.js";
 export { gitLoopCommitter, type LoopCommitter, type LoopCommitResult } from "../loop/git-committer.js";
