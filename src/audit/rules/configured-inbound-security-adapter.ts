@@ -125,7 +125,7 @@ export const CONFIGURED_INBOUND_SECURITY_ADAPTER_RULE: AuditRule = (() => {
       "The V14.5 pilot must bind configured API-key identity, explicit tenant/role/project/operation ACL, atomic persistent replay claims and one adapter delegation without provider, Runtime or credential discovery.",
     metadata: {
       introducedIn: "V14.5",
-      tags: ["architecture", "contract", "security", "execution", "policy"],
+      tags: ["architecture", "contract", "execution", "policy", "ci"],
       stability: "stable",
       dependsOn: ["AUDIT-494", "AUDIT-495"],
     },
