@@ -17,5 +17,6 @@ export {
 } from "../loop/execution.js";
 export {
   createLoopExecutionPlan,
+  type CreateLoopExecutionPlanInput,
   type LoopExecutionPlan,
 } from "../loop/execution-plan.js";
