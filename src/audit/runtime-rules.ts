@@ -79,11 +79,16 @@ import { PREPARED_INBOUND_RUNTIME_EXECUTION_RULE } from "./rules/prepared-inboun
 import { LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE } from "./rules/looprunner-execute-validation-repair.js";
 import { CONFIGURED_INBOUND_SECURITY_ADAPTER_RULE } from "./rules/configured-inbound-security-adapter.js";
 import { CODEX_PROVIDER_CONTROLLED_COMMIT_RULE } from "./rules/codex-provider-controlled-commit.js";
+import { AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE } from "./rules/github-actions-parallel-ci.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
+const BASE_AUDIT_RULES_WITH_PARALLEL_CI = BASE_AUDIT_RULES.map((rule) =>
+  rule.id === "AUDIT-012" ? AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE : rule,
+);
+
 export const AUDIT_RULES = createAuditRuleRegistry([
-  ...BASE_AUDIT_RULES,
+  ...BASE_AUDIT_RULES_WITH_PARALLEL_CI,
   RUNTIME_EXECUTION_RECEIPT_REPORTING_RULE,
   RUNTIME_EXECUTION_RECEIPT_REPORTING_SERIALIZATION_RULE,
   RUNTIME_EXECUTION_PUBLIC_RESULT_FACADE_RULE,
