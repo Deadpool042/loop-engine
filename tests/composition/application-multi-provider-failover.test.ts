@@ -84,6 +84,6 @@ test("rejects ambiguous single and multi-provider configuration", () => {
           assembly("codex", profile("configured.codex", "openai", "codex")),
         ],
       }),
-    /never both/,
+    /Configure exactly one of provider, providers, providerAssemblies, or a legacy provider option/,
   );
 });
