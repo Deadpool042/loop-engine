@@ -32,11 +32,37 @@ export type ConfiguredInboundAclDecision =
     }>;
 
 function isOrdinaryObject(value: unknown): value is Record<PropertyKey, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  try {
+    return Object.getPrototypeOf(value) === Object.prototype;
+  } catch {
+    return false;
+  }
+}
+
+function isEnumerableDataProperty(
+  descriptor: PropertyDescriptor | undefined,
+): descriptor is PropertyDescriptor & { value: unknown } {
   return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.getPrototypeOf(value) === Object.prototype
+    descriptor !== undefined &&
+    descriptor.enumerable === true &&
+    "value" in descriptor &&
+    !("get" in descriptor) &&
+    !("set" in descriptor)
+  );
+}
+
+function hasExactKeys(
+  descriptors: Readonly<Record<PropertyKey, PropertyDescriptor>>,
+  expected: readonly string[],
+): boolean {
+  const keys = Reflect.ownKeys(descriptors);
+  return (
+    keys.length === expected.length &&
+    expected.every((key) => keys.includes(key)) &&
+    keys.every((key) => typeof key === "string" && expected.includes(key))
   );
 }
 
@@ -66,35 +92,45 @@ function isOperationArray(
 
 function isValidRule(value: unknown): value is ConfiguredInboundAclRule {
   if (!isOrdinaryObject(value)) return false;
-  const keys = Reflect.ownKeys(value);
-  const expected = [
-    "ruleId",
-    "tenantId",
-    "requiredRoles",
-    "projects",
-    "operations",
-  ];
-  return (
-    keys.length === expected.length &&
-    expected.every((key) => keys.includes(key)) &&
-    keys.every((key) => typeof key === "string" && expected.includes(key)) &&
-    isNonEmptyString(value.ruleId) &&
-    (value.tenantId === null || isNonEmptyString(value.tenantId)) &&
-    isUniqueNonEmptyStringArray(value.requiredRoles) &&
-    isUniqueNonEmptyStringArray(value.projects) &&
-    isOperationArray(value.operations)
-  );
+
+  try {
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    const expected = [
+      "ruleId",
+      "tenantId",
+      "requiredRoles",
+      "projects",
+      "operations",
+    ] as const;
+
+    return (
+      hasExactKeys(descriptors, expected) &&
+      expected.every((key) => isEnumerableDataProperty(descriptors[key])) &&
+      isNonEmptyString(descriptors.ruleId!.value) &&
+      (descriptors.tenantId!.value === null ||
+        isNonEmptyString(descriptors.tenantId!.value)) &&
+      isUniqueNonEmptyStringArray(descriptors.requiredRoles!.value) &&
+      isUniqueNonEmptyStringArray(descriptors.projects!.value) &&
+      isOperationArray(descriptors.operations!.value)
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function validateConfiguredInboundAclRules(
   rules: unknown,
 ): rules is readonly ConfiguredInboundAclRule[] {
-  return (
-    Array.isArray(rules) &&
-    rules.length > 0 &&
-    rules.every(isValidRule) &&
-    new Set(rules.map((rule) => rule.ruleId)).size === rules.length
-  );
+  try {
+    return (
+      Array.isArray(rules) &&
+      rules.length > 0 &&
+      rules.every(isValidRule) &&
+      new Set(rules.map((rule) => rule.ruleId)).size === rules.length
+    );
+  } catch {
+    return false;
+  }
 }
 
 function denied(reason: ConfiguredInboundAclDenyReason): ConfiguredInboundAclDecision {
