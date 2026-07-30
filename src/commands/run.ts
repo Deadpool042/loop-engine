@@ -102,6 +102,25 @@ export async function runLoopRunCommand(
     );
   }
 
+  if (
+    application.loopExecutor !== undefined &&
+    application.loopAgentRegistry === undefined
+  ) {
+    return printCommandError(
+      json,
+      "agent_policy_rejected",
+      "The configured provider has no bound agent registry.",
+    );
+  }
+
+  const executionDependencies = {
+    ...(application.loopExecutor
+      ? { executor: application.loopExecutor }
+      : {}),
+    ...(application.loopAgentRegistry
+      ? { agentRegistry: application.loopAgentRegistry }
+      : {}),
+  };
   const { runLoopCommit, runLoopExecute, runLoopPlan } = application;
   let result: Awaited<ReturnType<typeof runLoopExecute>>;
   if (mode === "plan") {
@@ -109,9 +128,7 @@ export async function runLoopRunCommand(
   } else if (mode === "execute") {
     result = await runLoopExecute(project.name, {
       maxRepairs: options.maxRepairs ?? 0,
-      ...(application.loopExecutor
-        ? { executor: application.loopExecutor }
-        : {}),
+      ...executionDependencies,
     });
   } else {
     if (!options.commitMessage) {
@@ -124,9 +141,7 @@ export async function runLoopRunCommand(
     result = await runLoopCommit(project.name, {
       maxRepairs: options.maxRepairs ?? 0,
       commitMessage: options.commitMessage,
-      ...(application.loopExecutor
-        ? { executor: application.loopExecutor }
-        : {}),
+      ...executionDependencies,
     });
   }
 
