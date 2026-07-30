@@ -25,7 +25,7 @@ test("extractProviderModuleSpecifiers detects imports, exports and dynamic impor
   );
 });
 
-test("allows concrete provider composition in the reviewed command boundary", () => {
+test("allows executable provider composition in the reviewed command boundary", () => {
   assert.deepEqual(
     inspectConcreteProviderExposure([
       {
@@ -38,7 +38,19 @@ test("allows concrete provider composition in the reviewed command boundary", ()
   );
 });
 
-test("rejects concrete provider exports from the Core public barrel", () => {
+test("allows deterministic Runtime stubs through the Runtime barrel", () => {
+  assert.deepEqual(
+    inspectConcreteProviderExposure([
+      {
+        path: "src/runtime/index.ts",
+        source: 'export { CodexRuntime } from "./codex.js";',
+      },
+    ]),
+    [],
+  );
+});
+
+test("rejects executable provider exports from the Core public barrel", () => {
   assert.deepEqual(
     inspectConcreteProviderExposure([
       {
@@ -57,25 +69,7 @@ test("rejects concrete provider exports from the Core public barrel", () => {
   );
 });
 
-test("rejects concrete Runtime providers from public barrels", () => {
-  assert.deepEqual(
-    inspectConcreteProviderExposure([
-      {
-        path: "src/runtime/index.ts",
-        source: 'export * from "./codex.js";',
-      },
-    ]),
-    [
-      {
-        path: "src/runtime/index.ts",
-        target: "./codex.js",
-        reason: "concrete_provider_publicly_exposed",
-      },
-    ],
-  );
-});
-
-test("rejects concrete provider composition outside the reviewed boundary", () => {
+test("rejects executable provider composition outside the reviewed boundary", () => {
   assert.deepEqual(
     inspectConcreteProviderExposure([
       {
