@@ -9,6 +9,24 @@ export type LoopRunCommitOptions = LoopRunExecuteOptions &
     committer?: LoopCommitter;
   }>;
 
+function failedCommitResult(
+  execution: LoopRunResult,
+  code: string,
+  message: string,
+): LoopRunResult {
+  return Object.freeze({
+    ...execution,
+    mode: "commit" as const,
+    status: "failed" as const,
+    commit: null,
+    failure: Object.freeze({
+      code,
+      message,
+      details: Object.freeze(["Git diagnostics are redacted."]),
+    }),
+  });
+}
+
 export async function runLoopCommit(
   projectName: string,
   options: LoopRunCommitOptions,
@@ -16,15 +34,27 @@ export async function runLoopCommit(
   const execution = await runLoopExecute(projectName, options);
   if (
     execution.status !== "completed" ||
-    execution.validation?.status !== "passed" ||
-    execution.modifiedFiles.length === 0
+    execution.validation?.status !== "passed"
   ) {
     return Object.freeze({ ...execution, mode: "commit" as const });
+  }
+  if (execution.modifiedFiles.length === 0) {
+    return failedCommitResult(
+      execution,
+      "nothing_to_commit",
+      "Validation passed but no provider modification was reported.",
+    );
   }
 
   const config = (options.loadConfig ?? loadConfig)();
   const project = config.projects.find((candidate) => candidate.name === projectName);
-  if (!project) return Object.freeze({ ...execution, mode: "commit" as const });
+  if (!project) {
+    return failedCommitResult(
+      execution,
+      "unknown_project",
+      "The project could not be resolved for controlled commit.",
+    );
+  }
 
   const result = await (options.committer ?? gitLoopCommitter)({
     project,
@@ -32,17 +62,7 @@ export async function runLoopCommit(
     message: options.commitMessage,
   });
   if (!result.committed) {
-    return Object.freeze({
-      ...execution,
-      mode: "commit" as const,
-      status: "failed" as const,
-      commit: null,
-      failure: Object.freeze({
-        code: result.code,
-        message: result.message,
-        details: Object.freeze(["Git diagnostics are redacted."]),
-      }),
-    });
+    return failedCommitResult(execution, result.code, result.message);
   }
 
   return Object.freeze({
