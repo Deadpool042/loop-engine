@@ -8,8 +8,8 @@ import {
   type LoopRunResult,
   type ProjectConfig,
 } from "../core/index.js";
-import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";
 import { terminal } from "../ui/terminal.js";
+import { composeCodexProvider } from "./codex-provider.js";
 import { printJsonError } from "./json-error.js";
 
 export function isLoopRunMode(value: string): value is LoopRunMode {
@@ -101,7 +101,7 @@ export async function runLoopRunCommand(
   let executor;
   if (options.provider === "codex" && options.providerExecutable) {
     try {
-      executor = createCodexCliLoopExecutor({
+      executor = composeCodexProvider({
         executable: options.providerExecutable,
         ...(options.providerModel ? { model: options.providerModel } : {}),
         ...(options.providerTimeoutMs ? { timeoutMs: options.providerTimeoutMs } : {}),
