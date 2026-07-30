@@ -5,6 +5,7 @@ import { fail, pass } from "../findings.js";
 import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 const ASSEMBLY_FILE = "src/composition/application-assembly.ts";
+const PROVIDER_REGISTRY_FILE = "src/composition/provider-registry.ts";
 const CLI_FILE = "src/cli.ts";
 const COMMANDS_ROOT = "src/commands";
 const CORE_ROOT = "src/core";
@@ -22,7 +23,7 @@ export type ApplicationAssemblyViolation = Readonly<{
   reason:
     | "command_bypasses_application_assembly"
     | "core_depends_on_composition"
-    | "concrete_provider_wired_outside_assembly";
+    | "concrete_provider_wired_outside_composition";
 }>;
 
 const MODULE_SPECIFIER_PATTERN =
@@ -84,14 +85,14 @@ export function inspectApplicationAssemblyContract(
   }
 
   for (const file of sourceFiles) {
-    if (file.path === ASSEMBLY_FILE) continue;
+    if (file.path === PROVIDER_REGISTRY_FILE) continue;
     for (const target of moduleSpecifiers(file.source)) {
       if (target !== CONCRETE_PROVIDER_TARGET) continue;
       violations.push(
         Object.freeze({
           path: file.path,
           target,
-          reason: "concrete_provider_wired_outside_assembly" as const,
+          reason: "concrete_provider_wired_outside_composition" as const,
         }),
       );
     }
@@ -132,7 +133,7 @@ export const APPLICATION_ASSEMBLY_CONTRACT_RULE: AuditRule = (() => {
     severity: "error",
     title: "Application assembly is the single concrete composition boundary",
     description:
-      "Commands consume only LoopApplicationAssembly, Core never depends on composition, and concrete provider construction stays inside createLoopApplicationAssembly.",
+      "Commands consume only LoopApplicationAssembly, Core never depends on composition, and concrete providers are assembled only through the registered composition boundary.",
     metadata: {
       introducedIn: "V14.12",
       tags: ["architecture", "contract", "execution", "ci"],
@@ -143,30 +144,36 @@ export const APPLICATION_ASSEMBLY_CONTRACT_RULE: AuditRule = (() => {
       const assemblySource = existsSync(ASSEMBLY_FILE)
         ? readFileSync(ASSEMBLY_FILE, "utf8")
         : "";
+      const providerRegistrySource = existsSync(PROVIDER_REGISTRY_FILE)
+        ? readFileSync(PROVIDER_REGISTRY_FILE, "utf8")
+        : "";
       const cliSource = existsSync(CLI_FILE)
         ? readFileSync(CLI_FILE, "utf8")
         : "";
       const required = [
-        ["assembly contract", "export type LoopApplicationAssembly ="],
-        ["assembly factory", "export function createLoopApplicationAssembly("],
-        ["provider construction", "createCodexCliLoopExecutor({"],
-        ["immutable assembly", "return Object.freeze({"],
-        ["CLI assembly creation", "createLoopApplicationAssembly()"],
+        [ASSEMBLY_FILE, "assembly contract", "export type LoopApplicationAssembly ="],
+        [ASSEMBLY_FILE, "assembly factory", "export function createLoopApplicationAssembly("],
+        [ASSEMBLY_FILE, "provider registry resolution", "assembleLoopProvider("],
+        [PROVIDER_REGISTRY_FILE, "provider registration", "export const codexProviderRegistration"],
+        [PROVIDER_REGISTRY_FILE, "provider construction", "createCodexCliLoopExecutor({"],
+        [ASSEMBLY_FILE, "immutable assembly", "return Object.freeze({"],
+        [CLI_FILE, "CLI assembly creation", "createLoopApplicationAssembly()"],
       ] as const;
+      const sourceByPath = new Map([
+        [ASSEMBLY_FILE, assemblySource],
+        [PROVIDER_REGISTRY_FILE, providerRegistrySource],
+        [CLI_FILE, cliSource],
+      ]);
       const missing = required
-        .filter(([, token]) =>
-          token === "createLoopApplicationAssembly()"
-            ? !cliSource.includes(token)
-            : !assemblySource.includes(token),
-        )
-        .map(([label]) => label);
+        .filter(([path, , token]) => !sourceByPath.get(path)?.includes(token))
+        .map(([path, label]) => `${path} -> missing ${label}`);
       const violations = inspectApplicationAssemblyContract(
         sources(COMMANDS_ROOT),
         sources(CORE_ROOT),
         sources(SOURCE_ROOT),
       );
       const details = [
-        ...missing.map((label) => `${ASSEMBLY_FILE} -> missing ${label}`),
+        ...missing,
         ...violations.map(
           ({ path, target, reason }) => `${path} -> ${target}: ${reason}`,
         ),
@@ -177,12 +184,18 @@ export const APPLICATION_ASSEMBLY_CONTRACT_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Inject LoopApplicationAssembly into commands and keep all concrete provider wiring inside createLoopApplicationAssembly.",
+            "Inject LoopApplicationAssembly into commands and keep concrete provider construction inside registered composition modules.",
           )
         : pass(
             rule,
             `${rule.title}.`,
-            Object.freeze([ASSEMBLY_FILE, CLI_FILE, COMMANDS_ROOT, CORE_ROOT]),
+            Object.freeze([
+              ASSEMBLY_FILE,
+              PROVIDER_REGISTRY_FILE,
+              CLI_FILE,
+              COMMANDS_ROOT,
+              CORE_ROOT,
+            ]),
           );
     },
   };

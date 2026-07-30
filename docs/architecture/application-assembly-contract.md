@@ -2,7 +2,7 @@
 
 ## Status
 
-V14.13 — provider-bound agent selection implemented.
+V14.14 — provider registry assembly implemented.
 
 ## Goal
 
@@ -28,8 +28,10 @@ cli.ts
 
 cli.ts
   -> createLoopApplicationAssembly(...)
-  -> concrete provider construction
-  -> provider-bound AgentRegistry
+  -> LoopProviderRegistry
+  -> LoopProviderRegistration
+  -> LoopProviderAssembly
+  -> concrete executor + provider-bound AgentRegistry
 ```
 
 Commands receive an assembly instance. They do not import Core, LoopRunner,
@@ -40,22 +42,40 @@ Core never imports `src/composition`. Core continues to define application
 services and abstract ports without knowing which concrete provider the
 composition root selects.
 
-## Provider wiring
+## Provider registry
 
-The optional `codexProvider` factory input is explicit configuration. When it is
-present, `createLoopApplicationAssembly(...)` constructs the bounded Codex CLI
-executor and exposes it only through the abstract `LoopExecutor` port on the
-assembly contract.
+`src/composition/provider-registry.ts` owns provider discovery and assembly.
+Each `LoopProviderRegistration` contains a stable provider id and one factory
+that returns a `LoopProviderAssembly`.
 
-The factory also derives a provider-bound `AgentRegistry`. Its single configured
-profile has runtime `codex`, provider `openai`, and the exact configured model.
-The command layer passes the executor and this registry to LoopRunner as one
-indivisible execution dependency set.
+A provider assembly is indivisible:
 
-This prevents policy/execution divergence: LoopRunner can no longer report that
-a Claude, Gemini, Copilot, or OpenClaw profile was selected while the concrete
-executor being invoked is Codex. Adding another provider requires assembling its
-executor and matching registry together.
+- its abstract `LoopExecutor`;
+- its provider-bound `AgentRegistry`;
+- its provider id.
+
+`createLoopApplicationAssembly(...)` resolves provider configuration through the
+registry. It does not construct Codex or any future provider directly. Codex is
+the first registration in `defaultLoopProviderRegistry`.
+
+Registries reject duplicate provider ids. Resolution fails closed when no
+registration exists or when a registration returns an assembly with a different
+id. Adding a provider therefore requires one explicit registration rather than
+new provider-specific branching in the application factory.
+
+The legacy `codexProvider` option remains accepted as a compatibility alias. New
+callers should use `provider: { id: "codex", ... }`.
+
+## Provider and policy binding
+
+The Codex registration constructs the bounded Codex CLI executor and derives a
+provider-bound `AgentRegistry`. Its single configured profile has runtime
+`codex`, provider `openai`, and the exact configured model.
+
+This prevents policy/execution divergence: LoopRunner cannot report that a
+Claude, Gemini, Copilot, or OpenClaw profile was selected while the concrete
+executor being invoked is Codex. Future providers must assemble their executor
+and matching registry together.
 
 The concrete constructor is not exported by Core and is not reachable through a
 command module. Invalid executable configuration keeps the existing fail-closed
@@ -75,15 +95,15 @@ Creating an assembly without provider configuration:
 - reads no clock;
 - returns a frozen object containing stable function references and constants.
 
-Provider configuration only constructs the existing inert executor closure and
-a frozen local registry. It does not start the executable; execution remains
-governed by the existing explicit `execute` and `commit` modes.
+Provider configuration only constructs an inert executor closure and a frozen
+local registry. It does not start the executable; execution remains governed by
+the explicit `execute` and `commit` modes.
 
 The factory adds no dependency or side effect to Core.
 
 ## Runtime compatibility
 
-V14.13 preserves:
+V14.14 preserves:
 
 - CLI arguments, validation and error codes;
 - command rendering and JSON schemas;
@@ -92,19 +112,15 @@ V14.13 preserves:
 - validation and repair limits;
 - controlled commit and no-publication guarantees.
 
-It tightens one invariant: a configured concrete executor and the agent profile
-selected by policy must originate from the same application assembly.
+It tightens two invariants:
+
+1. a configured concrete executor and the agent profile selected by policy must
+   originate from the same provider assembly;
+2. every provider must be resolved through a unique registry entry.
 
 ## Enforcement
 
-`AUDIT-502` verifies that:
-
-1. the public contract and factory exist;
-2. the CLI creates the assembly;
-3. commands do not bypass the assembly;
-4. Core does not depend on composition;
-5. concrete Codex provider construction occurs only in the assembly factory.
-
-Composition tests additionally verify that provider construction creates a
-single matching frozen registry profile and that the default assembly exposes
-neither an executor nor a provider registry.
+`AUDIT-502` continues to verify the application assembly boundary. Composition
+tests additionally verify provider registration uniqueness, immutable ordering,
+Codex resolution, provider/profile identity and the absence of provider effects
+from the default assembly.
