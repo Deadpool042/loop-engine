@@ -1,6 +1,8 @@
 import {
+  createCodexCliLoopExecutor,
   generateExecutionReport,
   LOOP_RUN_MODES,
+  runLoopCommit,
   runLoopExecute,
   runLoopPlan,
   type LoopRunMode,
@@ -19,82 +21,34 @@ function printLoopRunResult(result: LoopRunResult): void {
   terminal.info(`Run id: ${result.runId}`);
   terminal.info(`Mode: ${result.mode}`);
   terminal.info(`Status: ${result.status}`);
-
   terminal.section("Candidate");
   if (result.candidate) {
     terminal.info(`Kind: ${result.candidate.kind}`);
     terminal.info(result.candidate.text);
-  } else {
-    terminal.warning("No roadmap candidate selected.");
-  }
+  } else terminal.warning("No roadmap candidate selected.");
 
   terminal.section("Cycle steps");
-  if (result.steps.length === 0) {
-    terminal.warning("No cycle step recorded.");
-  } else {
-    for (const step of result.steps) {
-      terminal.info(`${step.name}: ${step.status}`);
-      for (const detail of step.details) terminal.info(`  ${detail}`);
-    }
+  for (const step of result.steps) {
+    terminal.info(`${step.name}: ${step.status}`);
+    for (const detail of step.details) terminal.info(`  ${detail}`);
   }
 
-  terminal.section(
-    result.mode === "plan" ? "Agent policy (forecast)" : "Agent policy",
-  );
-  if (result.agentPolicy) {
-    terminal.info(`Status: ${result.agentPolicy.status}`);
-    if (result.agentPolicy.selection?.outcome === "selected") {
-      terminal.info(
-        `${result.mode === "plan" ? "Would select" : "Selected"}: ${result.agentPolicy.selection.profile.id} (effort ${result.agentPolicy.selection.profile.effort})`,
-      );
-    }
-    if (result.mode === "plan") terminal.info("No agent was called.");
-  } else {
-    terminal.warning("No agent policy resolution available for this cycle.");
-  }
-
-  terminal.section(
-    result.mode === "plan" ? "Context package (forecast)" : "Context package",
-  );
-  if (result.contextPackage) {
-    const { files, omitted, totalCharacters, estimatedTokens, truncated } =
-      result.contextPackage;
-
-    terminal.info(
-      `Files included: ${files.length} (${totalCharacters} chars, ~${estimatedTokens} tokens)`,
-    );
-    terminal.info(`Omitted: ${omitted.length}`);
-
-    if (truncated) {
-      terminal.warning("Context was truncated to fit the budget.");
-    }
-  } else {
-    terminal.warning("No context package available for this cycle.");
-  }
+  terminal.section(result.mode === "plan" ? "Agent policy (forecast)" : "Agent policy");
+  if (result.agentPolicy?.selection?.outcome === "selected") {
+    terminal.info(`Selected: ${result.agentPolicy.selection.profile.id} (effort ${result.agentPolicy.selection.profile.effort})`);
+  } else if (result.mode === "plan") terminal.info("No agent was called.");
 
   terminal.section("Validation");
   if (result.validation) {
     terminal.info(`Status: ${result.validation.status}`);
     terminal.info(`Attempts: ${result.validation.attempts}`);
     terminal.info(`Repair attempts: ${result.validation.repairAttempts}`);
-    if (result.validation.failedCommand) {
-      terminal.error(`Failed command: ${result.validation.failedCommand}`);
-    }
-  } else {
-    terminal.info("No validation executed.");
-  }
+  } else terminal.info("No validation executed.");
 
   terminal.section("Worktree");
-  if (result.modifiedFiles.length === 0) {
-    terminal.success(
-      result.mode === "plan"
-        ? "No modification performed."
-        : "No modified file reported by the execution ports.",
-    );
-  } else {
-    for (const file of result.modifiedFiles) terminal.info(file);
-  }
-  terminal.info("Commit: not performed.");
+  if (result.modifiedFiles.length === 0) terminal.info("No modified file reported.");
+  else for (const file of result.modifiedFiles) terminal.info(file);
+  terminal.info(result.commit ? `Commit: ${result.commit.sha}` : "Commit: not performed.");
   terminal.info("Publication: not performed.");
 
   if (result.failure) {
@@ -103,13 +57,24 @@ function printLoopRunResult(result: LoopRunResult): void {
   }
 }
 
-function printLoopRunResultJson(result: LoopRunResult): void {
-  console.log(JSON.stringify(generateExecutionReport(result)));
-}
-
 export type RunLoopRunCommandOptions = Readonly<{
   maxRepairs?: number;
+  provider?: "codex";
+  providerExecutable?: string;
+  providerModel?: string;
+  providerTimeoutMs?: number;
+  commitMessage?: string;
 }>;
+
+function printCommandError(
+  json: boolean,
+  code: Parameters<typeof printJsonError>[0],
+  message: string,
+): number {
+  if (json) printJsonError(code, message);
+  else terminal.error(message);
+  return 1;
+}
 
 export async function runLoopRunCommand(
   project: ProjectConfig,
@@ -117,30 +82,63 @@ export async function runLoopRunCommand(
   json: boolean,
   options: RunLoopRunCommandOptions = {},
 ): Promise<number> {
-  if (mode === "commit" || mode === "publish") {
-    const message = `Loop run mode not implemented: ${mode}`;
+  if (mode === "publish") {
+    return printCommandError(
+      json,
+      "mode_not_implemented",
+      "Loop run mode not implemented: publish",
+    );
+  }
 
-    if (json) {
-      printJsonError("mode_not_implemented", message);
-    } else {
-      terminal.error(message);
+  if (options.provider === "codex" && !options.providerExecutable) {
+    return printCommandError(
+      json,
+      "missing_provider_executable",
+      "Codex provider requires --provider-executable.",
+    );
+  }
+
+  let executor;
+  if (options.provider === "codex" && options.providerExecutable) {
+    try {
+      executor = createCodexCliLoopExecutor({
+        executable: options.providerExecutable,
+        ...(options.providerModel ? { model: options.providerModel } : {}),
+        ...(options.providerTimeoutMs ? { timeoutMs: options.providerTimeoutMs } : {}),
+      });
+    } catch {
+      return printCommandError(
+        json,
+        "invalid_provider_executable",
+        "Codex provider executable must resolve to a command named codex.",
+      );
     }
-
-    return 1;
   }
 
-  const result =
-    mode === "plan"
-      ? runLoopPlan(project.name)
-      : await runLoopExecute(project.name, {
-          maxRepairs: options.maxRepairs ?? 0,
-        });
-
-  if (json) {
-    printLoopRunResultJson(result);
+  let result: LoopRunResult;
+  if (mode === "plan") {
+    result = runLoopPlan(project.name);
+  } else if (mode === "execute") {
+    result = await runLoopExecute(project.name, {
+      maxRepairs: options.maxRepairs ?? 0,
+      ...(executor ? { executor } : {}),
+    });
   } else {
-    printLoopRunResult(result);
+    if (!options.commitMessage) {
+      return printCommandError(
+        json,
+        "missing_commit_message",
+        "Commit mode requires --commit-message.",
+      );
+    }
+    result = await runLoopCommit(project.name, {
+      maxRepairs: options.maxRepairs ?? 0,
+      commitMessage: options.commitMessage,
+      ...(executor ? { executor } : {}),
+    });
   }
 
+  if (json) console.log(JSON.stringify(generateExecutionReport(result)));
+  else printLoopRunResult(result);
   return result.status === "failed" ? 1 : 0;
 }

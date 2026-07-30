@@ -78,17 +78,10 @@ import { INBOUND_AUTHENTICATION_ISSUED_AT_VALIDATION_GATE_RULE } from "./rules/i
 import { PREPARED_INBOUND_RUNTIME_EXECUTION_RULE } from "./rules/prepared-inbound-runtime-execution.js";
 import { LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE } from "./rules/looprunner-execute-validation-repair.js";
 import { CONFIGURED_INBOUND_SECURITY_ADAPTER_RULE } from "./rules/configured-inbound-security-adapter.js";
+import { CODEX_PROVIDER_CONTROLLED_COMMIT_RULE } from "./rules/codex-provider-controlled-commit.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
-/**
- * Operational audit inventory.
- *
- * V13.76+ keeps the historical rules module stable while extending the runtime
- * audit inventory with additive Runtime receipt/public-result boundary rules.
- * The composite inventory is normalized again so downstream selectors and
- * manifests always receive complete AuditRule metadata.
- */
 export const AUDIT_RULES = createAuditRuleRegistry([
   ...BASE_AUDIT_RULES,
   RUNTIME_EXECUTION_RECEIPT_REPORTING_RULE,
@@ -167,6 +160,7 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   PREPARED_INBOUND_RUNTIME_EXECUTION_RULE,
   LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE,
   CONFIGURED_INBOUND_SECURITY_ADAPTER_RULE,
+  CODEX_PROVIDER_CONTROLLED_COMMIT_RULE,
 ]);
 
 registerAuditRulesForIntegrityCheck(AUDIT_RULES);

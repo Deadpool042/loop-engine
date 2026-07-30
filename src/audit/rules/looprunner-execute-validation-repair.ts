@@ -71,8 +71,8 @@ export function inspectLoopRunnerExecuteInvariant(
     ...(!sourceIncludesToken(commandSource, "await runLoopExecute(")
       ? [`${COMMAND_FILE} -> execute mode is not routed`]
       : []),
-    ...(!sourceIncludesToken(commandSource, 'mode === "commit" || mode === "publish"')
-      ? [`${COMMAND_FILE} -> commit/publish boundary is not explicit`]
+    ...(!sourceIncludesToken(commandSource, 'mode === "publish"')
+      ? [`${COMMAND_FILE} -> publish boundary is not explicit`]
       : []),
     ...(!sourceIncludesToken(
       architectureSource,
@@ -112,7 +112,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
     severity: "error",
     title: "LoopRunner execute mode validates and repairs within a finite budget",
     description:
-      "The V14.4 execute runner must require policy admission, call one injected executor, validate after execution, repair only within a finite budget, revalidate after repair, report modified files, and never commit or publish.",
+      "The V14.4 execute runner must require policy admission, call one injected executor, validate after execution, repair only within a finite budget, revalidate after repair, report modified files, and never commit or publish itself.",
     metadata: {
       introducedIn: "V14.4",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -162,7 +162,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Keep V14.4 as one fail-closed execute/validate/repair boundary: admit policy before execution, invoke one injected executor, revalidate after each bounded repair, and leave commit/publication null.",
+            "Keep V14.4 as one fail-closed execute/validate/repair boundary: admit policy before execution, invoke one injected executor, revalidate after each bounded repair, and leave commit/publication null inside the execute runner.",
           )
         : pass(
             rule,
