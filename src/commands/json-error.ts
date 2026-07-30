@@ -10,6 +10,8 @@ export type JsonErrorCode =
   | "mode_not_implemented"
   | "invalid_provider_timeout"
   | "unsupported_provider"
+  | "missing_provider_executable"
+  | "invalid_provider_executable"
   | "missing_commit_message";
 
 export function printJsonError(code: JsonErrorCode, message: string): void {
