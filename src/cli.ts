@@ -80,8 +80,9 @@ else if (command === "audit") {
     }
     printAuditRuleManifest();
   } else {
+    const strict = process.argv.includes("--strict");
     const report = process.argv.includes("--json") ? printAuditReportJson() : printAuditReport();
-    if (process.argv.includes("--strict") && report.summary.status !== "pass") process.exitCode = 1;
+    if (strict && report.summary.status !== "pass") process.exitCode = 1;
   }
 } else if (command === "handoff") {
   const project = resolveProjectOrExit("handoff");
