@@ -5,6 +5,7 @@ export * from "./loop-execution-plan-evidence-report.js";
 export * from "./loop-execution-report-integrity.js";
 export * from "./trusted-loop-execution-report-boundary.js";
 export * from "./trusted-loop-execution-report-import-evidence.js";
+export * from "./trusted-loop-execution-report-import-evidence-serialization.js";
 export * from "./loop-execution-cycle.js";
 export * from "./loop-runtime-escalation-serialization.js";
 export * from "./loop-runtime-escalation-delivery.js";
