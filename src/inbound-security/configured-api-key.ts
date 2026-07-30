@@ -187,7 +187,6 @@ export function hashConfiguredApiKeySecret(secret: string): string {
 
 export function deriveConfiguredApiKeyEvidenceId(
   record: ConfiguredApiKeyCredentialRecord,
-  requestId: string,
 ): string {
   return createHash("sha256")
     .update("loop-engine:configured-api-key-evidence:v1\0", "utf8")
@@ -198,8 +197,6 @@ export function deriveConfiguredApiKeyEvidenceId(
     .update(record.subjectId, "utf8")
     .update("\0", "utf8")
     .update(record.secretSha256, "utf8")
-    .update("\0", "utf8")
-    .update(requestId, "utf8")
     .digest("hex");
 }
 
@@ -226,7 +223,7 @@ export function createConfiguredApiKeyVerifier(
   return Object.freeze({
     verify(
       input: InboundAuthenticationInput,
-      context: InboundAuthenticationVerificationContext,
+      _context: InboundAuthenticationVerificationContext,
     ): InboundAuthenticationVerifierResult {
       if (input.method !== CONFIGURED_API_KEY_METHOD) {
         return Object.freeze({ verified: false as const, reason: "rejected" as const });
@@ -246,7 +243,7 @@ export function createConfiguredApiKeyVerifier(
       }
 
       const evidence: InboundAuthenticationEvidence = Object.freeze({
-        evidenceId: deriveConfiguredApiKeyEvidenceId(record, context.requestId),
+        evidenceId: deriveConfiguredApiKeyEvidenceId(record),
         method: CONFIGURED_API_KEY_METHOD,
         subjectId: record.subjectId,
         issuerId: record.issuerId,
