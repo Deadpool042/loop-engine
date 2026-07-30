@@ -15,3 +15,7 @@ export {
   type LoopValidatorInput,
   type LoopValidatorResult,
 } from "../loop/execution.js";
+export {
+  createLoopExecutionPlan,
+  type LoopExecutionPlan,
+} from "../loop/execution-plan.js";
