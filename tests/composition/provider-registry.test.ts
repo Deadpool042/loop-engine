@@ -16,20 +16,22 @@ describe("LoopProviderRegistry", () => {
       model: "gpt-5.6-sol",
       timeoutMs: 1_000,
     });
+    const [profile] = assembly.agentRegistry.profiles;
 
+    assert.ok(profile);
     assert.equal(assembly.id, "codex");
     assert.equal(typeof assembly.executor, "function");
     assert.equal(assembly.agentRegistry.profiles.length, 1);
     assert.deepEqual(
-      assembly.agentRegistry.profiles.map((profile) => ({
-        runtime: profile.runtime,
-        provider: profile.provider,
-        model: profile.model,
+      assembly.agentRegistry.profiles.map((candidate) => ({
+        runtime: candidate.runtime,
+        provider: candidate.provider,
+        model: candidate.model,
       })),
       [{ runtime: "codex", provider: "openai", model: "gpt-5.6-sol" }],
     );
     assert.equal(Object.isFrozen(assembly), true);
-    assert.equal(Object.isFrozen(assembly.agentRegistry.profiles[0]), true);
+    assert.equal(Object.isFrozen(profile), true);
   });
 
   it("rejects duplicate provider registrations deterministically", () => {
