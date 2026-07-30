@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fail, pass } from "../findings.js";
 import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
-const REVIEWED_COMPOSITION_FILE = "src/commands/run.ts";
+const REVIEWED_COMPOSITION_FILE = "src/commands/codex-provider.ts";
 const PUBLIC_BARREL_FILES = Object.freeze([
   "src/core/index.ts",
   "src/loop/index.ts",
