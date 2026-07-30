@@ -8,7 +8,7 @@ import {
 } from "../../src/audit/rules/concrete-provider-exposure.js";
 import { AUDIT_RULES } from "../../src/audit/runtime-rules.js";
 
-const COMPOSITION_PATH = "src/commands/run.ts";
+const COMPOSITION_PATH = "src/commands/codex-provider.ts";
 
 test("extractProviderModuleSpecifiers detects imports, exports and dynamic imports", () => {
   assert.deepEqual(
