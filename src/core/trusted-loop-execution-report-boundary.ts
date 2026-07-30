@@ -2,7 +2,16 @@ import {
   verifyLoopExecutionReportIntegrity,
   type LoopExecutionReportIntegrityFailureCode,
 } from "./loop-execution-report-integrity.js";
+import {
+  verifyProviderFailoverReportIntegrity,
+  type ProviderFailoverReportIntegrityFailureCode,
+} from "./provider-failover-report-integrity.js";
 import type { LoopRunResult } from "../loop/types.js";
+
+export type TrustedLoopExecutionReportImportFailureCode =
+  | "invalid_json"
+  | LoopExecutionReportIntegrityFailureCode
+  | ProviderFailoverReportIntegrityFailureCode;
 
 export type TrustedLoopExecutionReportImportResult =
   | Readonly<{
@@ -11,12 +20,12 @@ export type TrustedLoopExecutionReportImportResult =
     }>
   | Readonly<{
       status: "rejected";
-      code: "invalid_json" | LoopExecutionReportIntegrityFailureCode;
+      code: TrustedLoopExecutionReportImportFailureCode;
       details: readonly string[];
     }>;
 
 function reject(
-  code: "invalid_json" | LoopExecutionReportIntegrityFailureCode,
+  code: TrustedLoopExecutionReportImportFailureCode,
   ...details: string[]
 ): TrustedLoopExecutionReportImportResult {
   return Object.freeze({
@@ -29,7 +38,7 @@ function reject(
 /**
  * The only Core entry point for importing an execution report received from an
  * external storage, transport or adapter boundary. The value remains unknown
- * until the integrity gate accepts it.
+ * until both execution-plan and provider-failover integrity gates accept it.
  */
 export function importTrustedLoopExecutionReport(
   value: unknown,
@@ -37,6 +46,14 @@ export function importTrustedLoopExecutionReport(
   const verification = verifyLoopExecutionReportIntegrity(value);
   if (verification.status === "rejected") {
     return reject(verification.code, ...verification.details);
+  }
+
+  const failoverVerification = verifyProviderFailoverReportIntegrity(
+    verification.report.providerFailoverEvidence,
+    verification.report.providerFailoverFingerprint,
+  );
+  if (failoverVerification.status === "rejected") {
+    return reject(failoverVerification.code, ...failoverVerification.details);
   }
 
   return Object.freeze({
