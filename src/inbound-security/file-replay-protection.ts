@@ -35,13 +35,16 @@ function isValidInput(value: InboundReplayProtectionInput): boolean {
 }
 
 function replayKey(input: InboundReplayProtectionInput): string {
+  const claimIdentity =
+    input.nonce === null
+      ? `request:${input.requestId}`
+      : `nonce:${input.nonce}`;
+
   return createHash("sha256")
     .update("loop-engine:file-replay-claim:v1\0", "utf8")
-    .update(input.requestId, "utf8")
-    .update("\0", "utf8")
     .update(input.evidenceId, "utf8")
     .update("\0", "utf8")
-    .update(input.nonce ?? "<null>", "utf8")
+    .update(claimIdentity, "utf8")
     .digest("hex");
 }
 
