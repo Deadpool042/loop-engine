@@ -34,7 +34,9 @@ import type { AgentRegistry } from "../agents/registry.js";
 import { createLoopProviderFailoverAssembly } from "./provider-failover-assembly.js";
 import {
   assembleLoopProvider,
+  assembleLoopProviders,
   defaultLoopProviderRegistry,
+  type ClaudeCodeProviderConfiguration,
   type CodexProviderConfiguration,
   type LoopProviderAssembly,
   type LoopProviderConfiguration,
@@ -42,21 +44,24 @@ import {
   type LoopProviderRegistry,
 } from "./provider-registry.js";
 
-export type LoopApplicationCodexProviderOptions = Omit<
-  CodexProviderConfiguration,
+export type LoopApplicationCodexProviderOptions = Omit<CodexProviderConfiguration, "id">;
+export type LoopApplicationClaudeCodeProviderOptions = Omit<
+  ClaudeCodeProviderConfiguration,
   "id"
 >;
 
 export type LoopApplicationAssemblyOptions = Readonly<{
   provider?: LoopProviderConfiguration;
+  providers?: readonly LoopProviderConfiguration[];
   providerRegistry?: LoopProviderRegistry;
   providerAssemblies?: readonly LoopProviderAssembly[];
   maxProviderAttempts?: number;
   /** @deprecated Prefer provider: { id: "codex", ... }. */
   codexProvider?: LoopApplicationCodexProviderOptions;
+  /** @deprecated Prefer provider: { id: "claude_code", ... }. */
+  claudeCodeProvider?: LoopApplicationClaudeCodeProviderOptions;
 }>;
 
-/** Public application boundary consumed by the CLI command layer. */
 export type LoopApplicationAssembly = Readonly<{
   findProject: typeof findProject;
   generateAuditReport: typeof generateAuditReport;
@@ -98,36 +103,40 @@ export type LoopApplicationAuditProfile = AuditProfile;
 export type LoopApplicationAuditSelection = AuditRuleSelection;
 export type LoopApplicationAuditReport = AuditReport;
 
-function resolveProviderConfiguration(
+function resolveLegacyProvider(
   options: LoopApplicationAssemblyOptions,
 ): LoopProviderConfiguration | undefined {
-  if (options.provider && options.codexProvider) {
-    throw new Error("Configure either provider or codexProvider, never both.");
+  const legacyCount = Number(options.codexProvider !== undefined) + Number(options.claudeCodeProvider !== undefined);
+  if (legacyCount > 1) {
+    throw new Error("Configure only one legacy provider option.");
   }
-  if (options.provider) return options.provider;
-  if (!options.codexProvider) return undefined;
-  return Object.freeze({ id: "codex", ...options.codexProvider });
+  if (options.codexProvider) return Object.freeze({ id: "codex", ...options.codexProvider });
+  if (options.claudeCodeProvider) {
+    return Object.freeze({ id: "claude_code", ...options.claudeCodeProvider });
+  }
+  return undefined;
 }
 
 function resolveProviderAssemblies(
   options: LoopApplicationAssemblyOptions,
 ): readonly LoopProviderAssembly[] {
-  const providerConfiguration = resolveProviderConfiguration(options);
-  if (options.providerAssemblies && providerConfiguration) {
+  const legacyProvider = resolveLegacyProvider(options);
+  const configuredModes = [
+    options.provider !== undefined,
+    options.providers !== undefined,
+    options.providerAssemblies !== undefined,
+    legacyProvider !== undefined,
+  ].filter(Boolean).length;
+  if (configuredModes > 1) {
     throw new Error(
-      "Configure providerAssemblies or a single provider configuration, never both.",
+      "Configure exactly one of provider, providers, providerAssemblies, or a legacy provider option.",
     );
   }
-  if (options.providerAssemblies) {
-    return Object.freeze([...options.providerAssemblies]);
-  }
-  if (!providerConfiguration) return Object.freeze([]);
-  return Object.freeze([
-    assembleLoopProvider(
-      options.providerRegistry ?? defaultLoopProviderRegistry,
-      providerConfiguration,
-    ),
-  ]);
+  if (options.providerAssemblies) return Object.freeze([...options.providerAssemblies]);
+  const registry = options.providerRegistry ?? defaultLoopProviderRegistry;
+  if (options.providers) return assembleLoopProviders(registry, options.providers);
+  const single = options.provider ?? legacyProvider;
+  return single ? Object.freeze([assembleLoopProvider(registry, single)]) : Object.freeze([]);
 }
 
 export function createLoopApplicationAssembly(
