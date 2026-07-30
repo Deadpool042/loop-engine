@@ -83,6 +83,7 @@ import { AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE } from "./rules/github-actions-pa
 import { CORE_CONCRETE_DEPENDENCY_DIRECTION_RULE } from "./rules/core-concrete-dependency-direction.js";
 import { CONCRETE_PROVIDER_EXPOSURE_RULE } from "./rules/concrete-provider-exposure.js";
 import { CLI_COMMAND_BOUNDARY_RULE } from "./rules/cli-command-boundary.js";
+import { COMPOSITION_ROOT_DIRECTION_RULE } from "./rules/composition-root-direction.js";
 import { registerAuditRulesForIntegrityCheck } from "./rules/audit.js";
 import { AUDIT_RULES as BASE_AUDIT_RULES } from "./rules.js";
 
@@ -168,6 +169,7 @@ export const AUDIT_RULES = createAuditRuleRegistry([
   CORE_CONCRETE_DEPENDENCY_DIRECTION_RULE,
   CONCRETE_PROVIDER_EXPOSURE_RULE,
   CLI_COMMAND_BOUNDARY_RULE,
+  COMPOSITION_ROOT_DIRECTION_RULE,
 ].map((rule) =>
   rule.id === "AUDIT-012" ? AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE : rule,
 ));
