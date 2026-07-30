@@ -20,7 +20,7 @@ for (const pattern of GITHUB_ACTIONS_PARALLEL_CI_CONTRACT.requiredPatterns) {
 
     assert.ok(match, `expected workflow fixture to match ${pattern.source}`);
 
-    const mutated = source.replace(match[0], "removed-ci-contract-token");
+    const mutated = source.replaceAll(match[0], "removed-ci-contract-token");
     const report = inspectGithubActionsCiContract(mutated);
 
     assert.ok(report.missing.includes(pattern.source));
