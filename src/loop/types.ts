@@ -3,6 +3,8 @@ import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import type { AgentPolicyResolution } from "../policy/types.js";
 import type { LoopExecutionPlanEvidence } from "./execution-plan-evidence.js";
 import type { LoopExecutionPlanFingerprint } from "./execution-plan-evidence-fingerprint.js";
+import type { LoopProviderFailoverEvidence } from "./provider-failover.js";
+import type { LoopProviderFailoverEvidenceFingerprint } from "./provider-failover-evidence-integrity.js";
 
 export const LOOP_RUN_MODES = ["plan", "execute", "commit", "publish"] as const;
 export type LoopRunMode = (typeof LOOP_RUN_MODES)[number];
@@ -53,4 +55,6 @@ export type LoopRunResult = Readonly<{
   contextPackage: MinimalContextPackage | null;
   executionPlanEvidence?: LoopExecutionPlanEvidence | null;
   executionPlanFingerprint?: LoopExecutionPlanFingerprint | null;
+  providerFailoverEvidence?: LoopProviderFailoverEvidence | null;
+  providerFailoverFingerprint?: LoopProviderFailoverEvidenceFingerprint | null;
 }>;
