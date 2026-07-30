@@ -55,29 +55,24 @@ function configuredCodexProfile(
   });
 }
 
-export const codexProviderRegistration: LoopProviderRegistration = Object.freeze({
-  id: "codex",
-  assemble(configuration): LoopProviderAssembly {
-    if (configuration.id !== "codex") {
-      throw new Error(
-        `Provider registration codex cannot assemble ${configuration.id}.`,
-      );
-    }
+export const codexProviderRegistration: LoopProviderRegistration =
+  Object.freeze({
+    id: "codex",
+    assemble(configuration): LoopProviderAssembly {
+      const executor = createCodexCliLoopExecutor({
+        executable: configuration.executable,
+        ...(configuration.model ? { model: configuration.model } : {}),
+        ...(configuration.timeoutMs
+          ? { timeoutMs: configuration.timeoutMs }
+          : {}),
+      });
+      const agentRegistry = createAgentRegistry([
+        configuredCodexProfile(configuration),
+      ]);
 
-    const executor = createCodexCliLoopExecutor({
-      executable: configuration.executable,
-      ...(configuration.model ? { model: configuration.model } : {}),
-      ...(configuration.timeoutMs
-        ? { timeoutMs: configuration.timeoutMs }
-        : {}),
-    });
-    const agentRegistry = createAgentRegistry([
-      configuredCodexProfile(configuration),
-    ]);
-
-    return Object.freeze({ id: "codex", executor, agentRegistry });
-  },
-});
+      return Object.freeze({ id: "codex", executor, agentRegistry });
+    },
+  });
 
 export function createLoopProviderRegistry(
   registrations: readonly LoopProviderRegistration[],
