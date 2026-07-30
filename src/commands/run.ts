@@ -66,6 +66,16 @@ export type RunLoopRunCommandOptions = Readonly<{
   commitMessage?: string;
 }>;
 
+function printCommandError(
+  json: boolean,
+  code: Parameters<typeof printJsonError>[0],
+  message: string,
+): number {
+  if (json) printJsonError(code, message);
+  else terminal.error(message);
+  return 1;
+}
+
 export async function runLoopRunCommand(
   project: ProjectConfig,
   mode: LoopRunMode,
@@ -73,20 +83,37 @@ export async function runLoopRunCommand(
   options: RunLoopRunCommandOptions = {},
 ): Promise<number> {
   if (mode === "publish") {
-    const message = "Loop run mode not implemented: publish";
-    if (json) printJsonError("mode_not_implemented", message);
-    else terminal.error(message);
-    return 1;
+    return printCommandError(
+      json,
+      "mode_not_implemented",
+      "Loop run mode not implemented: publish",
+    );
   }
 
-  const executor =
-    options.provider === "codex" && options.providerExecutable
-      ? createCodexCliLoopExecutor({
-          executable: options.providerExecutable,
-          ...(options.providerModel ? { model: options.providerModel } : {}),
-          ...(options.providerTimeoutMs ? { timeoutMs: options.providerTimeoutMs } : {}),
-        })
-      : undefined;
+  if (options.provider === "codex" && !options.providerExecutable) {
+    return printCommandError(
+      json,
+      "missing_provider_executable",
+      "Codex provider requires --provider-executable.",
+    );
+  }
+
+  let executor;
+  if (options.provider === "codex" && options.providerExecutable) {
+    try {
+      executor = createCodexCliLoopExecutor({
+        executable: options.providerExecutable,
+        ...(options.providerModel ? { model: options.providerModel } : {}),
+        ...(options.providerTimeoutMs ? { timeoutMs: options.providerTimeoutMs } : {}),
+      });
+    } catch {
+      return printCommandError(
+        json,
+        "invalid_provider_executable",
+        "Codex provider executable must resolve to a command named codex.",
+      );
+    }
+  }
 
   let result: LoopRunResult;
   if (mode === "plan") {
@@ -98,10 +125,11 @@ export async function runLoopRunCommand(
     });
   } else {
     if (!options.commitMessage) {
-      const message = "Commit mode requires --commit-message.";
-      if (json) printJsonError("missing_commit_message", message);
-      else terminal.error(message);
-      return 1;
+      return printCommandError(
+        json,
+        "missing_commit_message",
+        "Commit mode requires --commit-message.",
+      );
     }
     result = await runLoopCommit(project.name, {
       maxRepairs: options.maxRepairs ?? 0,
