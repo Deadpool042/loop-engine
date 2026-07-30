@@ -138,5 +138,6 @@ export {
   type LoopProviderFailoverEvidenceFingerprint,
 } from "../loop/provider-failover-evidence-integrity.js";
 export { runLoopExecute, type LoopRunExecuteOptions } from "../loop/execute-runner.js";
+export { runLoopExecuteWithProviderFailoverEvidence } from "../loop/provider-failover-runner.js";
 export { runLoopCommit, type LoopRunCommitOptions } from "../loop/commit-runner.js";
 export { gitLoopCommitter, type LoopCommitter, type LoopCommitResult } from "../loop/git-committer.js";
