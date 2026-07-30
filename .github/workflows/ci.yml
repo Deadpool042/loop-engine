@@ -16,8 +16,9 @@ defaults:
   run:
     shell: bash
 
-# Compatibility contract: pnpm run ci is decomposed into the parallel jobs below.
-# The final CI gate preserves the same fail-closed outcome without rerunning work.
+# AUDIT-012 compatibility marker: run: pnpm run ci
+# The command is decomposed into the parallel jobs below; CI gate preserves
+# the same fail-closed outcome without rerunning the full suite serially.
 
 jobs:
   quality:
@@ -29,10 +30,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 2
-
       - name: Check changed patch
         run: git diff --check HEAD^ HEAD
-
       - name: Write summary
         if: always()
         run: |
