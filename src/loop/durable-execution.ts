@@ -16,6 +16,7 @@ export type DurableExecutionEvent = Readonly<{
   type:
     | "lease_acquired"
     | "lease_recovered"
+    | "lease_renewed"
     | "cancellation_requested"
     | "completed"
     | "failed"
@@ -72,9 +73,29 @@ export type DurableExecutionResult =
     }>;
 
 export type DurableExecutionCancellationResult =
-  | Readonly<{ status: "requested" | "already_terminal"; record: DurableExecutionRecord }>
+  | Readonly<{
+      status: "requested" | "already_terminal";
+      record: DurableExecutionRecord;
+    }>
   | Readonly<{
       status: "rejected";
       code: "not_found" | "record_conflict" | "invalid_request";
+      details: readonly string[];
+    }>;
+
+export type DurableExecutionLeaseRenewalResult =
+  | Readonly<{
+      status: "renewed";
+      record: DurableExecutionRecord;
+    }>
+  | Readonly<{
+      status: "rejected";
+      code:
+        | "invalid_request"
+        | "not_found"
+        | "not_running"
+        | "lease_lost"
+        | "record_conflict";
+      record: DurableExecutionRecord | null;
       details: readonly string[];
     }>;
