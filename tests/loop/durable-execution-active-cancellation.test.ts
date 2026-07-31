@@ -3,10 +3,10 @@ import test from "node:test";
 
 import {
   DURABLE_EXECUTION_SCHEMA_VERSION,
-  createInMemoryDurableExecutionStore,
-  superviseActiveExecutionCancellation,
   type DurableExecutionRecord,
-} from "../../src/core/index.js";
+} from "../../src/loop/durable-execution.js";
+import { createInMemoryDurableExecutionStore } from "../../src/loop/in-memory-durable-execution-store.js";
+import { superviseActiveExecutionCancellation } from "../../src/loop/durable-execution-active-cancellation.js";
 
 function record(overrides: Partial<DurableExecutionRecord> = {}): DurableExecutionRecord {
   return Object.freeze({
