@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { createServer, type IncomingHttpHeaders, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 import type { OrchestrationServiceLifecycle } from "./orchestration-service-lifecycle.js";
 import type {
@@ -35,6 +35,17 @@ function writeJson(
 ): void {
   response.writeHead(status, headers);
   response.end(JSON.stringify(body));
+}
+
+function normalizeHeaders(
+  headers: IncomingHttpHeaders,
+): Readonly<Record<string, string>> {
+  const normalized: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (typeof value === "string") normalized[name.toLowerCase()] = value;
+    else if (Array.isArray(value)) normalized[name.toLowerCase()] = value.join(",");
+  }
+  return Object.freeze(normalized);
 }
 
 async function readBody(
@@ -119,6 +130,7 @@ export function createNodeHttpServiceAdapter(
             method,
             path: new URL(request.url ?? "/", `http://${host}`).pathname,
             body,
+            headers: normalizeHeaders(request.headers),
           });
           const result = await transport.handle(transportRequest);
           writeJson(response, result.status, result.headers, result.body);
