@@ -1,4 +1,8 @@
 import {
+  createAuthenticatedOrchestrationServiceTransport,
+  type OrchestrationServiceAuthenticationOptions,
+} from "./orchestration-service-authentication.js";
+import {
   createNodeHttpServiceAdapter,
   type NodeHttpServiceAdapter,
   type NodeHttpServiceAddress,
@@ -10,6 +14,7 @@ import {
 import {
   createOrchestrationServiceTransport,
   type OrchestrationServiceExecutionHandler,
+  type OrchestrationServiceTransport,
 } from "./orchestration-service-transport.js";
 import type { OrchestrationServiceConfiguration } from "./orchestration-service-configuration.js";
 
@@ -17,6 +22,7 @@ export type OrchestrationServiceDependencies = Readonly<{
   persistenceReady(): Promise<boolean>;
   workerReady(): Promise<boolean>;
   execution: OrchestrationServiceExecutionHandler;
+  authentication?: OrchestrationServiceAuthenticationOptions;
 }>;
 
 export type OrchestrationServiceApplication = Readonly<{
@@ -30,10 +36,17 @@ export function createOrchestrationServiceApplication(
   dependencies: OrchestrationServiceDependencies,
 ): OrchestrationServiceApplication {
   const lifecycle = createOrchestrationServiceLifecycle();
-  const transport = createOrchestrationServiceTransport(
+  const baseTransport = createOrchestrationServiceTransport(
     lifecycle,
     dependencies.execution,
   );
+  const transport: OrchestrationServiceTransport =
+    dependencies.authentication === undefined
+      ? baseTransport
+      : createAuthenticatedOrchestrationServiceTransport(
+          baseTransport,
+          dependencies.authentication,
+        );
   const adapter: NodeHttpServiceAdapter = createNodeHttpServiceAdapter(
     lifecycle,
     transport,

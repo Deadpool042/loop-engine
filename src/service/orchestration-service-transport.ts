@@ -9,6 +9,7 @@ export type OrchestrationServiceTransportRequest = Readonly<{
   method: "GET" | "POST";
   path: string;
   body: unknown;
+  headers?: Readonly<Record<string, string>>;
 }>;
 
 export type OrchestrationServiceTransportResponse = Readonly<{
