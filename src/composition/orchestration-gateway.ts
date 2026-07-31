@@ -203,17 +203,23 @@ export function createOrchestrationGateway(
           : response("verify", "rejected", "integrity_failed");
       }
 
-      const cancellation = await controlPlane.cancel(
-        request.idempotencyKey,
-        request.requestedBy,
-      );
-      if (cancellation.status === "rejected") {
-        return response("cancel", "rejected", cancellation.code, {
-          details: cancellation.details,
+      if (request.operation === "cancel") {
+        const cancellation = await controlPlane.cancel(
+          request.idempotencyKey,
+          request.requestedBy,
+        );
+        if (cancellation.status === "rejected") {
+          return response("cancel", "rejected", cancellation.code, {
+            details: cancellation.details,
+          });
+        }
+        return response("cancel", "ok", cancellation.status, {
+          record: cancellation.record,
         });
       }
-      return response("cancel", "ok", cancellation.status, {
-        record: cancellation.record,
+
+      return response("status", "rejected", "invalid_request", {
+        details: ["Gateway operation could not be resolved."],
       });
     },
 
