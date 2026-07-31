@@ -48,6 +48,8 @@ const JSON_HEADERS = Object.freeze({
   "cache-control": "no-store",
 });
 
+const EMPTY_REQUEST_HEADERS: Readonly<Record<string, string>> = Object.freeze({});
+
 function response(
   status: number,
   error: string,
@@ -125,7 +127,8 @@ export function createAuthenticatedOrchestrationServiceTransport(
     ): Promise<OrchestrationServiceTransportResponse> {
       if (isPublicProbe(request)) return inner.handle(request);
 
-      const headers = request.headers ?? Object.freeze({});
+      const headers: Readonly<Record<string, string>> =
+        request.headers ?? EMPTY_REQUEST_HEADERS;
       const keyId = headers[ORCHESTRATION_SERVICE_AUTH_HEADERS.keyId];
       const timestampText = headers[ORCHESTRATION_SERVICE_AUTH_HEADERS.timestamp];
       const nonce = headers[ORCHESTRATION_SERVICE_AUTH_HEADERS.nonce];
