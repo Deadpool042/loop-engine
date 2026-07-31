@@ -18,6 +18,19 @@ export {
 } from "./durable-execution-control-plane.js";
 
 export {
+  createOrchestrationGateway,
+  ORCHESTRATION_GATEWAY_SCHEMA_VERSION,
+  type OrchestrationGateway,
+  type OrchestrationGatewayRequest,
+  type OrchestrationGatewayResponse,
+} from "./orchestration-gateway.js";
+
+export {
+  createProductionOrchestrationGateway,
+  type ProductionOrchestrationGateway,
+} from "./production-orchestration-gateway.js";
+
+export {
   createFallbackExecutionPlan,
   createLoopProviderFailoverAssembly,
   type LoopProviderFailoverAssembly,
