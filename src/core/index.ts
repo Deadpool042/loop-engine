@@ -114,6 +114,7 @@ export * from "../loop/durable-execution-controller.js";
 export * from "../loop/durable-execution-integrity.js";
 export * from "../loop/durable-execution-maintenance.js";
 export * from "../loop/in-memory-durable-execution-store.js";
+export * from "../service/orchestration-service-lifecycle.js";
 export {
   canonicalizeLoopExecutionPlanEvidence,
   fingerprintLoopExecutionPlanEvidence,
