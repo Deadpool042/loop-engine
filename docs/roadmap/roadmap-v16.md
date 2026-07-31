@@ -1,7 +1,7 @@
 # Loop Engine Roadmap — Post-V15 Strategic Plan
 
-Status: ACTIVE  
-Baseline: state of `main` after V15.1  
+Status: ACTIVE
+Baseline: state of `main` after V15.1
 Planning horizon: V16 through V20
 
 ## Purpose
@@ -121,8 +121,8 @@ Each PR must be reviewable, independently validated, and protected by targeted t
 
 # Macro-Lot V16 — Isolated Durable Worker Platform
 
-Status: PLANNED  
-Priority: P0  
+Status: PLANNED
+Priority: P0
 Depends on: V15 durable execution and orchestration contracts
 
 ## Objective
@@ -178,8 +178,8 @@ Loop Engine can safely operate as a durable, concurrent, single-host worker plat
 
 # Macro-Lot V17 — Secure Orchestration Service
 
-Status: PLANNED  
-Priority: P0/P1  
+Status: PLANNED
+Priority: P0/P1
 Depends on: V16 worker platform
 
 ## Objective
@@ -236,8 +236,8 @@ Loop Engine is deployable as a secure single-host orchestration service with a c
 
 # Macro-Lot V18 — Economic Intelligence Engine
 
-Status: PLANNED  
-Priority: P1/P2  
+Status: PLANNED
+Priority: P1/P2
 Depends on: V17 service telemetry and durable persistence
 
 ## Objective
@@ -290,8 +290,8 @@ Loop Engine can enforce budgets and make explainable, adaptive, economically inf
 
 # Macro-Lot V19 — Durable End-to-End Delivery Lifecycle
 
-Status: PLANNED  
-Priority: P3  
+Status: PLANNED
+Priority: P3
 Depends on: V16 worker durability and V18 economic controls
 
 ## Objective
@@ -343,8 +343,8 @@ Loop Engine can autonomously and durably deliver a bounded software change from 
 
 # Macro-Lot V20 — Production Hardening and Provider Ecosystem
 
-Status: PLANNED  
-Priority: P1/P2  
+Status: PLANNED
+Priority: P1/P2
 Depends on: V16 through V19
 
 ## Objective
