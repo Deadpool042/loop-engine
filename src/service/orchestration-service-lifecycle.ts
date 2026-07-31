@@ -78,7 +78,7 @@ export function createOrchestrationServiceLifecycle(): OrchestrationServiceLifec
     snapshot() {
       return freezeSnapshot(state, activeRequests, dependencies, failureCode);
     },
-    updateDependencies(status) {
+    updateDependencies(status: OrchestrationServiceDependencyStatus) {
       if (state === "draining" || state === "stopped" || state === "failed") {
         return;
       }
@@ -118,7 +118,7 @@ export function createOrchestrationServiceLifecycle(): OrchestrationServiceLifec
     stop() {
       state = "stopped";
     },
-    fail(code) {
+    fail(code: string) {
       state = "failed";
       failureCode = code.trim().length > 0 ? code.trim() : "service_failed";
     },
