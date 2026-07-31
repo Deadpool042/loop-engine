@@ -138,8 +138,8 @@ export async function runDurableExecutionHeartbeat(
   shouldContinue: () => boolean,
   dependency: DurableExecutionHeartbeatDependency = Object.freeze({
     now: () => new Date().toISOString(),
-    sleep: (durationMs: number) =>
-      new Promise((resolve) => setTimeout(resolve, durationMs)),
+    sleep: (durationMs: number): Promise<void> =>
+      new Promise<void>((resolve) => setTimeout(resolve, durationMs)),
   }),
 ): Promise<DurableExecutionHeartbeatResult> {
   if (
