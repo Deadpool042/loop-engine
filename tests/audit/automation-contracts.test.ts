@@ -28,6 +28,10 @@ import {
   AUTOMATION_WORKER_DISPATCH_PORT_IDENTIFIERS_RULE,
   AUTOMATION_WORKER_DISPATCH_PORT_MATRIX_RULE,
   AUTOMATION_WORKER_DISPATCH_PORT_PURITY_RULE,
+  AUTOMATION_WORKER_DISPATCH_SERVICE_CONTRACTS_RULE,
+  AUTOMATION_WORKER_DISPATCH_SERVICE_DEPENDENCIES_RULE,
+  AUTOMATION_WORKER_DISPATCH_SERVICE_INVARIANTS_RULE,
+  AUTOMATION_WORKER_DISPATCH_SERVICE_MATRIX_RULE,
   AUTOMATION_PROVIDER_CONTRACTS_RULE,
   inspectAutomationAssemblyContracts,
   inspectAutomationAssemblyInertness,
@@ -64,6 +68,10 @@ import {
   inspectAutomationOrchestratorWorkerDispatchPortIdentifiers,
   inspectAutomationOrchestratorWorkerDispatchPortMatrix,
   inspectAutomationOrchestratorWorkerDispatchPortPurity,
+  inspectAutomationOrchestratorWorkerDispatchServiceContracts,
+  inspectAutomationOrchestratorWorkerDispatchServiceDependencies,
+  inspectAutomationOrchestratorWorkerDispatchServiceInvariants,
+  inspectAutomationOrchestratorWorkerDispatchServiceMatrix,
   inspectAutomationOrchestratorPipelineValidation,
   inspectAutomationPolicyContracts,
   inspectAutomationProviderContracts,
@@ -100,6 +108,10 @@ const AUTOMATION_PATHS = [
   "src/automation/orchestrator/worker-command.ts",
   "src/automation/orchestrator/worker-dispatch-port-types.ts",
   "src/automation/orchestrator/worker-dispatch-port.ts",
+  "src/automation/orchestrator/worker-dispatch-invocation-types.ts",
+  "src/automation/orchestrator/worker-dispatch-invocation.ts",
+  "src/automation/orchestrator/worker-dispatch-service-types.ts",
+  "src/automation/orchestrator/worker-dispatch-service.ts",
   "src/automation/orchestrator/evaluation/types.ts",
   "src/automation/orchestrator/evaluation/index.ts",
   "src/automation/orchestrator/planning/types.ts",
@@ -383,6 +395,73 @@ test("AUDIT-526 through AUDIT-529 are registered, executed, and passing", () => 
     );
     assert.equal(rule.check().status, "pass");
   }
+});
+
+test("AUDIT-534 through AUDIT-537 are registered, executed, and reject dispatch service regressions", () => {
+  const fixture = sources();
+  const rules = [
+    AUTOMATION_WORKER_DISPATCH_SERVICE_CONTRACTS_RULE,
+    AUTOMATION_WORKER_DISPATCH_SERVICE_DEPENDENCIES_RULE,
+    AUTOMATION_WORKER_DISPATCH_SERVICE_MATRIX_RULE,
+    AUTOMATION_WORKER_DISPATCH_SERVICE_INVARIANTS_RULE,
+  ];
+  assert.deepEqual(
+    [
+      inspectAutomationOrchestratorWorkerDispatchServiceContracts(fixture),
+      inspectAutomationOrchestratorWorkerDispatchServiceDependencies(fixture),
+      inspectAutomationOrchestratorWorkerDispatchServiceMatrix(fixture),
+      inspectAutomationOrchestratorWorkerDispatchServiceInvariants(fixture),
+    ],
+    [[], [], [], []],
+  );
+  assert.deepEqual(
+    rules.map((rule) => rule.id),
+    ["AUDIT-534", "AUDIT-535", "AUDIT-536", "AUDIT-537"],
+  );
+  for (const rule of rules) assert.equal(rule.check().status, "pass");
+
+  const typesPath =
+    "src/automation/orchestrator/worker-dispatch-service-types.ts";
+  const implementationPath =
+    "src/automation/orchestrator/worker-dispatch-service.ts";
+  assertRuleRejects(
+    AUTOMATION_WORKER_DISPATCH_SERVICE_CONTRACTS_RULE,
+    inspectAutomationOrchestratorWorkerDispatchServiceContracts(
+      sourcesWithout(typesPath),
+    ),
+    "required_file_missing",
+  );
+  assertRuleRejects(
+    AUTOMATION_WORKER_DISPATCH_SERVICE_DEPENDENCIES_RULE,
+    inspectAutomationOrchestratorWorkerDispatchServiceDependencies(
+      mutatedSources(
+        implementationPath,
+        "\n}",
+        '\n}\nimport { readFileSync } from "node:fs";',
+        3,
+        3,
+      ),
+    ),
+    "automation_worker_dispatch_service_dependencies_not_closed",
+  );
+  assertRuleRejects(
+    AUTOMATION_WORKER_DISPATCH_SERVICE_MATRIX_RULE,
+    inspectAutomationOrchestratorWorkerDispatchServiceMatrix(
+      mutatedSources(
+        implementationPath,
+        '"port_accepted"',
+        '"removed_outcome"',
+      ),
+    ),
+    "automation_worker_dispatch_service_matrix_not_closed_or_fail_closed",
+  );
+  assertRuleRejects(
+    AUTOMATION_WORKER_DISPATCH_SERVICE_INVARIANTS_RULE,
+    inspectAutomationOrchestratorWorkerDispatchServiceInvariants(
+      mutatedSources(implementationPath, "Object.freeze(", "port.dispatch("),
+    ),
+    "automation_worker_dispatch_service_invariants_not_fail_closed",
+  );
 });
 
 test("AUDIT-526 through AUDIT-529 reject Worker Dispatch Port regressions", () => {

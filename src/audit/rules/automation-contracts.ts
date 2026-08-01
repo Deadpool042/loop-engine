@@ -42,6 +42,10 @@ const WORKER_DISPATCH_INVOCATION_TYPES_FILE =
   "src/automation/orchestrator/worker-dispatch-invocation-types.ts";
 const WORKER_DISPATCH_INVOCATION_FILE =
   "src/automation/orchestrator/worker-dispatch-invocation.ts";
+const WORKER_DISPATCH_SERVICE_TYPES_FILE =
+  "src/automation/orchestrator/worker-dispatch-service-types.ts";
+const WORKER_DISPATCH_SERVICE_FILE =
+  "src/automation/orchestrator/worker-dispatch-service.ts";
 const EVALUATION_TYPES_FILE = "src/automation/orchestrator/evaluation/types.ts";
 const EVALUATION_BARREL_FILE =
   "src/automation/orchestrator/evaluation/index.ts";
@@ -269,6 +273,11 @@ const WORKER_DISPATCH_INVOCATION_CONTRACTS = [
   "AutomationOrchestratorWorkerDispatchInvocationReason",
   "AutomationOrchestratorWorkerDispatchInvocation",
 ] as const;
+const WORKER_DISPATCH_SERVICE_CONTRACTS = [
+  "AutomationOrchestratorWorkerDispatchServiceStatus",
+  "AutomationOrchestratorWorkerDispatchServiceReason",
+  "AutomationOrchestratorWorkerDispatchServiceResult",
+] as const;
 
 const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./types.js", CORE_CONTRACTS],
@@ -290,6 +299,7 @@ const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./orchestrator/index.js", WORKER_COMMAND_CONTRACTS],
   ["./orchestrator/index.js", WORKER_DISPATCH_PORT_CONTRACTS],
   ["./orchestrator/index.js", WORKER_DISPATCH_INVOCATION_CONTRACTS],
+  ["./orchestrator/index.js", WORKER_DISPATCH_SERVICE_CONTRACTS],
 ] as const;
 
 const REQUIRED_FILES = [
@@ -320,6 +330,8 @@ const REQUIRED_FILES = [
   WORKER_DISPATCH_PORT_FILE,
   WORKER_DISPATCH_INVOCATION_TYPES_FILE,
   WORKER_DISPATCH_INVOCATION_FILE,
+  WORKER_DISPATCH_SERVICE_TYPES_FILE,
+  WORKER_DISPATCH_SERVICE_FILE,
   EVALUATION_TYPES_FILE,
   EVALUATION_BARREL_FILE,
   PLANNING_TYPES_FILE,
@@ -2236,6 +2248,142 @@ export function inspectAutomationOrchestratorWorkerDispatchInvocationIdentifiers
       ]);
 }
 
+export function inspectAutomationOrchestratorWorkerDispatchServiceContracts(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const violations = [
+    ...violationsForContracts(
+      sources,
+      WORKER_DISPATCH_SERVICE_TYPES_FILE,
+      ORCHESTRATOR_BARREL_FILE,
+      "./worker-dispatch-service-types.js",
+      WORKER_DISPATCH_SERVICE_CONTRACTS,
+    ),
+  ];
+  const implementation = sourceFor(sources, WORKER_DISPATCH_SERVICE_FILE);
+  const orchestrator = sourceFor(sources, ORCHESTRATOR_BARREL_FILE);
+  const automation = sourceFor(sources, BARREL_FILE);
+  if (
+    implementation === null ||
+    !/export\s+async\s+function\s+dispatchAutomationOrchestratorWorkerCommand\b/.test(
+      withoutComments(implementation),
+    )
+  )
+    violations.push(
+      Object.freeze({
+        path: WORKER_DISPATCH_SERVICE_FILE,
+        reason: "automation_worker_dispatch_service_function_missing",
+      }),
+    );
+  for (const [path, source, target] of [
+    [ORCHESTRATOR_BARREL_FILE, orchestrator, "./worker-dispatch-service.js"],
+    [BARREL_FILE, automation, "./orchestrator/worker-dispatch-service.js"],
+  ] as const)
+    if (
+      source === null ||
+      !hasBarrelExport(
+        source,
+        "dispatchAutomationOrchestratorWorkerCommand",
+        target,
+      )
+    )
+      violations.push(
+        Object.freeze({
+          path,
+          reason:
+            "automation_worker_dispatch_service_function_not_canonically_exported",
+        }),
+      );
+  return Object.freeze(violations);
+}
+
+export function inspectAutomationOrchestratorWorkerDispatchServiceDependencies(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, WORKER_DISPATCH_SERVICE_FILE);
+  const structural = source === null ? "" : withoutComments(source);
+  const allowed = [
+    "./worker-command-types.js",
+    "./worker-dispatch-port.js",
+    "./worker-dispatch-port-types.js",
+    "./worker-dispatch-invocation.js",
+    "./worker-dispatch-service-types.js",
+  ];
+  return source === null ||
+    moduleSpecifiers(structural).some((target) => !allowed.includes(target)) ||
+    /\b(?:Date|Math\.random|crypto|setTimeout|setInterval|process|fs|net|http|exec|spawn|let|var)\b/.test(
+      structural,
+    )
+    ? Object.freeze([
+        Object.freeze({
+          path: WORKER_DISPATCH_SERVICE_FILE,
+          reason: "automation_worker_dispatch_service_dependencies_not_closed",
+        }),
+      ])
+    : Object.freeze([]);
+}
+
+export function inspectAutomationOrchestratorWorkerDispatchServiceMatrix(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = withoutComments(
+    sourceFor(sources, WORKER_DISPATCH_SERVICE_FILE) ?? "",
+  );
+  const valid =
+    /prepareAutomationOrchestratorWorkerDispatchRequest\(command\)/.test(
+      source,
+    ) &&
+    /invokeAutomationOrchestratorWorkerDispatch\(\s*request,\s*port,?\s*\)/.test(
+      source,
+    ) &&
+    [
+      "command_prepared",
+      "command_rejected",
+      "invalid_command",
+      "port_accepted",
+      "port_rejected",
+      "port_indeterminate",
+      "invalid_port_result",
+      "port_failed",
+    ].every((value) => source.includes(`"${value}"`)) &&
+    !/if\s*\(\s*command\.prepared\s*\)/.test(source);
+  return valid
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: WORKER_DISPATCH_SERVICE_FILE,
+          reason:
+            "automation_worker_dispatch_service_matrix_not_closed_or_fail_closed",
+        }),
+      ]);
+}
+
+export function inspectAutomationOrchestratorWorkerDispatchServiceInvariants(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = withoutComments(
+    sourceFor(sources, WORKER_DISPATCH_SERVICE_FILE) ?? "",
+  );
+  const valid =
+    (source.match(/invokeAutomationOrchestratorWorkerDispatch\s*\(/g)?.length ??
+      0) === 1 &&
+    !/\.dispatch\s*\(/.test(source) &&
+    /Object\.freeze\(/.test(source) &&
+    /requestId:\s*identifiers\?\.requestId\s*\?\?\s*null[\s\S]*?executionStarted:\s*flags\?\.executionStarted\s*\?\?\s*false/.test(
+      source,
+    ) &&
+    !/\.trim\(\)|\.length\s*>\s*0|\.to(?:Lower|Upper)Case\(\)/.test(source);
+  return valid
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: WORKER_DISPATCH_SERVICE_FILE,
+          reason:
+            "automation_worker_dispatch_service_invariants_not_fail_closed",
+        }),
+      ]);
+}
+
 export function inspectAutomationOrchestratorPipelineValidation(
   sources: readonly AutomationAuditSource[],
 ): readonly AutomationAuditViolation[] {
@@ -2531,6 +2679,7 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/worker-command.js",
         "./orchestrator/worker-dispatch-port.js",
         "./orchestrator/worker-dispatch-invocation.js",
+        "./orchestrator/worker-dispatch-service.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2584,6 +2733,8 @@ export function inspectAutomationDependencyDirection(
         "./worker-dispatch-port-types.js",
         "./worker-dispatch-invocation.js",
         "./worker-dispatch-invocation-types.js",
+        "./worker-dispatch-service.js",
+        "./worker-dispatch-service-types.js",
       ],
     ],
     [
@@ -2635,6 +2786,17 @@ export function inspectAutomationDependencyDirection(
       [
         "./worker-dispatch-port-types.js",
         "./worker-dispatch-invocation-types.js",
+      ],
+    ],
+    [WORKER_DISPATCH_SERVICE_TYPES_FILE, []],
+    [
+      WORKER_DISPATCH_SERVICE_FILE,
+      [
+        "./worker-command-types.js",
+        "./worker-dispatch-port.js",
+        "./worker-dispatch-port-types.js",
+        "./worker-dispatch-invocation.js",
+        "./worker-dispatch-service-types.js",
       ],
     ],
     [
@@ -3058,3 +3220,27 @@ export const AUTOMATION_WORKER_DISPATCH_INVOCATION_IDENTIFIERS_RULE =
     "Dispatch Invocation validates matching identifiers and normalizes invalid outcomes with false flags.",
     inspectAutomationOrchestratorWorkerDispatchInvocationIdentifiers,
   );
+export const AUTOMATION_WORKER_DISPATCH_SERVICE_CONTRACTS_RULE = createRule(
+  "AUDIT-534",
+  "Automation Worker Dispatch Service contracts and exports are complete",
+  "Dispatch Service types, function, and canonical exports are present.",
+  inspectAutomationOrchestratorWorkerDispatchServiceContracts,
+);
+export const AUTOMATION_WORKER_DISPATCH_SERVICE_DEPENDENCIES_RULE = createRule(
+  "AUDIT-535",
+  "Automation Worker Dispatch Service dependencies are closed",
+  "Dispatch Service depends only on public Worker Command, preparation, port, invocation, and service contracts.",
+  inspectAutomationOrchestratorWorkerDispatchServiceDependencies,
+);
+export const AUTOMATION_WORKER_DISPATCH_SERVICE_MATRIX_RULE = createRule(
+  "AUDIT-536",
+  "Automation Worker Dispatch Service orchestration is fail-closed",
+  "Dispatch Service composes preparation and invocation only for a prepared request and closes every outcome.",
+  inspectAutomationOrchestratorWorkerDispatchServiceMatrix,
+);
+export const AUTOMATION_WORKER_DISPATCH_SERVICE_INVARIANTS_RULE = createRule(
+  "AUDIT-537",
+  "Automation Worker Dispatch Service preserves indirect-effect invariants",
+  "Dispatch Service never directly calls the port and preserves identifiers and closed failure flags.",
+  inspectAutomationOrchestratorWorkerDispatchServiceInvariants,
+);

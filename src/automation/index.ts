@@ -141,6 +141,7 @@ export { prepareAutomationOrchestratorPipelineWorkerHandoff } from "./orchestrat
 export { prepareAutomationOrchestratorWorkerCommand } from "./orchestrator/worker-command.js";
 export { prepareAutomationOrchestratorWorkerDispatchRequest } from "./orchestrator/worker-dispatch-port.js";
 export { invokeAutomationOrchestratorWorkerDispatch } from "./orchestrator/worker-dispatch-invocation.js";
+export { dispatchAutomationOrchestratorWorkerCommand } from "./orchestrator/worker-dispatch-service.js";
 export type {
   AutomationOrchestratorPipelineAdmissionDecision,
   AutomationOrchestratorPipelineAdmissionReason,
@@ -162,4 +163,7 @@ export type {
   AutomationOrchestratorWorkerDispatchInvocation,
   AutomationOrchestratorWorkerDispatchInvocationReason,
   AutomationOrchestratorWorkerDispatchInvocationStatus,
+  AutomationOrchestratorWorkerDispatchServiceReason,
+  AutomationOrchestratorWorkerDispatchServiceResult,
+  AutomationOrchestratorWorkerDispatchServiceStatus,
 } from "./orchestrator/index.js";
