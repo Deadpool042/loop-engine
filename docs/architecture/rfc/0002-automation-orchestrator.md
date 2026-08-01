@@ -195,7 +195,8 @@ frontière de provider, forge, transport ou runtime n'est franchie.
 
 La décision pure `decideAutomationOrchestratorPipelineAdmission` suit cette
 projection : `pipeline result → validation → summary → admission decision →
-worker handoff → future execution`. Le summary reste descriptif ; l'admission
+worker handoff → worker command → future dispatch → future execution`. Le
+summary reste descriptif ; l'admission
 est seulement une autorisation déclarative de remise future. Même `admitted`
 ne réalise aucun dispatch, appel de provider, forge, runtime ou worker, ne
 franchit aucun transport et ne persiste aucun état. Les identifiants sont
@@ -212,6 +213,14 @@ persistance. Les identifiants restent exacts, sans normalisation. Les sept
 indicateurs de handoff et d'opération restent littéralement `false`; une
 admission incohérente produit un handoff `rejected` fail-closed. L'exécution
 reste un effet externe futur et distinct.
+
+La construction pure `prepareAutomationOrchestratorWorkerCommand` transforme
+uniquement un handoff public cohérent en instruction déclarative fermée. Son
+seul `kind`, `execute_delegated_task`, ne constitue ni un payload exécutable
+ni une sélection de worker. Une commande `prepared` n'envoie rien : le dispatch
+reste un futur franchissement d'adaptateur, puis l'exécution un effet externe
+ultérieur. Aucun worker concret, provider, forge, runtime, transport ou état
+persisté n'est impliqué ; tous les indicateurs restent littéralement `false`.
 
 ## 5. Execution lifecycle
 

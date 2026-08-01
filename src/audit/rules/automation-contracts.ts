@@ -31,6 +31,9 @@ const PIPELINE_WORKER_HANDOFF_TYPES_FILE =
   "src/automation/orchestrator/pipeline-worker-handoff-types.ts";
 const PIPELINE_WORKER_HANDOFF_FILE =
   "src/automation/orchestrator/pipeline-worker-handoff.ts";
+const WORKER_COMMAND_TYPES_FILE =
+  "src/automation/orchestrator/worker-command-types.ts";
+const WORKER_COMMAND_FILE = "src/automation/orchestrator/worker-command.ts";
 const EVALUATION_TYPES_FILE = "src/automation/orchestrator/evaluation/types.ts";
 const EVALUATION_BARREL_FILE =
   "src/automation/orchestrator/evaluation/index.ts";
@@ -238,6 +241,13 @@ const PIPELINE_WORKER_HANDOFF_CONTRACTS = [
   "AutomationOrchestratorPipelineWorkerHandoff",
 ] as const;
 
+const WORKER_COMMAND_CONTRACTS = [
+  "AutomationOrchestratorWorkerCommandStatus",
+  "AutomationOrchestratorWorkerCommandReason",
+  "AutomationOrchestratorWorkerCommandKind",
+  "AutomationOrchestratorWorkerCommand",
+] as const;
+
 const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./types.js", CORE_CONTRACTS],
   ["./provider/index.js", PROVIDER_CONTRACTS],
@@ -255,6 +265,7 @@ const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./orchestrator/index.js", PIPELINE_SUMMARY_CONTRACTS],
   ["./orchestrator/index.js", PIPELINE_ADMISSION_CONTRACTS],
   ["./orchestrator/index.js", PIPELINE_WORKER_HANDOFF_CONTRACTS],
+  ["./orchestrator/index.js", WORKER_COMMAND_CONTRACTS],
 ] as const;
 
 const REQUIRED_FILES = [
@@ -279,6 +290,8 @@ const REQUIRED_FILES = [
   PIPELINE_ADMISSION_FILE,
   PIPELINE_WORKER_HANDOFF_TYPES_FILE,
   PIPELINE_WORKER_HANDOFF_FILE,
+  WORKER_COMMAND_TYPES_FILE,
+  WORKER_COMMAND_FILE,
   EVALUATION_TYPES_FILE,
   EVALUATION_BARREL_FILE,
   PLANNING_TYPES_FILE,
@@ -1730,6 +1743,200 @@ export function inspectAutomationOrchestratorPipelineWorkerHandoffIdentifiers(
   return Object.freeze([]);
 }
 
+export function inspectAutomationOrchestratorWorkerCommandContracts(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const violations = [
+    ...violationsForContracts(
+      sources,
+      WORKER_COMMAND_TYPES_FILE,
+      ORCHESTRATOR_BARREL_FILE,
+      "./worker-command-types.js",
+      WORKER_COMMAND_CONTRACTS,
+    ),
+  ];
+  const implementation = sourceFor(sources, WORKER_COMMAND_FILE);
+  const orchestratorBarrel = sourceFor(sources, ORCHESTRATOR_BARREL_FILE);
+  const automationBarrel = sourceFor(sources, BARREL_FILE);
+  if (implementation === null) {
+    violations.push(
+      Object.freeze({
+        path: WORKER_COMMAND_FILE,
+        reason: "automation_worker_command_file_missing",
+      }),
+    );
+  } else if (
+    !/export\s+function\s+prepareAutomationOrchestratorWorkerCommand\b/.test(
+      withoutComments(implementation),
+    )
+  ) {
+    violations.push(
+      Object.freeze({
+        path: WORKER_COMMAND_FILE,
+        reason: "automation_worker_command_function_missing",
+      }),
+    );
+  }
+  for (const [path, source, target] of [
+    [ORCHESTRATOR_BARREL_FILE, orchestratorBarrel, "./worker-command.js"],
+    [BARREL_FILE, automationBarrel, "./orchestrator/worker-command.js"],
+  ] as const) {
+    if (
+      source === null ||
+      !hasBarrelExport(
+        source,
+        "prepareAutomationOrchestratorWorkerCommand",
+        target,
+      )
+    )
+      violations.push(
+        Object.freeze({
+          path,
+          reason: "automation_worker_command_function_not_canonically_exported",
+        }),
+      );
+  }
+  for (const name of WORKER_COMMAND_CONTRACTS) {
+    if (
+      automationBarrel === null ||
+      !hasBarrelExport(automationBarrel, name, "./orchestrator/index.js")
+    )
+      violations.push(
+        Object.freeze({
+          path: BARREL_FILE,
+          reason: `automation_worker_command_type_not_canonically_exported:${name}`,
+        }),
+      );
+  }
+  return Object.freeze(violations);
+}
+
+export function inspectAutomationOrchestratorWorkerCommandPurity(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, WORKER_COMMAND_FILE);
+  if (source === null)
+    return Object.freeze([
+      Object.freeze({
+        path: WORKER_COMMAND_FILE,
+        reason: "automation_worker_command_file_missing",
+      }),
+    ]);
+  const structuralSource = withoutComments(source);
+  const allowedImports = [
+    "./pipeline-worker-handoff-types.js",
+    "./worker-command-types.js",
+  ];
+  const forbidden =
+    /(?:\b(?:evaluateAutomationOrchestratorPipeline|validateAutomationOrchestratorPipeline|summarizeAutomationOrchestratorPipeline|decideAutomationOrchestratorPipelineAdmission|prepareAutomationOrchestratorPipelineWorkerHandoff|dispatchAutomation|executeAutomation)\s*\(|\bDate\.now\b|\bnew\s+Date\b|\bMath\.random\b|\bcrypto\b|\b(?:setTimeout|setInterval|queueMicrotask|requestAnimationFrame)\b|\bprocess\b|\b(?:node:)?(?:fs|net|http|https|child_process)\b|\b(?:exec|spawn)\w*\s*\(|\b(?:send|deliver|invoke|delegate|provide|selectWorker|createCommand)\s*\(|\b(?:let|var)\s+)/;
+  const mutatesInput =
+    /\b(?:handoff|source)\s*(?:\.\w+|\[[^\]]+\])\s*=(?!=)|\b(?:handoff|source)\s*(?:\.\w+|\[[^\]]+\])\s*(?:\+\+|--)/.test(
+      structuralSource,
+    );
+  if (
+    moduleSpecifiers(structuralSource).some(
+      (target) => !allowedImports.includes(target),
+    ) ||
+    forbidden.test(structuralSource) ||
+    mutatesInput
+  )
+    return Object.freeze([
+      Object.freeze({
+        path: WORKER_COMMAND_FILE,
+        reason: "automation_worker_command_not_pure_or_dependency_safe",
+      }),
+    ]);
+  return Object.freeze([]);
+}
+
+export function inspectAutomationOrchestratorWorkerCommandMatrix(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const implementation = sourceFor(sources, WORKER_COMMAND_FILE);
+  const types = sourceFor(sources, WORKER_COMMAND_TYPES_FILE);
+  const source =
+    implementation === null ? null : withoutComments(implementation);
+  const typeSource = types === null ? null : withoutComments(types);
+  const hasClosedTypes =
+    typeSource !== null &&
+    /"prepared"\s*\|\s*"rejected"/.test(typeSource) &&
+    /"handoff_prepared"[\s\S]*?"handoff_rejected"[\s\S]*?"invalid_handoff"/.test(
+      typeSource,
+    ) &&
+    /"execute_delegated_task"/.test(typeSource);
+  const hasClosedMatrix =
+    source !== null &&
+    /source\.status\s*===\s*"prepared"/.test(source) &&
+    /source\.prepared\s*===\s*true/.test(source) &&
+    /source\.reason\s*===\s*"admission_accepted"\s*&&\s*source\.progression\s*===\s*"dispatch"/.test(
+      source,
+    ) &&
+    /source\.status\s*===\s*"rejected"/.test(source) &&
+    /source\.prepared\s*===\s*false/.test(source) &&
+    /source\.reason\s*===\s*"admission_rejected"/.test(source) &&
+    /command\("prepared",\s*"handoff_prepared"/.test(source) &&
+    /command\("rejected",\s*"handoff_rejected"/.test(source) &&
+    /kind:\s*status\s*===\s*"prepared"\s*\?\s*"execute_delegated_task"\s*:\s*null/.test(
+      source,
+    ) &&
+    /return\s+command\("rejected",\s*"invalid_handoff",\s*null\);\s*}\s*$/.test(
+      source,
+    ) &&
+    !/if\s*\(\s*handoff\.prepared\s*\)/.test(source);
+  if (!hasClosedTypes || !hasClosedMatrix)
+    return Object.freeze([
+      Object.freeze({
+        path: WORKER_COMMAND_FILE,
+        reason: "automation_worker_command_matrix_not_closed_or_fail_closed",
+      }),
+    ]);
+  return Object.freeze([]);
+}
+
+export function inspectAutomationOrchestratorWorkerCommandIdentifiers(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, WORKER_COMMAND_FILE);
+  if (source === null)
+    return Object.freeze([
+      Object.freeze({
+        path: WORKER_COMMAND_FILE,
+        reason: "automation_worker_command_file_missing",
+      }),
+    ]);
+  const structuralSource = withoutComments(source);
+  const hasIdentifierChecks =
+    /source\.requestId !== null && typeof source\.requestId !== "string"/.test(
+      structuralSource,
+    ) &&
+    /source\.delegationId !== null && typeof source\.delegationId !== "string"/.test(
+      structuralSource,
+    ) &&
+    /source\.candidateId !== null && typeof source\.candidateId !== "string"/.test(
+      structuralSource,
+    ) &&
+    /source\.targetId !== null && typeof source\.targetId !== "string"/.test(
+      structuralSource,
+    );
+  const hasFalseFlags =
+    /workerSelected:\s*false[\s\S]*?commandDispatched:\s*false[\s\S]*?dispatchOccurred:\s*false[\s\S]*?delegationOccurred:\s*false[\s\S]*?providerInvoked:\s*false[\s\S]*?forgeInvoked:\s*false[\s\S]*?executionStarted:\s*false/.test(
+      structuralSource,
+    );
+  const normalizesIdentifier =
+    /\.trim\(\)|\.length\s*>\s*0|\.to(?:Lower|Upper)Case\(\)/.test(
+      structuralSource,
+    );
+  if (!hasIdentifierChecks || !hasFalseFlags || normalizesIdentifier)
+    return Object.freeze([
+      Object.freeze({
+        path: WORKER_COMMAND_FILE,
+        reason:
+          "automation_worker_command_identifiers_or_operational_flags_not_fail_closed",
+      }),
+    ]);
+  return Object.freeze([]);
+}
+
 export function inspectAutomationOrchestratorPipelineValidation(
   sources: readonly AutomationAuditSource[],
 ): readonly AutomationAuditViolation[] {
@@ -2022,6 +2229,7 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/pipeline-summary.js",
         "./orchestrator/pipeline-admission.js",
         "./orchestrator/pipeline-worker-handoff.js",
+        "./orchestrator/worker-command.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2069,6 +2277,8 @@ export function inspectAutomationDependencyDirection(
         "./pipeline-admission-types.js",
         "./pipeline-worker-handoff.js",
         "./pipeline-worker-handoff-types.js",
+        "./worker-command.js",
+        "./worker-command-types.js",
       ],
     ],
     [
@@ -2103,6 +2313,11 @@ export function inspectAutomationDependencyDirection(
     [
       PIPELINE_WORKER_HANDOFF_FILE,
       ["./pipeline-admission-types.js", "./pipeline-worker-handoff-types.js"],
+    ],
+    [WORKER_COMMAND_TYPES_FILE, []],
+    [
+      WORKER_COMMAND_FILE,
+      ["./pipeline-worker-handoff-types.js", "./worker-command-types.js"],
     ],
     [
       PLANNING_TYPES_FILE,
@@ -2447,4 +2662,32 @@ export const AUTOMATION_PIPELINE_WORKER_HANDOFF_IDENTIFIERS_RULE = createRule(
   "Automation Pipeline Worker Handoff preserves identifier and operational invariants",
   "Pipeline Worker Handoff validates all prepared identifiers without normalization and keeps every handoff and operational flag literally false.",
   inspectAutomationOrchestratorPipelineWorkerHandoffIdentifiers,
+);
+
+export const AUTOMATION_WORKER_COMMAND_CONTRACTS_RULE = createRule(
+  "AUDIT-522",
+  "Automation Worker Command contracts and exports are complete",
+  "Worker Command files, public contracts, canonical function, and public-barrel exports are present.",
+  inspectAutomationOrchestratorWorkerCommandContracts,
+);
+
+export const AUTOMATION_WORKER_COMMAND_PURITY_RULE = createRule(
+  "AUDIT-523",
+  "Automation Worker Command remains pure and dependency-safe",
+  "Worker Command imports only the public Worker Handoff contract and contains no operational dependency, effect, mutable state, or input mutation.",
+  inspectAutomationOrchestratorWorkerCommandPurity,
+);
+
+export const AUTOMATION_WORKER_COMMAND_MATRIX_RULE = createRule(
+  "AUDIT-524",
+  "Automation Worker Command uses a closed fail-closed matrix",
+  "Worker Command prepares only a coherent prepared handoff and rejects every contradictory handoff.",
+  inspectAutomationOrchestratorWorkerCommandMatrix,
+);
+
+export const AUTOMATION_WORKER_COMMAND_IDENTIFIERS_RULE = createRule(
+  "AUDIT-525",
+  "Automation Worker Command preserves identifier and operational invariants",
+  "Worker Command validates prepared identifiers without normalization and keeps every command and operational flag literally false.",
+  inspectAutomationOrchestratorWorkerCommandIdentifiers,
 );
