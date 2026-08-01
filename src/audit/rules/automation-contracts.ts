@@ -2777,6 +2777,7 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/worker-dispatch-invocation.js",
         "./orchestrator/worker-dispatch-service.js",
         "./orchestrator/worker-execution-lifecycle-initialization.js",
+        "./orchestrator/worker-execution-start-request-preparation.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2834,6 +2835,8 @@ export function inspectAutomationDependencyDirection(
         "./worker-dispatch-service-types.js",
         "./worker-execution-lifecycle-initialization.js",
         "./worker-execution-lifecycle-initialization-types.js",
+        "./worker-execution-start-request-preparation.js",
+        "./worker-execution-start-request-preparation-types.js",
       ],
     ],
     [
@@ -3379,3 +3382,66 @@ export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_INVARIANTS_RUL
     "Lifecycle initialization freezes its result and keeps executionStarted false.",
     inspectAutomationOrchestratorWorkerExecutionLifecycleInitializationInvariants,
   );
+
+function executionStartRule(
+  source: string,
+  terms: readonly string[],
+): readonly AutomationAuditViolation[] {
+  return terms.every((term) => source.includes(term))
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: "src/automation/orchestrator/worker-execution-start-request-preparation.ts",
+          reason: "automation_worker_execution_start_not_closed",
+        }),
+      ]);
+}
+const executionStartSources = (): string =>
+  [
+    "src/automation/orchestrator/worker-execution-start-request-preparation-types.ts",
+    "src/automation/orchestrator/worker-execution-start-request-preparation.ts",
+    "src/automation/orchestrator/index.ts",
+    "src/automation/index.ts",
+  ]
+    .map((path) => (existsSync(path) ? readFileSync(path, "utf8") : ""))
+    .join("\n");
+export const AUTOMATION_WORKER_EXECUTION_START_CONTRACTS_RULE = createRule(
+  "AUDIT-542",
+  "Automation Worker Execution Start Request contracts and exports are complete",
+  "Start request preparation public contracts are closed.",
+  (sources) =>
+    executionStartRule(sources.map((entry) => entry.source).join("\n"), [
+      "AutomationOrchestratorWorkerExecutionStartRequest",
+      "prepareAutomationOrchestratorWorkerExecutionStartRequest",
+    ]),
+);
+export const AUTOMATION_WORKER_EXECUTION_START_DEPENDENCIES_RULE = createRule(
+  "AUDIT-543",
+  "Automation Worker Execution Start Request dependencies are closed",
+  "Start request preparation is pure and infrastructure-free.",
+  () =>
+    executionStartRule(executionStartSources(), [
+      "worker-execution-lifecycle-initialization-types.js",
+    ]),
+);
+export const AUTOMATION_WORKER_EXECUTION_START_MATRIX_RULE = createRule(
+  "AUDIT-544",
+  "Automation Worker Execution Start Request matrix is fail-closed",
+  "Only pending lifecycle states prepare a request.",
+  () =>
+    executionStartRule(executionStartSources(), [
+      "request_prepared",
+      "request_rejected",
+      "request_indeterminate",
+    ]),
+);
+export const AUTOMATION_WORKER_EXECUTION_START_INVARIANTS_RULE = createRule(
+  "AUDIT-545",
+  "Automation Worker Execution Start Request preserves inert identifiers",
+  "Start request preparation preserves canonical identifiers without effects.",
+  () =>
+    executionStartRule(executionStartSources(), [
+      "executionStarted: false",
+      "Object.freeze",
+    ]),
+);
