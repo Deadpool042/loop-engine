@@ -239,6 +239,22 @@ choisi par le cœur : les erreurs d'adaptateur deviennent `port_failed` et tout
 résultat incohérent devient `invalid_port_result`. L'exécution du worker reste
 un cycle externe ultérieur.
 
+Le Dispatch Application Service compose ces deux frontières sans effet direct :
+il reçoit une Worker Command et un Dispatch Port injecté, délègue la validation
+et projection à `prepareAutomationOrchestratorWorkerDispatchRequest`, puis
+délègue l'effet contrôlé unique à
+`invokeAutomationOrchestratorWorkerDispatch` seulement si la requête est
+préparée. Le service ne connaît aucun adaptateur concret et n'appelle jamais le
+port directement ; V20.7 et V20.8 restent les seules autorités de préparation
+et d'invocation. Il n'ajoute ni logique dupliquée, ni retry, ni sélection de
+provider, forge, worker ou runtime.
+
+La chaîne reste donc : Worker Command = instruction déclarative ; Dispatch
+Request Preparation = validation et projection pure ; Dispatch Invocation
+Boundary = effet contrôlé unique ; Dispatch Application Service = composition
+applicative sans effet direct ; Dispatch Adapter = infrastructure injectée ;
+Execution Lifecycle = cycle ultérieur.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif
