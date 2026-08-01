@@ -262,6 +262,12 @@ démarré, ni runtime appelé, ni traitement en cours. `executionStarted` reste
 toujours `false` et aucune infrastructure concrète n'est introduite : dispatch
 et exécution restent deux phases séparées.
 
+V21.1 ajoute Execution Start Request Preparation : elle propage uniquement
+`requestId`, `delegationId`, `candidateId` et `targetId` dans une requête
+déclarative. Elle ne crée ni ne renomme aucun identifiant, ne sélectionne aucun
+runtime, ne démarre aucun worker et ne produit aucun effet. L'identité d'une
+tentative future reste à la frontière qui possédera cette autorité.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif
