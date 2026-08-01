@@ -33,6 +33,10 @@ import {
   AUTOMATION_WORKER_DISPATCH_SERVICE_INVARIANTS_RULE,
   AUTOMATION_WORKER_DISPATCH_SERVICE_MATRIX_RULE,
   AUTOMATION_PROVIDER_CONTRACTS_RULE,
+  inspectAutomationOrchestratorWorkerExecutionStartReceiptContracts,
+  inspectAutomationOrchestratorWorkerExecutionStartReceiptDependencies,
+  inspectAutomationOrchestratorWorkerExecutionStartReceiptInvariants,
+  inspectAutomationOrchestratorWorkerExecutionStartReceiptMatrix,
   inspectAutomationAssemblyContracts,
   inspectAutomationAssemblyInertness,
   inspectAutomationAuditDocumentation,
@@ -127,6 +131,8 @@ const AUTOMATION_PATHS = [
   "src/automation/orchestrator/delegation-dispatch/types.ts",
   "src/automation/orchestrator/delegation-dispatch/index.ts",
   "src/automation/orchestrator/delegation-dispatch/preparation.ts",
+  "src/automation/orchestrator/worker-execution-start-receipt-types.ts",
+  "src/automation/orchestrator/worker-execution-start-receipt.ts",
   "docs/architecture/rfc/0001-automation-platform.md",
 ] as const;
 
@@ -2469,6 +2475,101 @@ test("Automation contract inspectors reject mutable registries and effects", () 
         reason: "automation_contract_contains_effect_or_mutable_global",
       },
     ],
+  );
+});
+
+test("AUDIT-554 through AUDIT-557 accept canonical receipt sources and reject targeted mutations", () => {
+  const receiptPath =
+    "src/automation/orchestrator/worker-execution-start-receipt.ts";
+  const typesPath =
+    "src/automation/orchestrator/worker-execution-start-receipt-types.ts";
+  const checks = [
+    [
+      inspectAutomationOrchestratorWorkerExecutionStartReceiptContracts,
+      typesPath,
+      "export type AutomationOrchestratorWorkerExecutionStartReceipt =",
+      "export type RemovedReceipt =",
+    ],
+    [
+      inspectAutomationOrchestratorWorkerExecutionStartReceiptDependencies,
+      receiptPath,
+      "import type { AutomationOrchestratorWorkerExecutionStartServiceResult }",
+      'import "./worker-execution-start-port.js";\nimport type { AutomationOrchestratorWorkerExecutionStartServiceResult }',
+    ],
+    [
+      inspectAutomationOrchestratorWorkerExecutionStartReceiptDependencies,
+      receiptPath,
+      "import type { AutomationOrchestratorWorkerExecutionStartServiceResult }",
+      "Date.now();\nimport type { AutomationOrchestratorWorkerExecutionStartServiceResult }",
+    ],
+    [
+      inspectAutomationOrchestratorWorkerExecutionStartReceiptMatrix,
+      receiptPath,
+      'serviceResult.status === "start_accepted"',
+      "true",
+    ],
+    [
+      inspectAutomationOrchestratorWorkerExecutionStartReceiptMatrix,
+      receiptPath,
+      "receipt.requestId === identifiers.requestId",
+      "true",
+    ],
+    [
+      inspectAutomationOrchestratorWorkerExecutionStartReceiptMatrix,
+      receiptPath,
+      "receipt.delegationId === identifiers.delegationId",
+      "true",
+    ],
+    [
+      inspectAutomationOrchestratorWorkerExecutionStartReceiptMatrix,
+      receiptPath,
+      "receipt.candidateId === identifiers.candidateId",
+      "true",
+    ],
+    [
+      inspectAutomationOrchestratorWorkerExecutionStartReceiptMatrix,
+      receiptPath,
+      "receipt.targetId === identifiers.targetId",
+      "true",
+    ],
+    [
+      inspectAutomationOrchestratorWorkerExecutionStartReceiptInvariants,
+      receiptPath,
+      "return Object.freeze({",
+      "return Object.seal({",
+    ],
+    [
+      inspectAutomationOrchestratorWorkerExecutionStartReceiptInvariants,
+      receiptPath,
+      "requestId: identifiers?.requestId ?? null,",
+      "requestId: crypto.randomUUID(),",
+    ],
+  ] as const;
+  for (const inspector of [
+    inspectAutomationOrchestratorWorkerExecutionStartReceiptContracts,
+    inspectAutomationOrchestratorWorkerExecutionStartReceiptDependencies,
+    inspectAutomationOrchestratorWorkerExecutionStartReceiptMatrix,
+    inspectAutomationOrchestratorWorkerExecutionStartReceiptInvariants,
+  ])
+    assert.deepEqual(inspector(sources()), []);
+  for (const [inspector, path, pattern, replacement] of checks) {
+    assert.notDeepEqual(
+      inspector(mutatedSources(path, pattern, replacement)),
+      [],
+      `mutation was not rejected: ${pattern}`,
+    );
+  }
+  assert.notDeepEqual(
+    inspectAutomationOrchestratorWorkerExecutionStartReceiptContracts(
+      sourcesWithout(typesPath),
+    ),
+    [],
+  );
+  assert.notDeepEqual(
+    inspectAutomationOrchestratorWorkerExecutionStartReceiptDependencies(
+      sourcesWithout(receiptPath),
+    ),
+    [],
   );
 });
 
