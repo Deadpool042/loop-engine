@@ -181,6 +181,18 @@ aléa ni registre global n'est utilisé ; un pipeline malformé produit un sujet
 permet aux futures projections de refuser une validation issue d'un autre
 pipeline sans franchir de frontière externe.
 
+La projection pure `summarizeAutomationOrchestratorPipeline` consomme seulement
+les contrats publics de résultat de pipeline et de validation. Avant toute
+projection `valid`, elle vérifie que le sujet complet de validation correspond
+exactement à la progression et aux identifiants stables du pipeline ; une
+validation incomplète ou issue d'un autre pipeline reste `invalid`. Elle ne
+réexécute ni ne répare aucun stage. Son résultat compact expose des statuts,
+identifiants, compteurs et indicateurs non opérationnels uniquement : les
+résultats de stage complets, preuves, constats, échecs et métadonnées bruts
+sont omis, et les stages absents restent explicitement `null`. `valid`,
+`eligible`, `selected` et `prepared` gardent leur sens déclaratif : aucune
+frontière de provider, forge, transport ou runtime n'est franchie.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif

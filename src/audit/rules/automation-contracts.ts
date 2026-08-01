@@ -20,6 +20,9 @@ const PIPELINE_FILE = "src/automation/orchestrator/pipeline.ts";
 const PIPELINE_TYPES_FILE = "src/automation/orchestrator/pipeline-types.ts";
 const PIPELINE_VALIDATION_FILE =
   "src/automation/orchestrator/pipeline-validation.ts";
+const PIPELINE_SUMMARY_TYPES_FILE =
+  "src/automation/orchestrator/pipeline-summary-types.ts";
+const PIPELINE_SUMMARY_FILE = "src/automation/orchestrator/pipeline-summary.ts";
 const EVALUATION_TYPES_FILE = "src/automation/orchestrator/evaluation/types.ts";
 const EVALUATION_BARREL_FILE =
   "src/automation/orchestrator/evaluation/index.ts";
@@ -208,6 +211,13 @@ const PIPELINE_CONTRACTS = [
   "AutomationOrchestratorPipelineValidationSubject",
 ] as const;
 
+const PIPELINE_SUMMARY_CONTRACTS = [
+  "AutomationOrchestratorPipelineSummaryStatus",
+  "AutomationOrchestratorPipelineSummaryStage",
+  "AutomationOrchestratorPipelineSummaryCounts",
+  "AutomationOrchestratorPipelineSummary",
+] as const;
+
 const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./types.js", CORE_CONTRACTS],
   ["./provider/index.js", PROVIDER_CONTRACTS],
@@ -222,6 +232,7 @@ const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./orchestrator/index.js", DELEGATION_SELECTION_CONTRACTS],
   ["./orchestrator/index.js", DELEGATION_DISPATCH_CONTRACTS],
   ["./orchestrator/index.js", PIPELINE_CONTRACTS],
+  ["./orchestrator/index.js", PIPELINE_SUMMARY_CONTRACTS],
 ] as const;
 
 const REQUIRED_FILES = [
@@ -240,6 +251,8 @@ const REQUIRED_FILES = [
   PIPELINE_FILE,
   PIPELINE_TYPES_FILE,
   PIPELINE_VALIDATION_FILE,
+  PIPELINE_SUMMARY_TYPES_FILE,
+  PIPELINE_SUMMARY_FILE,
   EVALUATION_TYPES_FILE,
   EVALUATION_BARREL_FILE,
   PLANNING_TYPES_FILE,
@@ -390,6 +403,7 @@ export function inspectAutomationCoreContracts(
     ...inspectAutomationOrchestratorPipeline(sources),
     ...inspectAutomationOrchestratorPipelineContracts(sources),
     ...inspectAutomationOrchestratorPipelineValidation(sources),
+    ...inspectAutomationOrchestratorPipelineSummary(sources),
     ...inspectAutomationContractConsistency(sources),
   ];
   const barrel = sourceFor(sources, BARREL_FILE);
@@ -1193,6 +1207,72 @@ export function inspectAutomationOrchestratorPipelineContracts(
   return Object.freeze(violations);
 }
 
+export function inspectAutomationOrchestratorPipelineSummary(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const violations = [
+    ...violationsForContracts(
+      sources,
+      PIPELINE_SUMMARY_TYPES_FILE,
+      ORCHESTRATOR_BARREL_FILE,
+      "./pipeline-summary-types.js",
+      PIPELINE_SUMMARY_CONTRACTS,
+    ),
+  ];
+  const source = sourceFor(sources, PIPELINE_SUMMARY_FILE);
+  const barrel = sourceFor(sources, ORCHESTRATOR_BARREL_FILE);
+  const structuralSource = source === null ? null : withoutComments(source);
+  const allowedImports = ["./pipeline-types.js", "./pipeline-summary-types.js"];
+  const forbidden =
+    /(?:\b(?:evaluateAutomationOrchestratorPipeline|validateAutomationOrchestratorPipeline|evaluateAutomationOrchestratorDelegation|evaluateAutomationOrchestratorDelegationSelection|prepareAutomationOrchestratorDelegationDispatch)\s*\(|\bDate\.now\b|\bnew\s+Date\b|\bMath\.random\b|\bcrypto\b|\b(?:setTimeout|setInterval|queueMicrotask|requestAnimationFrame)\b|\bprocess\b|\b(?:node:)?(?:fs|net|http|https|child_process)\b|\b(?:exec|spawn)\w*\s*\(|\b(?:let|var)\s+)/;
+  const hasCanonicalExport =
+    barrel !== null &&
+    /\bsummarizeAutomationOrchestratorPipeline\b/.test(
+      withoutComments(barrel),
+    ) &&
+    withoutComments(barrel).includes('from "./pipeline-summary.js";');
+  if (
+    structuralSource === null ||
+    !/export\s+function\s+summarizeAutomationOrchestratorPipeline\b/.test(
+      structuralSource,
+    ) ||
+    !hasCanonicalExport ||
+    forbidden.test(structuralSource) ||
+    moduleSpecifiers(structuralSource).some(
+      (target) => !allowedImports.includes(target),
+    ) ||
+    !/subjectMatches\(/.test(structuralSource) ||
+    /\.length\s*>\s*0|\.trim\(\)|\.to(?:Lower|Upper)Case\(\)/.test(
+      structuralSource,
+    ) ||
+    !/isStageStatusForKind\(/.test(structuralSource) ||
+    !/kind\s*===\s*"evaluation"[\s\S]*?"eligible"[\s\S]*?"denied"[\s\S]*?"indeterminate"/.test(
+      structuralSource,
+    ) ||
+    !/kind\s*===\s*"selection"[\s\S]*?"selected"[\s\S]*?"rejected"[\s\S]*?"indeterminate"/.test(
+      structuralSource,
+    ) ||
+    !/"prepared"\s*\|\|\s*value\s*===\s*"rejected"[\s\S]*?"indeterminate"/.test(
+      structuralSource,
+    ) ||
+    !/status\s*===\s*"complete"/.test(structuralSource) ||
+    !/dispatchOccurred:\s*false[\s\S]*?delegationOccurred:\s*false[\s\S]*?providerInvoked:\s*false[\s\S]*?forgeInvoked:\s*false[\s\S]*?executionStarted:\s*false/.test(
+      structuralSource,
+    ) ||
+    /\b(?:pipeline|validation)\s*(?:\.|\[)[^;]*(?<![!<>=])=(?!=)/.test(
+      structuralSource,
+    )
+  ) {
+    violations.push(
+      Object.freeze({
+        path: PIPELINE_SUMMARY_FILE,
+        reason: "automation_pipeline_summary_not_pure_compact_or_fail_closed",
+      }),
+    );
+  }
+  return Object.freeze(violations);
+}
+
 export function inspectAutomationOrchestratorPipelineValidation(
   sources: readonly AutomationAuditSource[],
 ): readonly AutomationAuditViolation[] {
@@ -1482,6 +1562,7 @@ export function inspectAutomationDependencyDirection(
         "./policy/index.js",
         "./assembly/index.js",
         "./orchestrator/index.js",
+        "./orchestrator/pipeline-summary.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -1523,6 +1604,8 @@ export function inspectAutomationDependencyDirection(
         "./pipeline.js",
         "./pipeline-types.js",
         "./pipeline-validation.js",
+        "./pipeline-summary.js",
+        "./pipeline-summary-types.js",
       ],
     ],
     [
@@ -1541,6 +1624,11 @@ export function inspectAutomationDependencyDirection(
         "./delegation-selection/index.js",
         "./delegation-dispatch/index.js",
       ],
+    ],
+    [PIPELINE_SUMMARY_TYPES_FILE, ["./pipeline-types.js"]],
+    [
+      PIPELINE_SUMMARY_FILE,
+      ["./pipeline-types.js", "./pipeline-summary-types.js"],
     ],
     [PIPELINE_VALIDATION_FILE, ["./pipeline-types.js"]],
     [
