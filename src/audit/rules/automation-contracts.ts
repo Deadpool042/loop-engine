@@ -50,6 +50,10 @@ const WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_TYPES_FILE =
   "src/automation/orchestrator/worker-execution-lifecycle-initialization-types.ts";
 const WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_FILE =
   "src/automation/orchestrator/worker-execution-lifecycle-initialization.ts";
+const RECEIPT_FILE =
+  "src/automation/orchestrator/worker-execution-start-receipt.ts";
+const RECEIPT_TYPES_FILE =
+  "src/automation/orchestrator/worker-execution-start-receipt-types.ts";
 const EVALUATION_TYPES_FILE = "src/automation/orchestrator/evaluation/types.ts";
 const EVALUATION_BARREL_FILE =
   "src/automation/orchestrator/evaluation/index.ts";
@@ -347,6 +351,8 @@ const REQUIRED_FILES = [
   WORKER_DISPATCH_SERVICE_FILE,
   WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_TYPES_FILE,
   WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_FILE,
+  RECEIPT_TYPES_FILE,
+  RECEIPT_FILE,
   EVALUATION_TYPES_FILE,
   EVALUATION_BARREL_FILE,
   PLANNING_TYPES_FILE,
@@ -2780,6 +2786,7 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/worker-execution-start-request-preparation.js",
         "./orchestrator/worker-execution-start-invocation.js",
         "./orchestrator/worker-execution-start-service.js",
+        "./orchestrator/worker-execution-start-receipt.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2844,6 +2851,8 @@ export function inspectAutomationDependencyDirection(
         "./worker-execution-start-invocation.js",
         "./worker-execution-start-service.js",
         "./worker-execution-start-service-types.js",
+        "./worker-execution-start-receipt.js",
+        "./worker-execution-start-receipt-types.js",
       ],
     ],
     [
@@ -2914,6 +2923,14 @@ export function inspectAutomationDependencyDirection(
       [
         "./worker-dispatch-service-types.js",
         "./worker-execution-lifecycle-initialization-types.js",
+      ],
+    ],
+    ["src/automation/orchestrator/worker-execution-start-receipt-types.ts", []],
+    [
+      "src/automation/orchestrator/worker-execution-start-receipt.ts",
+      [
+        "./worker-execution-start-service-types.js",
+        "./worker-execution-start-receipt-types.js",
       ],
     ],
     [
@@ -3557,4 +3574,131 @@ export const AUTOMATION_WORKER_EXECUTION_START_SERVICE_INVARIANTS_RULE =
     "Automation Worker Execution Start Service preserves inert invariants",
     "Start service freezes results and never asserts execution started.",
     executionStartServiceRule(["Object.freeze", "executionStarted: false"]),
+  );
+
+const receiptViolation = (reason: string) =>
+  Object.freeze([Object.freeze({ path: RECEIPT_FILE, reason })]);
+export function inspectAutomationOrchestratorWorkerExecutionStartReceiptContracts(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const implementation = sourceFor(sources, RECEIPT_FILE);
+  const types = sourceFor(sources, RECEIPT_TYPES_FILE);
+  const orchestrator = sourceFor(sources, ORCHESTRATOR_BARREL_FILE);
+  const automation = sourceFor(sources, BARREL_FILE);
+  return implementation === null ||
+    types === null ||
+    orchestrator === null ||
+    automation === null ||
+    !/export\s+type\s+AutomationOrchestratorWorkerExecutionStartReceipt\s*=/.test(
+      types,
+    ) ||
+    !/export\s+type\s+AutomationOrchestratorWorkerExecutionStartReceiptValidationResult\s*=/.test(
+      types,
+    ) ||
+    !implementation.includes(
+      "validateAutomationOrchestratorWorkerExecutionStartReceipt",
+    ) ||
+    !hasBarrelExport(
+      orchestrator,
+      "validateAutomationOrchestratorWorkerExecutionStartReceipt",
+      "./worker-execution-start-receipt.js",
+    ) ||
+    !hasBarrelExport(
+      automation,
+      "validateAutomationOrchestratorWorkerExecutionStartReceipt",
+      "./orchestrator/worker-execution-start-receipt.js",
+    )
+    ? receiptViolation(
+        "automation_worker_execution_start_receipt_contracts_invalid",
+      )
+    : Object.freeze([]);
+}
+export function inspectAutomationOrchestratorWorkerExecutionStartReceiptDependencies(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, RECEIPT_FILE);
+  const clean = source === null ? "" : withoutComments(source);
+  return source === null ||
+    moduleSpecifiers(clean).some(
+      (target) =>
+        ![
+          "./worker-execution-start-service-types.js",
+          "./worker-execution-start-receipt-types.js",
+        ].includes(target),
+    ) ||
+    /\b(?:Date|setTimeout|crypto|process|fs|net|http|port|dispatchAutomationOrchestratorWorkerExecutionStart)\b/.test(
+      clean,
+    )
+    ? receiptViolation(
+        "automation_worker_execution_start_receipt_dependencies_invalid",
+      )
+    : Object.freeze([]);
+}
+export function inspectAutomationOrchestratorWorkerExecutionStartReceiptMatrix(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, RECEIPT_FILE);
+  const terms = [
+    'receipt.status === "started"',
+    'receipt.reason === "execution_started"',
+    "receipt.executionStarted === true",
+    'serviceResult.status === "start_accepted"',
+    'receipt.status === "not_started"',
+    'receipt.status === "indeterminate"',
+    "receipt.requestId === identifiers.requestId",
+    "receipt.delegationId === identifiers.delegationId",
+    "receipt.candidateId === identifiers.candidateId",
+    "receipt.targetId === identifiers.targetId",
+  ];
+  return source === null ||
+    !terms.every((term) => withoutComments(source).includes(term))
+    ? receiptViolation(
+        "automation_worker_execution_start_receipt_matrix_invalid",
+      )
+    : Object.freeze([]);
+}
+export function inspectAutomationOrchestratorWorkerExecutionStartReceiptInvariants(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, RECEIPT_FILE);
+  const clean = source === null ? "" : withoutComments(source);
+  return source === null ||
+    !clean.includes("return Object.freeze({") ||
+    !clean.includes(
+      'return result("receipt_accepted", "execution_started", identifiers, true)',
+    ) ||
+    /\.(?:trim|toLowerCase|toUpperCase)\(|crypto\.randomUUID|\b(?:executionId|dispatchId|correlationId)\b|\b(?:receipt|serviceResult)\.[\w]+\s*=(?!=)/.test(
+      clean,
+    )
+    ? receiptViolation(
+        "automation_worker_execution_start_receipt_invariants_invalid",
+      )
+    : Object.freeze([]);
+}
+export const AUTOMATION_WORKER_EXECUTION_START_RECEIPT_CONTRACTS_RULE =
+  createRule(
+    "AUDIT-554",
+    "Automation Worker Execution Start Receipt contracts and exports are complete",
+    "Receipt contracts and public validation are closed.",
+    inspectAutomationOrchestratorWorkerExecutionStartReceiptContracts,
+  );
+export const AUTOMATION_WORKER_EXECUTION_START_RECEIPT_DEPENDENCIES_RULE =
+  createRule(
+    "AUDIT-555",
+    "Automation Worker Execution Start Receipt dependencies are closed",
+    "Receipt validation consumes only the service result and receipt contracts.",
+    inspectAutomationOrchestratorWorkerExecutionStartReceiptDependencies,
+  );
+export const AUTOMATION_WORKER_EXECUTION_START_RECEIPT_MATRIX_RULE = createRule(
+  "AUDIT-556",
+  "Automation Worker Execution Start Receipt is fail-closed",
+  "Only a coherent started receipt for start_accepted can be accepted.",
+  inspectAutomationOrchestratorWorkerExecutionStartReceiptMatrix,
+);
+export const AUTOMATION_WORKER_EXECUTION_START_RECEIPT_INVARIANTS_RULE =
+  createRule(
+    "AUDIT-557",
+    "Automation Worker Execution Start Receipt restricts start authority",
+    "Only a valid started receipt asserts execution started.",
+    inspectAutomationOrchestratorWorkerExecutionStartReceiptInvariants,
   );
