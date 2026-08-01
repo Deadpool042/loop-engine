@@ -2778,6 +2778,7 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/worker-dispatch-service.js",
         "./orchestrator/worker-execution-lifecycle-initialization.js",
         "./orchestrator/worker-execution-start-request-preparation.js",
+        "./orchestrator/worker-execution-start-invocation.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2837,6 +2838,9 @@ export function inspectAutomationDependencyDirection(
         "./worker-execution-lifecycle-initialization-types.js",
         "./worker-execution-start-request-preparation.js",
         "./worker-execution-start-request-preparation-types.js",
+        "./worker-execution-start-port-types.js",
+        "./worker-execution-start-invocation-types.js",
+        "./worker-execution-start-invocation.js",
       ],
     ],
     [
@@ -3445,3 +3449,60 @@ export const AUTOMATION_WORKER_EXECUTION_START_INVARIANTS_RULE = createRule(
       "Object.freeze",
     ]),
 );
+const executionStartInvocationSource = (): string =>
+  existsSync("src/automation/orchestrator/worker-execution-start-invocation.ts")
+    ? readFileSync(
+        "src/automation/orchestrator/worker-execution-start-invocation.ts",
+        "utf8",
+      )
+    : "";
+const executionStartInvocationRule = (terms: readonly string[]) => () =>
+  terms.every((term) => executionStartInvocationSource().includes(term))
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: "src/automation/orchestrator/worker-execution-start-invocation.ts",
+          reason: "automation_worker_execution_start_invocation_invalid",
+        }),
+      ]);
+export const AUTOMATION_WORKER_EXECUTION_START_INVOCATION_CONTRACTS_RULE =
+  createRule(
+    "AUDIT-546",
+    "Automation Worker Execution Start Invocation contracts and exports are complete",
+    "Start port and invocation contracts are closed.",
+    executionStartInvocationRule([
+      "invokeAutomationOrchestratorWorkerExecutionStart",
+    ]),
+  );
+export const AUTOMATION_WORKER_EXECUTION_START_INVOCATION_DEPENDENCIES_RULE =
+  createRule(
+    "AUDIT-547",
+    "Automation Worker Execution Start Invocation dependencies are closed",
+    "Invocation is infrastructure-agnostic.",
+    executionStartInvocationRule(["worker-execution-start-port-types.js"]),
+  );
+export const AUTOMATION_WORKER_EXECUTION_START_INVOCATION_MATRIX_RULE =
+  createRule(
+    "AUDIT-548",
+    "Automation Worker Execution Start Invocation is fail-closed",
+    "Invocation closes invalid requests, port outcomes and errors.",
+    executionStartInvocationRule([
+      "request_invalid",
+      "port_accepted",
+      "port_rejected",
+      "port_indeterminate",
+      "invalid_port_result",
+      "port_failed",
+    ]),
+  );
+export const AUTOMATION_WORKER_EXECUTION_START_INVOCATION_INVARIANTS_RULE =
+  createRule(
+    "AUDIT-549",
+    "Automation Worker Execution Start Invocation has one controlled effect",
+    "Invocation calls the injected start port at most once and never asserts execution started.",
+    executionStartInvocationRule([
+      "port.start(request)",
+      "executionStarted: false",
+      "Object.freeze",
+    ]),
+  );
