@@ -93,6 +93,7 @@ export { initializeAutomationOrchestratorWorkerExecutionLifecycle } from "./work
 export { prepareAutomationOrchestratorWorkerExecutionStartRequest } from "./worker-execution-start-request-preparation.js";
 export { invokeAutomationOrchestratorWorkerExecutionStart } from "./worker-execution-start-invocation.js";
 export { dispatchAutomationOrchestratorWorkerExecutionStart } from "./worker-execution-start-service.js";
+export { validateAutomationOrchestratorWorkerExecutionStartReceipt } from "./worker-execution-start-receipt.js";
 export type {
   AutomationOrchestratorPipelineAdmissionDecision,
   AutomationOrchestratorPipelineAdmissionReason,
@@ -155,6 +156,14 @@ export type {
   AutomationOrchestratorWorkerExecutionStartServiceResult,
   AutomationOrchestratorWorkerExecutionStartServiceStatus,
 } from "./worker-execution-start-service-types.js";
+export type {
+  AutomationOrchestratorWorkerExecutionStartReceipt,
+  AutomationOrchestratorWorkerExecutionStartReceiptReason,
+  AutomationOrchestratorWorkerExecutionStartReceiptStatus,
+  AutomationOrchestratorWorkerExecutionStartReceiptValidationReason,
+  AutomationOrchestratorWorkerExecutionStartReceiptValidationResult,
+  AutomationOrchestratorWorkerExecutionStartReceiptValidationStatus,
+} from "./worker-execution-start-receipt-types.js";
 export type {
   AutomationOrchestratorPipelineProgression,
   AutomationOrchestratorPipelineResult,

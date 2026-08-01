@@ -2780,6 +2780,7 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/worker-execution-start-request-preparation.js",
         "./orchestrator/worker-execution-start-invocation.js",
         "./orchestrator/worker-execution-start-service.js",
+        "./orchestrator/worker-execution-start-receipt.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2844,6 +2845,8 @@ export function inspectAutomationDependencyDirection(
         "./worker-execution-start-invocation.js",
         "./worker-execution-start-service.js",
         "./worker-execution-start-service-types.js",
+        "./worker-execution-start-receipt.js",
+        "./worker-execution-start-receipt-types.js",
       ],
     ],
     [
@@ -2914,6 +2917,14 @@ export function inspectAutomationDependencyDirection(
       [
         "./worker-dispatch-service-types.js",
         "./worker-execution-lifecycle-initialization-types.js",
+      ],
+    ],
+    ["src/automation/orchestrator/worker-execution-start-receipt-types.ts", []],
+    [
+      "src/automation/orchestrator/worker-execution-start-receipt.ts",
+      [
+        "./worker-execution-start-service-types.js",
+        "./worker-execution-start-receipt-types.js",
       ],
     ],
     [
@@ -3557,4 +3568,81 @@ export const AUTOMATION_WORKER_EXECUTION_START_SERVICE_INVARIANTS_RULE =
     "Automation Worker Execution Start Service preserves inert invariants",
     "Start service freezes results and never asserts execution started.",
     executionStartServiceRule(["Object.freeze", "executionStarted: false"]),
+  );
+
+const executionStartReceiptSource = (): string =>
+  existsSync("src/automation/orchestrator/worker-execution-start-receipt.ts")
+    ? readFileSync(
+        "src/automation/orchestrator/worker-execution-start-receipt.ts",
+        "utf8",
+      )
+    : "";
+const executionStartReceiptTypesSource = (): string =>
+  existsSync(
+    "src/automation/orchestrator/worker-execution-start-receipt-types.ts",
+  )
+    ? readFileSync(
+        "src/automation/orchestrator/worker-execution-start-receipt-types.ts",
+        "utf8",
+      )
+    : "";
+const executionStartReceiptRule = (terms: readonly string[]) => () => {
+  const source = executionStartReceiptSource();
+  const types = executionStartReceiptTypesSource();
+  return terms.every((term) => source.includes(term) || types.includes(term))
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: "src/automation/orchestrator/worker-execution-start-receipt.ts",
+          reason: "automation_worker_execution_start_receipt_invalid",
+        }),
+      ]);
+};
+export const AUTOMATION_WORKER_EXECUTION_START_RECEIPT_CONTRACTS_RULE =
+  createRule(
+    "AUDIT-554",
+    "Automation Worker Execution Start Receipt contracts and exports are complete",
+    "Receipt contracts and public validation are closed.",
+    executionStartReceiptRule([
+      "AutomationOrchestratorWorkerExecutionStartReceipt",
+      "AutomationOrchestratorWorkerExecutionStartReceiptValidationResult",
+      "validateAutomationOrchestratorWorkerExecutionStartReceipt",
+    ]),
+  );
+export const AUTOMATION_WORKER_EXECUTION_START_RECEIPT_DEPENDENCIES_RULE =
+  createRule(
+    "AUDIT-555",
+    "Automation Worker Execution Start Receipt dependencies are closed",
+    "Receipt validation consumes only the service result and receipt contracts.",
+    executionStartReceiptRule([
+      "worker-execution-start-service-types.js",
+      "worker-execution-start-receipt-types.js",
+    ]),
+  );
+export const AUTOMATION_WORKER_EXECUTION_START_RECEIPT_MATRIX_RULE = createRule(
+  "AUDIT-556",
+  "Automation Worker Execution Start Receipt is fail-closed",
+  "Only a coherent started receipt for start_accepted can be accepted.",
+  executionStartReceiptRule([
+    '"started"',
+    '"not_started"',
+    '"indeterminate"',
+    '"receipt_accepted"',
+    '"receipt_rejected"',
+    '"receipt_indeterminate"',
+    'serviceResult.status === "start_accepted"',
+    '"identifier_mismatch"',
+  ]),
+);
+export const AUTOMATION_WORKER_EXECUTION_START_RECEIPT_INVARIANTS_RULE =
+  createRule(
+    "AUDIT-557",
+    "Automation Worker Execution Start Receipt restricts start authority",
+    "Only a valid started receipt asserts execution started.",
+    executionStartReceiptRule([
+      "Object.freeze",
+      'return result("receipt_accepted", "execution_started", identifiers, true)',
+      'return result("receipt_rejected", "invalid_receipt", null, false)',
+      "matchesIdentifiers",
+    ]),
   );

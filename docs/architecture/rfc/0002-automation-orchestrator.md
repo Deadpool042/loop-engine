@@ -280,6 +280,16 @@ V21.1 et l'invocation V21.2. Le port reste encapsulé dans V21.2 ; le service
 ne l'appelle jamais directement, n'ajoute aucune infrastructure et n'observe
 aucun démarrage réel.
 
+V21.4 ajoute Execution Start Receipt Validation. Elle ne démarre rien et ne
+récupère aucun reçu : un reçu déclaratif est fourni de l'extérieur puis validé
+de façon pure contre le résultat fermé du service V21.3. Seul un reçu `started`
+cohérent, associé à `start_accepted`, permet d'affirmer `executionStarted: true`.
+Les états rejetés, indéterminés ou incohérents restent fermés. La frontière ne
+fait ni polling, ni appel de port, ni sélection de runtime, ni adaptation
+concrète. Elle propage seulement `requestId`, `delegationId`, `candidateId` et
+`targetId`; aucune identité d'exécution n'est créée : cette autorité devra être
+définie dans un lot ultérieur dédié.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif
