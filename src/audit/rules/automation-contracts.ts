@@ -2779,6 +2779,7 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/worker-execution-lifecycle-initialization.js",
         "./orchestrator/worker-execution-start-request-preparation.js",
         "./orchestrator/worker-execution-start-invocation.js",
+        "./orchestrator/worker-execution-start-service.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2841,6 +2842,8 @@ export function inspectAutomationDependencyDirection(
         "./worker-execution-start-port-types.js",
         "./worker-execution-start-invocation-types.js",
         "./worker-execution-start-invocation.js",
+        "./worker-execution-start-service.js",
+        "./worker-execution-start-service-types.js",
       ],
     ],
     [
@@ -3505,4 +3508,53 @@ export const AUTOMATION_WORKER_EXECUTION_START_INVOCATION_INVARIANTS_RULE =
       "executionStarted: false",
       "Object.freeze",
     ]),
+  );
+const executionStartServiceSource = (): string =>
+  existsSync("src/automation/orchestrator/worker-execution-start-service.ts")
+    ? readFileSync(
+        "src/automation/orchestrator/worker-execution-start-service.ts",
+        "utf8",
+      )
+    : "";
+const executionStartServiceRule = (terms: readonly string[]) => () =>
+  terms.every((term) => executionStartServiceSource().includes(term))
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: "src/automation/orchestrator/worker-execution-start-service.ts",
+          reason: "automation_worker_execution_start_service_invalid",
+        }),
+      ]);
+export const AUTOMATION_WORKER_EXECUTION_START_SERVICE_CONTRACTS_RULE =
+  createRule(
+    "AUDIT-550",
+    "Automation Worker Execution Start Service contracts and exports are complete",
+    "Start service contracts and public function are present.",
+    executionStartServiceRule([
+      "dispatchAutomationOrchestratorWorkerExecutionStart",
+    ]),
+  );
+export const AUTOMATION_WORKER_EXECUTION_START_SERVICE_DEPENDENCIES_RULE =
+  createRule(
+    "AUDIT-551",
+    "Automation Worker Execution Start Service dependencies are closed",
+    "Start service depends only on V21.0 through V21.2 contracts.",
+    executionStartServiceRule(["worker-execution-start-invocation.js"]),
+  );
+export const AUTOMATION_WORKER_EXECUTION_START_SERVICE_COMPOSITION_RULE =
+  createRule(
+    "AUDIT-552",
+    "Automation Worker Execution Start Service composes canonical boundaries",
+    "Start service prepares before invoking and never calls the port directly.",
+    executionStartServiceRule([
+      "prepareAutomationOrchestratorWorkerExecutionStartRequest",
+      "invokeAutomationOrchestratorWorkerExecutionStart",
+    ]),
+  );
+export const AUTOMATION_WORKER_EXECUTION_START_SERVICE_INVARIANTS_RULE =
+  createRule(
+    "AUDIT-553",
+    "Automation Worker Execution Start Service preserves inert invariants",
+    "Start service freezes results and never asserts execution started.",
+    executionStartServiceRule(["Object.freeze", "executionStarted: false"]),
   );

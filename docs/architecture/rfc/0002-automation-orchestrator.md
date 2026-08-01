@@ -275,6 +275,11 @@ les erreurs en `port_failed` ainsi que les résultats incohérents en
 `executionStarted` reste faux, sans retry, adaptateur concret, worker, provider
 ni runtime sélectionné.
 
+V21.3 ajoute Execution Start Service : il compose seulement la préparation
+V21.1 et l'invocation V21.2. Le port reste encapsulé dans V21.2 ; le service
+ne l'appelle jamais directement, n'ajoute aucune infrastructure et n'observe
+aucun démarrage réel.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif
