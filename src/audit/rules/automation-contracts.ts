@@ -1242,6 +1242,16 @@ export function inspectAutomationOrchestratorPipelineSummary(
       (target) => !allowedImports.includes(target),
     ) ||
     !/subjectMatches\(/.test(structuralSource) ||
+    !/isStageStatusForKind\(/.test(structuralSource) ||
+    !/kind\s*===\s*"evaluation"[\s\S]*?"eligible"[\s\S]*?"denied"[\s\S]*?"indeterminate"/.test(
+      structuralSource,
+    ) ||
+    !/kind\s*===\s*"selection"[\s\S]*?"selected"[\s\S]*?"rejected"[\s\S]*?"indeterminate"/.test(
+      structuralSource,
+    ) ||
+    !/"prepared"\s*\|\|\s*value\s*===\s*"rejected"[\s\S]*?"indeterminate"/.test(
+      structuralSource,
+    ) ||
     !/status\s*===\s*"complete"/.test(structuralSource) ||
     !/dispatchOccurred:\s*false[\s\S]*?delegationOccurred:\s*false[\s\S]*?providerInvoked:\s*false[\s\S]*?forgeInvoked:\s*false[\s\S]*?executionStarted:\s*false/.test(
       structuralSource,

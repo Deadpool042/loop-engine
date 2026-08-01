@@ -26,16 +26,22 @@ function isProgression(
   );
 }
 
-function isStageStatus(
+function isStageStatusForKind(
   value: unknown,
+  kind: "evaluation" | "selection" | "dispatch",
 ): value is AutomationOrchestratorPipelineSummaryStage["status"] {
+  if (kind === "evaluation") {
+    return (
+      value === "eligible" || value === "denied" || value === "indeterminate"
+    );
+  }
+  if (kind === "selection") {
+    return (
+      value === "selected" || value === "rejected" || value === "indeterminate"
+    );
+  }
   return (
-    value === "eligible" ||
-    value === "denied" ||
-    value === "indeterminate" ||
-    value === "selected" ||
-    value === "rejected" ||
-    value === "prepared"
+    value === "prepared" || value === "rejected" || value === "indeterminate"
   );
 }
 
@@ -91,7 +97,7 @@ function stage(
 ): AutomationOrchestratorPipelineSummaryStage | null {
   if (
     !isRecord(result) ||
-    !isStageStatus(result.status) ||
+    !isStageStatusForKind(result.status, kind) ||
     !isRecord(result.decision)
   )
     return null;

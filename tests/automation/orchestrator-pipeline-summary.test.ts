@@ -209,6 +209,86 @@ test("fails closed for validation contradictions, cross-pipeline subjects, malfo
   }
 });
 
+test("rejects statuses belonging to another declarative stage family", () => {
+  const { pipeline, validation } = valid();
+  const selection = pipeline.delegationSelection!;
+  const dispatch = pipeline.delegationDispatch!;
+  const cases = [
+    {
+      stage: "evaluation",
+      status: "selected",
+      value: {
+        ...pipeline,
+        delegationEvaluation: {
+          ...pipeline.delegationEvaluation,
+          status: "selected",
+        },
+      },
+    },
+    {
+      stage: "evaluation",
+      status: "prepared",
+      value: {
+        ...pipeline,
+        delegationEvaluation: {
+          ...pipeline.delegationEvaluation,
+          decision: {
+            ...pipeline.delegationEvaluation.decision,
+            status: "prepared",
+          },
+        },
+      },
+    },
+    {
+      stage: "selection",
+      status: "eligible",
+      value: {
+        ...pipeline,
+        delegationSelection: { ...selection, status: "eligible" },
+      },
+    },
+    {
+      stage: "selection",
+      status: "prepared",
+      value: {
+        ...pipeline,
+        delegationSelection: {
+          ...selection,
+          decision: { ...selection.decision, status: "prepared" },
+        },
+      },
+    },
+    {
+      stage: "dispatch",
+      status: "eligible",
+      value: {
+        ...pipeline,
+        delegationDispatch: { ...dispatch, status: "eligible" },
+      },
+    },
+    {
+      stage: "dispatch",
+      status: "selected",
+      value: {
+        ...pipeline,
+        delegationDispatch: {
+          ...dispatch,
+          dispatch: { ...dispatch.dispatch!, status: "selected" },
+        },
+      },
+    },
+  ];
+  for (const item of cases) {
+    const summary = summarizeAutomationOrchestratorPipeline(
+      item.value as never,
+      validation,
+    );
+    assert.equal(summary.status, "invalid", `${item.stage}:${item.status}`);
+    assert.equal(summary.valid, false);
+    assert.equal(summary.progression, null);
+  }
+});
+
 test("does not mutate pipeline or validation inputs", () => {
   const { pipeline, validation } = valid();
   const pipelineBefore = JSON.stringify(pipeline);
