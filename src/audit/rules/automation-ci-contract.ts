@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 
 import { fail, pass } from "../findings.js";
-import { inspectAutomationGithubActionsCiContract } from "../github-actions-ci-contract.js";
+import { inspectGithubActionsCiContract } from "../github-actions-ci-contract.js";
 import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 const WORKFLOW_PATH = ".github/workflows/ci.yml";
@@ -29,7 +29,7 @@ export const AUTOMATION_CI_CONTRACT_RULE: AuditRule = {
       );
     }
 
-    const report = inspectAutomationGithubActionsCiContract(
+    const report = inspectGithubActionsCiContract(
       readFileSync(WORKFLOW_PATH, "utf8"),
     );
 
