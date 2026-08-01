@@ -268,6 +268,13 @@ déclarative. Elle ne crée ni ne renomme aucun identifiant, ne sélectionne auc
 runtime, ne démarre aucun worker et ne produit aucun effet. L'identité d'une
 tentative future reste à la frontière qui possédera cette autorité.
 
+V21.2 ajoute Execution Start Invocation Boundary : elle appelle au plus une
+fois un port abstrait injecté, refuse une requête invalide sans appel et ferme
+les erreurs en `port_failed` ainsi que les résultats incohérents en
+`invalid_port_result`. `start_accepted` ne prouve pas un démarrage observé :
+`executionStarted` reste faux, sans retry, adaptateur concret, worker, provider
+ni runtime sélectionné.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif
