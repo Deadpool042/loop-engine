@@ -255,6 +255,13 @@ Boundary = effet contrôlé unique ; Dispatch Application Service = composition
 applicative sans effet direct ; Dispatch Adapter = infrastructure injectée ;
 Execution Lifecycle = cycle ultérieur.
 
+V21.0 ajoute seulement Execution Lifecycle Initialization après le Dispatch
+Application Service. Un `execution_pending` signifie uniquement qu'un futur
+Execution Start Boundary pourra tenter un démarrage ; il ne signifie ni worker
+démarré, ni runtime appelé, ni traitement en cours. `executionStarted` reste
+toujours `false` et aucune infrastructure concrète n'est introduite : dispatch
+et exécution restent deux phases séparées.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif
