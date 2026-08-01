@@ -195,12 +195,23 @@ frontière de provider, forge, transport ou runtime n'est franchie.
 
 La décision pure `decideAutomationOrchestratorPipelineAdmission` suit cette
 projection : `pipeline result → validation → summary → admission decision →
-future handoff → future execution`. Le summary reste descriptif ; l'admission
+worker handoff → future execution`. Le summary reste descriptif ; l'admission
 est seulement une autorisation déclarative de remise future. Même `admitted`
 ne réalise aucun dispatch, appel de provider, forge, runtime ou worker, ne
 franchit aucun transport et ne persiste aucun état. Les identifiants sont
 conservés exactement et toute incohérence est rejetée fail-closed ; les cinq
 indicateurs opérationnels restent `false`.
+
+La construction pure
+`prepareAutomationOrchestratorPipelineWorkerHandoff` consomme exclusivement
+une décision publique d'admission. Un handoff `prepared` est une enveloppe
+minimale, immuable et déclarative pour une future remise : il ne sélectionne
+aucun worker, ne crée aucune commande, ne réalise aucun dispatch, et ne
+franchit aucune frontière de provider, forge, runtime, transport ou
+persistance. Les identifiants restent exacts, sans normalisation. Les sept
+indicateurs de handoff et d'opération restent littéralement `false`; une
+admission incohérente produit un handoff `rejected` fail-closed. L'exécution
+reste un effet externe futur et distinct.
 
 ## 5. Execution lifecycle
 

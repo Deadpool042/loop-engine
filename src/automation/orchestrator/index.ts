@@ -84,11 +84,17 @@ export { evaluateAutomationOrchestratorPipeline } from "./pipeline.js";
 export { validateAutomationOrchestratorPipeline } from "./pipeline-validation.js";
 export { summarizeAutomationOrchestratorPipeline } from "./pipeline-summary.js";
 export { decideAutomationOrchestratorPipelineAdmission } from "./pipeline-admission.js";
+export { prepareAutomationOrchestratorPipelineWorkerHandoff } from "./pipeline-worker-handoff.js";
 export type {
   AutomationOrchestratorPipelineAdmissionDecision,
   AutomationOrchestratorPipelineAdmissionReason,
   AutomationOrchestratorPipelineAdmissionStatus,
 } from "./pipeline-admission-types.js";
+export type {
+  AutomationOrchestratorPipelineHandoffReason,
+  AutomationOrchestratorPipelineHandoffStatus,
+  AutomationOrchestratorPipelineWorkerHandoff,
+} from "./pipeline-worker-handoff-types.js";
 export type {
   AutomationOrchestratorPipelineProgression,
   AutomationOrchestratorPipelineResult,
