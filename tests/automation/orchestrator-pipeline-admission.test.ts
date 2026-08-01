@@ -201,6 +201,37 @@ test("admission rejects contradictory summary structure and cross-stage statuses
   }
 });
 
+test("admission requires a complete validation subject", () => {
+  for (const validationSubjectStatus of [
+    null,
+    "incomplete",
+    "unknown",
+  ] as const) {
+    const result = decideAutomationOrchestratorPipelineAdmission({
+      ...summary(),
+      validationSubjectStatus,
+    } as never);
+
+    assert.equal(result.status, "indeterminate");
+    assert.equal(result.admitted, false);
+    assert.equal(result.reason, "invalid_summary");
+    assert.deepEqual(
+      {
+        requestId: result.requestId,
+        delegationId: result.delegationId,
+        candidateId: result.candidateId,
+        targetId: result.targetId,
+      },
+      {
+        requestId: null,
+        delegationId: null,
+        candidateId: null,
+        targetId: null,
+      },
+    );
+  }
+});
+
 test("admission preserves exact identifiers and rejects inconsistent identifiers", () => {
   const source = summary();
   const mismatches = [

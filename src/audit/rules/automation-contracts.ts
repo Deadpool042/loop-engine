@@ -1440,6 +1440,7 @@ export function inspectAutomationOrchestratorPipelineAdmissionMatrix(
     source !== null &&
     /source\.status\s*!==\s*"valid"/.test(source) &&
     /source\.valid\s*!==\s*true/.test(source) &&
+    /source\.validationSubjectStatus\s*!==\s*"complete"/.test(source) &&
     /stage\(/.test(source) &&
     /decision\("admitted",\s*"dispatch_prepared"/.test(source) &&
     !/\bsummary\.valid\s*(?:===|!==)?[\s\S]{0,160}?decision\("admitted"/.test(
@@ -1802,7 +1803,6 @@ export function inspectAutomationDependencyDirection(
         "./policy/index.js",
         "./assembly/index.js",
         "./orchestrator/index.js",
-        "./orchestrator/index.js",
         "./orchestrator/pipeline-summary.js",
         "./orchestrator/pipeline-admission.js",
       ],
@@ -1971,7 +1971,7 @@ export function inspectAutomationDependencyDirection(
   for (const [path, expected] of expectedImports) {
     const source = sourceFor(sources, path);
     if (source === null) continue;
-    const actual = moduleSpecifiers(source);
+    const actual = [...new Set(moduleSpecifiers(source))];
     if (
       actual.length !== expected.length ||
       actual.some((target) => !expected.includes(target))

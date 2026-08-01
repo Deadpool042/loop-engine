@@ -71,6 +71,7 @@ export function decideAutomationOrchestratorPipelineAdmission(
     !record(source) ||
     source.status !== "valid" ||
     source.valid !== true ||
+    source.validationSubjectStatus !== "complete" ||
     !validFlags(source)
   )
     return decision("indeterminate", "invalid_summary", null);

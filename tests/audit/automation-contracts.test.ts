@@ -517,6 +517,12 @@ test("AUDIT-516 rejects every open or permissive Pipeline Admission matrix", () 
       'source.selection,\n      ["rejected"],',
     ],
     [
+      "missing complete validation subject precondition",
+      implementationPath,
+      'source.validationSubjectStatus !== "complete"',
+      "false",
+    ],
+    [
       "admission based only on summary valid",
       implementationPath,
       "  const source: unknown = summary;",
