@@ -83,6 +83,12 @@ export type {
 export { evaluateAutomationOrchestratorPipeline } from "./pipeline.js";
 export { validateAutomationOrchestratorPipeline } from "./pipeline-validation.js";
 export { summarizeAutomationOrchestratorPipeline } from "./pipeline-summary.js";
+export { decideAutomationOrchestratorPipelineAdmission } from "./pipeline-admission.js";
+export type {
+  AutomationOrchestratorPipelineAdmissionDecision,
+  AutomationOrchestratorPipelineAdmissionReason,
+  AutomationOrchestratorPipelineAdmissionStatus,
+} from "./pipeline-admission-types.js";
 export type {
   AutomationOrchestratorPipelineProgression,
   AutomationOrchestratorPipelineResult,

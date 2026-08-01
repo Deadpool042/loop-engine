@@ -193,6 +193,15 @@ sont omis, et les stages absents restent explicitement `null`. `valid`,
 `eligible`, `selected` et `prepared` gardent leur sens déclaratif : aucune
 frontière de provider, forge, transport ou runtime n'est franchie.
 
+La décision pure `decideAutomationOrchestratorPipelineAdmission` suit cette
+projection : `pipeline result → validation → summary → admission decision →
+future handoff → future execution`. Le summary reste descriptif ; l'admission
+est seulement une autorisation déclarative de remise future. Même `admitted`
+ne réalise aucun dispatch, appel de provider, forge, runtime ou worker, ne
+franchit aucun transport et ne persiste aucun état. Les identifiants sont
+conservés exactement et toute incohérence est rejetée fail-closed ; les cinq
+indicateurs opérationnels restent `false`.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif

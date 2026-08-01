@@ -12,6 +12,10 @@ import {
   AUTOMATION_FORBIDDEN_DEPENDENCIES_RULE,
   AUTOMATION_FORGE_CONTRACTS_RULE,
   AUTOMATION_POLICY_CONTRACTS_RULE,
+  AUTOMATION_PIPELINE_ADMISSION_CONTRACTS_RULE,
+  AUTOMATION_PIPELINE_ADMISSION_IDENTIFIERS_RULE,
+  AUTOMATION_PIPELINE_ADMISSION_MATRIX_RULE,
+  AUTOMATION_PIPELINE_ADMISSION_PURITY_RULE,
   AUTOMATION_PROVIDER_CONTRACTS_RULE,
   inspectAutomationAssemblyContracts,
   inspectAutomationAssemblyInertness,
@@ -32,10 +36,15 @@ import {
   inspectAutomationOrchestratorPlanningContracts,
   inspectAutomationOrchestratorPipeline,
   inspectAutomationOrchestratorPipelineContracts,
+  inspectAutomationOrchestratorPipelineAdmissionContracts,
+  inspectAutomationOrchestratorPipelineAdmissionIdentifiers,
+  inspectAutomationOrchestratorPipelineAdmissionMatrix,
+  inspectAutomationOrchestratorPipelineAdmissionPurity,
   inspectAutomationOrchestratorPipelineValidation,
   inspectAutomationPolicyContracts,
   inspectAutomationProviderContracts,
   inspectAutomationPurity,
+  type AutomationAuditViolation,
   type AutomationAuditSource,
 } from "../../src/audit/rules/automation-contracts.js";
 import { selectAuditRulesForProfile } from "../../src/audit/profiles.js";
@@ -59,6 +68,8 @@ const AUTOMATION_PATHS = [
   "src/automation/orchestrator/pipeline-validation.ts",
   "src/automation/orchestrator/pipeline-summary-types.ts",
   "src/automation/orchestrator/pipeline-summary.ts",
+  "src/automation/orchestrator/pipeline-admission-types.ts",
+  "src/automation/orchestrator/pipeline-admission.ts",
   "src/automation/orchestrator/evaluation/types.ts",
   "src/automation/orchestrator/evaluation/index.ts",
   "src/automation/orchestrator/planning/types.ts",
@@ -95,6 +106,74 @@ function sources(
 
 function source(path: string): string {
   return readFileSync(path, "utf8");
+}
+
+function countOccurrences(sourceText: string, pattern: string): number {
+  return sourceText.split(pattern).length - 1;
+}
+
+function replaceOccurrence(
+  sourceText: string,
+  pattern: string,
+  replacement: string,
+  expectedOccurrences = 1,
+  occurrence = 1,
+): string {
+  assert.equal(
+    countOccurrences(sourceText, pattern),
+    expectedOccurrences,
+    `expected ${expectedOccurrences} occurrence(s) of ${JSON.stringify(pattern)}`,
+  );
+
+  let currentOccurrence = 0;
+  const mutated = sourceText.replaceAll(pattern, (match) => {
+    currentOccurrence += 1;
+    return currentOccurrence === occurrence ? replacement : match;
+  });
+
+  assert.notEqual(
+    mutated,
+    sourceText,
+    "the requested mutation was not applied",
+  );
+  return mutated;
+}
+
+function mutatedSources(
+  path: string,
+  pattern: string,
+  replacement: string,
+  expectedOccurrences = 1,
+  occurrence = 1,
+): readonly AutomationAuditSource[] {
+  return sources({
+    path,
+    source: replaceOccurrence(
+      source(path),
+      pattern,
+      replacement,
+      expectedOccurrences,
+      occurrence,
+    ),
+  });
+}
+
+function sourcesWithout(path: string): readonly AutomationAuditSource[] {
+  assert.equal(AUTOMATION_PATHS.includes(path as never), true);
+  return Object.freeze(sources().filter((entry) => entry.path !== path));
+}
+
+function assertRuleRejects(
+  rule: Readonly<{ id: string }>,
+  violations: readonly AutomationAuditViolation[],
+  expectedReason: string,
+  label = expectedReason,
+): void {
+  assert.equal(
+    violations.some((violation) => violation.reason === expectedReason),
+    true,
+    `${rule.id} did not reject the intended mutation: ${label}`,
+  );
 }
 
 test("Automation contract inspectors accept the repository contract surface", () => {
@@ -150,6 +229,430 @@ test("Automation contract inspectors accept the repository contract surface", ()
   assert.deepEqual(inspectAutomationDependencyDirection(fixture), []);
   assert.deepEqual(inspectAutomationForbiddenDependencies(fixture), []);
   assert.deepEqual(inspectAutomationAuditDocumentation(fixture), []);
+});
+
+test("AUDIT-514 through AUDIT-517 are registered, executed, and passing", () => {
+  const fixture = sources();
+  const rules = [
+    AUTOMATION_PIPELINE_ADMISSION_CONTRACTS_RULE,
+    AUTOMATION_PIPELINE_ADMISSION_PURITY_RULE,
+    AUTOMATION_PIPELINE_ADMISSION_MATRIX_RULE,
+    AUTOMATION_PIPELINE_ADMISSION_IDENTIFIERS_RULE,
+  ];
+  const expectedIds = ["AUDIT-514", "AUDIT-515", "AUDIT-516", "AUDIT-517"];
+
+  assert.deepEqual(
+    [
+      inspectAutomationOrchestratorPipelineAdmissionContracts(fixture),
+      inspectAutomationOrchestratorPipelineAdmissionPurity(fixture),
+      inspectAutomationOrchestratorPipelineAdmissionMatrix(fixture),
+      inspectAutomationOrchestratorPipelineAdmissionIdentifiers(fixture),
+    ],
+    [[], [], [], []],
+  );
+  assert.deepEqual(
+    rules.map((rule) => rule.id),
+    expectedIds,
+  );
+  for (const rule of rules) {
+    assert.equal(
+      AUDIT_RULES.find(({ id }) => id === rule.id)?.title,
+      rule.title,
+    );
+    assert.equal(rule.check().status, "pass");
+  }
+});
+
+test("AUDIT-514 rejects every missing Pipeline Admission contract and export", () => {
+  const typesPath = "src/automation/orchestrator/pipeline-admission-types.ts";
+  const implementationPath =
+    "src/automation/orchestrator/pipeline-admission.ts";
+  const orchestratorBarrelPath = "src/automation/orchestrator/index.ts";
+  const automationBarrelPath = "src/automation/index.ts";
+  const mutations = [
+    {
+      name: "missing admission types file",
+      fixture: () => sourcesWithout(typesPath),
+      reason: "required_file_missing",
+    },
+    {
+      name: "missing admission implementation file",
+      fixture: () => sourcesWithout(implementationPath),
+      reason: "automation_pipeline_admission_file_missing",
+    },
+    {
+      name: "missing Admission Status contract",
+      fixture: () =>
+        mutatedSources(
+          typesPath,
+          "export type AutomationOrchestratorPipelineAdmissionStatus",
+          "type AutomationOrchestratorPipelineAdmissionStatus",
+        ),
+      reason:
+        "missing_public_contract:AutomationOrchestratorPipelineAdmissionStatus",
+    },
+    {
+      name: "missing Admission Reason contract",
+      fixture: () =>
+        mutatedSources(
+          typesPath,
+          "export type AutomationOrchestratorPipelineAdmissionReason",
+          "type AutomationOrchestratorPipelineAdmissionReason",
+        ),
+      reason:
+        "missing_public_contract:AutomationOrchestratorPipelineAdmissionReason",
+    },
+    {
+      name: "missing Admission Decision contract",
+      fixture: () =>
+        mutatedSources(
+          typesPath,
+          "export type AutomationOrchestratorPipelineAdmissionDecision",
+          "type AutomationOrchestratorPipelineAdmissionDecision",
+        ),
+      reason:
+        "missing_public_contract:AutomationOrchestratorPipelineAdmissionDecision",
+    },
+    {
+      name: "missing admission decision function",
+      fixture: () =>
+        mutatedSources(
+          implementationPath,
+          "export function decideAutomationOrchestratorPipelineAdmission",
+          "function decideAutomationOrchestratorPipelineAdmission",
+        ),
+      reason: "automation_pipeline_admission_function_missing",
+    },
+    {
+      name: "missing Orchestrator admission export",
+      fixture: () =>
+        mutatedSources(
+          orchestratorBarrelPath,
+          'export { decideAutomationOrchestratorPipelineAdmission } from "./pipeline-admission.js";',
+          'export {} from "./pipeline-admission.js";',
+        ),
+      reason: "automation_pipeline_admission_function_not_canonically_exported",
+    },
+    {
+      name: "missing Automation admission export",
+      fixture: () =>
+        mutatedSources(
+          automationBarrelPath,
+          'export { decideAutomationOrchestratorPipelineAdmission } from "./orchestrator/pipeline-admission.js";',
+          'export {} from "./orchestrator/pipeline-admission.js";',
+        ),
+      reason: "automation_pipeline_admission_function_not_canonically_exported",
+    },
+  ] as const;
+
+  for (const mutation of mutations) {
+    assertRuleRejects(
+      AUTOMATION_PIPELINE_ADMISSION_CONTRACTS_RULE,
+      inspectAutomationOrchestratorPipelineAdmissionContracts(
+        mutation.fixture(),
+      ),
+      mutation.reason,
+    );
+  }
+});
+
+test("AUDIT-515 rejects impure or forbidden Pipeline Admission dependencies", () => {
+  const path = "src/automation/orchestrator/pipeline-admission.ts";
+  const mutations = [
+    [
+      "provider import",
+      '\nimport type { Provider } from "../provider/index.js";',
+    ],
+    ["forge import", '\nimport type { Forge } from "../forge/index.js";'],
+    [
+      "runtime import",
+      '\nimport type { Runtime } from "../../runtime/index.js";',
+    ],
+    [
+      "service import",
+      '\nimport type { Service } from "../../service/index.js";',
+    ],
+    [
+      "persistence import",
+      '\nimport type { Persistence } from "../../persistence/index.js";',
+    ],
+    [
+      "transport import",
+      '\nimport type { Transport } from "../../transport/index.js";',
+    ],
+    ["pipeline call", "\nevaluateAutomationOrchestratorPipeline();"],
+    ["validation call", "\nvalidateAutomationOrchestratorPipeline();"],
+    [
+      "selection call",
+      "\nevaluateAutomationOrchestratorDelegationSelection();",
+    ],
+    ["dispatch call", "\nprepareAutomationOrchestratorDelegationDispatch();"],
+    ["execution call", "\nexecuteAutomation();"],
+    ["current time", "\nDate.now();"],
+    ["randomness", "\nMath.random();"],
+    ["timer", "\nsetTimeout(() => undefined, 0);"],
+    ["process access", "\nprocess.cwd();"],
+    ["filesystem access", '\nimport { readFileSync } from "node:fs";'],
+    ["network access", '\nimport { request } from "node:https";'],
+    ["subprocess access", '\nimport { spawn } from "node:child_process";'],
+    ["summary mutation", '\nsummary.status = "valid";'],
+    ["mutable module state", "\nlet admissionRegistry: unknown;"],
+  ] as const;
+
+  for (const [name, addition] of mutations) {
+    assertRuleRejects(
+      AUTOMATION_PIPELINE_ADMISSION_PURITY_RULE,
+      inspectAutomationOrchestratorPipelineAdmissionPurity(
+        mutatedSources(path, "\n}", `\n}${addition}`, 6, 6),
+      ),
+      "automation_pipeline_admission_not_pure_or_dependency_safe",
+    );
+    assert.ok(name.length > 0);
+  }
+});
+
+test("AUDIT-516 rejects every open or permissive Pipeline Admission matrix", () => {
+  const implementationPath =
+    "src/automation/orchestrator/pipeline-admission.ts";
+  const typesPath = "src/automation/orchestrator/pipeline-admission-types.ts";
+  const mutations = [
+    [
+      "missing evaluation branch",
+      implementationPath,
+      'progression === "evaluation"',
+      'progression === "removed_evaluation"',
+      2,
+      2,
+    ],
+    [
+      "missing selection branch",
+      implementationPath,
+      'progression === "selection"',
+      'progression === "removed_selection"',
+      2,
+      2,
+    ],
+    [
+      "missing dispatch branch",
+      implementationPath,
+      'progression === "dispatch"',
+      'progression === "removed_dispatch"',
+      2,
+      2,
+    ],
+    [
+      "missing denied evaluation status",
+      implementationPath,
+      '["denied", "indeterminate"]',
+      '["indeterminate"]',
+    ],
+    [
+      "missing indeterminate evaluation status",
+      implementationPath,
+      '["denied", "indeterminate"]',
+      '["denied"]',
+    ],
+    [
+      "missing rejected selection status",
+      implementationPath,
+      '["rejected", "indeterminate"]',
+      '["indeterminate"]',
+    ],
+    [
+      "missing prepared dispatch status",
+      implementationPath,
+      '["prepared", "rejected", "indeterminate"]',
+      '["rejected", "indeterminate"]',
+    ],
+    [
+      "missing rejected dispatch status",
+      implementationPath,
+      '["prepared", "rejected", "indeterminate"]',
+      '["prepared", "indeterminate"]',
+    ],
+    [
+      "missing dispatch prepared reason",
+      typesPath,
+      '"dispatch_prepared"',
+      '"removed_reason"',
+    ],
+    [
+      "missing pipeline rejected reason",
+      typesPath,
+      '"pipeline_rejected"',
+      '"removed_reason"',
+    ],
+    [
+      "missing pipeline indeterminate reason",
+      typesPath,
+      '"pipeline_indeterminate"',
+      '"removed_reason"',
+    ],
+    [
+      "missing invalid summary reason",
+      typesPath,
+      '"invalid_summary"',
+      '"removed_reason"',
+    ],
+    [
+      "missing selection evaluation precondition",
+      implementationPath,
+      'source.evaluation,\n      ["eligible"],',
+      'source.evaluation,\n      ["denied"],',
+      2,
+      1,
+    ],
+    [
+      "missing dispatch evaluation precondition",
+      implementationPath,
+      'source.evaluation,\n      ["eligible"],',
+      'source.evaluation,\n      ["denied"],',
+      2,
+      2,
+    ],
+    [
+      "missing dispatch selection precondition",
+      implementationPath,
+      'source.selection,\n      ["selected"],',
+      'source.selection,\n      ["rejected"],',
+    ],
+    [
+      "admission based only on summary valid",
+      implementationPath,
+      "  const source: unknown = summary;",
+      '  if (summary.valid === true) return decision("admitted", "dispatch_prepared", null);\n  const source: unknown = summary;',
+    ],
+    [
+      "permissive terminal fallback",
+      implementationPath,
+      'return decision("indeterminate", "invalid_summary", null);',
+      'return decision("admitted", "dispatch_prepared", source);',
+      3,
+      3,
+    ],
+    [
+      "eligible evaluation terminal",
+      implementationPath,
+      '["denied", "indeterminate"]',
+      '["denied", "indeterminate", "eligible"]',
+    ],
+    [
+      "selected selection terminal",
+      implementationPath,
+      '["rejected", "indeterminate"]',
+      '["rejected", "indeterminate", "selected"]',
+    ],
+    [
+      "cross-stage selection status",
+      implementationPath,
+      '["rejected", "indeterminate"]',
+      '["rejected", "indeterminate", "prepared"]',
+    ],
+  ] as const;
+
+  for (const [
+    name,
+    path,
+    pattern,
+    replacement,
+    occurrences,
+    occurrence,
+  ] of mutations) {
+    assertRuleRejects(
+      AUTOMATION_PIPELINE_ADMISSION_MATRIX_RULE,
+      inspectAutomationOrchestratorPipelineAdmissionMatrix(
+        mutatedSources(path, pattern, replacement, occurrences, occurrence),
+      ),
+      "automation_pipeline_admission_matrix_not_closed_or_fail_closed",
+      name,
+    );
+    assert.ok(name.length > 0);
+  }
+});
+
+test("AUDIT-517 rejects identifier weakening and operational flag changes", () => {
+  const path = "src/automation/orchestrator/pipeline-admission.ts";
+  const appendAtEnd = (addition: string): readonly AutomationAuditSource[] =>
+    mutatedSources(
+      path,
+      'return decision("indeterminate", "invalid_summary", null);\n}',
+      `return decision("indeterminate", "invalid_summary", null);\n}${addition}`,
+    );
+  const mutations = [
+    [
+      "missing candidateId type check",
+      () =>
+        mutatedSources(
+          path,
+          'candidateId !== null && typeof candidateId !== "string"',
+          "false",
+        ),
+    ],
+    [
+      "missing targetId type check",
+      () =>
+        mutatedSources(
+          path,
+          'targetId !== null && typeof targetId !== "string"',
+          "false",
+        ),
+    ],
+    ["identifier trim", () => appendAtEnd('\n"identifier".trim();')],
+    ["identifier length", () => appendAtEnd('\n"identifier".length > 0;')],
+    [
+      "identifier lowercase",
+      () => appendAtEnd('\n"identifier".toLowerCase();'),
+    ],
+    [
+      "identifier uppercase",
+      () => appendAtEnd('\n"identifier".toUpperCase();'),
+    ],
+    [
+      "dispatch occurred",
+      () =>
+        mutatedSources(
+          path,
+          "dispatchOccurred: false",
+          "dispatchOccurred: true",
+        ),
+    ],
+    [
+      "delegation occurred",
+      () =>
+        mutatedSources(
+          path,
+          "delegationOccurred: false",
+          "delegationOccurred: true",
+        ),
+    ],
+    [
+      "provider invoked",
+      () =>
+        mutatedSources(path, "providerInvoked: false", "providerInvoked: true"),
+    ],
+    [
+      "forge invoked",
+      () => mutatedSources(path, "forgeInvoked: false", "forgeInvoked: true"),
+    ],
+    [
+      "execution started",
+      () =>
+        mutatedSources(
+          path,
+          "executionStarted: false",
+          "executionStarted: true",
+        ),
+    ],
+  ] as const;
+
+  for (const [name, fixture] of mutations) {
+    assertRuleRejects(
+      AUTOMATION_PIPELINE_ADMISSION_IDENTIFIERS_RULE,
+      inspectAutomationOrchestratorPipelineAdmissionIdentifiers(fixture()),
+      "automation_pipeline_admission_identifiers_or_operational_flags_not_fail_closed",
+    );
+    assert.ok(name.length > 0);
+  }
 });
 
 test("Automation contract inspectors reject missing public exports", () => {

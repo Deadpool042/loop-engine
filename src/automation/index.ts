@@ -136,3 +136,9 @@ export type {
   AutomationOrchestratorStep,
 } from "./orchestrator/index.js";
 export { summarizeAutomationOrchestratorPipeline } from "./orchestrator/pipeline-summary.js";
+export { decideAutomationOrchestratorPipelineAdmission } from "./orchestrator/pipeline-admission.js";
+export type {
+  AutomationOrchestratorPipelineAdmissionDecision,
+  AutomationOrchestratorPipelineAdmissionReason,
+  AutomationOrchestratorPipelineAdmissionStatus,
+} from "./orchestrator/index.js";
