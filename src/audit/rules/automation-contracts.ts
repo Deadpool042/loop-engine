@@ -38,6 +38,10 @@ const WORKER_DISPATCH_PORT_TYPES_FILE =
   "src/automation/orchestrator/worker-dispatch-port-types.ts";
 const WORKER_DISPATCH_PORT_FILE =
   "src/automation/orchestrator/worker-dispatch-port.ts";
+const WORKER_DISPATCH_INVOCATION_TYPES_FILE =
+  "src/automation/orchestrator/worker-dispatch-invocation-types.ts";
+const WORKER_DISPATCH_INVOCATION_FILE =
+  "src/automation/orchestrator/worker-dispatch-invocation.ts";
 const EVALUATION_TYPES_FILE = "src/automation/orchestrator/evaluation/types.ts";
 const EVALUATION_BARREL_FILE =
   "src/automation/orchestrator/evaluation/index.ts";
@@ -260,6 +264,11 @@ const WORKER_DISPATCH_PORT_CONTRACTS = [
   "AutomationOrchestratorWorkerDispatchResult",
   "AutomationOrchestratorWorkerDispatchPort",
 ] as const;
+const WORKER_DISPATCH_INVOCATION_CONTRACTS = [
+  "AutomationOrchestratorWorkerDispatchInvocationStatus",
+  "AutomationOrchestratorWorkerDispatchInvocationReason",
+  "AutomationOrchestratorWorkerDispatchInvocation",
+] as const;
 
 const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./types.js", CORE_CONTRACTS],
@@ -280,6 +289,7 @@ const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./orchestrator/index.js", PIPELINE_WORKER_HANDOFF_CONTRACTS],
   ["./orchestrator/index.js", WORKER_COMMAND_CONTRACTS],
   ["./orchestrator/index.js", WORKER_DISPATCH_PORT_CONTRACTS],
+  ["./orchestrator/index.js", WORKER_DISPATCH_INVOCATION_CONTRACTS],
 ] as const;
 
 const REQUIRED_FILES = [
@@ -308,6 +318,8 @@ const REQUIRED_FILES = [
   WORKER_COMMAND_FILE,
   WORKER_DISPATCH_PORT_TYPES_FILE,
   WORKER_DISPATCH_PORT_FILE,
+  WORKER_DISPATCH_INVOCATION_TYPES_FILE,
+  WORKER_DISPATCH_INVOCATION_FILE,
   EVALUATION_TYPES_FILE,
   EVALUATION_BARREL_FILE,
   PLANNING_TYPES_FILE,
@@ -2097,6 +2109,133 @@ export function inspectAutomationOrchestratorWorkerDispatchPortIdentifiers(
       ]);
 }
 
+export function inspectAutomationOrchestratorWorkerDispatchInvocationContracts(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const violations = [
+    ...violationsForContracts(
+      sources,
+      WORKER_DISPATCH_INVOCATION_TYPES_FILE,
+      ORCHESTRATOR_BARREL_FILE,
+      "./worker-dispatch-invocation-types.js",
+      WORKER_DISPATCH_INVOCATION_CONTRACTS,
+    ),
+  ];
+  const implementation = sourceFor(sources, WORKER_DISPATCH_INVOCATION_FILE);
+  const orchestrator = sourceFor(sources, ORCHESTRATOR_BARREL_FILE);
+  const automation = sourceFor(sources, BARREL_FILE);
+  if (
+    implementation === null ||
+    !/export\s+async\s+function\s+invokeAutomationOrchestratorWorkerDispatch\b/.test(
+      withoutComments(implementation ?? ""),
+    )
+  )
+    violations.push(
+      Object.freeze({
+        path: WORKER_DISPATCH_INVOCATION_FILE,
+        reason: "automation_worker_dispatch_invocation_function_missing",
+      }),
+    );
+  for (const [path, source, target] of [
+    [ORCHESTRATOR_BARREL_FILE, orchestrator, "./worker-dispatch-invocation.js"],
+    [BARREL_FILE, automation, "./orchestrator/worker-dispatch-invocation.js"],
+  ] as const)
+    if (
+      source === null ||
+      !hasBarrelExport(
+        source,
+        "invokeAutomationOrchestratorWorkerDispatch",
+        target,
+      )
+    )
+      violations.push(
+        Object.freeze({
+          path,
+          reason:
+            "automation_worker_dispatch_invocation_function_not_canonically_exported",
+        }),
+      );
+  return Object.freeze(violations);
+}
+export function inspectAutomationOrchestratorWorkerDispatchInvocationPurity(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, WORKER_DISPATCH_INVOCATION_FILE);
+  const structural = source === null ? "" : withoutComments(source);
+  const allowed = [
+    "./worker-dispatch-port-types.js",
+    "./worker-dispatch-invocation-types.js",
+  ];
+  const calls = structural.match(/\.dispatch\s*\(/g)?.length ?? 0;
+  if (
+    source === null ||
+    moduleSpecifiers(structural).some((target) => !allowed.includes(target)) ||
+    calls !== 1 ||
+    /\b(?:Date|Math\.random|crypto|setTimeout|setInterval|process|fs|net|http|exec|spawn|let|var)\b/.test(
+      structural,
+    )
+  )
+    return Object.freeze([
+      Object.freeze({
+        path: WORKER_DISPATCH_INVOCATION_FILE,
+        reason:
+          "automation_worker_dispatch_invocation_not_single_effect_or_dependency_safe",
+      }),
+    ]);
+  return Object.freeze([]);
+}
+export function inspectAutomationOrchestratorWorkerDispatchInvocationMatrix(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = withoutComments(
+    sourceFor(sources, WORKER_DISPATCH_INVOCATION_FILE) ?? "",
+  );
+  const valid =
+    /request\.status\s*!==\s*"prepared"/.test(source) &&
+    /port\.dispatch\(request\)/.test(source) &&
+    /"port_accepted"/.test(source) &&
+    /"port_rejected"/.test(source) &&
+    /"port_indeterminate"/.test(source) &&
+    /"invalid_port_result"/.test(source) &&
+    /"port_failed"/.test(source) &&
+    /catch\s*{/.test(source) &&
+    !/if\s*\(\s*request\.prepared\s*\)/.test(source);
+  return valid
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: WORKER_DISPATCH_INVOCATION_FILE,
+          reason:
+            "automation_worker_dispatch_invocation_matrix_not_closed_or_fail_closed",
+        }),
+      ]);
+}
+export function inspectAutomationOrchestratorWorkerDispatchInvocationIdentifiers(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = withoutComments(
+    sourceFor(sources, WORKER_DISPATCH_INVOCATION_FILE) ?? "",
+  );
+  const valid =
+    ["requestId", "delegationId", "candidateId", "targetId"].every((name) =>
+      new RegExp(`typeof source\\.${name} !== "string"`).test(source),
+    ) &&
+    /ids\.requestId !== request\.requestId/.test(source) &&
+    /dispatchOccurred:\s*flags\?\.dispatchOccurred\s*\?\?\s*false[\s\S]*?workerSelected:\s*flags\?\.workerSelected\s*\?\?\s*false[\s\S]*?providerInvoked:\s*flags\?\.providerInvoked\s*\?\?\s*false[\s\S]*?forgeInvoked:\s*flags\?\.forgeInvoked\s*\?\?\s*false[\s\S]*?executionStarted:\s*flags\?\.executionStarted\s*\?\?\s*false/.test(
+      source,
+    ) &&
+    !/\.trim\(\)|\.length\s*>\s*0|\.to(?:Lower|Upper)Case\(\)/.test(source);
+  return valid
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: WORKER_DISPATCH_INVOCATION_FILE,
+          reason:
+            "automation_worker_dispatch_invocation_identifiers_or_flags_not_fail_closed",
+        }),
+      ]);
+}
+
 export function inspectAutomationOrchestratorPipelineValidation(
   sources: readonly AutomationAuditSource[],
 ): readonly AutomationAuditViolation[] {
@@ -2391,6 +2530,7 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/pipeline-worker-handoff.js",
         "./orchestrator/worker-command.js",
         "./orchestrator/worker-dispatch-port.js",
+        "./orchestrator/worker-dispatch-invocation.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2442,6 +2582,8 @@ export function inspectAutomationDependencyDirection(
         "./worker-command-types.js",
         "./worker-dispatch-port.js",
         "./worker-dispatch-port-types.js",
+        "./worker-dispatch-invocation.js",
+        "./worker-dispatch-invocation-types.js",
       ],
     ],
     [
@@ -2486,6 +2628,14 @@ export function inspectAutomationDependencyDirection(
     [
       WORKER_DISPATCH_PORT_FILE,
       ["./worker-command-types.js", "./worker-dispatch-port-types.js"],
+    ],
+    [WORKER_DISPATCH_INVOCATION_TYPES_FILE, []],
+    [
+      WORKER_DISPATCH_INVOCATION_FILE,
+      [
+        "./worker-dispatch-port-types.js",
+        "./worker-dispatch-invocation-types.js",
+      ],
     ],
     [
       PLANNING_TYPES_FILE,
@@ -2883,3 +3033,28 @@ export const AUTOMATION_WORKER_DISPATCH_PORT_IDENTIFIERS_RULE = createRule(
   "Worker Dispatch Port preserves identifiers exactly and request flags remain false.",
   inspectAutomationOrchestratorWorkerDispatchPortIdentifiers,
 );
+export const AUTOMATION_WORKER_DISPATCH_INVOCATION_CONTRACTS_RULE = createRule(
+  "AUDIT-530",
+  "Automation Worker Dispatch Invocation contracts and exports are complete",
+  "Dispatch Invocation contracts, function, and canonical exports are present.",
+  inspectAutomationOrchestratorWorkerDispatchInvocationContracts,
+);
+export const AUTOMATION_WORKER_DISPATCH_INVOCATION_PURITY_RULE = createRule(
+  "AUDIT-531",
+  "Automation Worker Dispatch Invocation has one controlled effect",
+  "Dispatch Invocation permits only one injected port dispatch call.",
+  inspectAutomationOrchestratorWorkerDispatchInvocationPurity,
+);
+export const AUTOMATION_WORKER_DISPATCH_INVOCATION_MATRIX_RULE = createRule(
+  "AUDIT-532",
+  "Automation Worker Dispatch Invocation is fail-closed",
+  "Dispatch Invocation validates requests and normalizes all port outcomes fail-closed.",
+  inspectAutomationOrchestratorWorkerDispatchInvocationMatrix,
+);
+export const AUTOMATION_WORKER_DISPATCH_INVOCATION_IDENTIFIERS_RULE =
+  createRule(
+    "AUDIT-533",
+    "Automation Worker Dispatch Invocation preserves identifiers and flags",
+    "Dispatch Invocation validates matching identifiers and normalizes invalid outcomes with false flags.",
+    inspectAutomationOrchestratorWorkerDispatchInvocationIdentifiers,
+  );

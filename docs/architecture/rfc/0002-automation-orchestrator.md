@@ -231,6 +231,14 @@ donc aucun port, provider, worker, transport ou runtime. Le résultat de port
 est un compte rendu fermé du futur adaptateur : ses booléens dynamiques ne sont
 pas produits par la préparation pure et restent distincts de l'exécution.
 
+`invokeAutomationOrchestratorWorkerDispatch` est l'unique frontière
+applicative autorisée à appeler une méthode de Dispatch Port injectée. Elle
+valide d'abord une dispatch request préparée, appelle le port au plus une fois,
+et normalise son outcome. Aucun fournisseur, adaptateur concret ou retry n'est
+choisi par le cœur : les erreurs d'adaptateur deviennent `port_failed` et tout
+résultat incohérent devient `invalid_port_result`. L'exécution du worker reste
+un cycle externe ultérieur.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif

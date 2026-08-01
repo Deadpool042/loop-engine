@@ -87,6 +87,7 @@ export { decideAutomationOrchestratorPipelineAdmission } from "./pipeline-admiss
 export { prepareAutomationOrchestratorPipelineWorkerHandoff } from "./pipeline-worker-handoff.js";
 export { prepareAutomationOrchestratorWorkerCommand } from "./worker-command.js";
 export { prepareAutomationOrchestratorWorkerDispatchRequest } from "./worker-dispatch-port.js";
+export { invokeAutomationOrchestratorWorkerDispatch } from "./worker-dispatch-invocation.js";
 export type {
   AutomationOrchestratorPipelineAdmissionDecision,
   AutomationOrchestratorPipelineAdmissionReason,
@@ -112,6 +113,11 @@ export type {
   AutomationOrchestratorWorkerDispatchResultReason,
   AutomationOrchestratorWorkerDispatchResultStatus,
 } from "./worker-dispatch-port-types.js";
+export type {
+  AutomationOrchestratorWorkerDispatchInvocation,
+  AutomationOrchestratorWorkerDispatchInvocationReason,
+  AutomationOrchestratorWorkerDispatchInvocationStatus,
+} from "./worker-dispatch-invocation-types.js";
 export type {
   AutomationOrchestratorPipelineProgression,
   AutomationOrchestratorPipelineResult,
