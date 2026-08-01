@@ -23,6 +23,10 @@ const PIPELINE_VALIDATION_FILE =
 const PIPELINE_SUMMARY_TYPES_FILE =
   "src/automation/orchestrator/pipeline-summary-types.ts";
 const PIPELINE_SUMMARY_FILE = "src/automation/orchestrator/pipeline-summary.ts";
+const PIPELINE_ADMISSION_TYPES_FILE =
+  "src/automation/orchestrator/pipeline-admission-types.ts";
+const PIPELINE_ADMISSION_FILE =
+  "src/automation/orchestrator/pipeline-admission.ts";
 const EVALUATION_TYPES_FILE = "src/automation/orchestrator/evaluation/types.ts";
 const EVALUATION_BARREL_FILE =
   "src/automation/orchestrator/evaluation/index.ts";
@@ -218,6 +222,12 @@ const PIPELINE_SUMMARY_CONTRACTS = [
   "AutomationOrchestratorPipelineSummary",
 ] as const;
 
+const PIPELINE_ADMISSION_CONTRACTS = [
+  "AutomationOrchestratorPipelineAdmissionStatus",
+  "AutomationOrchestratorPipelineAdmissionReason",
+  "AutomationOrchestratorPipelineAdmissionDecision",
+] as const;
+
 const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./types.js", CORE_CONTRACTS],
   ["./provider/index.js", PROVIDER_CONTRACTS],
@@ -233,6 +243,7 @@ const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./orchestrator/index.js", DELEGATION_DISPATCH_CONTRACTS],
   ["./orchestrator/index.js", PIPELINE_CONTRACTS],
   ["./orchestrator/index.js", PIPELINE_SUMMARY_CONTRACTS],
+  ["./orchestrator/index.js", PIPELINE_ADMISSION_CONTRACTS],
 ] as const;
 
 const REQUIRED_FILES = [
@@ -253,6 +264,8 @@ const REQUIRED_FILES = [
   PIPELINE_VALIDATION_FILE,
   PIPELINE_SUMMARY_TYPES_FILE,
   PIPELINE_SUMMARY_FILE,
+  PIPELINE_ADMISSION_TYPES_FILE,
+  PIPELINE_ADMISSION_FILE,
   EVALUATION_TYPES_FILE,
   EVALUATION_BARREL_FILE,
   PLANNING_TYPES_FILE,
@@ -444,9 +457,16 @@ export function inspectAutomationContractConsistency(
     DELEGATION_DISPATCH_TYPES_FILE,
   ];
 
+  const hasAdmissionTypeReexport =
+    rootBarrel !== null &&
+    PIPELINE_ADMISSION_CONTRACTS.every((name) =>
+      hasBarrelExport(rootBarrel, name, "./orchestrator/index.js"),
+    );
+  const expectedOrchestratorBarrelExports = hasAdmissionTypeReexport ? 2 : 1;
   if (
     rootBarrel !== null &&
-    countBarrelExports(rootBarrel, "./orchestrator/index.js") !== 1
+    countBarrelExports(rootBarrel, "./orchestrator/index.js") !==
+      expectedOrchestratorBarrelExports
   ) {
     violations.push(
       Object.freeze({
@@ -1273,6 +1293,227 @@ export function inspectAutomationOrchestratorPipelineSummary(
   return Object.freeze(violations);
 }
 
+export function inspectAutomationOrchestratorPipelineAdmissionContracts(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const violations = [
+    ...violationsForContracts(
+      sources,
+      PIPELINE_ADMISSION_TYPES_FILE,
+      ORCHESTRATOR_BARREL_FILE,
+      "./pipeline-admission-types.js",
+      PIPELINE_ADMISSION_CONTRACTS,
+    ),
+  ];
+  const implementation = sourceFor(sources, PIPELINE_ADMISSION_FILE);
+  const orchestratorBarrel = sourceFor(sources, ORCHESTRATOR_BARREL_FILE);
+  const automationBarrel = sourceFor(sources, BARREL_FILE);
+
+  if (implementation === null) {
+    violations.push(
+      Object.freeze({
+        path: PIPELINE_ADMISSION_FILE,
+        reason: "automation_pipeline_admission_file_missing",
+      }),
+    );
+  } else if (
+    !/export\s+function\s+decideAutomationOrchestratorPipelineAdmission\b/.test(
+      withoutComments(implementation),
+    )
+  ) {
+    violations.push(
+      Object.freeze({
+        path: PIPELINE_ADMISSION_FILE,
+        reason: "automation_pipeline_admission_function_missing",
+      }),
+    );
+  }
+
+  for (const [path, source, target] of [
+    [ORCHESTRATOR_BARREL_FILE, orchestratorBarrel, "./pipeline-admission.js"],
+    [BARREL_FILE, automationBarrel, "./orchestrator/pipeline-admission.js"],
+  ] as const) {
+    if (
+      source === null ||
+      !hasBarrelExport(
+        source,
+        "decideAutomationOrchestratorPipelineAdmission",
+        target,
+      )
+    ) {
+      violations.push(
+        Object.freeze({
+          path,
+          reason:
+            "automation_pipeline_admission_function_not_canonically_exported",
+        }),
+      );
+    }
+  }
+
+  for (const name of PIPELINE_ADMISSION_CONTRACTS) {
+    if (
+      automationBarrel === null ||
+      !hasBarrelExport(automationBarrel, name, "./orchestrator/index.js")
+    ) {
+      violations.push(
+        Object.freeze({
+          path: BARREL_FILE,
+          reason: `automation_pipeline_admission_type_not_canonically_exported:${name}`,
+        }),
+      );
+    }
+  }
+
+  return Object.freeze(violations);
+}
+
+export function inspectAutomationOrchestratorPipelineAdmissionPurity(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, PIPELINE_ADMISSION_FILE);
+  if (source === null) {
+    return Object.freeze([
+      Object.freeze({
+        path: PIPELINE_ADMISSION_FILE,
+        reason: "automation_pipeline_admission_file_missing",
+      }),
+    ]);
+  }
+
+  const structuralSource = withoutComments(source);
+  const allowedImports = [
+    "./pipeline-admission-types.js",
+    "./pipeline-summary-types.js",
+  ];
+  const forbidden =
+    /(?:\b(?:evaluateAutomationOrchestratorPipeline|validateAutomationOrchestratorPipeline|evaluateAutomationOrchestratorDelegation|evaluateAutomationOrchestratorDelegationSelection|prepareAutomationOrchestratorDelegationDispatch|dispatchAutomation|executeAutomation)\s*\(|\bDate\.now\b|\bnew\s+Date\b|\bMath\.random\b|\bcrypto\b|\b(?:setTimeout|setInterval|queueMicrotask|requestAnimationFrame)\b|\bprocess\b|\b(?:node:)?(?:fs|net|http|https|child_process)\b|\b(?:exec|spawn)\w*\s*\(|\b(?:send|deliver|invoke|delegate|provide)\s*\(|\b(?:let|var)\s+)/;
+  const mutatesInput =
+    /\b(?:summary|source)\s*(?:\.|\[)[^;]*(?<![!<>=])=(?!=)|\b(?:summary|source)\s*(?:\.|\[)[^;]*(?:\+\+|--)/.test(
+      structuralSource,
+    );
+
+  if (
+    moduleSpecifiers(structuralSource).some(
+      (target) => !allowedImports.includes(target),
+    ) ||
+    forbidden.test(structuralSource) ||
+    mutatesInput
+  ) {
+    return Object.freeze([
+      Object.freeze({
+        path: PIPELINE_ADMISSION_FILE,
+        reason: "automation_pipeline_admission_not_pure_or_dependency_safe",
+      }),
+    ]);
+  }
+
+  return Object.freeze([]);
+}
+
+export function inspectAutomationOrchestratorPipelineAdmissionMatrix(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const implementation = sourceFor(sources, PIPELINE_ADMISSION_FILE);
+  const types = sourceFor(sources, PIPELINE_ADMISSION_TYPES_FILE);
+  const source =
+    implementation === null ? null : withoutComments(implementation);
+  const typeSource = types === null ? null : withoutComments(types);
+  const hasClosedProgressionMatrix =
+    source !== null &&
+    /if\s*\(\s*progression\s*===\s*"evaluation"[\s\S]*?\["denied",\s*"indeterminate"\]/.test(
+      source,
+    ) &&
+    /if\s*\(\s*progression\s*===\s*"selection"[\s\S]*?\["eligible"\][\s\S]*?\["rejected",\s*"indeterminate"\]/.test(
+      source,
+    ) &&
+    /if\s*\(\s*progression\s*===\s*"dispatch"[\s\S]*?\["eligible"\][\s\S]*?\["selected"\][\s\S]*?\["prepared",\s*"rejected",\s*"indeterminate"\]/.test(
+      source,
+    );
+  const hasClosedAdmissionOutcomes =
+    typeSource !== null &&
+    /"admitted"\s*\|\s*"rejected"\s*\|\s*"indeterminate"/.test(typeSource) &&
+    /"dispatch_prepared"[\s\S]*?"pipeline_rejected"[\s\S]*?"pipeline_indeterminate"[\s\S]*?"invalid_summary"/.test(
+      typeSource,
+    );
+  const hasStructuralAdmission =
+    source !== null &&
+    /source\.status\s*!==\s*"valid"/.test(source) &&
+    /source\.valid\s*!==\s*true/.test(source) &&
+    /source\.validationSubjectStatus\s*!==\s*"complete"/.test(source) &&
+    /stage\(/.test(source) &&
+    /decision\("admitted",\s*"dispatch_prepared"/.test(source) &&
+    !/\bsummary\.valid\s*(?:===|!==)?[\s\S]{0,160}?decision\("admitted"/.test(
+      source,
+    ) &&
+    /return\s+decision\("indeterminate",\s*"invalid_summary",\s*null\);\s*}\s*$/.test(
+      source,
+    );
+
+  if (
+    !hasClosedProgressionMatrix ||
+    !hasClosedAdmissionOutcomes ||
+    !hasStructuralAdmission
+  ) {
+    return Object.freeze([
+      Object.freeze({
+        path: PIPELINE_ADMISSION_FILE,
+        reason:
+          "automation_pipeline_admission_matrix_not_closed_or_fail_closed",
+      }),
+    ]);
+  }
+
+  return Object.freeze([]);
+}
+
+export function inspectAutomationOrchestratorPipelineAdmissionIdentifiers(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, PIPELINE_ADMISSION_FILE);
+  if (source === null) {
+    return Object.freeze([
+      Object.freeze({
+        path: PIPELINE_ADMISSION_FILE,
+        reason: "automation_pipeline_admission_file_missing",
+      }),
+    ]);
+  }
+
+  const structuralSource = withoutComments(source);
+  const hasOptionalIdentifierTypeChecks =
+    /candidateId\s*!==\s*null\s*&&\s*typeof\s+candidateId\s*!==\s*"string"/.test(
+      structuralSource,
+    ) &&
+    /targetId\s*!==\s*null\s*&&\s*typeof\s+targetId\s*!==\s*"string"/.test(
+      structuralSource,
+    );
+  const hasFalseOperationalFlags =
+    /dispatchOccurred:\s*false[\s\S]*?delegationOccurred:\s*false[\s\S]*?providerInvoked:\s*false[\s\S]*?forgeInvoked:\s*false[\s\S]*?executionStarted:\s*false/.test(
+      structuralSource,
+    );
+  const normalizesIdentifier =
+    /\.trim\(\)|\.length\s*>\s*0|\.to(?:Lower|Upper)Case\(\)/.test(
+      structuralSource,
+    );
+
+  if (
+    !hasOptionalIdentifierTypeChecks ||
+    !hasFalseOperationalFlags ||
+    normalizesIdentifier
+  ) {
+    return Object.freeze([
+      Object.freeze({
+        path: PIPELINE_ADMISSION_FILE,
+        reason:
+          "automation_pipeline_admission_identifiers_or_operational_flags_not_fail_closed",
+      }),
+    ]);
+  }
+
+  return Object.freeze([]);
+}
+
 export function inspectAutomationOrchestratorPipelineValidation(
   sources: readonly AutomationAuditSource[],
 ): readonly AutomationAuditViolation[] {
@@ -1563,6 +1804,7 @@ export function inspectAutomationDependencyDirection(
         "./assembly/index.js",
         "./orchestrator/index.js",
         "./orchestrator/pipeline-summary.js",
+        "./orchestrator/pipeline-admission.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -1606,6 +1848,8 @@ export function inspectAutomationDependencyDirection(
         "./pipeline-validation.js",
         "./pipeline-summary.js",
         "./pipeline-summary-types.js",
+        "./pipeline-admission.js",
+        "./pipeline-admission-types.js",
       ],
     ],
     [
@@ -1631,6 +1875,11 @@ export function inspectAutomationDependencyDirection(
       ["./pipeline-types.js", "./pipeline-summary-types.js"],
     ],
     [PIPELINE_VALIDATION_FILE, ["./pipeline-types.js"]],
+    [PIPELINE_ADMISSION_TYPES_FILE, ["./pipeline-types.js"]],
+    [
+      PIPELINE_ADMISSION_FILE,
+      ["./pipeline-summary-types.js", "./pipeline-admission-types.js"],
+    ],
     [
       PLANNING_TYPES_FILE,
       [
@@ -1722,7 +1971,7 @@ export function inspectAutomationDependencyDirection(
   for (const [path, expected] of expectedImports) {
     const source = sourceFor(sources, path);
     if (source === null) continue;
-    const actual = moduleSpecifiers(source);
+    const actual = [...new Set(moduleSpecifiers(source))];
     if (
       actual.length !== expected.length ||
       actual.some((target) => !expected.includes(target))
@@ -1918,4 +2167,32 @@ export const AUTOMATION_AUDIT_DOCUMENTATION_RULE = createRule(
   "RFC-0001 documents the deterministic Automation audit family and its registered rule range.",
   inspectAutomationAuditDocumentation,
   "docs",
+);
+
+export const AUTOMATION_PIPELINE_ADMISSION_CONTRACTS_RULE = createRule(
+  "AUDIT-514",
+  "Automation Pipeline Admission contracts and exports are complete",
+  "Pipeline Admission files, public contracts, canonical function, and public-barrel exports are present.",
+  inspectAutomationOrchestratorPipelineAdmissionContracts,
+);
+
+export const AUTOMATION_PIPELINE_ADMISSION_PURITY_RULE = createRule(
+  "AUDIT-515",
+  "Automation Pipeline Admission remains pure and dependency-safe",
+  "Pipeline Admission imports only public summary contracts and contains no operational dependency, effect, mutable state, or input mutation.",
+  inspectAutomationOrchestratorPipelineAdmissionPurity,
+);
+
+export const AUTOMATION_PIPELINE_ADMISSION_MATRIX_RULE = createRule(
+  "AUDIT-516",
+  "Automation Pipeline Admission uses a closed fail-closed matrix",
+  "Pipeline Admission recognizes only the declared evaluation, selection, and dispatch outcomes and admits only prepared dispatch.",
+  inspectAutomationOrchestratorPipelineAdmissionMatrix,
+);
+
+export const AUTOMATION_PIPELINE_ADMISSION_IDENTIFIERS_RULE = createRule(
+  "AUDIT-517",
+  "Automation Pipeline Admission preserves identifier and operational invariants",
+  "Pipeline Admission validates present optional identifiers without normalization and keeps every operational flag literally false.",
+  inspectAutomationOrchestratorPipelineAdmissionIdentifiers,
 );
