@@ -24,6 +24,10 @@ import {
   AUTOMATION_WORKER_COMMAND_IDENTIFIERS_RULE,
   AUTOMATION_WORKER_COMMAND_MATRIX_RULE,
   AUTOMATION_WORKER_COMMAND_PURITY_RULE,
+  AUTOMATION_WORKER_DISPATCH_PORT_CONTRACTS_RULE,
+  AUTOMATION_WORKER_DISPATCH_PORT_IDENTIFIERS_RULE,
+  AUTOMATION_WORKER_DISPATCH_PORT_MATRIX_RULE,
+  AUTOMATION_WORKER_DISPATCH_PORT_PURITY_RULE,
   AUTOMATION_PROVIDER_CONTRACTS_RULE,
   inspectAutomationAssemblyContracts,
   inspectAutomationAssemblyInertness,
@@ -56,6 +60,10 @@ import {
   inspectAutomationOrchestratorWorkerCommandIdentifiers,
   inspectAutomationOrchestratorWorkerCommandMatrix,
   inspectAutomationOrchestratorWorkerCommandPurity,
+  inspectAutomationOrchestratorWorkerDispatchPortContracts,
+  inspectAutomationOrchestratorWorkerDispatchPortIdentifiers,
+  inspectAutomationOrchestratorWorkerDispatchPortMatrix,
+  inspectAutomationOrchestratorWorkerDispatchPortPurity,
   inspectAutomationOrchestratorPipelineValidation,
   inspectAutomationPolicyContracts,
   inspectAutomationProviderContracts,
@@ -90,6 +98,8 @@ const AUTOMATION_PATHS = [
   "src/automation/orchestrator/pipeline-worker-handoff.ts",
   "src/automation/orchestrator/worker-command-types.ts",
   "src/automation/orchestrator/worker-command.ts",
+  "src/automation/orchestrator/worker-dispatch-port-types.ts",
+  "src/automation/orchestrator/worker-dispatch-port.ts",
   "src/automation/orchestrator/evaluation/types.ts",
   "src/automation/orchestrator/evaluation/index.ts",
   "src/automation/orchestrator/planning/types.ts",
@@ -343,6 +353,93 @@ test("AUDIT-522 through AUDIT-525 are registered, executed, and passing", () => 
     );
     assert.equal(rule.check().status, "pass");
   }
+});
+
+test("AUDIT-526 through AUDIT-529 are registered, executed, and passing", () => {
+  const fixture = sources();
+  const rules = [
+    AUTOMATION_WORKER_DISPATCH_PORT_CONTRACTS_RULE,
+    AUTOMATION_WORKER_DISPATCH_PORT_PURITY_RULE,
+    AUTOMATION_WORKER_DISPATCH_PORT_MATRIX_RULE,
+    AUTOMATION_WORKER_DISPATCH_PORT_IDENTIFIERS_RULE,
+  ];
+  assert.deepEqual(
+    [
+      inspectAutomationOrchestratorWorkerDispatchPortContracts(fixture),
+      inspectAutomationOrchestratorWorkerDispatchPortPurity(fixture),
+      inspectAutomationOrchestratorWorkerDispatchPortMatrix(fixture),
+      inspectAutomationOrchestratorWorkerDispatchPortIdentifiers(fixture),
+    ],
+    [[], [], [], []],
+  );
+  assert.deepEqual(
+    rules.map((rule) => rule.id),
+    ["AUDIT-526", "AUDIT-527", "AUDIT-528", "AUDIT-529"],
+  );
+  for (const rule of rules) {
+    assert.equal(
+      AUDIT_RULES.find(({ id }) => id === rule.id)?.title,
+      rule.title,
+    );
+    assert.equal(rule.check().status, "pass");
+  }
+});
+
+test("AUDIT-526 through AUDIT-529 reject Worker Dispatch Port regressions", () => {
+  const implementationPath =
+    "src/automation/orchestrator/worker-dispatch-port.ts";
+  const checks = [
+    [
+      AUTOMATION_WORKER_DISPATCH_PORT_CONTRACTS_RULE,
+      inspectAutomationOrchestratorWorkerDispatchPortContracts,
+      sourcesWithout(
+        "src/automation/orchestrator/worker-dispatch-port-types.ts",
+      ),
+      "required_file_missing",
+    ],
+    [
+      AUTOMATION_WORKER_DISPATCH_PORT_PURITY_RULE,
+      inspectAutomationOrchestratorWorkerDispatchPortPurity,
+      mutatedSources(
+        implementationPath,
+        'source.reason === "handoff_prepared"',
+        "Date.now() === 0",
+      ),
+      "automation_worker_dispatch_port_not_pure_or_dependency_safe",
+    ],
+    [
+      AUTOMATION_WORKER_DISPATCH_PORT_MATRIX_RULE,
+      inspectAutomationOrchestratorWorkerDispatchPortMatrix,
+      mutatedSources(
+        implementationPath,
+        'request("prepared", "command_prepared", values)',
+        'request("rejected", "command_prepared", values)',
+      ),
+      "automation_worker_dispatch_port_matrix_not_closed_or_fail_closed",
+    ],
+    [
+      AUTOMATION_WORKER_DISPATCH_PORT_IDENTIFIERS_RULE,
+      inspectAutomationOrchestratorWorkerDispatchPortIdentifiers,
+      mutatedSources(
+        implementationPath,
+        "dispatchRequested: false",
+        "dispatchRequested: true",
+      ),
+      "automation_worker_dispatch_port_identifiers_or_operational_flags_not_fail_closed",
+    ],
+    [
+      AUTOMATION_WORKER_DISPATCH_PORT_IDENTIFIERS_RULE,
+      inspectAutomationOrchestratorWorkerDispatchPortIdentifiers,
+      mutatedSources(
+        implementationPath,
+        'source.candidateId !== null && typeof source.candidateId !== "string"',
+        "false",
+      ),
+      "automation_worker_dispatch_port_identifiers_or_operational_flags_not_fail_closed",
+    ],
+  ] as const;
+  for (const [rule, inspect, fixture, reason] of checks)
+    assertRuleRejects(rule, inspect(fixture), reason);
 });
 
 test("AUDIT-522 through AUDIT-525 reject Worker Command regressions", () => {

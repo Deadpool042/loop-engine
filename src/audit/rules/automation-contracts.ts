@@ -34,6 +34,10 @@ const PIPELINE_WORKER_HANDOFF_FILE =
 const WORKER_COMMAND_TYPES_FILE =
   "src/automation/orchestrator/worker-command-types.ts";
 const WORKER_COMMAND_FILE = "src/automation/orchestrator/worker-command.ts";
+const WORKER_DISPATCH_PORT_TYPES_FILE =
+  "src/automation/orchestrator/worker-dispatch-port-types.ts";
+const WORKER_DISPATCH_PORT_FILE =
+  "src/automation/orchestrator/worker-dispatch-port.ts";
 const EVALUATION_TYPES_FILE = "src/automation/orchestrator/evaluation/types.ts";
 const EVALUATION_BARREL_FILE =
   "src/automation/orchestrator/evaluation/index.ts";
@@ -247,6 +251,15 @@ const WORKER_COMMAND_CONTRACTS = [
   "AutomationOrchestratorWorkerCommandKind",
   "AutomationOrchestratorWorkerCommand",
 ] as const;
+const WORKER_DISPATCH_PORT_CONTRACTS = [
+  "AutomationOrchestratorWorkerDispatchRequestStatus",
+  "AutomationOrchestratorWorkerDispatchRequestReason",
+  "AutomationOrchestratorWorkerDispatchRequest",
+  "AutomationOrchestratorWorkerDispatchResultStatus",
+  "AutomationOrchestratorWorkerDispatchResultReason",
+  "AutomationOrchestratorWorkerDispatchResult",
+  "AutomationOrchestratorWorkerDispatchPort",
+] as const;
 
 const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./types.js", CORE_CONTRACTS],
@@ -266,6 +279,7 @@ const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./orchestrator/index.js", PIPELINE_ADMISSION_CONTRACTS],
   ["./orchestrator/index.js", PIPELINE_WORKER_HANDOFF_CONTRACTS],
   ["./orchestrator/index.js", WORKER_COMMAND_CONTRACTS],
+  ["./orchestrator/index.js", WORKER_DISPATCH_PORT_CONTRACTS],
 ] as const;
 
 const REQUIRED_FILES = [
@@ -292,6 +306,8 @@ const REQUIRED_FILES = [
   PIPELINE_WORKER_HANDOFF_FILE,
   WORKER_COMMAND_TYPES_FILE,
   WORKER_COMMAND_FILE,
+  WORKER_DISPATCH_PORT_TYPES_FILE,
+  WORKER_DISPATCH_PORT_FILE,
   EVALUATION_TYPES_FILE,
   EVALUATION_BARREL_FILE,
   PLANNING_TYPES_FILE,
@@ -1937,6 +1953,150 @@ export function inspectAutomationOrchestratorWorkerCommandIdentifiers(
   return Object.freeze([]);
 }
 
+export function inspectAutomationOrchestratorWorkerDispatchPortContracts(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const violations = [
+    ...violationsForContracts(
+      sources,
+      WORKER_DISPATCH_PORT_TYPES_FILE,
+      ORCHESTRATOR_BARREL_FILE,
+      "./worker-dispatch-port-types.js",
+      WORKER_DISPATCH_PORT_CONTRACTS,
+    ),
+  ];
+  const implementation = sourceFor(sources, WORKER_DISPATCH_PORT_FILE);
+  const orchestrator = sourceFor(sources, ORCHESTRATOR_BARREL_FILE);
+  const automation = sourceFor(sources, BARREL_FILE);
+  if (
+    implementation === null ||
+    !/export\s+function\s+prepareAutomationOrchestratorWorkerDispatchRequest\b/.test(
+      withoutComments(implementation ?? ""),
+    )
+  )
+    violations.push(
+      Object.freeze({
+        path: WORKER_DISPATCH_PORT_FILE,
+        reason: "automation_worker_dispatch_port_function_missing",
+      }),
+    );
+  for (const [path, source, target] of [
+    [ORCHESTRATOR_BARREL_FILE, orchestrator, "./worker-dispatch-port.js"],
+    [BARREL_FILE, automation, "./orchestrator/worker-dispatch-port.js"],
+  ] as const)
+    if (
+      source === null ||
+      !hasBarrelExport(
+        source,
+        "prepareAutomationOrchestratorWorkerDispatchRequest",
+        target,
+      )
+    )
+      violations.push(
+        Object.freeze({
+          path,
+          reason:
+            "automation_worker_dispatch_port_function_not_canonically_exported",
+        }),
+      );
+  for (const name of WORKER_DISPATCH_PORT_CONTRACTS)
+    if (
+      automation === null ||
+      !hasBarrelExport(automation, name, "./orchestrator/index.js")
+    )
+      violations.push(
+        Object.freeze({
+          path: BARREL_FILE,
+          reason: `automation_worker_dispatch_port_type_not_canonically_exported:${name}`,
+        }),
+      );
+  return Object.freeze(violations);
+}
+
+export function inspectAutomationOrchestratorWorkerDispatchPortPurity(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, WORKER_DISPATCH_PORT_FILE);
+  const structural = source === null ? "" : withoutComments(source);
+  const allowed = [
+    "./worker-command-types.js",
+    "./worker-dispatch-port-types.js",
+  ];
+  const forbidden =
+    /\b(?:dispatch\s*\(|Date|Math\.random|crypto|setTimeout|setInterval|process|fs|net|http|exec|spawn|let|var)\b/;
+  if (
+    source === null ||
+    moduleSpecifiers(structural).some((target) => !allowed.includes(target)) ||
+    forbidden.test(structural) ||
+    /\b(?:command|source)\.\w+\s*=(?!=)/.test(structural)
+  )
+    return Object.freeze([
+      Object.freeze({
+        path: WORKER_DISPATCH_PORT_FILE,
+        reason: "automation_worker_dispatch_port_not_pure_or_dependency_safe",
+      }),
+    ]);
+  return Object.freeze([]);
+}
+
+export function inspectAutomationOrchestratorWorkerDispatchPortMatrix(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, WORKER_DISPATCH_PORT_FILE);
+  const types = sourceFor(sources, WORKER_DISPATCH_PORT_TYPES_FILE);
+  const structural = source === null ? "" : withoutComments(source);
+  const typeSource = types === null ? "" : withoutComments(types);
+  const valid =
+    /source\.status\s*===\s*"prepared"/.test(structural) &&
+    /source\.reason\s*===\s*"handoff_prepared"/.test(structural) &&
+    /source\.kind\s*===\s*"execute_delegated_task"/.test(structural) &&
+    /request\("prepared",\s*"command_prepared"/.test(structural) &&
+    /source\.status\s*===\s*"rejected"/.test(structural) &&
+    /request\("rejected",\s*"command_rejected"/.test(structural) &&
+    /return\s+request\("rejected",\s*"invalid_command",\s*null\);\s*}\s*$/.test(
+      structural,
+    ) &&
+    /"command_prepared"[\s\S]*?"command_rejected"[\s\S]*?"invalid_command"/.test(
+      typeSource,
+    ) &&
+    !/if\s*\(\s*command\.prepared\s*\)/.test(structural);
+  return valid
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: WORKER_DISPATCH_PORT_FILE,
+          reason:
+            "automation_worker_dispatch_port_matrix_not_closed_or_fail_closed",
+        }),
+      ]);
+}
+
+export function inspectAutomationOrchestratorWorkerDispatchPortIdentifiers(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(sources, WORKER_DISPATCH_PORT_FILE);
+  const structural = source === null ? "" : withoutComments(source);
+  const valid =
+    ["requestId", "delegationId", "candidateId", "targetId"].every((name) =>
+      new RegExp(
+        `source\\.${name} !== null && typeof source\\.${name} !== "string"`,
+      ).test(structural),
+    ) &&
+    /dispatchRequested:\s*false[\s\S]*?dispatchOccurred:\s*false[\s\S]*?workerSelected:\s*false[\s\S]*?providerInvoked:\s*false[\s\S]*?forgeInvoked:\s*false[\s\S]*?executionStarted:\s*false/.test(
+      structural,
+    ) &&
+    !/\.trim\(\)|\.length\s*>\s*0|\.to(?:Lower|Upper)Case\(\)/.test(structural);
+  return valid
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: WORKER_DISPATCH_PORT_FILE,
+          reason:
+            "automation_worker_dispatch_port_identifiers_or_operational_flags_not_fail_closed",
+        }),
+      ]);
+}
+
 export function inspectAutomationOrchestratorPipelineValidation(
   sources: readonly AutomationAuditSource[],
 ): readonly AutomationAuditViolation[] {
@@ -2230,6 +2390,7 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/pipeline-admission.js",
         "./orchestrator/pipeline-worker-handoff.js",
         "./orchestrator/worker-command.js",
+        "./orchestrator/worker-dispatch-port.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2279,6 +2440,8 @@ export function inspectAutomationDependencyDirection(
         "./pipeline-worker-handoff-types.js",
         "./worker-command.js",
         "./worker-command-types.js",
+        "./worker-dispatch-port.js",
+        "./worker-dispatch-port-types.js",
       ],
     ],
     [
@@ -2318,6 +2481,11 @@ export function inspectAutomationDependencyDirection(
     [
       WORKER_COMMAND_FILE,
       ["./pipeline-worker-handoff-types.js", "./worker-command-types.js"],
+    ],
+    [WORKER_DISPATCH_PORT_TYPES_FILE, []],
+    [
+      WORKER_DISPATCH_PORT_FILE,
+      ["./worker-command-types.js", "./worker-dispatch-port-types.js"],
     ],
     [
       PLANNING_TYPES_FILE,
@@ -2690,4 +2858,28 @@ export const AUTOMATION_WORKER_COMMAND_IDENTIFIERS_RULE = createRule(
   "Automation Worker Command preserves identifier and operational invariants",
   "Worker Command validates prepared identifiers without normalization and keeps every command and operational flag literally false.",
   inspectAutomationOrchestratorWorkerCommandIdentifiers,
+);
+export const AUTOMATION_WORKER_DISPATCH_PORT_CONTRACTS_RULE = createRule(
+  "AUDIT-526",
+  "Automation Worker Dispatch Port contracts and exports are complete",
+  "Worker Dispatch Port contracts, function, and canonical exports are present.",
+  inspectAutomationOrchestratorWorkerDispatchPortContracts,
+);
+export const AUTOMATION_WORKER_DISPATCH_PORT_PURITY_RULE = createRule(
+  "AUDIT-527",
+  "Automation Worker Dispatch Port remains pure and dependency-safe",
+  "Worker Dispatch Port preparation is pure and never invokes the port.",
+  inspectAutomationOrchestratorWorkerDispatchPortPurity,
+);
+export const AUTOMATION_WORKER_DISPATCH_PORT_MATRIX_RULE = createRule(
+  "AUDIT-528",
+  "Automation Worker Dispatch Port uses a closed fail-closed matrix",
+  "Worker Dispatch Port prepares only coherent Worker Commands.",
+  inspectAutomationOrchestratorWorkerDispatchPortMatrix,
+);
+export const AUTOMATION_WORKER_DISPATCH_PORT_IDENTIFIERS_RULE = createRule(
+  "AUDIT-529",
+  "Automation Worker Dispatch Port preserves identifier and operational invariants",
+  "Worker Dispatch Port preserves identifiers exactly and request flags remain false.",
+  inspectAutomationOrchestratorWorkerDispatchPortIdentifiers,
 );

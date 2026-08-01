@@ -195,7 +195,8 @@ frontière de provider, forge, transport ou runtime n'est franchie.
 
 La décision pure `decideAutomationOrchestratorPipelineAdmission` suit cette
 projection : `pipeline result → validation → summary → admission decision →
-worker handoff → worker command → future dispatch → future execution`. Le
+worker handoff → worker command → dispatch request → dispatch port → future
+adapter → future worker execution`. Le
 summary reste descriptif ; l'admission
 est seulement une autorisation déclarative de remise future. Même `admitted`
 ne réalise aucun dispatch, appel de provider, forge, runtime ou worker, ne
@@ -221,6 +222,14 @@ ni une sélection de worker. Une commande `prepared` n'envoie rien : le dispatch
 reste un futur franchissement d'adaptateur, puis l'exécution un effet externe
 ultérieur. Aucun worker concret, provider, forge, runtime, transport ou état
 persisté n'est impliqué ; tous les indicateurs restent littéralement `false`.
+
+La construction pure `prepareAutomationOrchestratorWorkerDispatchRequest`
+transforme seulement une Worker Command publique en enveloppe déclarative prête
+pour le Dispatch Port. Ce port est un contrat abstrait pour un futur adaptateur
+et sa méthode `dispatch` n'est jamais appelée ici. La préparation ne traverse
+donc aucun port, provider, worker, transport ou runtime. Le résultat de port
+est un compte rendu fermé du futur adaptateur : ses booléens dynamiques ne sont
+pas produits par la préparation pure et restent distincts de l'exécution.
 
 ## 5. Execution lifecycle
 
