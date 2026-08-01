@@ -46,6 +46,10 @@ const WORKER_DISPATCH_SERVICE_TYPES_FILE =
   "src/automation/orchestrator/worker-dispatch-service-types.ts";
 const WORKER_DISPATCH_SERVICE_FILE =
   "src/automation/orchestrator/worker-dispatch-service.ts";
+const WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_TYPES_FILE =
+  "src/automation/orchestrator/worker-execution-lifecycle-initialization-types.ts";
+const WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_FILE =
+  "src/automation/orchestrator/worker-execution-lifecycle-initialization.ts";
 const EVALUATION_TYPES_FILE = "src/automation/orchestrator/evaluation/types.ts";
 const EVALUATION_BARREL_FILE =
   "src/automation/orchestrator/evaluation/index.ts";
@@ -278,6 +282,11 @@ const WORKER_DISPATCH_SERVICE_CONTRACTS = [
   "AutomationOrchestratorWorkerDispatchServiceReason",
   "AutomationOrchestratorWorkerDispatchServiceResult",
 ] as const;
+const WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_CONTRACTS = [
+  "AutomationOrchestratorWorkerExecutionLifecycleInitializationStatus",
+  "AutomationOrchestratorWorkerExecutionLifecycleInitializationReason",
+  "AutomationOrchestratorWorkerExecutionLifecycleInitializationResult",
+] as const;
 
 const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./types.js", CORE_CONTRACTS],
@@ -300,6 +309,10 @@ const AUTOMATION_PUBLIC_CONTRACTS = [
   ["./orchestrator/index.js", WORKER_DISPATCH_PORT_CONTRACTS],
   ["./orchestrator/index.js", WORKER_DISPATCH_INVOCATION_CONTRACTS],
   ["./orchestrator/index.js", WORKER_DISPATCH_SERVICE_CONTRACTS],
+  [
+    "./orchestrator/index.js",
+    WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_CONTRACTS,
+  ],
 ] as const;
 
 const REQUIRED_FILES = [
@@ -332,6 +345,8 @@ const REQUIRED_FILES = [
   WORKER_DISPATCH_INVOCATION_FILE,
   WORKER_DISPATCH_SERVICE_TYPES_FILE,
   WORKER_DISPATCH_SERVICE_FILE,
+  WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_TYPES_FILE,
+  WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_FILE,
   EVALUATION_TYPES_FILE,
   EVALUATION_BARREL_FILE,
   PLANNING_TYPES_FILE,
@@ -2384,6 +2399,87 @@ export function inspectAutomationOrchestratorWorkerDispatchServiceInvariants(
       ]);
 }
 
+function inspectWorkerExecutionLifecycleInitialization(
+  sources: readonly AutomationAuditSource[],
+  kind: "contracts" | "dependencies" | "matrix" | "invariants",
+): readonly AutomationAuditViolation[] {
+  const types = withoutComments(
+    sourceFor(sources, WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_TYPES_FILE) ??
+      "",
+  );
+  const source = withoutComments(
+    sourceFor(sources, WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_FILE) ?? "",
+  );
+  const orchestrator = sourceFor(sources, ORCHESTRATOR_BARREL_FILE) ?? "";
+  const automation = sourceFor(sources, BARREL_FILE) ?? "";
+  const valid =
+    kind === "contracts"
+      ? WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_CONTRACTS.every((name) =>
+          hasPublicContract(types, name),
+        ) &&
+        /export\s+function\s+initializeAutomationOrchestratorWorkerExecutionLifecycle\b/.test(
+          source,
+        ) &&
+        hasBarrelExport(
+          orchestrator,
+          "initializeAutomationOrchestratorWorkerExecutionLifecycle",
+          "./worker-execution-lifecycle-initialization.js",
+        ) &&
+        hasBarrelExport(
+          automation,
+          "initializeAutomationOrchestratorWorkerExecutionLifecycle",
+          "./orchestrator/worker-execution-lifecycle-initialization.js",
+        )
+      : kind === "dependencies"
+        ? moduleSpecifiers(source).every((target) =>
+            [
+              "./worker-dispatch-service-types.js",
+              "./worker-execution-lifecycle-initialization-types.js",
+            ].includes(target),
+          ) &&
+          !/\b(?:Date|Math\.random|crypto|setTimeout|setInterval|process|fs|net|http|exec|spawn|let|var)\b/.test(
+            source,
+          )
+        : kind === "matrix"
+          ? [
+              "execution_pending",
+              "execution_not_started",
+              "execution_indeterminate",
+              "dispatch_accepted",
+              "dispatch_indeterminate",
+              "invalid_dispatch_service_result",
+            ].every((value) => source.includes(`"${value}"`)) &&
+            !/\.trim\(\)|\.to(?:Lower|Upper)Case\(\)/.test(source)
+          : /Object\.freeze\(/.test(source) &&
+            /executionStarted:\s*false/.test(source) &&
+            !/\.dispatch\s*\(|initializeAutomationOrchestratorWorkerExecutionLifecycle\s*\(/.test(
+              source.replace(
+                /export function initializeAutomationOrchestratorWorkerExecutionLifecycle/,
+                "",
+              ),
+            );
+  return valid
+    ? Object.freeze([])
+    : Object.freeze([
+        Object.freeze({
+          path: WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_FILE,
+          reason: `automation_worker_execution_lifecycle_initialization_${kind}_invalid`,
+        }),
+      ]);
+}
+export const inspectAutomationOrchestratorWorkerExecutionLifecycleInitializationContracts =
+  (sources: readonly AutomationAuditSource[]) =>
+    inspectWorkerExecutionLifecycleInitialization(sources, "contracts");
+export const inspectAutomationOrchestratorWorkerExecutionLifecycleInitializationDependencies =
+  (sources: readonly AutomationAuditSource[]) =>
+    inspectWorkerExecutionLifecycleInitialization(sources, "dependencies");
+export const inspectAutomationOrchestratorWorkerExecutionLifecycleInitializationMatrix =
+  (sources: readonly AutomationAuditSource[]) =>
+    inspectWorkerExecutionLifecycleInitialization(sources, "matrix");
+export const inspectAutomationOrchestratorWorkerExecutionLifecycleInitializationInvariants =
+  (sources: readonly AutomationAuditSource[]) =>
+    inspectWorkerExecutionLifecycleInitialization(sources, "invariants");
+
 export function inspectAutomationOrchestratorPipelineValidation(
   sources: readonly AutomationAuditSource[],
 ): readonly AutomationAuditViolation[] {
@@ -2680,6 +2776,7 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/worker-dispatch-port.js",
         "./orchestrator/worker-dispatch-invocation.js",
         "./orchestrator/worker-dispatch-service.js",
+        "./orchestrator/worker-execution-lifecycle-initialization.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2735,6 +2832,8 @@ export function inspectAutomationDependencyDirection(
         "./worker-dispatch-invocation-types.js",
         "./worker-dispatch-service.js",
         "./worker-dispatch-service-types.js",
+        "./worker-execution-lifecycle-initialization.js",
+        "./worker-execution-lifecycle-initialization-types.js",
       ],
     ],
     [
@@ -2797,6 +2896,14 @@ export function inspectAutomationDependencyDirection(
         "./worker-dispatch-port-types.js",
         "./worker-dispatch-invocation.js",
         "./worker-dispatch-service-types.js",
+      ],
+    ],
+    [WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_TYPES_FILE, []],
+    [
+      WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_FILE,
+      [
+        "./worker-dispatch-service-types.js",
+        "./worker-execution-lifecycle-initialization-types.js",
       ],
     ],
     [
@@ -3244,3 +3351,31 @@ export const AUTOMATION_WORKER_DISPATCH_SERVICE_INVARIANTS_RULE = createRule(
   "Dispatch Service never directly calls the port and preserves identifiers and closed failure flags.",
   inspectAutomationOrchestratorWorkerDispatchServiceInvariants,
 );
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_CONTRACTS_RULE =
+  createRule(
+    "AUDIT-538",
+    "Automation Worker Execution Lifecycle Initialization contracts and exports are complete",
+    "Lifecycle initialization types and canonical exports are present.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleInitializationContracts,
+  );
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_DEPENDENCIES_RULE =
+  createRule(
+    "AUDIT-539",
+    "Automation Worker Execution Lifecycle Initialization dependencies are closed",
+    "Lifecycle initialization is pure and depends only on the V20.9 service contract.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleInitializationDependencies,
+  );
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_MATRIX_RULE =
+  createRule(
+    "AUDIT-540",
+    "Automation Worker Execution Lifecycle Initialization is fail-closed",
+    "Lifecycle initialization maps only the closed V20.9 matrix.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleInitializationMatrix,
+  );
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_INVARIANTS_RULE =
+  createRule(
+    "AUDIT-541",
+    "Automation Worker Execution Lifecycle Initialization never starts execution",
+    "Lifecycle initialization freezes its result and keeps executionStarted false.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleInitializationInvariants,
+  );

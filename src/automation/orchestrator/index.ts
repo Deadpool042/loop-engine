@@ -89,6 +89,7 @@ export { prepareAutomationOrchestratorWorkerCommand } from "./worker-command.js"
 export { prepareAutomationOrchestratorWorkerDispatchRequest } from "./worker-dispatch-port.js";
 export { invokeAutomationOrchestratorWorkerDispatch } from "./worker-dispatch-invocation.js";
 export { dispatchAutomationOrchestratorWorkerCommand } from "./worker-dispatch-service.js";
+export { initializeAutomationOrchestratorWorkerExecutionLifecycle } from "./worker-execution-lifecycle-initialization.js";
 export type {
   AutomationOrchestratorPipelineAdmissionDecision,
   AutomationOrchestratorPipelineAdmissionReason,
@@ -124,6 +125,11 @@ export type {
   AutomationOrchestratorWorkerDispatchServiceResult,
   AutomationOrchestratorWorkerDispatchServiceStatus,
 } from "./worker-dispatch-service-types.js";
+export type {
+  AutomationOrchestratorWorkerExecutionLifecycleInitializationReason,
+  AutomationOrchestratorWorkerExecutionLifecycleInitializationResult,
+  AutomationOrchestratorWorkerExecutionLifecycleInitializationStatus,
+} from "./worker-execution-lifecycle-initialization-types.js";
 export type {
   AutomationOrchestratorPipelineProgression,
   AutomationOrchestratorPipelineResult,
