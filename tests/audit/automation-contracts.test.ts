@@ -16,6 +16,10 @@ import {
   AUTOMATION_PIPELINE_ADMISSION_IDENTIFIERS_RULE,
   AUTOMATION_PIPELINE_ADMISSION_MATRIX_RULE,
   AUTOMATION_PIPELINE_ADMISSION_PURITY_RULE,
+  AUTOMATION_PIPELINE_WORKER_HANDOFF_CONTRACTS_RULE,
+  AUTOMATION_PIPELINE_WORKER_HANDOFF_IDENTIFIERS_RULE,
+  AUTOMATION_PIPELINE_WORKER_HANDOFF_MATRIX_RULE,
+  AUTOMATION_PIPELINE_WORKER_HANDOFF_PURITY_RULE,
   AUTOMATION_PROVIDER_CONTRACTS_RULE,
   inspectAutomationAssemblyContracts,
   inspectAutomationAssemblyInertness,
@@ -40,6 +44,10 @@ import {
   inspectAutomationOrchestratorPipelineAdmissionIdentifiers,
   inspectAutomationOrchestratorPipelineAdmissionMatrix,
   inspectAutomationOrchestratorPipelineAdmissionPurity,
+  inspectAutomationOrchestratorPipelineWorkerHandoffContracts,
+  inspectAutomationOrchestratorPipelineWorkerHandoffIdentifiers,
+  inspectAutomationOrchestratorPipelineWorkerHandoffMatrix,
+  inspectAutomationOrchestratorPipelineWorkerHandoffPurity,
   inspectAutomationOrchestratorPipelineValidation,
   inspectAutomationPolicyContracts,
   inspectAutomationProviderContracts,
@@ -70,6 +78,8 @@ const AUTOMATION_PATHS = [
   "src/automation/orchestrator/pipeline-summary.ts",
   "src/automation/orchestrator/pipeline-admission-types.ts",
   "src/automation/orchestrator/pipeline-admission.ts",
+  "src/automation/orchestrator/pipeline-worker-handoff-types.ts",
+  "src/automation/orchestrator/pipeline-worker-handoff.ts",
   "src/automation/orchestrator/evaluation/types.ts",
   "src/automation/orchestrator/evaluation/index.ts",
   "src/automation/orchestrator/planning/types.ts",
@@ -260,6 +270,221 @@ test("AUDIT-514 through AUDIT-517 are registered, executed, and passing", () => 
       rule.title,
     );
     assert.equal(rule.check().status, "pass");
+  }
+});
+
+test("AUDIT-518 through AUDIT-521 are registered, executed, and passing", () => {
+  const fixture = sources();
+  const rules = [
+    AUTOMATION_PIPELINE_WORKER_HANDOFF_CONTRACTS_RULE,
+    AUTOMATION_PIPELINE_WORKER_HANDOFF_PURITY_RULE,
+    AUTOMATION_PIPELINE_WORKER_HANDOFF_MATRIX_RULE,
+    AUTOMATION_PIPELINE_WORKER_HANDOFF_IDENTIFIERS_RULE,
+  ];
+  const expectedIds = ["AUDIT-518", "AUDIT-519", "AUDIT-520", "AUDIT-521"];
+
+  assert.deepEqual(
+    [
+      inspectAutomationOrchestratorPipelineWorkerHandoffContracts(fixture),
+      inspectAutomationOrchestratorPipelineWorkerHandoffPurity(fixture),
+      inspectAutomationOrchestratorPipelineWorkerHandoffMatrix(fixture),
+      inspectAutomationOrchestratorPipelineWorkerHandoffIdentifiers(fixture),
+    ],
+    [[], [], [], []],
+  );
+  assert.deepEqual(
+    rules.map((rule) => rule.id),
+    expectedIds,
+  );
+  for (const rule of rules) {
+    assert.equal(
+      AUDIT_RULES.find(({ id }) => id === rule.id)?.title,
+      rule.title,
+    );
+    assert.equal(rule.check().status, "pass");
+  }
+});
+
+test("AUDIT-518 through AUDIT-521 reject Worker Handoff regressions", () => {
+  const typesPath =
+    "src/automation/orchestrator/pipeline-worker-handoff-types.ts";
+  const implementationPath =
+    "src/automation/orchestrator/pipeline-worker-handoff.ts";
+  const orchestratorBarrelPath = "src/automation/orchestrator/index.ts";
+  const automationBarrelPath = "src/automation/index.ts";
+  const checks = [
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_CONTRACTS_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffContracts,
+      sourcesWithout(typesPath),
+      "required_file_missing",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_CONTRACTS_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffContracts,
+      mutatedSources(
+        implementationPath,
+        "export function prepareAutomationOrchestratorPipelineWorkerHandoff",
+        "function prepareAutomationOrchestratorPipelineWorkerHandoff",
+      ),
+      "automation_pipeline_worker_handoff_function_missing",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_CONTRACTS_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffContracts,
+      mutatedSources(
+        orchestratorBarrelPath,
+        'export { prepareAutomationOrchestratorPipelineWorkerHandoff } from "./pipeline-worker-handoff.js";',
+        'export {} from "./pipeline-worker-handoff.js";',
+      ),
+      "automation_pipeline_worker_handoff_function_not_canonically_exported",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_CONTRACTS_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffContracts,
+      mutatedSources(
+        typesPath,
+        "export type AutomationOrchestratorPipelineHandoffReason",
+        "type AutomationOrchestratorPipelineHandoffReason",
+      ),
+      "missing_public_contract:AutomationOrchestratorPipelineHandoffReason",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_CONTRACTS_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffContracts,
+      mutatedSources(
+        automationBarrelPath,
+        'export { prepareAutomationOrchestratorPipelineWorkerHandoff } from "./orchestrator/pipeline-worker-handoff.js";',
+        'export {} from "./orchestrator/pipeline-worker-handoff.js";',
+      ),
+      "automation_pipeline_worker_handoff_function_not_canonically_exported",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_PURITY_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffPurity,
+      mutatedSources(implementationPath, "\n}", "\n}\nDate.now();", 7, 7),
+      "automation_pipeline_worker_handoff_not_pure_or_dependency_safe",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_PURITY_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffPurity,
+      mutatedSources(implementationPath, "\n}", "\n}\nMath.random();", 7, 7),
+      "automation_pipeline_worker_handoff_not_pure_or_dependency_safe",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_PURITY_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffPurity,
+      mutatedSources(implementationPath, "\n}", "\n}\nprocess.cwd();", 7, 7),
+      "automation_pipeline_worker_handoff_not_pure_or_dependency_safe",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_PURITY_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffPurity,
+      mutatedSources(
+        implementationPath,
+        "\n}",
+        '\n}\nimport type { Provider } from "../provider/index.js";',
+        7,
+        7,
+      ),
+      "automation_pipeline_worker_handoff_not_pure_or_dependency_safe",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_PURITY_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffPurity,
+      mutatedSources(
+        implementationPath,
+        "\n}",
+        '\n}\nadmission.status = "admitted";',
+        7,
+        7,
+      ),
+      "automation_pipeline_worker_handoff_not_pure_or_dependency_safe",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_MATRIX_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffMatrix,
+      mutatedSources(
+        implementationPath,
+        'source.progression === "dispatch"',
+        'source.progression === "selection"',
+        2,
+        1,
+      ),
+      "automation_pipeline_worker_handoff_matrix_not_closed_or_fail_closed",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_MATRIX_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffMatrix,
+      mutatedSources(
+        implementationPath,
+        'source.reason === "dispatch_prepared"',
+        'source.reason === "pipeline_rejected"',
+      ),
+      "automation_pipeline_worker_handoff_matrix_not_closed_or_fail_closed",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_MATRIX_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffMatrix,
+      mutatedSources(typesPath, '"invalid_admission"', '"removed_reason"'),
+      "automation_pipeline_worker_handoff_matrix_not_closed_or_fail_closed",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_IDENTIFIERS_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffIdentifiers,
+      mutatedSources(
+        implementationPath,
+        'source.candidateId !== null && typeof source.candidateId !== "string"',
+        "false",
+      ),
+      "automation_pipeline_worker_handoff_identifiers_or_operational_flags_not_fail_closed",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_IDENTIFIERS_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffIdentifiers,
+      mutatedSources(
+        implementationPath,
+        'source.targetId !== null && typeof source.targetId !== "string"',
+        "false",
+      ),
+      "automation_pipeline_worker_handoff_identifiers_or_operational_flags_not_fail_closed",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_IDENTIFIERS_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffIdentifiers,
+      mutatedSources(
+        implementationPath,
+        "workerSelected: false",
+        "workerSelected: true",
+      ),
+      "automation_pipeline_worker_handoff_identifiers_or_operational_flags_not_fail_closed",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_IDENTIFIERS_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffIdentifiers,
+      mutatedSources(
+        implementationPath,
+        "commandCreated: false",
+        "commandCreated: true",
+      ),
+      "automation_pipeline_worker_handoff_identifiers_or_operational_flags_not_fail_closed",
+    ],
+    [
+      AUTOMATION_PIPELINE_WORKER_HANDOFF_IDENTIFIERS_RULE,
+      inspectAutomationOrchestratorPipelineWorkerHandoffIdentifiers,
+      mutatedSources(
+        implementationPath,
+        "\n}",
+        '\n}\n"identifier".trim();',
+        7,
+        7,
+      ),
+      "automation_pipeline_worker_handoff_identifiers_or_operational_flags_not_fail_closed",
+    ],
+  ] as const;
+
+  for (const [rule, inspect, fixture, reason] of checks) {
+    assertRuleRejects(rule, inspect(fixture), reason);
   }
 });
 

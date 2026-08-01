@@ -137,8 +137,12 @@ export type {
 } from "./orchestrator/index.js";
 export { summarizeAutomationOrchestratorPipeline } from "./orchestrator/pipeline-summary.js";
 export { decideAutomationOrchestratorPipelineAdmission } from "./orchestrator/pipeline-admission.js";
+export { prepareAutomationOrchestratorPipelineWorkerHandoff } from "./orchestrator/pipeline-worker-handoff.js";
 export type {
   AutomationOrchestratorPipelineAdmissionDecision,
   AutomationOrchestratorPipelineAdmissionReason,
   AutomationOrchestratorPipelineAdmissionStatus,
+  AutomationOrchestratorPipelineHandoffReason,
+  AutomationOrchestratorPipelineHandoffStatus,
+  AutomationOrchestratorPipelineWorkerHandoff,
 } from "./orchestrator/index.js";
