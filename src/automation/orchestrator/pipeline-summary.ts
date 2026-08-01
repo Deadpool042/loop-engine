@@ -15,7 +15,7 @@ function isRecord(value: unknown): value is UnknownRecord {
 }
 
 function isString(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0;
+  return typeof value === "string";
 }
 
 function isProgression(

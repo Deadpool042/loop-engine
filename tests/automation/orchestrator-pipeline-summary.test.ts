@@ -178,32 +178,70 @@ test("preserves valid evaluation and selection progression as explicit null stag
 test("fails closed for validation contradictions, cross-pipeline subjects, malformed stages, and operational flags", () => {
   const { pipeline, validation } = valid();
   const invalids = [
-    { ...validation, status: "invalid", valid: false },
-    { ...validation, status: "valid", valid: false },
-    { ...validation, subject: { ...validation.subject, status: "incomplete" } },
-    {
-      ...validation,
-      subject: { ...validation.subject, requestId: "other-request" },
-    },
-    { ...pipeline, progression: "unknown" },
-    { ...pipeline, delegationDispatch: null },
-    {
-      ...pipeline,
-      delegationDispatch: {
-        ...pipeline.delegationDispatch!,
-        decision: {
-          ...pipeline.delegationDispatch!.decision,
-          executionStarted: true,
+    [
+      "validation invalid",
+      pipeline,
+      { ...validation, status: "invalid", valid: false },
+    ],
+    [
+      "validation contradiction false",
+      pipeline,
+      { ...validation, status: "valid", valid: false },
+    ],
+    [
+      "validation contradiction true",
+      pipeline,
+      { ...validation, status: "invalid", valid: true },
+    ],
+    [
+      "incomplete subject",
+      pipeline,
+      {
+        ...validation,
+        subject: { ...validation.subject, status: "incomplete" },
+      },
+    ],
+    ...["requestId", "delegationId", "candidateId", "targetId"].map((key) => [
+      `mismatched ${key}`,
+      pipeline,
+      {
+        ...validation,
+        subject: { ...validation.subject, [key]: `other-${key}` },
+      },
+    ]),
+    [
+      "unknown progression",
+      { ...pipeline, progression: "unknown" },
+      validation,
+    ],
+    ["missing dispatch", { ...pipeline, delegationDispatch: null }, validation],
+    [
+      "missing selection",
+      { ...pipeline, delegationSelection: null },
+      validation,
+    ],
+    ["later dispatch", { ...pipeline, progression: "selection" }, validation],
+    [
+      "operational flag",
+      {
+        ...pipeline,
+        delegationDispatch: {
+          ...pipeline.delegationDispatch!,
+          decision: {
+            ...pipeline.delegationDispatch!.decision,
+            executionStarted: true,
+          },
         },
       },
-    },
-  ];
-  for (const value of invalids) {
+      validation,
+    ],
+  ] as const;
+  for (const [name, casePipeline, caseValidation] of invalids) {
     const summary = summarizeAutomationOrchestratorPipeline(
-      value as never,
-      validation as never,
+      casePipeline as never,
+      caseValidation as never,
     );
-    assert.equal(summary.status, "invalid");
+    assert.equal(summary.status, "invalid", name);
     assert.equal(summary.valid, false);
     assert.equal(summary.progression, null);
   }
@@ -296,4 +334,67 @@ test("does not mutate pipeline or validation inputs", () => {
   summarizeAutomationOrchestratorPipeline(pipeline, validation);
   assert.equal(JSON.stringify(pipeline), pipelineBefore);
   assert.equal(JSON.stringify(validation), validationBefore);
+});
+
+test("accepts empty plain-string identifiers when the public subject matches", () => {
+  const { pipeline, validation } = valid();
+  const empty = {
+    ...pipeline,
+    delegationEvaluation: {
+      ...pipeline.delegationEvaluation,
+      evaluation: {
+        ...pipeline.delegationEvaluation.evaluation!,
+        input: {
+          ...pipeline.delegationEvaluation.evaluation!.input,
+          request: {
+            ...pipeline.delegationEvaluation.evaluation!.input.request,
+            requestId: "",
+          },
+        },
+      },
+      decision: {
+        ...pipeline.delegationEvaluation.decision,
+        declaredDelegation: {
+          ...pipeline.delegationEvaluation.decision.declaredDelegation!,
+          delegationId: "",
+        },
+      },
+    },
+    delegationSelection: {
+      ...pipeline.delegationSelection!,
+      decision: {
+        ...pipeline.delegationSelection!.decision,
+        candidate: {
+          ...pipeline.delegationSelection!.decision.candidate!,
+          candidateId: "",
+        },
+      },
+    },
+    delegationDispatch: {
+      ...pipeline.delegationDispatch!,
+      decision: {
+        ...pipeline.delegationDispatch!.decision,
+        target: {
+          ...pipeline.delegationDispatch!.decision.target!,
+          targetId: "",
+        },
+      },
+    },
+  } as never;
+  const matching = {
+    ...validation,
+    subject: {
+      ...validation.subject,
+      requestId: "",
+      delegationId: "",
+      candidateId: "",
+      targetId: "",
+    },
+  } as never;
+  const summary = summarizeAutomationOrchestratorPipeline(empty, matching);
+  assert.equal(summary.status, "valid");
+  assert.equal(summary.requestId, "");
+  assert.equal(summary.delegationId, "");
+  assert.equal(summary.candidateId, "");
+  assert.equal(summary.targetId, "");
 });

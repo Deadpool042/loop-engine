@@ -1242,6 +1242,9 @@ export function inspectAutomationOrchestratorPipelineSummary(
       (target) => !allowedImports.includes(target),
     ) ||
     !/subjectMatches\(/.test(structuralSource) ||
+    /\.length\s*>\s*0|\.trim\(\)|\.to(?:Lower|Upper)Case\(\)/.test(
+      structuralSource,
+    ) ||
     !/isStageStatusForKind\(/.test(structuralSource) ||
     !/kind\s*===\s*"evaluation"[\s\S]*?"eligible"[\s\S]*?"denied"[\s\S]*?"indeterminate"/.test(
       structuralSource,
