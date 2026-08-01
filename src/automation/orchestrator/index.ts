@@ -82,6 +82,7 @@ export type {
 } from "./delegation-dispatch/index.js";
 export { evaluateAutomationOrchestratorPipeline } from "./pipeline.js";
 export { validateAutomationOrchestratorPipeline } from "./pipeline-validation.js";
+export { summarizeAutomationOrchestratorPipeline } from "./pipeline-summary.js";
 export type {
   AutomationOrchestratorPipelineProgression,
   AutomationOrchestratorPipelineResult,
@@ -90,3 +91,9 @@ export type {
   AutomationOrchestratorPipelineValidationStatus,
   AutomationOrchestratorPipelineValidationSubject,
 } from "./pipeline-types.js";
+export type {
+  AutomationOrchestratorPipelineSummary,
+  AutomationOrchestratorPipelineSummaryCounts,
+  AutomationOrchestratorPipelineSummaryStage,
+  AutomationOrchestratorPipelineSummaryStatus,
+} from "./pipeline-summary-types.js";

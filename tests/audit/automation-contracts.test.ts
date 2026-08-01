@@ -57,6 +57,8 @@ const AUTOMATION_PATHS = [
   "src/automation/orchestrator/pipeline.ts",
   "src/automation/orchestrator/pipeline-types.ts",
   "src/automation/orchestrator/pipeline-validation.ts",
+  "src/automation/orchestrator/pipeline-summary-types.ts",
+  "src/automation/orchestrator/pipeline-summary.ts",
   "src/automation/orchestrator/evaluation/types.ts",
   "src/automation/orchestrator/evaluation/index.ts",
   "src/automation/orchestrator/planning/types.ts",

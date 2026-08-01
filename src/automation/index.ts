@@ -122,6 +122,10 @@ export type {
   AutomationOrchestratorPlanner,
   AutomationOrchestratorPipelineProgression,
   AutomationOrchestratorPipelineResult,
+  AutomationOrchestratorPipelineSummary,
+  AutomationOrchestratorPipelineSummaryCounts,
+  AutomationOrchestratorPipelineSummaryStage,
+  AutomationOrchestratorPipelineSummaryStatus,
   AutomationOrchestratorPipelineValidationDiagnostic,
   AutomationOrchestratorPipelineValidationResult,
   AutomationOrchestratorPipelineValidationStatus,
@@ -131,3 +135,4 @@ export type {
   AutomationOrchestratorState,
   AutomationOrchestratorStep,
 } from "./orchestrator/index.js";
+export { summarizeAutomationOrchestratorPipeline } from "./orchestrator/pipeline-summary.js";
