@@ -330,6 +330,29 @@ d'identifiant n'est introduit. `executionId`, `dispatchId` et
 `correlationId` restent absents ; la collecte continue et la production future
 d'observations restent hors périmètre.
 
+V21.7 ajoute Execution Lifecycle Progression : elle consomme uniquement un
+`AutomationOrchestratorWorkerExecutionLifecycleTransitionResult` V21.5 et un
+`AutomationOrchestratorWorkerExecutionLifecycleObservationValidationResult`
+V21.6 déjà validés. Elle n'accepte ni observation brute ni reçu brut, ne
+relit pas l'observation externe et ne rappelle ni V21.5 ni V21.6. Le lifecycle
+doit être `execution_started` / `receipt_confirmed` /
+`executionStarted: true`; `requestId`, `delegationId`, `candidateId` et
+`targetId` doivent être des chaînes strictement identiques dans les deux
+entrées. La matrice fermée est : `observation_accepted` /
+`execution_running` → `execution_running` / `observation_running` ;
+`observation_accepted` / `execution_completed` → `execution_completed` /
+`observation_completed` ; `observation_accepted` / `execution_failed` →
+`execution_failed` / `observation_failed` ; et
+`observation_indeterminate` / `execution_indeterminate` →
+`execution_indeterminate` / `observation_indeterminate`. Toute autre
+combinaison produit `progression_rejected`, avec les trois flags à `false` et
+les quatre identifiants à `null`, fail-closed. Cette progression est pure,
+synchrone et déterministe : aucun polling, récupération d'observation, worker,
+port concret, service concret, provider, adaptateur, persistance, queue, retry,
+timeout, timestamp, génération d'identifiant ou infrastructure concrète n'est
+introduit. La progression suivante ou la finalisation concrète du lifecycle
+reste une capacité future.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif
