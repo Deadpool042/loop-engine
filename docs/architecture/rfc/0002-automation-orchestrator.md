@@ -290,6 +290,26 @@ concrète. Elle propage seulement `requestId`, `delegationId`, `candidateId` et
 `targetId`; aucune identité d'exécution n'est créée : cette autorité devra être
 définie dans un lot ultérieur dédié.
 
+V21.5 ajoute Execution Lifecycle Transition :
+Worker Command → Dispatch Request Preparation → Dispatch Invocation Boundary →
+Dispatch Application Service → Execution Lifecycle Initialization → Execution
+Start Request Preparation → Execution Start Invocation Boundary → Execution
+Start Application Service → Execution Start Receipt Validation → Execution
+Lifecycle Transition → future Execution Lifecycle Observation. Elle consomme
+uniquement `AutomationOrchestratorWorkerExecutionLifecycleInitializationResult`
+et `AutomationOrchestratorWorkerExecutionStartReceiptValidationResult`, jamais
+un reçu brut. Elle applique le résultat V21.4 déjà validé ; elle ne revalide pas
+le reçu, n'appelle ni V21.4 ni V21.3, aucun port, worker, service, validateur ou
+infrastructure. `executionStarted: true` n'est possible que pour un lifecycle
+`execution_pending` / `dispatch_accepted` / `false`, un reçu
+`receipt_accepted` / `execution_started` / `true`, et les quatre identifiants
+strictement identiques. Tous les autres cas restent fail-closed. Seuls
+`requestId`, `delegationId`, `candidateId` et `targetId` sont propagés sans
+transformation ; `executionId`, `dispatchId` et `correlationId` sont absents et
+aucune autorité ne crée encore `executionId`. L'observation continue du
+lifecycle reste future : aucun polling, supervision, persistance, queue,
+retry, timeout, adaptateur concret ou runtime concret n'est ajouté.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif
