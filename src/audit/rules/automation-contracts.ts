@@ -54,6 +54,10 @@ const WORKER_EXECUTION_LIFECYCLE_TRANSITION_TYPES_FILE =
   "src/automation/orchestrator/worker-execution-lifecycle-transition-types.ts";
 const WORKER_EXECUTION_LIFECYCLE_TRANSITION_FILE =
   "src/automation/orchestrator/worker-execution-lifecycle-transition.ts";
+const WORKER_EXECUTION_LIFECYCLE_OBSERVATION_TYPES_FILE =
+  "src/automation/orchestrator/worker-execution-lifecycle-observation-types.ts";
+const WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE =
+  "src/automation/orchestrator/worker-execution-lifecycle-observation.ts";
 const RECEIPT_FILE =
   "src/automation/orchestrator/worker-execution-start-receipt.ts";
 const RECEIPT_TYPES_FILE =
@@ -357,6 +361,8 @@ const REQUIRED_FILES = [
   WORKER_EXECUTION_LIFECYCLE_INITIALIZATION_FILE,
   WORKER_EXECUTION_LIFECYCLE_TRANSITION_TYPES_FILE,
   WORKER_EXECUTION_LIFECYCLE_TRANSITION_FILE,
+  WORKER_EXECUTION_LIFECYCLE_OBSERVATION_TYPES_FILE,
+  WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
   RECEIPT_TYPES_FILE,
   RECEIPT_FILE,
   EVALUATION_TYPES_FILE,
@@ -2794,6 +2800,8 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/worker-execution-start-service.js",
         "./orchestrator/worker-execution-start-receipt.js",
         "./orchestrator/worker-execution-lifecycle-transition.js",
+        "./orchestrator/worker-execution-lifecycle-observation.js",
+        "./orchestrator/worker-execution-lifecycle-observation-types.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2862,6 +2870,8 @@ export function inspectAutomationDependencyDirection(
         "./worker-execution-start-receipt-types.js",
         "./worker-execution-lifecycle-transition.js",
         "./worker-execution-lifecycle-transition-types.js",
+        "./worker-execution-lifecycle-observation.js",
+        "./worker-execution-lifecycle-observation-types.js",
       ],
     ],
     [
@@ -2941,6 +2951,14 @@ export function inspectAutomationDependencyDirection(
         "./worker-execution-lifecycle-initialization-types.js",
         "./worker-execution-start-receipt-types.js",
         "./worker-execution-lifecycle-transition-types.js",
+      ],
+    ],
+    [WORKER_EXECUTION_LIFECYCLE_OBSERVATION_TYPES_FILE, []],
+    [
+      WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
+      [
+        "./worker-execution-lifecycle-transition-types.js",
+        "./worker-execution-lifecycle-observation-types.js",
       ],
     ],
     ["src/automation/orchestrator/worker-execution-start-receipt-types.ts", []],
@@ -3954,4 +3972,238 @@ export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_TRANSITION_INVARIANTS_RULE =
     "Automation Worker Execution Lifecycle Transition preserves start authority and invariants",
     "Lifecycle Transition grants executionStarted only for the valid confirmed receipt case, freezes its result, preserves identifiers, and performs no mutation or effect.",
     inspectAutomationOrchestratorWorkerExecutionLifecycleTransitionInvariants,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleObservationContracts(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const types = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_OBSERVATION_TYPES_FILE,
+  );
+  const implementation = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
+  );
+  const orchestrator = sourceFor(sources, ORCHESTRATOR_BARREL_FILE);
+  const automation = sourceFor(sources, BARREL_FILE);
+  const contracts = [
+    "AutomationOrchestratorWorkerExecutionLifecycleObservationStatus",
+    "AutomationOrchestratorWorkerExecutionLifecycleObservationReason",
+    "AutomationOrchestratorWorkerExecutionLifecycleObservation",
+    "AutomationOrchestratorWorkerExecutionLifecycleObservationValidationStatus",
+    "AutomationOrchestratorWorkerExecutionLifecycleObservationValidationReason",
+    "AutomationOrchestratorWorkerExecutionLifecycleObservationValidationResult",
+  ];
+  const fn =
+    "validateAutomationOrchestratorWorkerExecutionLifecycleObservation";
+  if (
+    types === null ||
+    !contracts.every((c) =>
+      new RegExp(`export\\s+type\\s+${c}\\s*=`).test(withoutComments(types)),
+    )
+  )
+    return lifecycleTransitionViolation(
+      WORKER_EXECUTION_LIFECYCLE_OBSERVATION_TYPES_FILE,
+      "automation_worker_execution_lifecycle_observation_contract_missing",
+    );
+  if (
+    implementation === null ||
+    !new RegExp(`export\\s+function\\s+${fn}\\b`).test(
+      withoutComments(implementation),
+    )
+  )
+    return lifecycleTransitionViolation(
+      WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
+      "automation_worker_execution_lifecycle_observation_function_missing",
+    );
+  if (
+    orchestrator === null ||
+    !contracts.every((c) =>
+      hasBarrelExport(
+        orchestrator,
+        c,
+        "./worker-execution-lifecycle-observation-types.js",
+      ),
+    ) ||
+    !hasBarrelExport(
+      orchestrator,
+      fn,
+      "./worker-execution-lifecycle-observation.js",
+    )
+  )
+    return lifecycleTransitionViolation(
+      ORCHESTRATOR_BARREL_FILE,
+      "automation_worker_execution_lifecycle_observation_export_missing",
+    );
+  return automation === null ||
+    !contracts.every((c) =>
+      hasBarrelExport(
+        automation,
+        c,
+        "./orchestrator/worker-execution-lifecycle-observation-types.js",
+      ),
+    ) ||
+    !hasBarrelExport(
+      automation,
+      fn,
+      "./orchestrator/worker-execution-lifecycle-observation.js",
+    )
+    ? lifecycleTransitionViolation(
+        BARREL_FILE,
+        "automation_worker_execution_lifecycle_observation_export_not_canonical",
+      )
+    : Object.freeze([]);
+}
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_OBSERVATION_CONTRACTS_RULE =
+  createRule(
+    "AUDIT-562",
+    "Automation Worker Execution Lifecycle Observation contracts and exports are complete",
+    "Lifecycle Observation contracts, validation result, and public validation function are present and canonically exported.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleObservationContracts,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleObservationDependencies(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
+  );
+  const clean = source === null ? "" : withoutComments(source);
+  const allowedDependencies = [
+    "./worker-execution-lifecycle-transition-types.js",
+    "./worker-execution-lifecycle-observation-types.js",
+  ];
+  const hasForbiddenDependency = moduleSpecifiers(clean).some(
+    (target) => !allowedDependencies.includes(target),
+  );
+  const hasForbiddenApi =
+    /\bDate(?:\.now)?\b|\bMath\.random\b|\bcrypto\b|\bprocess\b|\b(?:fs|net|http|https)\b|\bset(?:Timeout|Interval)\b|\bexec(?:File|Sync)?\b|\bspawn(?:Sync)?\b/.test(
+      clean,
+    );
+  const hasForbiddenBoundaryCall =
+    /\b(?:port|service|provider|adapter|queue|persistence|polling|retry|timeout|worker)\.\w+\s*\(/.test(
+      clean,
+    );
+
+  return source === null ||
+    hasForbiddenDependency ||
+    hasForbiddenApi ||
+    hasForbiddenBoundaryCall
+    ? lifecycleTransitionViolation(
+        WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
+        "automation_worker_execution_lifecycle_observation_dependencies_not_closed",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_OBSERVATION_DEPENDENCIES_RULE =
+  createRule(
+    "AUDIT-563",
+    "Automation Worker Execution Lifecycle Observation dependencies are closed",
+    "Lifecycle Observation depends only on the closed lifecycle transition result and its own contracts, without infrastructure or nondeterministic APIs.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleObservationDependencies,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleObservationMatrix(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
+  );
+  const clean = source === null ? "" : withoutComments(source);
+  const requiredTerms = [
+    'lifecycle.status !== "execution_started"',
+    'lifecycle.reason !== "receipt_confirmed"',
+    "lifecycle.executionStarted !== true",
+    "lifecycleIds === null",
+    "observationIds === null",
+    "lifecycleIds.requestId !== observationIds.requestId",
+    "lifecycleIds.delegationId !== observationIds.delegationId",
+    "lifecycleIds.candidateId !== observationIds.candidateId",
+    "lifecycleIds.targetId !== observationIds.targetId",
+    'o.status === "running" &&\n    o.reason === "execution_running" &&\n    o.executionStarted === true &&\n    o.executionFinished === false &&\n    o.executionSucceeded === false',
+    'return result(\n      "observation_accepted",\n      "execution_running",\n      lifecycleIds,\n      true,\n      false,\n      false,\n    );',
+    'o.status === "completed" &&\n    o.reason === "execution_completed" &&\n    o.executionStarted === true &&\n    o.executionFinished === true &&\n    o.executionSucceeded === true',
+    'return result(\n      "observation_accepted",\n      "execution_completed",\n      lifecycleIds,\n      true,\n      true,\n      true,\n    );',
+    'o.status === "failed" &&\n    o.reason === "execution_failed" &&\n    o.executionStarted === true &&\n    o.executionFinished === true &&\n    o.executionSucceeded === false',
+    'return result(\n      "observation_accepted",\n      "execution_failed",\n      lifecycleIds,\n      true,\n      true,\n      false,\n    );',
+    'o.status === "indeterminate" &&\n    o.reason === "execution_indeterminate" &&\n    o.executionStarted === false &&\n    o.executionFinished === false &&\n    o.executionSucceeded === false',
+    'return result(\n      "observation_indeterminate",\n      "execution_indeterminate",\n      lifecycleIds,\n    );',
+    'return result("observation_rejected", "invalid_lifecycle", null);',
+    'return result("observation_rejected", "identifier_mismatch", null);',
+    '  return result("observation_rejected", "invalid_observation", null);\n}',
+  ];
+
+  return source === null || !requiredTerms.every((term) => clean.includes(term))
+    ? lifecycleTransitionViolation(
+        WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
+        "automation_worker_execution_lifecycle_observation_matrix_not_closed_or_fail_closed",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_OBSERVATION_MATRIX_RULE =
+  createRule(
+    "AUDIT-564",
+    "Automation Worker Execution Lifecycle Observation matrix is fail-closed",
+    "Lifecycle Observation accepts only the closed running, completed, failed, and indeterminate matrix for a coherent started lifecycle.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleObservationMatrix,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleObservationInvariants(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
+  );
+  const clean = source === null ? "" : withoutComments(source);
+  const requiredTerms = [
+    "return Object.freeze({\n    status,",
+    "requestId: ids?.requestId ?? null,",
+    "delegationId: ids?.delegationId ?? null,",
+    "candidateId: ids?.candidateId ?? null,",
+    "targetId: ids?.targetId ?? null,",
+  ];
+  const transformsIdentifiers = /\.(?:trim|toLowerCase|toUpperCase)\(/.test(
+    clean,
+  );
+  const hasForbiddenIdentifier =
+    /\b(?:executionId|dispatchId|correlationId)\b/.test(clean);
+  const mutatesInputs = /\b(?:lifecycle|observation)\.\w+\s*=(?!=)/.test(clean);
+  const hasTimestampOrGeneration =
+    /\b(?:Date\.now|Math\.random|crypto\.randomUUID)\b/.test(clean);
+  const invokesForbiddenBoundary =
+    /\b(?:transitionAutomationOrchestratorWorkerExecutionLifecycle|port\.observe|service\.observe|worker\.\w+|provider\.\w+|adapter\.\w+|queue\.\w+|persistence\.\w+)\s*\(/.test(
+      clean,
+    );
+  const hasForbiddenMechanism =
+    /\b(?:poll(?:ing)?|retry|timeout|setTimeout|setInterval|persist(?:ence)?)\b/.test(
+      clean,
+    );
+
+  return source === null ||
+    !requiredTerms.every((term) => clean.includes(term)) ||
+    transformsIdentifiers ||
+    hasForbiddenIdentifier ||
+    mutatesInputs ||
+    hasTimestampOrGeneration ||
+    invokesForbiddenBoundary ||
+    hasForbiddenMechanism
+    ? lifecycleTransitionViolation(
+        WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
+        "automation_worker_execution_lifecycle_observation_invariants_not_enforced",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_OBSERVATION_INVARIANTS_RULE =
+  createRule(
+    "AUDIT-565",
+    "Automation Worker Execution Lifecycle Observation invariants are enforced",
+    "Lifecycle Observation freezes its public result, preserves identifiers exactly, and performs no mutation, generation, or operational effect.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleObservationInvariants,
   );
