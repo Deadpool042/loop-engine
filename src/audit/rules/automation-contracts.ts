@@ -62,6 +62,10 @@ const WORKER_EXECUTION_LIFECYCLE_PROGRESSION_TYPES_FILE =
   "src/automation/orchestrator/worker-execution-lifecycle-progression-types.ts";
 const WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE =
   "src/automation/orchestrator/worker-execution-lifecycle-progression.ts";
+const WORKER_EXECUTION_LIFECYCLE_FINALIZATION_TYPES_FILE =
+  "src/automation/orchestrator/worker-execution-lifecycle-finalization-types.ts";
+const WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE =
+  "src/automation/orchestrator/worker-execution-lifecycle-finalization.ts";
 const RECEIPT_FILE =
   "src/automation/orchestrator/worker-execution-start-receipt.ts";
 const RECEIPT_TYPES_FILE =
@@ -369,6 +373,8 @@ const REQUIRED_FILES = [
   WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
   WORKER_EXECUTION_LIFECYCLE_PROGRESSION_TYPES_FILE,
   WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
+  WORKER_EXECUTION_LIFECYCLE_FINALIZATION_TYPES_FILE,
+  WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE,
   RECEIPT_TYPES_FILE,
   RECEIPT_FILE,
   EVALUATION_TYPES_FILE,
@@ -2810,6 +2816,8 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/worker-execution-lifecycle-observation-types.js",
         "./orchestrator/worker-execution-lifecycle-progression.js",
         "./orchestrator/worker-execution-lifecycle-progression-types.js",
+        "./orchestrator/worker-execution-lifecycle-finalization.js",
+        "./orchestrator/worker-execution-lifecycle-finalization-types.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2882,6 +2890,8 @@ export function inspectAutomationDependencyDirection(
         "./worker-execution-lifecycle-observation-types.js",
         "./worker-execution-lifecycle-progression.js",
         "./worker-execution-lifecycle-progression-types.js",
+        "./worker-execution-lifecycle-finalization.js",
+        "./worker-execution-lifecycle-finalization-types.js",
       ],
     ],
     [
@@ -2977,6 +2987,14 @@ export function inspectAutomationDependencyDirection(
       [
         "./worker-execution-lifecycle-transition-types.js",
         "./worker-execution-lifecycle-observation-types.js",
+        "./worker-execution-lifecycle-progression-types.js",
+      ],
+    ],
+    [WORKER_EXECUTION_LIFECYCLE_FINALIZATION_TYPES_FILE, []],
+    [
+      WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE,
+      [
+        "./worker-execution-lifecycle-finalization-types.js",
         "./worker-execution-lifecycle-progression-types.js",
       ],
     ],
@@ -4317,6 +4335,249 @@ export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_PROGRESSION_CONTRACTS_RULE =
     "Automation Worker Execution Lifecycle Progression contracts and exports are complete",
     "Lifecycle Progression contracts and public progression function are present and canonically exported.",
     inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationContracts(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const types = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_FINALIZATION_TYPES_FILE,
+  );
+  const implementation = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE,
+  );
+  const orchestrator = sourceFor(sources, ORCHESTRATOR_BARREL_FILE);
+  const automation = sourceFor(sources, BARREL_FILE);
+  const contracts = [
+    "AutomationOrchestratorWorkerExecutionLifecycleFinalizationStatus",
+    "AutomationOrchestratorWorkerExecutionLifecycleFinalizationReason",
+    "AutomationOrchestratorWorkerExecutionLifecycleFinalizationResult",
+  ];
+  const fn = "finalizeAutomationOrchestratorWorkerExecutionLifecycle";
+
+  if (
+    types === null ||
+    !contracts.every((contract) =>
+      new RegExp(`export\\s+type\\s+${contract}\\s*=`).test(
+        withoutComments(types),
+      ),
+    )
+  )
+    return lifecycleTransitionViolation(
+      WORKER_EXECUTION_LIFECYCLE_FINALIZATION_TYPES_FILE,
+      "automation_worker_execution_lifecycle_finalization_contract_missing",
+    );
+
+  if (
+    implementation === null ||
+    !new RegExp(`export\\s+function\\s+${fn}\\b`).test(
+      withoutComments(implementation),
+    )
+  )
+    return lifecycleTransitionViolation(
+      WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE,
+      "automation_worker_execution_lifecycle_finalization_function_missing",
+    );
+
+  if (
+    orchestrator === null ||
+    !contracts.every((contract) =>
+      hasBarrelExport(
+        orchestrator,
+        contract,
+        "./worker-execution-lifecycle-finalization-types.js",
+      ),
+    ) ||
+    !hasBarrelExport(
+      orchestrator,
+      fn,
+      "./worker-execution-lifecycle-finalization.js",
+    )
+  )
+    return lifecycleTransitionViolation(
+      ORCHESTRATOR_BARREL_FILE,
+      "automation_worker_execution_lifecycle_finalization_export_missing",
+    );
+
+  return automation === null ||
+    !contracts.every((contract) =>
+      hasBarrelExport(
+        automation,
+        contract,
+        "./orchestrator/worker-execution-lifecycle-finalization-types.js",
+      ),
+    ) ||
+    !hasBarrelExport(
+      automation,
+      fn,
+      "./orchestrator/worker-execution-lifecycle-finalization.js",
+    )
+    ? lifecycleTransitionViolation(
+        BARREL_FILE,
+        "automation_worker_execution_lifecycle_finalization_export_not_canonical",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_FINALIZATION_CONTRACTS_RULE =
+  createRule(
+    "AUDIT-570",
+    "Automation Worker Execution Lifecycle Finalization contracts and exports are complete",
+    "Lifecycle Finalization contracts and public finalization function are present and canonically exported.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationContracts,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationDependencies(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE,
+  );
+  const clean = source === null ? "" : withoutComments(source);
+  const allowedDependencies = [
+    "./worker-execution-lifecycle-progression-types.js",
+    "./worker-execution-lifecycle-finalization-types.js",
+  ];
+  const hasForbiddenDependency = moduleSpecifiers(clean).some(
+    (target) => !allowedDependencies.includes(target),
+  );
+  const hasForbiddenApi =
+    /\bDate(?:\.now)?\b|\bMath\.random\b|\bcrypto\b|\bprocess\b|\b(?:fs|net|http|https)\b|\bset(?:Timeout|Interval)\b|\bexec(?:File|Sync)?\b|\bspawn(?:Sync)?\b/.test(
+      clean,
+    );
+  const hasForbiddenBoundaryCall =
+    /\b(?:port|service|provider|adapter|queue|persistence|polling|retry|timeout|worker)\.\w+\s*\(/.test(
+      clean,
+    );
+
+  return source === null ||
+    hasForbiddenDependency ||
+    hasForbiddenApi ||
+    hasForbiddenBoundaryCall
+    ? lifecycleTransitionViolation(
+        WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE,
+        "automation_worker_execution_lifecycle_finalization_dependencies_not_closed",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_FINALIZATION_DEPENDENCIES_RULE =
+  createRule(
+    "AUDIT-571",
+    "Automation Worker Execution Lifecycle Finalization dependencies are closed",
+    "Lifecycle Finalization depends only on its closed progression and finalization contracts, without infrastructure or nondeterministic APIs.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationDependencies,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationMatrix(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE,
+  );
+  const clean = source === null ? "" : withoutComments(source);
+  const requiredTerms = [
+    'typeof value.requestId === "string"',
+    'typeof value.delegationId === "string"',
+    'typeof value.candidateId === "string"',
+    'typeof value.targetId === "string"',
+    'if (ids === null)\n    return result("finalization_rejected", "invalid_progression", null);',
+    'progression.status === "execution_completed" &&\n    progression.reason === "observation_completed" &&\n    progression.executionStarted === true &&\n    progression.executionFinished === true &&\n    progression.executionSucceeded === true',
+    'return result(\n      "lifecycle_finalized",\n      "execution_completed",\n      ids,\n      true,\n      true,\n      true,\n      true,\n    );',
+    'progression.status === "execution_failed" &&\n    progression.reason === "observation_failed" &&\n    progression.executionStarted === true &&\n    progression.executionFinished === true &&\n    progression.executionSucceeded === false',
+    'return result(\n      "lifecycle_finalized",\n      "execution_failed",\n      ids,\n      true,\n      true,\n      false,\n      true,\n    );',
+    'progression.status === "execution_running" &&\n    progression.reason === "observation_running" &&\n    progression.executionStarted === true &&\n    progression.executionFinished === false &&\n    progression.executionSucceeded === false',
+    'return result(\n      "lifecycle_active",\n      "execution_running",\n      ids,\n      true,\n      false,\n      false,\n    );',
+    'progression.status === "execution_indeterminate" &&\n    progression.reason === "observation_indeterminate" &&\n    progression.executionStarted === false &&\n    progression.executionFinished === false &&\n    progression.executionSucceeded === false',
+    'return result("lifecycle_indeterminate", "execution_indeterminate", ids);',
+    'return result("finalization_rejected", "invalid_progression", null);\n}',
+  ];
+
+  return source === null || !requiredTerms.every((term) => clean.includes(term))
+    ? lifecycleTransitionViolation(
+        WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE,
+        "automation_worker_execution_lifecycle_finalization_matrix_not_closed_or_fail_closed",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_FINALIZATION_MATRIX_RULE =
+  createRule(
+    "AUDIT-572",
+    "Automation Worker Execution Lifecycle Finalization matrix is fail-closed",
+    "Lifecycle Finalization accepts only the closed progression matrix and rejects every other combination without propagating identifiers.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationMatrix,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationInvariants(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE,
+  );
+  const clean = source === null ? "" : withoutComments(source);
+  const requiredTerms = [
+    "return Object.freeze({\n    status,",
+    "requestId: ids?.requestId ?? null,",
+    "delegationId: ids?.delegationId ?? null,",
+    "candidateId: ids?.candidateId ?? null,",
+    "targetId: ids?.targetId ?? null,",
+    "executionStarted = false,",
+    "executionFinished = false,",
+    "executionSucceeded = false,",
+    "lifecycleFinalized = false,",
+    'if (ids === null)\n    return result("finalization_rejected", "invalid_progression", null);',
+    'return result("finalization_rejected", "invalid_progression", null);\n}',
+    'return result(\n      "lifecycle_finalized",\n      "execution_completed",\n      ids,\n      true,\n      true,\n      true,\n      true,\n    );',
+    'return result(\n      "lifecycle_finalized",\n      "execution_failed",\n      ids,\n      true,\n      true,\n      false,\n      true,\n    );',
+    'return result(\n      "lifecycle_active",\n      "execution_running",\n      ids,\n      true,\n      false,\n      false,\n    );',
+    'return result("lifecycle_indeterminate", "execution_indeterminate", ids);',
+  ];
+  const transformsIdentifiers = /\.(?:trim|toLowerCase|toUpperCase)\(/.test(
+    clean,
+  );
+  const hasForbiddenIdentifier =
+    /\b(?:executionId|dispatchId|correlationId)\b/.test(clean);
+  const mutatesProgression = /\bprogression\.\w+\s*=(?!=)/.test(clean);
+  const hasTimestampOrGeneration =
+    /\b(?:Date\.now|Math\.random|crypto\.randomUUID|timestamp|observedAt|finalizedAt|completedAt|failedAt)\b/.test(
+      clean,
+    );
+  const invokesForbiddenBoundary =
+    /\b(?:progressAutomationOrchestratorWorkerExecutionLifecycle|validateAutomationOrchestratorWorkerExecutionLifecycleObservation|transitionAutomationOrchestratorWorkerExecutionLifecycle|port\.finalize|service\.finalize|provider\.finalize|worker\.finalize|adapter\.\w+|queue\.\w+|persistence\.\w+)\s*\(/.test(
+      clean,
+    );
+  const hasForbiddenMechanism =
+    /\b(?:poll(?:ing)?|retry|timeout|setTimeout|setInterval|persist(?:ence)?)\b/.test(
+      clean,
+    );
+
+  return source === null ||
+    !requiredTerms.every((term) => clean.includes(term)) ||
+    transformsIdentifiers ||
+    hasForbiddenIdentifier ||
+    mutatesProgression ||
+    hasTimestampOrGeneration ||
+    invokesForbiddenBoundary ||
+    hasForbiddenMechanism
+    ? lifecycleTransitionViolation(
+        WORKER_EXECUTION_LIFECYCLE_FINALIZATION_FILE,
+        "automation_worker_execution_lifecycle_finalization_invariants_not_enforced",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_FINALIZATION_INVARIANTS_RULE =
+  createRule(
+    "AUDIT-573",
+    "Automation Worker Execution Lifecycle Finalization invariants are enforced",
+    "Lifecycle Finalization freezes its public result, preserves identifiers exactly, keeps finalization authority closed, and performs no mutation, generation, or operational effect.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationInvariants,
   );
 
 export function inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionDependencies(

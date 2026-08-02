@@ -353,6 +353,34 @@ timeout, timestamp, génération d'identifiant ou infrastructure concrète n'est
 introduit. La progression suivante ou la finalisation concrète du lifecycle
 reste une capacité future.
 
+V21.8 ajoute Execution Lifecycle Finalization Decision : elle consomme
+uniquement un `AutomationOrchestratorWorkerExecutionLifecycleProgressionResult`
+V21.7 déjà validé. Elle ne consomme ni lifecycle V21.5, ni validation V21.6,
+ni observation brute, ne rappelle aucune frontière précédente et ne finalise
+rien concrètement. Elle produit seulement une décision pure, synchrone,
+déterministe et fail-closed. Sa matrice fermée est :
+`execution_completed` / `observation_completed` → `lifecycle_finalized` /
+`execution_completed`, avec `lifecycleFinalized: true` ; `execution_failed` /
+`observation_failed` → `lifecycle_finalized` / `execution_failed`, avec
+`lifecycleFinalized: true` ; `execution_running` / `observation_running` →
+`lifecycle_active` / `execution_running`, avec `lifecycleFinalized: false` ;
+et `execution_indeterminate` / `observation_indeterminate` →
+`lifecycle_indeterminate` / `execution_indeterminate`, avec
+`lifecycleFinalized: false`. Une exécution failed est donc terminale mais non
+réussie ; une exécution running reste active et un état indeterminate ne doit
+jamais être finalisé. Toute autre combinaison produit
+`finalization_rejected` / `invalid_progression`, avec les trois flags à
+`false`, `lifecycleFinalized: false` et les quatre identifiants à `null`.
+Seuls `requestId`, `delegationId`, `candidateId` et `targetId` sont propagés
+strictement et sans transformation pour une matrice valide.
+`lifecycleFinalized: true` est réservé aux cas completed et failed.
+
+V21.8 n'ajoute aucun polling, récupération d'observation, appel worker, port
+concret, service concret, provider, adaptateur, persistance, queue, retry,
+timeout, timestamp, génération d'identifiant ou infrastructure concrète. La
+persistance, la publication et la clôture opérationnelle du lifecycle restent
+des capacités futures.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif
