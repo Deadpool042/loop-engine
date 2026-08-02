@@ -37,6 +37,10 @@ import {
   inspectAutomationOrchestratorWorkerExecutionStartReceiptDependencies,
   inspectAutomationOrchestratorWorkerExecutionStartReceiptInvariants,
   inspectAutomationOrchestratorWorkerExecutionStartReceiptMatrix,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleTransitionContracts,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleTransitionDependencies,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleTransitionMatrix,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleTransitionInvariants,
   inspectAutomationAssemblyContracts,
   inspectAutomationAssemblyInertness,
   inspectAutomationAuditDocumentation,
@@ -133,6 +137,8 @@ const AUTOMATION_PATHS = [
   "src/automation/orchestrator/delegation-dispatch/preparation.ts",
   "src/automation/orchestrator/worker-execution-start-receipt-types.ts",
   "src/automation/orchestrator/worker-execution-start-receipt.ts",
+  "src/automation/orchestrator/worker-execution-lifecycle-transition-types.ts",
+  "src/automation/orchestrator/worker-execution-lifecycle-transition.ts",
   "docs/architecture/rfc/0001-automation-platform.md",
 ] as const;
 
@@ -2571,6 +2577,236 @@ test("AUDIT-554 through AUDIT-557 accept canonical receipt sources and reject ta
     ),
     [],
   );
+});
+
+test("AUDIT-558 accepts canonical lifecycle transition contracts and rejects targeted mutations", () => {
+  const typesPath =
+    "src/automation/orchestrator/worker-execution-lifecycle-transition-types.ts";
+  const implementationPath =
+    "src/automation/orchestrator/worker-execution-lifecycle-transition.ts";
+  const orchestratorPath = "src/automation/orchestrator/index.ts";
+  const automationPath = "src/automation/index.ts";
+  const inspector =
+    inspectAutomationOrchestratorWorkerExecutionLifecycleTransitionContracts;
+
+  assert.deepEqual(inspector(sources()), []);
+
+  const checks = [
+    [
+      typesPath,
+      "export type AutomationOrchestratorWorkerExecutionLifecycleTransitionStatus =",
+      "export type RemovedLifecycleTransitionStatus =",
+    ],
+    [
+      typesPath,
+      "export type AutomationOrchestratorWorkerExecutionLifecycleTransitionReason =",
+      "export type RemovedLifecycleTransitionReason =",
+    ],
+    [
+      typesPath,
+      "export type AutomationOrchestratorWorkerExecutionLifecycleTransitionResult =",
+      "export type RemovedLifecycleTransitionResult =",
+    ],
+    [
+      implementationPath,
+      "export function transitionAutomationOrchestratorWorkerExecutionLifecycle(",
+      "export function removedAutomationOrchestratorWorkerExecutionLifecycle(",
+    ],
+    [
+      orchestratorPath,
+      'export { transitionAutomationOrchestratorWorkerExecutionLifecycle } from "./worker-execution-lifecycle-transition.js";',
+      "",
+    ],
+    [
+      orchestratorPath,
+      'export type {\n  AutomationOrchestratorWorkerExecutionLifecycleTransitionReason,\n  AutomationOrchestratorWorkerExecutionLifecycleTransitionResult,\n  AutomationOrchestratorWorkerExecutionLifecycleTransitionStatus,\n} from "./worker-execution-lifecycle-transition-types.js";',
+      "",
+    ],
+    [
+      automationPath,
+      'export { transitionAutomationOrchestratorWorkerExecutionLifecycle } from "./orchestrator/worker-execution-lifecycle-transition.js";',
+      "",
+    ],
+    [
+      automationPath,
+      'export { transitionAutomationOrchestratorWorkerExecutionLifecycle } from "./orchestrator/worker-execution-lifecycle-transition.js";',
+      'export { transitionAutomationOrchestratorWorkerExecutionLifecycle } from "./orchestrator/not-canonical.js";',
+    ],
+  ] as const;
+
+  for (const [path, pattern, replacement] of checks) {
+    assert.notDeepEqual(
+      inspector(mutatedSources(path, pattern, replacement)),
+      [],
+      `mutation was not rejected: ${pattern}`,
+    );
+  }
+  assert.notDeepEqual(inspector(sourcesWithout(typesPath)), []);
+  assert.notDeepEqual(inspector(sourcesWithout(implementationPath)), []);
+});
+
+test("AUDIT-559 accepts closed canonical lifecycle transition dependencies and rejects targeted mutations", () => {
+  const implementationPath =
+    "src/automation/orchestrator/worker-execution-lifecycle-transition.ts";
+  const importTarget =
+    'import type { AutomationOrchestratorWorkerExecutionLifecycleInitializationResult } from "./worker-execution-lifecycle-initialization-types.js";';
+  const inspector =
+    inspectAutomationOrchestratorWorkerExecutionLifecycleTransitionDependencies;
+
+  assert.deepEqual(inspector(sources()), []);
+
+  const checks = [
+    [
+      importTarget,
+      `import { validateAutomationOrchestratorWorkerExecutionStartReceipt } from "./worker-execution-start-receipt.js";\n${importTarget}`,
+    ],
+    [
+      importTarget,
+      `import { dispatchAutomationOrchestratorWorkerExecutionStart } from "./worker-execution-start-service.js";\n${importTarget}`,
+    ],
+    [
+      importTarget,
+      `import type { AutomationOrchestratorWorkerExecutionStartPort } from "./worker-execution-start-port.js";\n${importTarget}`,
+    ],
+    [importTarget, `Date.now();\n${importTarget}`],
+    [importTarget, `setTimeout(() => undefined, 0);\n${importTarget}`],
+    [importTarget, `crypto.randomUUID();\n${importTarget}`],
+    [importTarget, `import fs from "node:fs";\n${importTarget}`],
+  ] as const;
+
+  for (const [pattern, replacement] of checks) {
+    assert.notDeepEqual(
+      inspector(mutatedSources(implementationPath, pattern, replacement)),
+      [],
+      `mutation was not rejected: ${replacement}`,
+    );
+  }
+  assert.notDeepEqual(inspector(sourcesWithout(implementationPath)), []);
+});
+
+test("AUDIT-560 accepts the closed lifecycle transition matrix and rejects targeted mutations", () => {
+  const implementationPath =
+    "src/automation/orchestrator/worker-execution-lifecycle-transition.ts";
+  const inspector =
+    inspectAutomationOrchestratorWorkerExecutionLifecycleTransitionMatrix;
+
+  assert.deepEqual(inspector(sources()), []);
+
+  const checks = [
+    [
+      'receiptValidation.status === "receipt_accepted"',
+      'receiptValidation.status === "receipt_rejected"',
+    ],
+    [
+      'receiptValidation.status === "receipt_accepted"',
+      'receiptValidation.status === "receipt_indeterminate"',
+    ],
+    [
+      "receiptValidation.executionStarted === true",
+      "receiptValidation.executionStarted === false",
+    ],
+    ["ids.requestId !== receiptIds.requestId", "false"],
+    ["ids.delegationId !== receiptIds.delegationId", "false"],
+    ["ids.candidateId !== receiptIds.candidateId", "false"],
+    ["ids.targetId !== receiptIds.targetId", "false"],
+    [
+      'receiptValidation.reason === "execution_started"',
+      'receiptValidation.reason === "execution_not_started"',
+    ],
+    [
+      'receiptValidation.status === "receipt_accepted"',
+      'receiptValidation.status !== "receipt_rejected"',
+    ],
+    [
+      'return result(\n      "execution_indeterminate",\n      "receipt_indeterminate",\n      ids,\n      false,\n    );',
+      'return result(\n      "execution_started",\n      "receipt_indeterminate",\n      ids,\n      false,\n    );',
+    ],
+    [
+      'return result("transition_rejected", "invalid_lifecycle", null, false);',
+      'return result("execution_started", "invalid_lifecycle", null, false);',
+    ],
+    ['lifecycle.status !== "execution_pending" ||\n    ', ""],
+  ] as const;
+
+  for (const [pattern, replacement] of checks) {
+    assert.notDeepEqual(
+      inspector(mutatedSources(implementationPath, pattern, replacement)),
+      [],
+      `mutation was not rejected: ${pattern}`,
+    );
+  }
+  assert.notDeepEqual(inspector(sourcesWithout(implementationPath)), []);
+});
+
+test("AUDIT-561 preserves lifecycle transition authority and invariants", () => {
+  const implementationPath =
+    "src/automation/orchestrator/worker-execution-lifecycle-transition.ts";
+  const inspector =
+    inspectAutomationOrchestratorWorkerExecutionLifecycleTransitionInvariants;
+
+  assert.deepEqual(inspector(sources()), []);
+
+  const checks = [
+    [
+      'return result("execution_not_started", "receipt_not_started", ids, false);',
+      'return result("execution_not_started", "receipt_not_started", ids, true);',
+    ],
+    [
+      'return result(\n      "execution_indeterminate",\n      "receipt_indeterminate",\n      ids,\n      false,\n    );',
+      'return result(\n      "execution_indeterminate",\n      "receipt_indeterminate",\n      ids,\n      true,\n    );',
+    ],
+    [
+      'return result("transition_rejected", "invalid_lifecycle", null, false);',
+      'return result("transition_rejected", "invalid_lifecycle", null, true);',
+    ],
+    [
+      "requestId: ids?.requestId ?? null,",
+      "requestId: ids?.requestId.trim() ?? null,",
+    ],
+    ["requestId: ids?.requestId ?? null,", "requestId: crypto.randomUUID(),"],
+    [
+      "    executionStarted,\n  });",
+      "    executionId: ids?.requestId ?? null,\n    executionStarted,\n  });",
+    ],
+    [
+      "    executionStarted,\n  });",
+      "    dispatchId: ids?.requestId ?? null,\n    executionStarted,\n  });",
+    ],
+    [
+      "    executionStarted,\n  });",
+      "    correlationId: ids?.requestId ?? null,\n    executionStarted,\n  });",
+    ],
+    ["return Object.freeze({", "return Object.seal({"],
+    [
+      "  const ids = identifiers(lifecycle);",
+      '  lifecycle.requestId = "mutated";\n  const ids = identifiers(lifecycle);',
+    ],
+    [
+      "  const receiptIds = identifiers(receiptValidation);",
+      "  receiptValidation.executionStarted = false;\n  const receiptIds = identifiers(receiptValidation);",
+    ],
+    [
+      "  const ids = identifiers(lifecycle);",
+      "  validateAutomationOrchestratorWorkerExecutionStartReceipt();\n  const ids = identifiers(lifecycle);",
+    ],
+    [
+      "  const ids = identifiers(lifecycle);",
+      "  dispatchAutomationOrchestratorWorkerExecutionStart();\n  const ids = identifiers(lifecycle);",
+    ],
+    [
+      "  const ids = identifiers(lifecycle);",
+      "  port.start(undefined);\n  const ids = identifiers(lifecycle);",
+    ],
+  ] as const;
+
+  for (const [pattern, replacement] of checks) {
+    assert.notDeepEqual(
+      inspector(mutatedSources(implementationPath, pattern, replacement)),
+      [],
+      `mutation was not rejected: ${pattern}`,
+    );
+  }
+  assert.notDeepEqual(inspector(sourcesWithout(implementationPath)), []);
 });
 
 test("AUDIT-503 through AUDIT-512 are registered, passing, and profile-covered", () => {
