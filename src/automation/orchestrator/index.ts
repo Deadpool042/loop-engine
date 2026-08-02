@@ -171,6 +171,7 @@ export type {
   AutomationOrchestratorWorkerExecutionLifecycleTransitionStatus,
 } from "./worker-execution-lifecycle-transition-types.js";
 export { validateAutomationOrchestratorWorkerExecutionLifecycleObservation } from "./worker-execution-lifecycle-observation.js";
+export { progressAutomationOrchestratorWorkerExecutionLifecycle } from "./worker-execution-lifecycle-progression.js";
 export type {
   AutomationOrchestratorWorkerExecutionLifecycleObservation,
   AutomationOrchestratorWorkerExecutionLifecycleObservationReason,
@@ -179,6 +180,11 @@ export type {
   AutomationOrchestratorWorkerExecutionLifecycleObservationValidationResult,
   AutomationOrchestratorWorkerExecutionLifecycleObservationValidationStatus,
 } from "./worker-execution-lifecycle-observation-types.js";
+export type {
+  AutomationOrchestratorWorkerExecutionLifecycleProgressionReason,
+  AutomationOrchestratorWorkerExecutionLifecycleProgressionResult,
+  AutomationOrchestratorWorkerExecutionLifecycleProgressionStatus,
+} from "./worker-execution-lifecycle-progression-types.js";
 export type {
   AutomationOrchestratorPipelineProgression,
   AutomationOrchestratorPipelineResult,

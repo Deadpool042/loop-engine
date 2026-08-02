@@ -37,6 +37,10 @@ import {
   inspectAutomationOrchestratorWorkerExecutionLifecycleObservationDependencies,
   inspectAutomationOrchestratorWorkerExecutionLifecycleObservationMatrix,
   inspectAutomationOrchestratorWorkerExecutionLifecycleObservationInvariants,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionDependencies,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionMatrix,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionInvariants,
   inspectAutomationOrchestratorWorkerExecutionStartReceiptContracts,
   inspectAutomationOrchestratorWorkerExecutionStartReceiptDependencies,
   inspectAutomationOrchestratorWorkerExecutionStartReceiptInvariants,
@@ -145,6 +149,8 @@ const AUTOMATION_PATHS = [
   "src/automation/orchestrator/worker-execution-lifecycle-transition.ts",
   "src/automation/orchestrator/worker-execution-lifecycle-observation-types.ts",
   "src/automation/orchestrator/worker-execution-lifecycle-observation.ts",
+  "src/automation/orchestrator/worker-execution-lifecycle-progression-types.ts",
+  "src/automation/orchestrator/worker-execution-lifecycle-progression.ts",
   "docs/architecture/rfc/0001-automation-platform.md",
 ] as const;
 
@@ -3245,6 +3251,492 @@ test("AUDIT-565 rejects weakened worker execution lifecycle observation invarian
           path,
           reason:
             "automation_worker_execution_lifecycle_observation_invariants_not_enforced",
+        },
+      ],
+      `mutation was not rejected: ${pattern}`,
+    );
+  }
+});
+
+test("AUDIT-566 accepts canonical worker execution lifecycle progression contracts and exports", () => {
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts(
+      sources(),
+    ),
+    [],
+  );
+});
+
+test("AUDIT-566 rejects missing worker execution lifecycle progression source files", () => {
+  const inspector =
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts;
+
+  assert.deepEqual(
+    inspector(
+      sourcesWithout(
+        "src/automation/orchestrator/worker-execution-lifecycle-progression-types.ts",
+      ),
+    ),
+    [
+      {
+        path: "src/automation/orchestrator/worker-execution-lifecycle-progression-types.ts",
+        reason:
+          "automation_worker_execution_lifecycle_progression_contract_missing",
+      },
+    ],
+  );
+  assert.deepEqual(
+    inspector(
+      sourcesWithout(
+        "src/automation/orchestrator/worker-execution-lifecycle-progression.ts",
+      ),
+    ),
+    [
+      {
+        path: "src/automation/orchestrator/worker-execution-lifecycle-progression.ts",
+        reason:
+          "automation_worker_execution_lifecycle_progression_function_missing",
+      },
+    ],
+  );
+});
+
+for (const [name, replacement] of [
+  [
+    "AutomationOrchestratorWorkerExecutionLifecycleProgressionStatus",
+    "RemovedProgressionStatus",
+  ],
+  [
+    "AutomationOrchestratorWorkerExecutionLifecycleProgressionReason",
+    "RemovedProgressionReason",
+  ],
+  [
+    "AutomationOrchestratorWorkerExecutionLifecycleProgressionResult",
+    "RemovedProgressionResult",
+  ],
+] as const)
+  test(`AUDIT-566 rejects missing worker execution lifecycle progression ${name}`, () => {
+    const path =
+      "src/automation/orchestrator/worker-execution-lifecycle-progression-types.ts";
+    assert.deepEqual(
+      inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts(
+        mutatedSources(
+          path,
+          `export type ${name} =`,
+          `export type ${replacement} =`,
+        ),
+      ),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_progression_contract_missing",
+        },
+      ],
+    );
+  });
+
+test("AUDIT-566 rejects renamed worker execution lifecycle progression function", () => {
+  const path =
+    "src/automation/orchestrator/worker-execution-lifecycle-progression.ts";
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts(
+      mutatedSources(
+        path,
+        "export function progressAutomationOrchestratorWorkerExecutionLifecycle(",
+        "export function removedAutomationOrchestratorWorkerExecutionLifecycle(",
+      ),
+    ),
+    [
+      {
+        path,
+        reason:
+          "automation_worker_execution_lifecycle_progression_function_missing",
+      },
+    ],
+  );
+});
+
+for (const name of [
+  "AutomationOrchestratorWorkerExecutionLifecycleProgressionStatus",
+  "AutomationOrchestratorWorkerExecutionLifecycleProgressionReason",
+  "AutomationOrchestratorWorkerExecutionLifecycleProgressionResult",
+] as const)
+  test(`AUDIT-566 rejects missing orchestrator export for ${name}`, () => {
+    const path = "src/automation/orchestrator/index.ts";
+    assert.deepEqual(
+      inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts(
+        mutatedSources(path, `  ${name},\n`, ""),
+      ),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_progression_export_missing",
+        },
+      ],
+    );
+  });
+
+test("AUDIT-566 rejects missing orchestrator export for worker execution lifecycle progression function", () => {
+  const path = "src/automation/orchestrator/index.ts";
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts(
+      mutatedSources(
+        path,
+        'export { progressAutomationOrchestratorWorkerExecutionLifecycle } from "./worker-execution-lifecycle-progression.js";\n',
+        "",
+      ),
+    ),
+    [
+      {
+        path,
+        reason:
+          "automation_worker_execution_lifecycle_progression_export_missing",
+      },
+    ],
+  );
+});
+
+for (const name of [
+  "AutomationOrchestratorWorkerExecutionLifecycleProgressionStatus",
+  "AutomationOrchestratorWorkerExecutionLifecycleProgressionReason",
+  "AutomationOrchestratorWorkerExecutionLifecycleProgressionResult",
+] as const)
+  test(`AUDIT-566 rejects missing automation export for ${name}`, () => {
+    const path = "src/automation/index.ts";
+    assert.deepEqual(
+      inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts(
+        mutatedSources(path, `  ${name},\n`, ""),
+      ),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_progression_export_not_canonical",
+        },
+      ],
+    );
+  });
+
+test("AUDIT-566 rejects missing automation export for worker execution lifecycle progression function", () => {
+  const path = "src/automation/index.ts";
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts(
+      mutatedSources(
+        path,
+        'export { progressAutomationOrchestratorWorkerExecutionLifecycle } from "./orchestrator/worker-execution-lifecycle-progression.js";\n',
+        "",
+      ),
+    ),
+    [
+      {
+        path,
+        reason:
+          "automation_worker_execution_lifecycle_progression_export_not_canonical",
+      },
+    ],
+  );
+});
+
+test("AUDIT-566 rejects non-canonical automation export for worker execution lifecycle progression", () => {
+  const path = "src/automation/index.ts";
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts(
+      mutatedSources(
+        path,
+        'from "./orchestrator/worker-execution-lifecycle-progression-types.js";',
+        'from "./orchestrator/index.js";',
+      ),
+    ),
+    [
+      {
+        path,
+        reason:
+          "automation_worker_execution_lifecycle_progression_export_not_canonical",
+      },
+    ],
+  );
+});
+
+test("AUDIT-567 accepts closed worker execution lifecycle progression dependencies", () => {
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionDependencies(
+      sources(),
+    ),
+    [],
+  );
+});
+
+test("AUDIT-567 rejects forbidden worker execution lifecycle progression dependencies", () => {
+  const path =
+    "src/automation/orchestrator/worker-execution-lifecycle-progression.ts";
+  const importTarget =
+    'import type { AutomationOrchestratorWorkerExecutionLifecycleObservationValidationResult } from "./worker-execution-lifecycle-observation-types.js";';
+  const functionTarget = "  const lifecycleIds = identifiers(lifecycle);";
+  const inspector =
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionDependencies;
+  const checks = [
+    [importTarget, `import fs from "node:fs";\n${importTarget}`],
+    [functionTarget, `  Date.now();\n${functionTarget}`],
+    [functionTarget, `  Math.random();\n${functionTarget}`],
+    [functionTarget, `  crypto.randomUUID();\n${functionTarget}`],
+    [functionTarget, `  setTimeout(() => undefined, 0);\n${functionTarget}`],
+    [functionTarget, `  setInterval(() => undefined, 0);\n${functionTarget}`],
+    [functionTarget, `  port.progress(undefined);\n${functionTarget}`],
+    [functionTarget, `  service.progress(undefined);\n${functionTarget}`],
+    [functionTarget, `  provider.progress(undefined);\n${functionTarget}`],
+    [functionTarget, `  worker.progress(undefined);\n${functionTarget}`],
+    [
+      importTarget,
+      `import { transitionAutomationOrchestratorWorkerExecutionLifecycle } from "./worker-execution-lifecycle-transition.js";\n${importTarget}`,
+    ],
+    [
+      importTarget,
+      `import { validateAutomationOrchestratorWorkerExecutionLifecycleObservation } from "./worker-execution-lifecycle-observation.js";\n${importTarget}`,
+    ],
+  ] as const;
+
+  for (const [pattern, replacement] of checks) {
+    assert.deepEqual(
+      inspector(mutatedSources(path, pattern, replacement)),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_progression_dependencies_not_closed",
+        },
+      ],
+      `mutation was not rejected: ${replacement}`,
+    );
+  }
+});
+
+test("AUDIT-568 accepts closed worker execution lifecycle progression matrix", () => {
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionMatrix(
+      sources(),
+    ),
+    [],
+  );
+});
+
+test("AUDIT-568 rejects open or inconsistent worker execution lifecycle progression matrix", () => {
+  const path =
+    "src/automation/orchestrator/worker-execution-lifecycle-progression.ts";
+  const inspector =
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionMatrix;
+  const checks = [
+    [
+      'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_running"',
+      'observationValidation.status === "removed_accepted" &&\n    observationValidation.reason === "execution_running"',
+    ],
+    [
+      'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_completed"',
+      'observationValidation.status === "removed_accepted" &&\n    observationValidation.reason === "execution_completed"',
+    ],
+    [
+      'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_failed"',
+      'observationValidation.status === "removed_accepted" &&\n    observationValidation.reason === "execution_failed"',
+    ],
+    [
+      'observationValidation.status === "observation_indeterminate" &&\n    observationValidation.reason === "execution_indeterminate"',
+      'observationValidation.status === "removed_indeterminate" &&\n    observationValidation.reason === "execution_indeterminate"',
+    ],
+    [
+      'observationValidation.reason === "execution_running"',
+      'observationValidation.reason === "execution_completed"',
+    ],
+    [
+      'observationValidation.reason === "execution_completed"',
+      'observationValidation.reason === "execution_failed"',
+    ],
+    [
+      'observationValidation.reason === "execution_failed"',
+      'observationValidation.reason === "execution_running"',
+    ],
+    [
+      'observationValidation.reason === "execution_indeterminate"',
+      'observationValidation.reason === "execution_running"',
+    ],
+    [
+      'return result(\n      "execution_running",\n      "observation_running",\n      lifecycleIds,\n      true,\n      false,\n      false,\n    );',
+      'return result(\n      "execution_failed",\n      "observation_running",\n      lifecycleIds,\n      true,\n      false,\n      false,\n    );',
+    ],
+    [
+      'return result(\n      "execution_completed",\n      "observation_completed",\n      lifecycleIds,\n      true,\n      true,\n      true,\n    );',
+      'return result(\n      "execution_running",\n      "observation_completed",\n      lifecycleIds,\n      true,\n      true,\n      true,\n    );',
+    ],
+    [
+      'return result(\n      "execution_failed",\n      "observation_failed",\n      lifecycleIds,\n      true,\n      true,\n      false,\n    );',
+      'return result(\n      "execution_completed",\n      "observation_failed",\n      lifecycleIds,\n      true,\n      true,\n      false,\n    );',
+    ],
+    [
+      'return result(\n      "execution_indeterminate",\n      "observation_indeterminate",\n      lifecycleIds,\n    );',
+      'return result(\n      "execution_running",\n      "observation_indeterminate",\n      lifecycleIds,\n    );',
+    ],
+    [
+      'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_running" &&\n    observationValidation.executionStarted === true &&\n    observationValidation.executionFinished === false &&\n    observationValidation.executionSucceeded === false',
+      'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_running" &&\n    observationValidation.executionStarted === false &&\n    observationValidation.executionFinished === false &&\n    observationValidation.executionSucceeded === false',
+    ],
+    [
+      'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_completed" &&\n    observationValidation.executionStarted === true &&\n    observationValidation.executionFinished === true &&\n    observationValidation.executionSucceeded === true',
+      'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_completed" &&\n    observationValidation.executionStarted === true &&\n    observationValidation.executionFinished === false &&\n    observationValidation.executionSucceeded === true',
+    ],
+    [
+      'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_failed" &&\n    observationValidation.executionStarted === true &&\n    observationValidation.executionFinished === true &&\n    observationValidation.executionSucceeded === false',
+      'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_failed" &&\n    observationValidation.executionStarted === true &&\n    observationValidation.executionFinished === true &&\n    observationValidation.executionSucceeded === true',
+    ],
+    [
+      'observationValidation.status === "observation_indeterminate" &&\n    observationValidation.reason === "execution_indeterminate" &&\n    observationValidation.executionStarted === false &&\n    observationValidation.executionFinished === false &&\n    observationValidation.executionSucceeded === false',
+      'observationValidation.status === "observation_indeterminate" &&\n    observationValidation.reason === "execution_indeterminate" &&\n    observationValidation.executionStarted === true &&\n    observationValidation.executionFinished === false &&\n    observationValidation.executionSucceeded === false',
+    ],
+    ["lifecycleIds.requestId !== observationIds.requestId", "false"],
+    ["lifecycleIds.delegationId !== observationIds.delegationId", "false"],
+    ["lifecycleIds.candidateId !== observationIds.candidateId", "false"],
+    ["lifecycleIds.targetId !== observationIds.targetId", "false"],
+    [
+      'lifecycle.status !== "execution_started"',
+      'lifecycle.status !== "execution_not_started"',
+    ],
+    [
+      'lifecycle.reason !== "receipt_confirmed"',
+      'lifecycle.reason !== "receipt_not_started"',
+    ],
+    [
+      "lifecycle.executionStarted !== true",
+      "lifecycle.executionStarted !== false",
+    ],
+    ["if (observationIds === null)", "if (false)"],
+    [
+      'return result("progression_rejected", "invalid_observation_validation", null);',
+      'return result("execution_running", "observation_running", lifecycleIds, true);',
+    ],
+    [
+      'return result("progression_rejected", "invalid_lifecycle", null);',
+      'return result("progression_rejected", "invalid_lifecycle", lifecycleIds);',
+    ],
+    [
+      'return result(\n      "progression_rejected",\n      "invalid_observation_validation",\n      null,\n    );',
+      'return result(\n      "progression_rejected",\n      "invalid_observation_validation",\n      lifecycleIds,\n    );',
+    ],
+    [
+      'return result("progression_rejected", "identifier_mismatch", null);',
+      'return result("progression_rejected", "identifier_mismatch", lifecycleIds);',
+    ],
+  ] as const;
+
+  for (const [pattern, replacement] of checks) {
+    assert.deepEqual(
+      inspector(mutatedSources(path, pattern, replacement)),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_progression_matrix_not_closed_or_fail_closed",
+        },
+      ],
+      `mutation was not rejected: ${pattern}`,
+    );
+  }
+});
+
+test("AUDIT-569 accepts enforced worker execution lifecycle progression invariants", () => {
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionInvariants(
+      sources(),
+    ),
+    [],
+  );
+});
+
+test("AUDIT-569 rejects weakened worker execution lifecycle progression invariants", () => {
+  const path =
+    "src/automation/orchestrator/worker-execution-lifecycle-progression.ts";
+  const inspector =
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionInvariants;
+  const functionTarget = "  const lifecycleIds = identifiers(lifecycle);";
+  const checks = [
+    ["return Object.freeze({\n    status,", "return ({\n    status,"],
+    [
+      "requestId: ids?.requestId ?? null,",
+      "requestId: ids?.requestId.trim() ?? null,",
+    ],
+    [
+      "delegationId: ids?.delegationId ?? null,",
+      "delegationId: ids?.delegationId.toLowerCase() ?? null,",
+    ],
+    [
+      "candidateId: ids?.candidateId ?? null,",
+      "candidateId: ids?.candidateId.toUpperCase() ?? null,",
+    ],
+    [functionTarget, '  lifecycle.status = "mutated";\n' + functionTarget],
+    [
+      functionTarget,
+      "  lifecycle.executionStarted = false;\n" + functionTarget,
+    ],
+    [
+      functionTarget,
+      '  observationValidation.status = "observation_rejected";\n' +
+        functionTarget,
+    ],
+    [
+      functionTarget,
+      "  observationValidation.executionFinished = true;\n" + functionTarget,
+    ],
+    [
+      "    executionStarted,",
+      "    executionId: ids?.requestId ?? null,\n    executionStarted,",
+    ],
+    [
+      "    executionStarted,",
+      "    dispatchId: ids?.requestId ?? null,\n    executionStarted,",
+    ],
+    [
+      "    executionStarted,",
+      "    correlationId: ids?.requestId ?? null,\n    executionStarted,",
+    ],
+    [functionTarget, "  Date.now();\n" + functionTarget],
+    [
+      functionTarget,
+      "  transitionAutomationOrchestratorWorkerExecutionLifecycle();\n" +
+        functionTarget,
+    ],
+    [
+      functionTarget,
+      "  validateAutomationOrchestratorWorkerExecutionLifecycleObservation();\n" +
+        functionTarget,
+    ],
+    [functionTarget, "  port.progress(undefined);\n" + functionTarget],
+    [functionTarget, "  service.progress(undefined);\n" + functionTarget],
+    [functionTarget, "  provider.progress(undefined);\n" + functionTarget],
+    [functionTarget, "  worker.progress(undefined);\n" + functionTarget],
+    [functionTarget, "  setInterval(() => undefined, 0);\n" + functionTarget],
+    [functionTarget, "  setTimeout(() => undefined, 0);\n" + functionTarget],
+    [functionTarget, "  retry();\n" + functionTarget],
+    ["requestId: ids?.requestId ?? null,", "requestId: null,"],
+    ["delegationId: ids?.delegationId ?? null,", "delegationId: null,"],
+    ["candidateId: ids?.candidateId ?? null,", "candidateId: null,"],
+    ["targetId: ids?.targetId ?? null,", "targetId: null,"],
+    [
+      'return result("progression_rejected", "invalid_lifecycle", null);',
+      'return result("progression_rejected", "invalid_lifecycle", lifecycleIds);',
+    ],
+    ["executionStarted = false,", "executionStarted = true,"],
+    [
+      "return Object.freeze({\n    status,",
+      "return Object.freeze({\n    status,\n    observedAt: Date.now(),",
+    ],
+  ] as const;
+
+  for (const [pattern, replacement] of checks) {
+    assert.deepEqual(
+      inspector(mutatedSources(path, pattern, replacement)),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_progression_invariants_not_enforced",
         },
       ],
       `mutation was not rejected: ${pattern}`,

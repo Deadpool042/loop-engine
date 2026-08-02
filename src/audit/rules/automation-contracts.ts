@@ -58,6 +58,10 @@ const WORKER_EXECUTION_LIFECYCLE_OBSERVATION_TYPES_FILE =
   "src/automation/orchestrator/worker-execution-lifecycle-observation-types.ts";
 const WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE =
   "src/automation/orchestrator/worker-execution-lifecycle-observation.ts";
+const WORKER_EXECUTION_LIFECYCLE_PROGRESSION_TYPES_FILE =
+  "src/automation/orchestrator/worker-execution-lifecycle-progression-types.ts";
+const WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE =
+  "src/automation/orchestrator/worker-execution-lifecycle-progression.ts";
 const RECEIPT_FILE =
   "src/automation/orchestrator/worker-execution-start-receipt.ts";
 const RECEIPT_TYPES_FILE =
@@ -363,6 +367,8 @@ const REQUIRED_FILES = [
   WORKER_EXECUTION_LIFECYCLE_TRANSITION_FILE,
   WORKER_EXECUTION_LIFECYCLE_OBSERVATION_TYPES_FILE,
   WORKER_EXECUTION_LIFECYCLE_OBSERVATION_FILE,
+  WORKER_EXECUTION_LIFECYCLE_PROGRESSION_TYPES_FILE,
+  WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
   RECEIPT_TYPES_FILE,
   RECEIPT_FILE,
   EVALUATION_TYPES_FILE,
@@ -2802,6 +2808,8 @@ export function inspectAutomationDependencyDirection(
         "./orchestrator/worker-execution-lifecycle-transition.js",
         "./orchestrator/worker-execution-lifecycle-observation.js",
         "./orchestrator/worker-execution-lifecycle-observation-types.js",
+        "./orchestrator/worker-execution-lifecycle-progression.js",
+        "./orchestrator/worker-execution-lifecycle-progression-types.js",
       ],
     ],
     [PROVIDER_TYPES_FILE, ["../types.js"]],
@@ -2872,6 +2880,8 @@ export function inspectAutomationDependencyDirection(
         "./worker-execution-lifecycle-transition-types.js",
         "./worker-execution-lifecycle-observation.js",
         "./worker-execution-lifecycle-observation-types.js",
+        "./worker-execution-lifecycle-progression.js",
+        "./worker-execution-lifecycle-progression-types.js",
       ],
     ],
     [
@@ -2959,6 +2969,15 @@ export function inspectAutomationDependencyDirection(
       [
         "./worker-execution-lifecycle-transition-types.js",
         "./worker-execution-lifecycle-observation-types.js",
+      ],
+    ],
+    [WORKER_EXECUTION_LIFECYCLE_PROGRESSION_TYPES_FILE, []],
+    [
+      WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
+      [
+        "./worker-execution-lifecycle-transition-types.js",
+        "./worker-execution-lifecycle-observation-types.js",
+        "./worker-execution-lifecycle-progression-types.js",
       ],
     ],
     ["src/automation/orchestrator/worker-execution-start-receipt-types.ts", []],
@@ -4206,4 +4225,250 @@ export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_OBSERVATION_INVARIANTS_RULE =
     "Automation Worker Execution Lifecycle Observation invariants are enforced",
     "Lifecycle Observation freezes its public result, preserves identifiers exactly, and performs no mutation, generation, or operational effect.",
     inspectAutomationOrchestratorWorkerExecutionLifecycleObservationInvariants,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const types = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_PROGRESSION_TYPES_FILE,
+  );
+  const implementation = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
+  );
+  const orchestrator = sourceFor(sources, ORCHESTRATOR_BARREL_FILE);
+  const automation = sourceFor(sources, BARREL_FILE);
+  const contracts = [
+    "AutomationOrchestratorWorkerExecutionLifecycleProgressionStatus",
+    "AutomationOrchestratorWorkerExecutionLifecycleProgressionReason",
+    "AutomationOrchestratorWorkerExecutionLifecycleProgressionResult",
+  ];
+  const fn = "progressAutomationOrchestratorWorkerExecutionLifecycle";
+
+  if (
+    types === null ||
+    !contracts.every((contract) =>
+      new RegExp(`export\\s+type\\s+${contract}\\s*=`).test(
+        withoutComments(types),
+      ),
+    )
+  )
+    return lifecycleTransitionViolation(
+      WORKER_EXECUTION_LIFECYCLE_PROGRESSION_TYPES_FILE,
+      "automation_worker_execution_lifecycle_progression_contract_missing",
+    );
+
+  if (
+    implementation === null ||
+    !new RegExp(`export\\s+function\\s+${fn}\\b`).test(
+      withoutComments(implementation),
+    )
+  )
+    return lifecycleTransitionViolation(
+      WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
+      "automation_worker_execution_lifecycle_progression_function_missing",
+    );
+
+  if (
+    orchestrator === null ||
+    !contracts.every((contract) =>
+      hasBarrelExport(
+        orchestrator,
+        contract,
+        "./worker-execution-lifecycle-progression-types.js",
+      ),
+    ) ||
+    !hasBarrelExport(
+      orchestrator,
+      fn,
+      "./worker-execution-lifecycle-progression.js",
+    )
+  )
+    return lifecycleTransitionViolation(
+      ORCHESTRATOR_BARREL_FILE,
+      "automation_worker_execution_lifecycle_progression_export_missing",
+    );
+
+  return automation === null ||
+    !contracts.every((contract) =>
+      hasBarrelExport(
+        automation,
+        contract,
+        "./orchestrator/worker-execution-lifecycle-progression-types.js",
+      ),
+    ) ||
+    !hasBarrelExport(
+      automation,
+      fn,
+      "./orchestrator/worker-execution-lifecycle-progression.js",
+    )
+    ? lifecycleTransitionViolation(
+        BARREL_FILE,
+        "automation_worker_execution_lifecycle_progression_export_not_canonical",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_PROGRESSION_CONTRACTS_RULE =
+  createRule(
+    "AUDIT-566",
+    "Automation Worker Execution Lifecycle Progression contracts and exports are complete",
+    "Lifecycle Progression contracts and public progression function are present and canonically exported.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionContracts,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionDependencies(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
+  );
+  const clean = source === null ? "" : withoutComments(source);
+  const allowedDependencies = [
+    "./worker-execution-lifecycle-transition-types.js",
+    "./worker-execution-lifecycle-observation-types.js",
+    "./worker-execution-lifecycle-progression-types.js",
+  ];
+  const hasForbiddenDependency = moduleSpecifiers(clean).some(
+    (target) => !allowedDependencies.includes(target),
+  );
+  const hasForbiddenApi =
+    /\bDate(?:\.now)?\b|\bMath\.random\b|\bcrypto\b|\bprocess\b|\b(?:fs|net|http|https)\b|\bset(?:Timeout|Interval)\b|\bexec(?:File|Sync)?\b|\bspawn(?:Sync)?\b/.test(
+      clean,
+    );
+  const hasForbiddenBoundaryCall =
+    /\b(?:port|service|provider|adapter|queue|persistence|polling|retry|timeout|worker)\.\w+\s*\(/.test(
+      clean,
+    );
+
+  return source === null ||
+    hasForbiddenDependency ||
+    hasForbiddenApi ||
+    hasForbiddenBoundaryCall
+    ? lifecycleTransitionViolation(
+        WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
+        "automation_worker_execution_lifecycle_progression_dependencies_not_closed",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_PROGRESSION_DEPENDENCIES_RULE =
+  createRule(
+    "AUDIT-567",
+    "Automation Worker Execution Lifecycle Progression dependencies are closed",
+    "Lifecycle Progression depends only on its closed lifecycle and observation contracts, without infrastructure or nondeterministic APIs.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionDependencies,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionMatrix(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
+  );
+  const clean = source === null ? "" : withoutComments(source);
+  const requiredTerms = [
+    'lifecycle.status !== "execution_started"',
+    'lifecycle.reason !== "receipt_confirmed"',
+    "lifecycle.executionStarted !== true",
+    "lifecycleIds === null",
+    "observationIds === null",
+    "lifecycleIds.requestId !== observationIds.requestId",
+    "lifecycleIds.delegationId !== observationIds.delegationId",
+    "lifecycleIds.candidateId !== observationIds.candidateId",
+    "lifecycleIds.targetId !== observationIds.targetId",
+    'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_running" &&\n    observationValidation.executionStarted === true &&\n    observationValidation.executionFinished === false &&\n    observationValidation.executionSucceeded === false',
+    'return result(\n      "execution_running",\n      "observation_running",\n      lifecycleIds,\n      true,\n      false,\n      false,\n    );',
+    'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_completed" &&\n    observationValidation.executionStarted === true &&\n    observationValidation.executionFinished === true &&\n    observationValidation.executionSucceeded === true',
+    'return result(\n      "execution_completed",\n      "observation_completed",\n      lifecycleIds,\n      true,\n      true,\n      true,\n    );',
+    'observationValidation.status === "observation_accepted" &&\n    observationValidation.reason === "execution_failed" &&\n    observationValidation.executionStarted === true &&\n    observationValidation.executionFinished === true &&\n    observationValidation.executionSucceeded === false',
+    'return result(\n      "execution_failed",\n      "observation_failed",\n      lifecycleIds,\n      true,\n      true,\n      false,\n    );',
+    'observationValidation.status === "observation_indeterminate" &&\n    observationValidation.reason === "execution_indeterminate" &&\n    observationValidation.executionStarted === false &&\n    observationValidation.executionFinished === false &&\n    observationValidation.executionSucceeded === false',
+    'return result(\n      "execution_indeterminate",\n      "observation_indeterminate",\n      lifecycleIds,\n    );',
+    'return result("progression_rejected", "invalid_lifecycle", null);',
+    'return result(\n      "progression_rejected",\n      "invalid_observation_validation",\n      null,\n    );',
+    'return result("progression_rejected", "identifier_mismatch", null);',
+    'return result("progression_rejected", "invalid_observation_validation", null);',
+  ];
+
+  return source === null || !requiredTerms.every((term) => clean.includes(term))
+    ? lifecycleTransitionViolation(
+        WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
+        "automation_worker_execution_lifecycle_progression_matrix_not_closed_or_fail_closed",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_PROGRESSION_MATRIX_RULE =
+  createRule(
+    "AUDIT-568",
+    "Automation Worker Execution Lifecycle Progression matrix is fail-closed",
+    "Lifecycle Progression accepts only the closed validated observation matrix for a coherent started lifecycle and rejects every other combination.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionMatrix,
+  );
+
+export function inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionInvariants(
+  sources: readonly AutomationAuditSource[],
+): readonly AutomationAuditViolation[] {
+  const source = sourceFor(
+    sources,
+    WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
+  );
+  const clean = source === null ? "" : withoutComments(source);
+  const requiredTerms = [
+    "return Object.freeze({\n    status,",
+    "requestId: ids?.requestId ?? null,",
+    "delegationId: ids?.delegationId ?? null,",
+    "candidateId: ids?.candidateId ?? null,",
+    "targetId: ids?.targetId ?? null,",
+    "executionStarted = false,",
+    "executionFinished = false,",
+    "executionSucceeded = false,",
+    'return result("progression_rejected", "invalid_lifecycle", null);',
+    'return result("progression_rejected", "identifier_mismatch", null);',
+    'return result("progression_rejected", "invalid_observation_validation", null);',
+  ];
+  const transformsIdentifiers = /\.(?:trim|toLowerCase|toUpperCase)\(/.test(
+    clean,
+  );
+  const hasForbiddenIdentifier =
+    /\b(?:executionId|dispatchId|correlationId)\b/.test(clean);
+  const mutatesInputs =
+    /\b(?:lifecycle|observationValidation)\.\w+\s*=(?!=)/.test(clean);
+  const hasTimestampOrGeneration =
+    /\b(?:Date\.now|Math\.random|crypto\.randomUUID)\b/.test(clean);
+  const invokesForbiddenBoundary =
+    /\b(?:transitionAutomationOrchestratorWorkerExecutionLifecycle|validateAutomationOrchestratorWorkerExecutionLifecycleObservation|port\.progress|service\.progress|provider\.progress|worker\.progress|adapter\.\w+|queue\.\w+|persistence\.\w+)\s*\(/.test(
+      clean,
+    );
+  const hasForbiddenMechanism =
+    /\b(?:poll(?:ing)?|retry|timeout|setTimeout|setInterval|persist(?:ence)?)\b/.test(
+      clean,
+    );
+
+  return source === null ||
+    !requiredTerms.every((term) => clean.includes(term)) ||
+    transformsIdentifiers ||
+    hasForbiddenIdentifier ||
+    mutatesInputs ||
+    hasTimestampOrGeneration ||
+    invokesForbiddenBoundary ||
+    hasForbiddenMechanism
+    ? lifecycleTransitionViolation(
+        WORKER_EXECUTION_LIFECYCLE_PROGRESSION_FILE,
+        "automation_worker_execution_lifecycle_progression_invariants_not_enforced",
+      )
+    : Object.freeze([]);
+}
+
+export const AUTOMATION_WORKER_EXECUTION_LIFECYCLE_PROGRESSION_INVARIANTS_RULE =
+  createRule(
+    "AUDIT-569",
+    "Automation Worker Execution Lifecycle Progression invariants are enforced",
+    "Lifecycle Progression freezes its public result, preserves identifiers exactly, and performs no mutation, generation, or operational effect.",
+    inspectAutomationOrchestratorWorkerExecutionLifecycleProgressionInvariants,
   );
