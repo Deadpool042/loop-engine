@@ -310,6 +310,26 @@ aucune autorité ne crée encore `executionId`. L'observation continue du
 lifecycle reste future : aucun polling, supervision, persistance, queue,
 retry, timeout, adaptateur concret ou runtime concret n'est ajouté.
 
+V21.6 ajoute Execution Lifecycle Observation Validation : Execution Lifecycle
+Transition → Execution Lifecycle Observation Validation → future Lifecycle
+Progression. Elle consomme uniquement un
+`AutomationOrchestratorWorkerExecutionLifecycleTransitionResult` V21.5 déjà
+validé et une observation externe fournie par l'appelant ; elle ne récupère ni
+ne produit aucune observation concrète. Le lifecycle doit être
+`execution_started` / `receipt_confirmed` / `executionStarted: true` et les
+quatre identifiants `requestId`, `delegationId`, `candidateId` et `targetId`
+doivent correspondre exactement à l'observation, sans transformation. Les
+observations `running`, `completed` et `failed` cohérentes deviennent
+`observation_accepted`; une observation `indeterminate` cohérente reste
+`observation_indeterminate` avec tous ses flags de progression à `false`.
+Toute forme, raison, flag, identité ou lifecycle incohérent produit
+`observation_rejected` fail-closed. Cette validation est pure, synchrone et
+déterministe : aucun polling, worker, port concret, service concret, provider,
+adaptateur, persistance, queue, retry, timeout, timestamp ni génération
+d'identifiant n'est introduit. `executionId`, `dispatchId` et
+`correlationId` restent absents ; la collecte continue et la production future
+d'observations restent hors périmètre.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif

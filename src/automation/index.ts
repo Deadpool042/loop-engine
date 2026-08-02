@@ -135,6 +135,15 @@ export type {
   AutomationOrchestratorState,
   AutomationOrchestratorStep,
 } from "./orchestrator/index.js";
+export { validateAutomationOrchestratorWorkerExecutionLifecycleObservation } from "./orchestrator/worker-execution-lifecycle-observation.js";
+export type {
+  AutomationOrchestratorWorkerExecutionLifecycleObservation,
+  AutomationOrchestratorWorkerExecutionLifecycleObservationReason,
+  AutomationOrchestratorWorkerExecutionLifecycleObservationStatus,
+  AutomationOrchestratorWorkerExecutionLifecycleObservationValidationReason,
+  AutomationOrchestratorWorkerExecutionLifecycleObservationValidationResult,
+  AutomationOrchestratorWorkerExecutionLifecycleObservationValidationStatus,
+} from "./orchestrator/worker-execution-lifecycle-observation-types.js";
 export { summarizeAutomationOrchestratorPipeline } from "./orchestrator/pipeline-summary.js";
 export { decideAutomationOrchestratorPipelineAdmission } from "./orchestrator/pipeline-admission.js";
 export { prepareAutomationOrchestratorPipelineWorkerHandoff } from "./orchestrator/pipeline-worker-handoff.js";
