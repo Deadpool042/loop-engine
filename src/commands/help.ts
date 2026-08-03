@@ -37,8 +37,22 @@ export function printHelp(): void {
     "pnpm loop prompt <project> --json  — contexte de prompt en JSON",
   );
 
+  terminal.section("Loop execution");
+  terminal.info(
+    "pnpm loop run <project> --mode plan — prépare un cycle sans appeler d'agent",
+  );
+  terminal.info(
+    "pnpm loop run <project> --mode execute --provider claude_code --provider-executable claude",
+  );
+  terminal.info(
+    "pnpm loop run <project> --mode execute --provider codex --provider-executable codex",
+  );
+  terminal.info(
+    "Options provider: --provider-model <model> --provider-timeout-ms <ms>",
+  );
+
   terminal.section("Principes");
-  terminal.info("Aucun appel IA automatique.");
-  terminal.info("Aucun commit ou push automatique.");
-  terminal.info("Les décisions restent humaines.");
+  terminal.info("Aucun appel IA implicite : execute et le provider sont explicites.");
+  terminal.info("Aucun commit ou push automatique en mode execute.");
+  terminal.info("Les validations configurées passent après l'agent.");
 }

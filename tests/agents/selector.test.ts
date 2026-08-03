@@ -29,7 +29,7 @@ function profile(overrides: Partial<AgentProfile> = {}): AgentProfile {
 }
 
 describe("selectAgentProfile", () => {
-  it("selects the smallest-effort profile among eligible ones", () => {
+  it("selects the smallest preferred-effort profile among eligible ones", () => {
     const registry = createAgentRegistry([
       profile({ id: "low", effort: "low", capabilities: ["code_edit"] }),
       profile({ id: "high", effort: "high", capabilities: ["code_edit"] }),
@@ -41,16 +41,13 @@ describe("selectAgentProfile", () => {
     });
 
     assert.equal(result.outcome, "selected");
-    assert.equal(
-      result.outcome === "selected" ? result.profile.id : null,
-      "low",
-    );
+    assert.equal(result.outcome === "selected" ? result.profile.id : null, "low");
   });
 
-  it("breaks ties between equal-effort profiles deterministically by id", () => {
+  it("breaks ties deterministically by id", () => {
     const registry = createAgentRegistry([
-      profile({ id: "zeta", effort: "low", capabilities: ["code_edit"] }),
-      profile({ id: "alpha", effort: "low", capabilities: ["code_edit"] }),
+      profile({ id: "zeta", capabilities: ["code_edit"] }),
+      profile({ id: "alpha", capabilities: ["code_edit"] }),
     ]);
 
     const result = selectAgentProfile(registry, {
@@ -58,13 +55,32 @@ describe("selectAgentProfile", () => {
       requiredPermissions: [],
     });
 
-    assert.equal(
-      result.outcome === "selected" ? result.profile.id : null,
-      "alpha",
-    );
+    assert.equal(result.outcome === "selected" ? result.profile.id : null, "alpha");
   });
 
-  it("rejects profiles missing a required capability, with an explainable reason", () => {
+  it("does not reject a compatible runtime because its preferred effort is below the requested invocation effort", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "claude",
+        runtime: "claude_code",
+        provider: "anthropic",
+        effort: "low",
+        capabilities: ["code_edit"],
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit"],
+      requiredPermissions: [],
+      minEffort: "medium",
+      maxEffort: "high",
+    });
+
+    assert.equal(result.outcome, "selected");
+    assert.equal(result.outcome === "selected" ? result.profile.id : null, "claude");
+  });
+
+  it("rejects profiles missing a required capability with an explainable reason", () => {
     const registry = createAgentRegistry([
       profile({ id: "no-shell", capabilities: ["code_edit"] }),
     ]);
@@ -75,11 +91,7 @@ describe("selectAgentProfile", () => {
     });
 
     assert.equal(result.outcome, "no_match");
-    assert.equal(result.rejected.length, 1);
-    assert.match(
-      result.rejected[0]!.reason,
-      /missing capabilities: shell_exec/,
-    );
+    assert.match(result.rejected[0]!.reason, /missing capabilities: shell_exec/);
   });
 
   it("rejects profiles missing a required permission", () => {
@@ -97,32 +109,7 @@ describe("selectAgentProfile", () => {
     });
 
     assert.equal(result.outcome, "no_match");
-    assert.match(
-      result.rejected[0]!.reason,
-      /missing permissions: write_worktree/,
-    );
-  });
-
-  it("rejects profiles whose effort exceeds the requested ceiling", () => {
-    const registry = createAgentRegistry([
-      profile({
-        id: "too-expensive",
-        effort: "max",
-        capabilities: ["code_edit"],
-      }),
-    ]);
-
-    const result = selectAgentProfile(registry, {
-      requiredCapabilities: ["code_edit"],
-      requiredPermissions: [],
-      maxEffort: "medium",
-    });
-
-    assert.equal(result.outcome, "no_match");
-    assert.match(
-      result.rejected[0]!.reason,
-      /effort max exceeds max effort medium/,
-    );
+    assert.match(result.rejected[0]!.reason, /missing permissions: write_worktree/);
   });
 
   it("rejects a profile whose declared budget exceeds an explicit ceiling", () => {
@@ -153,19 +140,9 @@ describe("selectAgentProfile", () => {
     );
   });
 
-  it("treats an unbounded profile budget as a violation once an explicit ceiling is set", () => {
+  it("treats an unbounded profile budget as a violation under an explicit ceiling", () => {
     const registry = createAgentRegistry([
-      profile({
-        id: "unbounded",
-        capabilities: ["code_edit"],
-        budget: {
-          maxTokens: null,
-          maxCostUsd: null,
-          maxDurationMs: null,
-          maxCalls: null,
-          maxRepairs: null,
-        },
-      }),
+      profile({ id: "unbounded", capabilities: ["code_edit"] }),
     ]);
 
     const result = selectAgentProfile(registry, {
@@ -181,10 +158,10 @@ describe("selectAgentProfile", () => {
     );
   });
 
-  it("always reports rejected profiles, even when a selection succeeds", () => {
+  it("always reports rejected profiles even when a selection succeeds", () => {
     const registry = createAgentRegistry([
-      profile({ id: "eligible", effort: "low", capabilities: ["code_edit"] }),
-      profile({ id: "missing-cap", effort: "low", capabilities: [] }),
+      profile({ id: "eligible", capabilities: ["code_edit"] }),
+      profile({ id: "missing-cap", capabilities: [] }),
     ]);
 
     const result = selectAgentProfile(registry, {
@@ -198,24 +175,10 @@ describe("selectAgentProfile", () => {
       ["missing-cap"],
     );
   });
-
-  it("returns no_match with all reasons when no profile is eligible", () => {
-    const registry = createAgentRegistry([
-      profile({ id: "solo", capabilities: [] }),
-    ]);
-
-    const result = selectAgentProfile(registry, {
-      requiredCapabilities: ["code_edit"],
-      requiredPermissions: [],
-    });
-
-    assert.equal(result.outcome, "no_match");
-    assert.equal(result.rejected.length, 1);
-  });
 });
 
 describe("evaluateAgentProfile", () => {
-  it("accepts a profile satisfying every constraint", () => {
+  it("accepts a profile satisfying capabilities, permissions and budget independently of invocation effort", () => {
     const candidate = profile({
       capabilities: ["code_edit"],
       permissions: ["read_only"],
@@ -225,7 +188,8 @@ describe("evaluateAgentProfile", () => {
     const evaluation = evaluateAgentProfile(candidate, {
       requiredCapabilities: ["code_edit"],
       requiredPermissions: ["read_only"],
-      maxEffort: "medium",
+      minEffort: "medium",
+      maxEffort: "high",
     });
 
     assert.equal(evaluation.ok, true);

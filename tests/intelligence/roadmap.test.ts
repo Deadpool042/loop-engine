@@ -293,6 +293,95 @@ describe("roadmap candidate status", () => {
   });
 });
 
+describe("roadmap markdown headings", () => {
+  it("ignores a markdown heading even when it contains a candidate keyword", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "## Lot actif — burn-in vertical",
+        "- [ ] Burn-in 1 — Exécuter le chemin CLI -> provider -> worktree -> validation",
+      ].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates.length, 1);
+      assert.equal(
+        candidates[0]?.text,
+        "- [ ] Burn-in 1 — Exécuter le chemin CLI -> provider -> worktree -> validation",
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("ignores markdown headings of any level", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      ["# Titre", "## Section", "### Sous-section Lot"].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates.length, 0);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("still selects the real task, not the section title, as the active candidate", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "## Lot actif — burn-in vertical",
+        "- [ ] Burn-in 1 — Exécuter le chemin CLI -> provider -> worktree -> validation",
+      ].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+      const selected = selectRoadmapCandidate(candidates);
+
+      assert.equal(selected?.status, "todo");
+      assert.equal(
+        selected?.text,
+        "- [ ] Burn-in 1 — Exécuter le chemin CLI -> provider -> worktree -> validation",
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("does not turn a completed - [x] line into an active candidate", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "- [x] Tâche déjà terminée",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+      const selected = selectRoadmapCandidate(candidates);
+
+      assert.equal(candidates[0]?.status, "done");
+      assert.equal(selected, null);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("keeps existing marker behavior unchanged", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      ["TODO Nettoyer le module X", "Prochain lot — stabilisation"].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates.length, 2);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
 describe("roadmap candidate priority", () => {
   it("detects p1 priority", () => {
     const { project, projectPath, cleanup } = setupRoadmap(

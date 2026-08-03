@@ -88,7 +88,9 @@ export function createLoopExecutionPlan(
     runtime: profile.runtime,
     profileId: profile.id,
     model: profile.model,
-    effort: profile.effort,
+    // Effort belongs to this invocation. The selected provider profile only
+    // supplies runtime capabilities and a deterministic ranking preference.
+    effort: input.agentPolicy.requirements.minimumEffort,
     budget: Object.freeze({ ...profile.budget }),
     policy: Object.freeze({
       id: input.agentPolicy.policyId,

@@ -147,4 +147,75 @@ describe("json errors", () => {
     assert.equal(json.error?.code, "invalid_max_repairs");
     assert.equal(json.error?.message, "Invalid --max-repairs value: -1");
   });
+
+  it("requires a Claude Code executable when the provider is selected", () => {
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "execute",
+      "--provider",
+      "claude_code",
+      "--json",
+    ]);
+    const json = JSON.parse(output) as {
+      error?: { code?: unknown; message?: unknown };
+    };
+    assert.equal(json.error?.code, "missing_provider_executable");
+    assert.equal(
+      json.error?.message,
+      "Claude Code provider requires --provider-executable.",
+    );
+  });
+
+  it("rejects a Claude Code executable with the wrong command name", () => {
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "execute",
+      "--provider",
+      "claude_code",
+      "--provider-executable",
+      "/usr/local/bin/not-claude",
+      "--json",
+    ]);
+    const json = JSON.parse(output) as {
+      error?: { code?: unknown; message?: unknown };
+    };
+    assert.equal(json.error?.code, "invalid_provider_executable");
+    assert.equal(
+      json.error?.message,
+      "Claude Code provider executable must resolve to a command named claude.",
+    );
+  });
+
+  it("wires Claude Code through the CLI and reaches the concrete executor boundary", () => {
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "execute",
+      "--provider",
+      "claude_code",
+      "--provider-executable",
+      "/definitely-missing/claude",
+      "--json",
+    ]);
+    const json = JSON.parse(output) as {
+      mode?: unknown;
+      status?: unknown;
+      failure?: { code?: unknown };
+      agentPolicy?: { selection?: { profile?: { runtime?: unknown } } };
+    };
+    assert.equal(json.mode, "execute");
+    assert.equal(json.status, "failed");
+    assert.equal(
+      ["provider_unavailable", "worktree_not_clean"].includes(
+        String(json.failure?.code),
+      ),
+      true,
+    );
+    assert.equal(json.agentPolicy?.selection?.profile?.runtime, "claude_code");
+  });
 });

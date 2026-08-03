@@ -35,7 +35,7 @@ const REQUIRED_RUNNER_TOKENS = Object.freeze([
   "publication: null",
 ]);
 const REQUIRED_COMMAND_TOKENS = Object.freeze([
-  'options.provider === "codex"',
+  "provider?: LoopProviderId",
   '"missing_provider_executable"',
   '"missing_commit_message"',
   "await runLoopCommit(",

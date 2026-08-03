@@ -37,7 +37,10 @@ import {
 import { isLoopRunMode, runLoopRunCommand } from "./commands/run.js";
 import {
   createLoopApplicationAssembly,
+  LOOP_PROVIDER_IDS,
   type LoopApplicationAssembly,
+  type LoopProviderConfiguration,
+  type LoopProviderId,
 } from "./composition/index.js";
 import { terminal } from "./ui/terminal.js";
 import { printJsonError } from "./commands/json-error.js";
@@ -78,6 +81,18 @@ function optionValue(name: string): string | undefined {
 
 function hasOption(name: string): boolean {
   return process.argv.includes(name);
+}
+
+function isLoopProviderId(value: string): value is LoopProviderId {
+  return (LOOP_PROVIDER_IDS as readonly string[]).includes(value);
+}
+
+function providerLabel(provider: LoopProviderId): string {
+  return provider === "claude_code" ? "Claude Code" : "Codex";
+}
+
+function providerExecutableName(provider: LoopProviderId): string {
+  return provider === "claude_code" ? "claude" : "codex";
 }
 
 function failOption(
@@ -216,13 +231,16 @@ else if (command === "review") {
   if (hasOption("--provider") && providerValue === undefined) {
     failOption(json, "unsupported_provider", "Missing value for --provider");
   }
-  if (providerValue !== undefined && providerValue !== "codex") {
-    failOption(
-      json,
-      "unsupported_provider",
-      `Unsupported provider: ${providerValue}`,
-    );
-  }
+  const providerId =
+    providerValue === undefined
+      ? undefined
+      : isLoopProviderId(providerValue)
+        ? providerValue
+        : failOption(
+            json,
+            "unsupported_provider",
+            `Unsupported provider: ${providerValue}`,
+          );
 
   const providerExecutable = optionValue("--provider-executable");
   const providerModel = optionValue("--provider-model");
@@ -230,35 +248,44 @@ else if (command === "review") {
 
   if (
     mode !== "publish" &&
-    providerValue === "codex" &&
+    providerId !== undefined &&
     providerExecutable === undefined
   ) {
     failOption(
       json,
       "missing_provider_executable",
-      "Codex provider requires --provider-executable.",
+      `${providerLabel(providerId)} provider requires --provider-executable.`,
     );
   }
 
   let runApplication: LoopApplicationAssembly = application;
   if (
     mode !== "publish" &&
-    providerValue === "codex" &&
+    providerId !== undefined &&
     providerExecutable !== undefined
   ) {
+    const provider: LoopProviderConfiguration =
+      providerId === "codex"
+        ? {
+            id: "codex",
+            executable: providerExecutable,
+            ...(providerModel ? { model: providerModel } : {}),
+            ...(providerTimeoutMs ? { timeoutMs: providerTimeoutMs } : {}),
+          }
+        : {
+            id: "claude_code",
+            executable: providerExecutable,
+            ...(providerModel ? { model: providerModel } : {}),
+            ...(providerTimeoutMs ? { timeoutMs: providerTimeoutMs } : {}),
+          };
+
     try {
-      runApplication = createLoopApplicationAssembly({
-        codexProvider: {
-          executable: providerExecutable,
-          ...(providerModel ? { model: providerModel } : {}),
-          ...(providerTimeoutMs ? { timeoutMs: providerTimeoutMs } : {}),
-        },
-      });
+      runApplication = createLoopApplicationAssembly({ provider });
     } catch {
       failOption(
         json,
         "invalid_provider_executable",
-        "Codex provider executable must resolve to a command named codex.",
+        `${providerLabel(providerId)} provider executable must resolve to a command named ${providerExecutableName(providerId)}.`,
       );
     }
   }
@@ -270,7 +297,7 @@ else if (command === "review") {
     json,
     {
       maxRepairs,
-      ...(providerValue === "codex" ? { provider: "codex" as const } : {}),
+      ...(providerId !== undefined ? { provider: providerId } : {}),
       ...(commitMessage !== undefined ? { commitMessage } : {}),
     },
   );

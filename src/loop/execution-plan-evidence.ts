@@ -48,7 +48,9 @@ export function projectLoopExecutionPlanEvidence(
     runtime: profile.runtime,
     profileId: profile.id,
     model: profile.model,
-    effort: profile.effort,
+    // Effort reflects the resolved execution plan (policy requirements),
+    // not the provider profile's own declared effort. See LoopExecutionPlan.effort.
+    effort: resolution.requirements.minimumEffort,
     budget: Object.freeze({ ...profile.budget }),
     policy: Object.freeze({
       id: resolution.policyId,

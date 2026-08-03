@@ -61,11 +61,11 @@ function admittedInput(): LoopExecutorInput {
       selection: {
         outcome: "selected",
         profile: {
-          id: "configured.codex",
-          runtime: "codex",
-          provider: "openai",
-          model: "gpt-5.6-sol",
-          effort: "medium",
+          id: "configured.claude_code",
+          runtime: "claude_code",
+          provider: "anthropic",
+          model: "claude-sonnet-4-5",
+          effort: "low",
           capabilities: ["code_edit", "shell_exec", "test_execution"],
           permissions: ["read_only", "write_worktree", "shell_exec"],
           budget: {
@@ -78,25 +78,25 @@ function admittedInput(): LoopExecutorInput {
         },
         rejected: [],
       },
-      reasons: ["selected configured.codex"],
+      reasons: ["selected configured.claude_code"],
     },
   } as unknown as LoopExecutorInput;
 }
 
 describe("createLoopExecutionPlan", () => {
-  it("captures the admitted provider decision immutably", () => {
+  it("captures the provider while resolving effort from policy requirements", () => {
     const plan = createLoopExecutionPlan(admittedInput());
 
     assert.equal(plan.schemaVersion, 1);
-    assert.equal(plan.provider, "openai");
-    assert.equal(plan.runtime, "codex");
-    assert.equal(plan.profileId, "configured.codex");
-    assert.equal(plan.model, "gpt-5.6-sol");
+    assert.equal(plan.provider, "anthropic");
+    assert.equal(plan.runtime, "claude_code");
+    assert.equal(plan.profileId, "configured.claude_code");
+    assert.equal(plan.model, "claude-sonnet-4-5");
+    assert.equal(plan.effort, "medium");
     assert.equal(plan.policy.status, "resolved");
     assert.equal(Object.isFrozen(plan), true);
     assert.equal(Object.isFrozen(plan.budget), true);
     assert.equal(Object.isFrozen(plan.policy), true);
-    assert.deepEqual(JSON.parse(JSON.stringify(plan)).provider, "openai");
   });
 
   it("rejects a request without an admitted selected policy", () => {
