@@ -1,0 +1,58 @@
+name: Patch V21.10 exports
+
+on:
+  push:
+    branches:
+      - feature/automation-worker-execution-lifecycle-closure-invocation-v21.10
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Patch public exports
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = [
+              Path('src/automation/orchestrator/index.ts'),
+              Path('src/automation/index.ts'),
+          ]
+
+          orchestrator_block = '''\nexport { invokeAutomationOrchestratorWorkerExecutionLifecycleClosure } from "./worker-execution-lifecycle-closure-invocation.js";\nexport type {\n  AutomationOrchestratorWorkerExecutionLifecycleClosurePort,\n  AutomationOrchestratorWorkerExecutionLifecycleClosurePortReason,\n  AutomationOrchestratorWorkerExecutionLifecycleClosurePortResult,\n  AutomationOrchestratorWorkerExecutionLifecycleClosurePortStatus,\n} from "./worker-execution-lifecycle-closure-port-types.js";\nexport type {\n  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationReason,\n  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationResult,\n  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationStatus,\n} from "./worker-execution-lifecycle-closure-invocation-types.js";\n'''
+
+          automation_block = '''\nexport { invokeAutomationOrchestratorWorkerExecutionLifecycleClosure } from "./orchestrator/worker-execution-lifecycle-closure-invocation.js";\nexport type {\n  AutomationOrchestratorWorkerExecutionLifecycleClosurePort,\n  AutomationOrchestratorWorkerExecutionLifecycleClosurePortReason,\n  AutomationOrchestratorWorkerExecutionLifecycleClosurePortResult,\n  AutomationOrchestratorWorkerExecutionLifecycleClosurePortStatus,\n} from "./orchestrator/worker-execution-lifecycle-closure-port-types.js";\nexport type {\n  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationReason,\n  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationResult,\n  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationStatus,\n} from "./orchestrator/worker-execution-lifecycle-closure-invocation-types.js";\n'''
+
+          for path, block, marker in [
+              (files[0], orchestrator_block, 'invokeAutomationOrchestratorWorkerExecutionLifecycleClosure'),
+              (files[1], automation_block, 'invokeAutomationOrchestratorWorkerExecutionLifecycleClosure'),
+          ]:
+              source = path.read_text()
+              if marker not in source:
+                  path.write_text(source.rstrip() + '\n' + block)
+          PY
+          pnpm exec prettier --write src/automation/orchestrator/index.ts src/automation/index.ts
+          git diff --check
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/automation/orchestrator/index.ts src/automation/index.ts
+          git commit -m "fix(automation): export lifecycle closure invocation" || exit 0
+          git rm .github/workflows/patch-v21-10-exports.yml
+          git commit --amend --no-edit
+          git push
