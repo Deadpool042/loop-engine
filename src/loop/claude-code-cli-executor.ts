@@ -29,10 +29,14 @@ function buildPrompt(plan: LoopExecutionPlan): string {
   ].join("\n");
 }
 
-function failure(code: string, message: string): LoopExecutorResult {
+function failure(
+  code: string,
+  message: string,
+  modifiedFiles: readonly string[] = [],
+): LoopExecutorResult {
   return Object.freeze({
     status: "failed" as const,
-    modifiedFiles: Object.freeze([]),
+    modifiedFiles: Object.freeze([...modifiedFiles]),
     failure: Object.freeze({
       code,
       message,
@@ -218,26 +222,43 @@ export function createClaudeCodeCliLoopExecutor(
       timeoutMs,
       maxOutputBytes,
     );
+
+    const modifiedFiles = await readModifiedFiles(cwd);
+
+    if (modifiedFiles === null) {
+      return failure(
+        "worktree_status_failed",
+        "Unable to inspect provider modifications.",
+      );
+    }
+
     if (result.killedReason === "timeout") {
       return failure(
         "provider_timeout",
         "Claude Code execution exceeded the configured timeout.",
+        modifiedFiles,
       );
     }
     if (result.killedReason === "output_limit") {
       return failure(
         "provider_limit_exceeded",
         "Claude Code execution exceeded the configured output limit.",
+        modifiedFiles,
       );
     }
     if (result.exitCode === 127) {
       return failure(
         "provider_unavailable",
         "Claude Code CLI is unavailable.",
+        modifiedFiles,
       );
     }
     if (result.exitCode !== 0) {
-      return failure("provider_failed", "Claude Code CLI execution failed.");
+      return failure(
+        "provider_failed",
+        "Claude Code CLI execution failed.",
+        modifiedFiles,
+      );
     }
 
     const output = parseClaudeCodeJsonOutput(result.stdout);
@@ -245,20 +266,14 @@ export function createClaudeCodeCliLoopExecutor(
       return failure(
         "provider_invalid_output",
         "Claude Code CLI produced output that could not be parsed.",
+        modifiedFiles,
       );
     }
     if (output.is_error === true) {
       return failure(
         "provider_reported_error",
         "Claude Code reported an error for this execution.",
-      );
-    }
-
-    const modifiedFiles = await readModifiedFiles(cwd);
-    if (modifiedFiles === null) {
-      return failure(
-        "worktree_status_failed",
-        "Unable to inspect provider modifications.",
+        modifiedFiles,
       );
     }
     return Object.freeze({

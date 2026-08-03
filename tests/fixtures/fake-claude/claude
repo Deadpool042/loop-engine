@@ -1,5 +1,9 @@
 #!/usr/bin/env node
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 const mode = process.env.FAKE_CLAUDE_MODE ?? "success";
+const cwd = process.cwd();
 
 function write(payload) {
   process.stdout.write(JSON.stringify(payload));
@@ -22,6 +26,12 @@ switch (mode) {
     break;
   }
   case "nonzero_exit": {
+    write({ subtype: "error", is_error: true });
+    process.exit(1);
+    break;
+  }
+  case "nonzero_exit_with_file": {
+    writeFileSync(join(cwd, "provider-leftover.txt"), "leftover\n");
     write({ subtype: "error", is_error: true });
     process.exit(1);
     break;
