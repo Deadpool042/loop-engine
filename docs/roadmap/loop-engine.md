@@ -19,7 +19,7 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 
 ## Lot actif — burn-in vertical
 
-- [ ] Burn-in 1 — Exécuter le chemin CLI -> provider -> worktree -> validation sur un dépôt fixture jetable et corriger uniquement les défauts réellement observés ; aucun nouveau contrat public, receipt, registre, boundary ou module d'architecture
+- [ ] Burn-in 1 — Ajouter `tests/integration/claude-code-provider-burn-in.test.ts` en réutilisant `tests/fixtures/fake-claude/claude`. Le test doit exécuter le chemin `LoopApplicationAssembly -> LoopExecutor -> worktree observation` dans un dépôt Git temporaire, faire créer exactement un fichier par le faux provider, vérifier que `modifiedFiles` reflète exactement ce fichier, puis valider avec `pnpm exec tsx --test tests/integration/claude-code-provider-burn-in.test.ts`. Aucun provider réel, aucune nouvelle abstraction, aucun commit, push ou publish.
 
 ## Gel architectural
 
