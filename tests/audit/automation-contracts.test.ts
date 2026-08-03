@@ -45,6 +45,10 @@ import {
   inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationDependencies,
   inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationMatrix,
   inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationInvariants,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationDependencies,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationMatrix,
+  inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationInvariants,
   inspectAutomationOrchestratorWorkerExecutionStartReceiptContracts,
   inspectAutomationOrchestratorWorkerExecutionStartReceiptDependencies,
   inspectAutomationOrchestratorWorkerExecutionStartReceiptInvariants,
@@ -157,6 +161,8 @@ const AUTOMATION_PATHS = [
   "src/automation/orchestrator/worker-execution-lifecycle-progression.ts",
   "src/automation/orchestrator/worker-execution-lifecycle-finalization-types.ts",
   "src/automation/orchestrator/worker-execution-lifecycle-finalization.ts",
+  "src/automation/orchestrator/worker-execution-lifecycle-closure-preparation-types.ts",
+  "src/automation/orchestrator/worker-execution-lifecycle-closure-preparation.ts",
   "docs/architecture/rfc/0001-automation-platform.md",
 ] as const;
 
@@ -3666,6 +3672,265 @@ test("AUDIT-570 rejects non-canonical automation export for worker execution lif
   );
 });
 
+test("AUDIT-574 accepts canonical worker execution lifecycle closure preparation contracts and exports", () => {
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts(
+      sources(),
+    ),
+    [],
+  );
+});
+
+test("AUDIT-574 rejects missing worker execution lifecycle closure preparation types file", () => {
+  const path =
+    "src/automation/orchestrator/worker-execution-lifecycle-closure-preparation-types.ts";
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts(
+      sourcesWithout(path),
+    ),
+    [
+      {
+        path,
+        reason:
+          "automation_worker_execution_lifecycle_closure_preparation_contract_missing",
+      },
+    ],
+  );
+});
+
+test("AUDIT-574 rejects missing worker execution lifecycle closure preparation implementation file", () => {
+  const path =
+    "src/automation/orchestrator/worker-execution-lifecycle-closure-preparation.ts";
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts(
+      sourcesWithout(path),
+    ),
+    [
+      {
+        path,
+        reason:
+          "automation_worker_execution_lifecycle_closure_preparation_function_missing",
+      },
+    ],
+  );
+});
+
+for (const [name, replacement] of [
+  [
+    "AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationStatus",
+    "RemovedClosurePreparationStatus",
+  ],
+  [
+    "AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationReason",
+    "RemovedClosurePreparationReason",
+  ],
+  [
+    "AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationResult",
+    "RemovedClosurePreparationResult",
+  ],
+] as const)
+  test(`AUDIT-574 rejects missing worker execution lifecycle closure preparation ${name}`, () => {
+    const path =
+      "src/automation/orchestrator/worker-execution-lifecycle-closure-preparation-types.ts";
+    assert.deepEqual(
+      inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts(
+        mutatedSources(
+          path,
+          `export type ${name} =`,
+          `export type ${replacement} =`,
+        ),
+      ),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_closure_preparation_contract_missing",
+        },
+      ],
+    );
+  });
+
+test("AUDIT-574 rejects renamed worker execution lifecycle closure preparation function", () => {
+  const path =
+    "src/automation/orchestrator/worker-execution-lifecycle-closure-preparation.ts";
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts(
+      mutatedSources(
+        path,
+        "export function prepareAutomationOrchestratorWorkerExecutionLifecycleClosure(",
+        "export function removedAutomationOrchestratorWorkerExecutionLifecycleClosure(",
+      ),
+    ),
+    [
+      {
+        path,
+        reason:
+          "automation_worker_execution_lifecycle_closure_preparation_function_missing",
+      },
+    ],
+  );
+});
+
+for (const name of [
+  "AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationStatus",
+  "AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationReason",
+  "AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationResult",
+] as const)
+  test(`AUDIT-574 rejects missing orchestrator export for ${name}`, () => {
+    const path = "src/automation/orchestrator/index.ts";
+    assert.deepEqual(
+      inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts(
+        mutatedSources(path, `  ${name},\n`, ""),
+      ),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_closure_preparation_export_missing",
+        },
+      ],
+    );
+  });
+
+test("AUDIT-574 rejects missing orchestrator export for worker execution lifecycle closure preparation function", () => {
+  const path = "src/automation/orchestrator/index.ts";
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts(
+      mutatedSources(
+        path,
+        'export { prepareAutomationOrchestratorWorkerExecutionLifecycleClosure } from "./worker-execution-lifecycle-closure-preparation.js";\n',
+        "",
+      ),
+    ),
+    [
+      {
+        path,
+        reason:
+          "automation_worker_execution_lifecycle_closure_preparation_export_missing",
+      },
+    ],
+  );
+});
+
+for (const name of [
+  "AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationStatus",
+  "AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationReason",
+  "AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationResult",
+] as const)
+  test(`AUDIT-574 rejects missing automation export for ${name}`, () => {
+    const path = "src/automation/index.ts";
+    assert.deepEqual(
+      inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts(
+        mutatedSources(path, `  ${name},\n`, ""),
+      ),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_closure_preparation_export_not_canonical",
+        },
+      ],
+    );
+  });
+
+test("AUDIT-574 rejects missing automation export for worker execution lifecycle closure preparation function", () => {
+  const path = "src/automation/index.ts";
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts(
+      mutatedSources(
+        path,
+        'export { prepareAutomationOrchestratorWorkerExecutionLifecycleClosure } from "./orchestrator/worker-execution-lifecycle-closure-preparation.js";\n',
+        "",
+      ),
+    ),
+    [
+      {
+        path,
+        reason:
+          "automation_worker_execution_lifecycle_closure_preparation_export_not_canonical",
+      },
+    ],
+  );
+});
+
+test("AUDIT-574 rejects non-canonical automation export for worker execution lifecycle closure preparation", () => {
+  const path = "src/automation/index.ts";
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationContracts(
+      mutatedSources(
+        path,
+        'from "./orchestrator/worker-execution-lifecycle-closure-preparation-types.js";',
+        'from "./orchestrator/index.js";',
+      ),
+    ),
+    [
+      {
+        path,
+        reason:
+          "automation_worker_execution_lifecycle_closure_preparation_export_not_canonical",
+      },
+    ],
+  );
+});
+
+test("AUDIT-575 accepts closed worker execution lifecycle closure preparation dependencies", () => {
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationDependencies(
+      sources(),
+    ),
+    [],
+  );
+});
+
+test("AUDIT-575 rejects forbidden worker execution lifecycle closure preparation dependencies", () => {
+  const path =
+    "src/automation/orchestrator/worker-execution-lifecycle-closure-preparation.ts";
+  const importTarget =
+    'import type { AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationResult } from "./worker-execution-lifecycle-closure-preparation-types.js";';
+  const functionTarget = "  const ids = identifiers(finalization);";
+  const inspector =
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationDependencies;
+  const checks = [
+    [importTarget, `import fs from "node:fs";\n${importTarget}`],
+    [functionTarget, `  Date.now();\n${functionTarget}`],
+    [functionTarget, `  Math.random();\n${functionTarget}`],
+    [functionTarget, `  crypto.randomUUID();\n${functionTarget}`],
+    [functionTarget, `  setTimeout(() => undefined, 0);\n${functionTarget}`],
+    [functionTarget, `  setInterval(() => undefined, 0);\n${functionTarget}`],
+    [functionTarget, `  port.prepareClosure(undefined);\n${functionTarget}`],
+    [functionTarget, `  service.prepareClosure(undefined);\n${functionTarget}`],
+    [
+      functionTarget,
+      `  provider.prepareClosure(undefined);\n${functionTarget}`,
+    ],
+    [functionTarget, `  worker.prepareClosure(undefined);\n${functionTarget}`],
+    [functionTarget, `  persistence.save(undefined);\n${functionTarget}`],
+    [functionTarget, `  publish(undefined);\n${functionTarget}`],
+    [
+      importTarget,
+      `import { finalizeAutomationOrchestratorWorkerExecutionLifecycle } from "./worker-execution-lifecycle-finalization.js";\n${importTarget}`,
+    ],
+    [
+      importTarget,
+      `import { progressAutomationOrchestratorWorkerExecutionLifecycle } from "./worker-execution-lifecycle-progression.js";\n${importTarget}`,
+    ],
+  ] as const;
+
+  for (const [pattern, replacement] of checks) {
+    assert.deepEqual(
+      inspector(mutatedSources(path, pattern, replacement)),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_closure_preparation_dependencies_not_closed",
+        },
+      ],
+      `mutation was not rejected: ${replacement}`,
+    );
+  }
+});
+
 test("AUDIT-571 accepts closed worker execution lifecycle finalization dependencies", () => {
   assert.deepEqual(
     inspectAutomationOrchestratorWorkerExecutionLifecycleFinalizationDependencies(
@@ -3850,6 +4115,129 @@ test("AUDIT-572 rejects open or inconsistent worker execution lifecycle finaliza
           path,
           reason:
             "automation_worker_execution_lifecycle_finalization_matrix_not_closed_or_fail_closed",
+        },
+      ],
+      `mutation was not rejected: ${pattern}`,
+    );
+  }
+});
+
+test("AUDIT-576 accepts closed worker execution lifecycle closure preparation matrix", () => {
+  assert.deepEqual(
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationMatrix(
+      sources(),
+    ),
+    [],
+  );
+});
+
+test("AUDIT-576 rejects weakened worker execution lifecycle closure preparation matrix", () => {
+  const path =
+    "src/automation/orchestrator/worker-execution-lifecycle-closure-preparation.ts";
+  const inspector =
+    inspectAutomationOrchestratorWorkerExecutionLifecycleClosurePreparationMatrix;
+
+  const completedCondition =
+    'finalization.status === "lifecycle_finalized" &&\n    finalization.reason === "execution_completed" &&\n    finalization.executionStarted === true &&\n    finalization.executionFinished === true &&\n    finalization.executionSucceeded === true &&\n    finalization.lifecycleFinalized === true';
+
+  const failedCondition =
+    'finalization.status === "lifecycle_finalized" &&\n    finalization.reason === "execution_failed" &&\n    finalization.executionStarted === true &&\n    finalization.executionFinished === true &&\n    finalization.executionSucceeded === false &&\n    finalization.lifecycleFinalized === true';
+
+  const runningCondition =
+    'finalization.status === "lifecycle_active" &&\n    finalization.reason === "execution_running" &&\n    finalization.executionStarted === true &&\n    finalization.executionFinished === false &&\n    finalization.executionSucceeded === false &&\n    finalization.lifecycleFinalized === false';
+
+  const indeterminateCondition =
+    'finalization.status === "lifecycle_indeterminate" &&\n    finalization.reason === "execution_indeterminate" &&\n    finalization.executionStarted === false &&\n    finalization.executionFinished === false &&\n    finalization.executionSucceeded === false &&\n    finalization.lifecycleFinalized === false';
+
+  const completedResult =
+    'return result(\n      "closure_ready",\n      "completed_lifecycle",\n      ids,\n      true,\n      true,\n      true,\n      true,\n      true,\n    );';
+
+  const failedResult =
+    'return result(\n      "closure_ready",\n      "failed_lifecycle",\n      ids,\n      true,\n      true,\n      false,\n      true,\n      true,\n    );';
+
+  const runningResult =
+    'return result(\n      "closure_not_required",\n      "active_lifecycle",\n      ids,\n      true,\n      false,\n      false,\n    );';
+
+  const indeterminateResult =
+    'return result("closure_indeterminate", "indeterminate_lifecycle", ids);';
+
+  const finalReject =
+    'return result("closure_rejected", "invalid_finalization", null);\n}';
+
+  const checks = [
+    ['typeof value.requestId === "string"', "false"],
+    ['typeof value.delegationId === "string"', "false"],
+    ['typeof value.candidateId === "string"', "false"],
+    ['typeof value.targetId === "string"', "false"],
+
+    [
+      'if (ids === null)\n    return result("closure_rejected", "invalid_finalization", null);',
+      "if (ids === null) return undefined;",
+    ],
+
+    [
+      completedCondition,
+      completedCondition.replace(
+        'finalization.reason === "execution_completed"',
+        'finalization.reason === "execution_failed"',
+      ),
+    ],
+    [
+      failedCondition,
+      failedCondition.replace(
+        "finalization.executionSucceeded === false",
+        "finalization.executionSucceeded === true",
+      ),
+    ],
+    [
+      runningCondition,
+      runningCondition.replace(
+        "finalization.lifecycleFinalized === false",
+        "finalization.lifecycleFinalized === true",
+      ),
+    ],
+    [
+      indeterminateCondition,
+      indeterminateCondition.replace(
+        "finalization.executionStarted === false",
+        "finalization.executionStarted === true",
+      ),
+    ],
+
+    [
+      completedResult,
+      completedResult.replace('"completed_lifecycle"', '"failed_lifecycle"'),
+    ],
+    [
+      failedResult,
+      failedResult.replace(
+        "      true,\n      true,\n    );",
+        "      true,\n      false,\n    );",
+      ),
+    ],
+    [
+      runningResult,
+      'return result(\n      "closure_ready",\n      "active_lifecycle",\n      ids,\n      true,\n      false,\n      false,\n      false,\n      true,\n    );',
+    ],
+    [
+      indeterminateResult,
+      'return result(\n      "closure_ready",\n      "indeterminate_lifecycle",\n      ids,\n      false,\n      false,\n      false,\n      false,\n      true,\n    );',
+    ],
+
+    [
+      finalReject,
+      'return result("closure_rejected", "invalid_finalization", ids);\n}',
+    ],
+  ] as const;
+
+  for (const [pattern, replacement] of checks) {
+    assert.deepEqual(
+      inspector(mutatedSources(path, pattern, replacement)),
+      [
+        {
+          path,
+          reason:
+            "automation_worker_execution_lifecycle_closure_preparation_matrix_not_closed_or_fail_closed",
         },
       ],
       `mutation was not rejected: ${pattern}`,

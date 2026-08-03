@@ -138,6 +138,7 @@ export type {
 export { validateAutomationOrchestratorWorkerExecutionLifecycleObservation } from "./orchestrator/worker-execution-lifecycle-observation.js";
 export { progressAutomationOrchestratorWorkerExecutionLifecycle } from "./orchestrator/worker-execution-lifecycle-progression.js";
 export { finalizeAutomationOrchestratorWorkerExecutionLifecycle } from "./orchestrator/worker-execution-lifecycle-finalization.js";
+export { prepareAutomationOrchestratorWorkerExecutionLifecycleClosure } from "./orchestrator/worker-execution-lifecycle-closure-preparation.js";
 export type {
   AutomationOrchestratorWorkerExecutionLifecycleObservation,
   AutomationOrchestratorWorkerExecutionLifecycleObservationReason,
@@ -156,6 +157,11 @@ export type {
   AutomationOrchestratorWorkerExecutionLifecycleFinalizationResult,
   AutomationOrchestratorWorkerExecutionLifecycleFinalizationStatus,
 } from "./orchestrator/worker-execution-lifecycle-finalization-types.js";
+export type {
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationReason,
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationResult,
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationStatus,
+} from "./orchestrator/worker-execution-lifecycle-closure-preparation-types.js";
 export { summarizeAutomationOrchestratorPipeline } from "./orchestrator/pipeline-summary.js";
 export { decideAutomationOrchestratorPipelineAdmission } from "./orchestrator/pipeline-admission.js";
 export { prepareAutomationOrchestratorPipelineWorkerHandoff } from "./orchestrator/pipeline-worker-handoff.js";
