@@ -2,6 +2,7 @@ import type {
   LoopApplicationAssembly,
   LoopApplicationProject,
   LoopApplicationRunMode,
+  LoopProviderId,
 } from "../composition/index.js";
 import { terminal } from "../ui/terminal.js";
 import { printJsonError } from "./json-error.js";
@@ -65,7 +66,7 @@ function printLoopRunResult(
 
 export type RunLoopRunCommandOptions = Readonly<{
   maxRepairs?: number;
-  provider?: "codex";
+  provider?: LoopProviderId;
   commitMessage?: string;
 }>;
 
@@ -94,11 +95,12 @@ export async function runLoopRunCommand(
     );
   }
 
-  if (options.provider === "codex" && !application.loopExecutor) {
+  if (options.provider !== undefined && !application.loopExecutor) {
+    const label = options.provider === "claude_code" ? "Claude Code" : "Codex";
     return printCommandError(
       json,
       "missing_provider_executable",
-      "Codex provider requires --provider-executable.",
+      `${label} provider requires --provider-executable.`,
     );
   }
 
