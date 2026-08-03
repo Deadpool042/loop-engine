@@ -88,10 +88,19 @@ export function evaluateAgentProfile(
     };
   }
 
-  // Effort is an invocation setting resolved by policy, not a fixed provider
-  // capability. profile.effort remains only a deterministic preference used to
-  // rank otherwise compatible profiles. The resolver already rejects an
-  // impossible min/max effort interval before calling the selector.
+  // Minimum effort is an invocation setting resolved by policy, not a fixed
+  // provider capability. A low-preference profile can therefore execute a
+  // medium-effort invocation. Maximum effort remains a selection ceiling so
+  // an expensive profile cannot bypass an explicit caller limit.
+  if (
+    request.maxEffort &&
+    compareAgentEffort(profile.effort, request.maxEffort) > 0
+  ) {
+    return {
+      ok: false,
+      reason: `effort ${profile.effort} exceeds max effort ${request.maxEffort}`,
+    };
+  }
 
   if (request.budgetCeiling) {
     const violation = findBudgetViolation(profile.budget, request.budgetCeiling);
