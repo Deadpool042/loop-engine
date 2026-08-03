@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -175,13 +175,18 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         executable: FAKE_CLAUDE,
         timeoutMs: 5_000,
       });
-      process.env.FAKE_CLAUDE_MODE = "nonzero_exit";
+      process.env.FAKE_CLAUDE_MODE = "nonzero_exit_with_file";
       const result = await executor(fakePlan(cwd));
       assert.equal(result.status, "failed");
       assert.equal(
         result.status === "failed" ? result.failure.code : null,
         "provider_failed",
       );
+      assert.deepEqual(
+        result.status === "failed" ? result.modifiedFiles : [],
+        ["provider-leftover.txt"],
+      );
+      assert.equal(readFileSync(join(cwd, "provider-leftover.txt"), "utf8"), "leftover\n");
     } finally {
       delete process.env.FAKE_CLAUDE_MODE;
       cleanup();
