@@ -381,6 +381,41 @@ timeout, timestamp, génération d'identifiant ou infrastructure concrète. La
 persistance, la publication et la clôture opérationnelle du lifecycle restent
 des capacités futures.
 
+V21.9 ajoute Execution Lifecycle Closure Preparation : elle consomme uniquement
+un
+`AutomationOrchestratorWorkerExecutionLifecycleFinalizationResult` V21.8 déjà
+validé. Elle ne consomme ni progression V21.7, ni validation V21.6, ni
+lifecycle V21.5, ni observation brute, et ne rappelle aucune frontière
+précédente. Elle ne clôture, ne persiste et ne publie rien concrètement ; elle
+prépare uniquement une décision pure, synchrone, déterministe et fail-closed
+indiquant si une clôture opérationnelle est requise.
+
+Sa matrice fermée est :
+
+- `lifecycle_finalized` / `execution_completed` devient `closure_ready` /
+  `completed_lifecycle`, avec `closureRequired: true` ;
+- `lifecycle_finalized` / `execution_failed` devient `closure_ready` /
+  `failed_lifecycle`, avec `closureRequired: true` ;
+- `lifecycle_active` / `execution_running` devient `closure_not_required` /
+  `active_lifecycle`, avec `closureRequired: false` ;
+- `lifecycle_indeterminate` / `execution_indeterminate` devient
+  `closure_indeterminate` / `indeterminate_lifecycle`, avec
+  `closureRequired: false`.
+
+Toute autre combinaison produit `closure_rejected` /
+`invalid_finalization`, avec les trois flags à `false`,
+`lifecycleFinalized: false`, `closureRequired: false` et les quatre
+identifiants à `null`. Seuls `requestId`, `delegationId`, `candidateId` et
+`targetId` sont propagés strictement et sans transformation pour une matrice
+valide. `closureRequired: true` est réservé aux lifecycles finalisés
+`completed` et `failed`.
+
+V21.9 n'ajoute aucun polling, suivi programmé, appel worker, port concret,
+service concret, provider, adaptateur, persistance, publication, queue, retry,
+timeout, timestamp, génération d'identifiant ou infrastructure concrète. La
+persistance, la publication et l'exécution opérationnelle de la clôture restent
+des capacités futures.
+
 ## 5. Execution lifecycle
 
 1. Une demande et son contexte sont fournis avec un assemblage applicatif
