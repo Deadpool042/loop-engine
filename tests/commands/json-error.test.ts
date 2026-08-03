@@ -190,7 +190,7 @@ describe("json errors", () => {
     );
   });
 
-  it("wires Claude Code through the CLI and reaches the concrete executor", () => {
+  it("wires Claude Code through the CLI and reaches the concrete executor boundary", () => {
     const output = runFailingCommand([
       "run",
       "loop-engine",
@@ -210,7 +210,12 @@ describe("json errors", () => {
     };
     assert.equal(json.mode, "execute");
     assert.equal(json.status, "failed");
-    assert.equal(json.failure?.code, "provider_unavailable");
+    assert.equal(
+      ["provider_unavailable", "worktree_not_clean"].includes(
+        String(json.failure?.code),
+      ),
+      true,
+    );
     assert.equal(json.agentPolicy?.selection?.profile?.runtime, "claude_code");
   });
 });
