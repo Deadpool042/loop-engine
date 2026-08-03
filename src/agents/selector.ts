@@ -51,16 +51,9 @@ function findBudgetViolation(
   for (const dimension of BUDGET_DIMENSIONS) {
     const ceilingValue = ceiling[dimension];
 
-    if (ceilingValue == null) {
-      continue;
-    }
+    if (ceilingValue == null) continue;
 
     const profileValue = budget[dimension];
-
-    // A profile with no declared bound on this dimension (null) is treated
-    // as a violation once the caller sets an explicit ceiling: token
-    // economy is a central goal of this lot, so an unknown bound must never
-    // silently pass an explicit budget constraint.
     if (profileValue === null || profileValue > ceilingValue) {
       return `budget.${dimension} (${profileValue ?? "unbounded"}) exceeds ceiling (${ceilingValue})`;
     }
@@ -95,35 +88,14 @@ export function evaluateAgentProfile(
     };
   }
 
-  if (
-    request.minEffort &&
-    compareAgentEffort(profile.effort, request.minEffort) < 0
-  ) {
-    return {
-      ok: false,
-      reason: `effort ${profile.effort} is below min effort ${request.minEffort}`,
-    };
-  }
-
-  if (
-    request.maxEffort &&
-    compareAgentEffort(profile.effort, request.maxEffort) > 0
-  ) {
-    return {
-      ok: false,
-      reason: `effort ${profile.effort} exceeds max effort ${request.maxEffort}`,
-    };
-  }
+  // Effort is an invocation setting resolved by policy, not a fixed provider
+  // capability. profile.effort remains only a deterministic preference used to
+  // rank otherwise compatible profiles. The resolver already rejects an
+  // impossible min/max effort interval before calling the selector.
 
   if (request.budgetCeiling) {
-    const violation = findBudgetViolation(
-      profile.budget,
-      request.budgetCeiling,
-    );
-
-    if (violation) {
-      return { ok: false, reason: violation };
-    }
+    const violation = findBudgetViolation(profile.budget, request.budgetCeiling);
+    if (violation) return { ok: false, reason: violation };
   }
 
   return { ok: true };
@@ -132,9 +104,7 @@ export function evaluateAgentProfile(
 export function pickSmallestCapable(
   profiles: readonly AgentProfile[],
 ): AgentProfile | null {
-  if (profiles.length === 0) {
-    return null;
-  }
+  if (profiles.length === 0) return null;
 
   return (
     [...profiles].sort(
@@ -154,18 +124,12 @@ export function selectAgentProfile(
   for (const profile of registry.profiles) {
     const evaluation = evaluateAgentProfile(profile, request);
 
-    if (evaluation.ok) {
-      eligible.push(profile);
-    } else {
-      rejected.push({ profileId: profile.id, reason: evaluation.reason });
-    }
+    if (evaluation.ok) eligible.push(profile);
+    else rejected.push({ profileId: profile.id, reason: evaluation.reason });
   }
 
   const selected = pickSmallestCapable(eligible);
-
-  if (!selected) {
-    return { outcome: "no_match", rejected };
-  }
+  if (!selected) return { outcome: "no_match", rejected };
 
   return { outcome: "selected", profile: selected, rejected };
 }
