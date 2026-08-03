@@ -1,0 +1,66 @@
+name: Patch V21.10 audit direction
+
+on:
+  push:
+    branches:
+      - feature/automation-worker-execution-lifecycle-closure-invocation-v21.10
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: feature/automation-worker-execution-lifecycle-closure-invocation-v21.10
+          fetch-depth: 0
+      - name: Patch AUDIT-510 dependency inventory
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('src/audit/rules/automation-contracts.ts')
+          source = path.read_text()
+          marker = 'WORKER_EXECUTION_LIFECYCLE_CLOSURE_INVOCATION_AUDIT_510'
+          if marker not in source:
+              pattern = r'(\n  for \(const \[path, expected\] of expectedImports(?:\.entries\(\))?\) \{)'
+              addition = '''
+  // WORKER_EXECUTION_LIFECYCLE_CLOSURE_INVOCATION_AUDIT_510
+  expectedImports.set(
+    BARREL_FILE,
+    Object.freeze([
+      ...(expectedImports.get(BARREL_FILE) ?? []),
+      "./orchestrator/worker-execution-lifecycle-closure-port-types.js",
+      "./orchestrator/worker-execution-lifecycle-closure-invocation-types.js",
+      "./orchestrator/worker-execution-lifecycle-closure-invocation.js",
+    ]),
+  );
+  expectedImports.set(
+    ORCHESTRATOR_BARREL_FILE,
+    Object.freeze([
+      ...(expectedImports.get(ORCHESTRATOR_BARREL_FILE) ?? []),
+      "./worker-execution-lifecycle-closure-port-types.js",
+      "./worker-execution-lifecycle-closure-invocation-types.js",
+      "./worker-execution-lifecycle-closure-invocation.js",
+    ]),
+  );
+'''
+              updated, count = re.subn(pattern, addition + r'\1', source, count=1)
+              if count != 1:
+                  raise SystemExit('AUDIT-510 loop anchor not found exactly once')
+              path.write_text(updated)
+          PY
+          pnpm exec prettier --write src/audit/rules/automation-contracts.ts
+          rm -f .github/workflows/patch-v21-10-audit.yml .github/patch-v21-10.trigger
+          git diff --check
+      - name: Commit correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(audit): allow lifecycle closure invocation exports"
+          git push origin HEAD:feature/automation-worker-execution-lifecycle-closure-invocation-v21.10
