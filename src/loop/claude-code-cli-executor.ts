@@ -43,13 +43,19 @@ function failure(code: string, message: string): LoopExecutorResult {
   });
 }
 
+type RunProcessOutcome = Readonly<{
+  exitCode: number;
+  stdout: string;
+  killedReason: "timeout" | "output_limit" | null;
+}>;
+
 function runProcess(
   executable: string,
   args: readonly string[],
   cwd: string,
   timeoutMs: number,
   maxOutputBytes: number,
-): Promise<Readonly<{ exitCode: number; stdout: string }>> {
+): Promise<RunProcessOutcome> {
   return new Promise((resolvePromise) => {
     const child = spawn(executable, [...args], {
       cwd,
@@ -64,17 +70,20 @@ function runProcess(
     let observedBytes = 0;
     let settled = false;
     let timer: NodeJS.Timeout | null = null;
-    const settle = (exitCode: number): void => {
+    const settle = (
+      exitCode: number,
+      killedReason: RunProcessOutcome["killedReason"] = null,
+    ): void => {
       if (settled) return;
       settled = true;
       if (timer !== null) clearTimeout(timer);
-      resolvePromise(Object.freeze({ exitCode, stdout }));
+      resolvePromise(Object.freeze({ exitCode, stdout, killedReason }));
     };
     const consume = (chunk: Buffer, capture: boolean): void => {
       observedBytes += chunk.byteLength;
       if (observedBytes > maxOutputBytes) {
         child.kill("SIGTERM");
-        settle(124);
+        settle(124, "output_limit");
         return;
       }
       if (capture) stdout += chunk.toString("utf8");
@@ -85,7 +94,7 @@ function runProcess(
     child.once("close", (code) => settle(code ?? 1));
     timer = setTimeout(() => {
       child.kill("SIGTERM");
-      settle(124);
+      settle(124, "timeout");
     }, timeoutMs);
   });
 }
@@ -113,6 +122,25 @@ async function readModifiedFiles(cwd: string): Promise<readonly string[] | null>
     1_000_000,
   );
   return result.exitCode === 0 ? parsePorcelainFiles(result.stdout) : null;
+}
+
+type ClaudeCodeCliJsonOutput = Readonly<{
+  is_error?: boolean;
+  subtype?: string;
+}>;
+
+function parseClaudeCodeJsonOutput(
+  stdout: string,
+): ClaudeCodeCliJsonOutput | null {
+  try {
+    const parsed: unknown = JSON.parse(stdout);
+    if (typeof parsed !== "object" || parsed === null) {
+      return null;
+    }
+    return parsed as ClaudeCodeCliJsonOutput;
+  } catch {
+    return null;
+  }
 }
 
 export function createClaudeCodeCliLoopExecutor(
@@ -190,10 +218,16 @@ export function createClaudeCodeCliLoopExecutor(
       timeoutMs,
       maxOutputBytes,
     );
-    if (result.exitCode === 124) {
+    if (result.killedReason === "timeout") {
+      return failure(
+        "provider_timeout",
+        "Claude Code execution exceeded the configured timeout.",
+      );
+    }
+    if (result.killedReason === "output_limit") {
       return failure(
         "provider_limit_exceeded",
-        "Claude Code execution exceeded a configured limit.",
+        "Claude Code execution exceeded the configured output limit.",
       );
     }
     if (result.exitCode === 127) {
@@ -204,6 +238,20 @@ export function createClaudeCodeCliLoopExecutor(
     }
     if (result.exitCode !== 0) {
       return failure("provider_failed", "Claude Code CLI execution failed.");
+    }
+
+    const output = parseClaudeCodeJsonOutput(result.stdout);
+    if (output === null) {
+      return failure(
+        "provider_invalid_output",
+        "Claude Code CLI produced output that could not be parsed.",
+      );
+    }
+    if (output.is_error === true) {
+      return failure(
+        "provider_reported_error",
+        "Claude Code reported an error for this execution.",
+      );
     }
 
     const modifiedFiles = await readModifiedFiles(cwd);

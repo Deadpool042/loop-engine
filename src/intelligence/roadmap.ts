@@ -121,7 +121,14 @@ function classifyCandidateLine(line: string): Readonly<{
   };
 }
 
+function isMarkdownHeading(line: string): boolean {
+  return /^#{1,6}(\s|$)/.test(line);
+}
+
 function isCandidateLine(line: string): boolean {
+  if (isMarkdownHeading(line)) {
+    return false;
+  }
   return CANDIDATE_PATTERNS.some((pattern) => line.includes(pattern));
 }
 

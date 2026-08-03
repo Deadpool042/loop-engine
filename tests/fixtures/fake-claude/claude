@@ -1,0 +1,36 @@
+#!/usr/bin/env node
+const mode = process.env.FAKE_CLAUDE_MODE ?? "success";
+
+function write(payload) {
+  process.stdout.write(JSON.stringify(payload));
+}
+
+switch (mode) {
+  case "success": {
+    write({ subtype: "success", is_error: false, num_turns: 1 });
+    process.exit(0);
+    break;
+  }
+  case "is_error": {
+    write({ subtype: "error_during_execution", is_error: true, num_turns: 1 });
+    process.exit(0);
+    break;
+  }
+  case "invalid_json": {
+    process.stdout.write("not json at all");
+    process.exit(0);
+    break;
+  }
+  case "nonzero_exit": {
+    write({ subtype: "error", is_error: true });
+    process.exit(1);
+    break;
+  }
+  case "hang": {
+    setInterval(() => {}, 1000);
+    break;
+  }
+  default: {
+    process.exit(1);
+  }
+}

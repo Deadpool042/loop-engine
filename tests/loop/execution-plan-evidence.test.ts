@@ -39,6 +39,36 @@ test("projects bounded immutable evidence from an admitted execution policy", ()
   assert.equal("contextPackage" in (evidence as object), false);
 });
 
+test("evidence effort reflects the resolved policy requirement, not the profile's own effort", () => {
+  const resolution = {
+    status: "resolved",
+    policyId: "default-agent-policy",
+    mode: "execute",
+    reasons: ["selected deterministic profile"],
+    requirements: {
+      minimumEffort: "medium",
+      requiredCapabilities: ["code"],
+      requiredPermissions: ["workspace_write"],
+      rationale: ["safe candidate"],
+    },
+    selection: {
+      outcome: "selected",
+      profile: {
+        id: "claude-code-low",
+        provider: "anthropic",
+        runtime: "claude_code",
+        model: "claude-haiku-4-5",
+        effort: "low",
+        budget: { maxInputTokens: 10_000, maxOutputTokens: 4_000 },
+      },
+      rejected: [],
+    },
+  } as any;
+
+  const evidence = projectLoopExecutionPlanEvidence(resolution);
+  assert.equal(evidence?.effort, "medium");
+});
+
 test("execution reports include null evidence when no execution was admitted", () => {
   const result = {
     schemaVersion: 1,
