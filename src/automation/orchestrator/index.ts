@@ -174,6 +174,7 @@ export { validateAutomationOrchestratorWorkerExecutionLifecycleObservation } fro
 export { progressAutomationOrchestratorWorkerExecutionLifecycle } from "./worker-execution-lifecycle-progression.js";
 export { finalizeAutomationOrchestratorWorkerExecutionLifecycle } from "./worker-execution-lifecycle-finalization.js";
 export { prepareAutomationOrchestratorWorkerExecutionLifecycleClosure } from "./worker-execution-lifecycle-closure-preparation.js";
+export { invokeAutomationOrchestratorWorkerExecutionLifecycleClosure } from "./worker-execution-lifecycle-closure-invocation.js";
 export type {
   AutomationOrchestratorWorkerExecutionLifecycleObservation,
   AutomationOrchestratorWorkerExecutionLifecycleObservationReason,
@@ -197,6 +198,17 @@ export type {
   AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationResult,
   AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationStatus,
 } from "./worker-execution-lifecycle-closure-preparation-types.js";
+export type {
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePort,
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePortReason,
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePortResult,
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePortStatus,
+} from "./worker-execution-lifecycle-closure-port-types.js";
+export type {
+  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationReason,
+  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationResult,
+  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationStatus,
+} from "./worker-execution-lifecycle-closure-invocation-types.js";
 export type {
   AutomationOrchestratorPipelineProgression,
   AutomationOrchestratorPipelineResult,

@@ -139,6 +139,7 @@ export { validateAutomationOrchestratorWorkerExecutionLifecycleObservation } fro
 export { progressAutomationOrchestratorWorkerExecutionLifecycle } from "./orchestrator/worker-execution-lifecycle-progression.js";
 export { finalizeAutomationOrchestratorWorkerExecutionLifecycle } from "./orchestrator/worker-execution-lifecycle-finalization.js";
 export { prepareAutomationOrchestratorWorkerExecutionLifecycleClosure } from "./orchestrator/worker-execution-lifecycle-closure-preparation.js";
+export { invokeAutomationOrchestratorWorkerExecutionLifecycleClosure } from "./orchestrator/worker-execution-lifecycle-closure-invocation.js";
 export type {
   AutomationOrchestratorWorkerExecutionLifecycleObservation,
   AutomationOrchestratorWorkerExecutionLifecycleObservationReason,
@@ -162,6 +163,17 @@ export type {
   AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationResult,
   AutomationOrchestratorWorkerExecutionLifecycleClosurePreparationStatus,
 } from "./orchestrator/worker-execution-lifecycle-closure-preparation-types.js";
+export type {
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePort,
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePortReason,
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePortResult,
+  AutomationOrchestratorWorkerExecutionLifecycleClosurePortStatus,
+} from "./orchestrator/worker-execution-lifecycle-closure-port-types.js";
+export type {
+  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationReason,
+  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationResult,
+  AutomationOrchestratorWorkerExecutionLifecycleClosureInvocationStatus,
+} from "./orchestrator/worker-execution-lifecycle-closure-invocation-types.js";
 export { summarizeAutomationOrchestratorPipeline } from "./orchestrator/pipeline-summary.js";
 export { decideAutomationOrchestratorPipelineAdmission } from "./orchestrator/pipeline-admission.js";
 export { prepareAutomationOrchestratorPipelineWorkerHandoff } from "./orchestrator/pipeline-worker-handoff.js";
