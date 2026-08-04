@@ -25,6 +25,8 @@ function buildPrompt(plan: LoopExecutionPlan): string {
     `Execution plan: provider=${plan.provider}, runtime=${plan.runtime}, profile=${plan.profileId}, model=${plan.model}, effort=${plan.effort}`,
     `Allowed context files: ${files || "none"}`,
     "Stay inside the current worktree. Do not commit, push, tag, publish, alter credentials, or expose secrets.",
+    "Do not modify the roadmap or mark the selected candidate complete.",
+    "Implement only the target files explicitly named by the selected candidate.",
     "Finish by leaving only the intended source changes in the worktree.",
   ].join("\n");
 }
@@ -117,7 +119,9 @@ function parsePorcelainFiles(output: string): readonly string[] {
   return Object.freeze([...files].sort());
 }
 
-async function readModifiedFiles(cwd: string): Promise<readonly string[] | null> {
+async function readModifiedFiles(
+  cwd: string,
+): Promise<readonly string[] | null> {
   const result = await runProcess(
     "git",
     ["status", "--porcelain=v1", "-z"],

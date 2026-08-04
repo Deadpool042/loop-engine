@@ -3,6 +3,11 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const mode = process.env.FAKE_CLAUDE_MODE ?? "success";
+
+const captureArgsPath = process.env.FAKE_CLAUDE_CAPTURE_ARGS;
+if (captureArgsPath) {
+  writeFileSync(captureArgsPath, JSON.stringify(process.argv.slice(2)));
+}
 const cwd = process.cwd();
 
 function write(payload) {
