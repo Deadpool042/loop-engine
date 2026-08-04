@@ -54,7 +54,7 @@ describe("project snapshot roadmap selection", () => {
   it("continues to select explicit todo candidates", () => {
     const { project, cleanup } = setupProject(
       [
-        "- Une phrase de prose contenant le mot lot.",
+        "- Une phrase de prose contenant le mot lot historique.",
         "- [ ] [P1] Ajouter le prochain burn-in contrôlé",
       ].join("\n"),
     );
