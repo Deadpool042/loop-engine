@@ -4,6 +4,28 @@ import { join } from "node:path";
 
 const mode = process.env.FAKE_CLAUDE_MODE ?? "success";
 
+// Test-only, bounded override for the filename written by "success_with_file"
+// (default unchanged: "provider-created.txt"). Deliberately restrictive —
+// this is a test fixture, not a production path-resolution abstraction.
+const DEFAULT_OUTPUT_FILE = "provider-created.txt";
+
+function resolveOutputFile() {
+  const override = process.env.FAKE_CLAUDE_OUTPUT_FILE;
+  if (override === undefined || override.length === 0) {
+    return DEFAULT_OUTPUT_FILE;
+  }
+  const isAbsolute = override.startsWith("/") || override.startsWith("\\");
+  const hasTraversal = override.split(/[\\/]/).includes("..");
+  const isSimpleRelativeName = !override.includes("/") && !override.includes("\\");
+  if (isAbsolute || hasTraversal || !isSimpleRelativeName) {
+    process.stderr.write(
+      "FAKE_CLAUDE_OUTPUT_FILE must be a simple relative filename (no absolute path, no '..').\n",
+    );
+    process.exit(1);
+  }
+  return override;
+}
+
 const captureArgsPath = process.env.FAKE_CLAUDE_CAPTURE_ARGS;
 if (captureArgsPath) {
   writeFileSync(captureArgsPath, JSON.stringify(process.argv.slice(2)));
@@ -57,7 +79,8 @@ switch (mode) {
     break;
   }
   case "success_with_file": {
-    writeFileSync(join(cwd, "provider-created.txt"), "created\n");
+    const outputFile = resolveOutputFile();
+    writeFileSync(join(cwd, outputFile), "created\n");
     write({ subtype: "success", is_error: false, num_turns: 1 });
     process.exit(0);
     break;

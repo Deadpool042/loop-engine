@@ -19,7 +19,8 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 
 ## Lot actif — burn-in vertical
 
-- [ ] Burn-in 1 — Ajouter `tests/integration/claude-code-provider-burn-in.test.ts` en réutilisant `tests/fixtures/fake-claude/claude`. Le test doit exécuter le chemin `LoopApplicationAssembly -> LoopExecutor -> worktree observation` dans un dépôt Git temporaire, faire créer exactement un fichier par le faux provider, vérifier que `modifiedFiles` reflète exactement ce fichier, puis valider avec `pnpm exec tsx --test tests/integration/claude-code-provider-burn-in.test.ts`. Aucun provider réel, aucune nouvelle abstraction, aucun commit, push ou publish.
+- [x] Burn-in 1 — Ajouter `tests/integration/claude-code-provider-burn-in.test.ts` en réutilisant `tests/fixtures/fake-claude/claude`. Le test doit exécuter le chemin `LoopApplicationAssembly -> LoopExecutor -> worktree observation` dans un dépôt Git temporaire, faire créer exactement un fichier par le faux provider, vérifier que `modifiedFiles` reflète exactement ce fichier, puis valider avec `pnpm exec tsx --test tests/integration/claude-code-provider-burn-in.test.ts`. Aucun provider réel, aucune nouvelle abstraction, aucun commit, push ou publish.
+- [x] Burn-in 2 — Ajouter `tests/integration/claude-code-provider-repeated-burn-in.test.ts` couvrant plusieurs exécutions successives dans un même dépôt Git temporaire (isolation du delta après re-baseline explicite, refus `worktree_not_clean` sur état préexistant non attribué, échec sans faux delta ni contamination). Invariant démontré : le delta observé par une exécution ne dépend que de l'état du worktree au moment de cette exécution, jamais d'une exécution précédente. Aucun provider réel, aucune nouvelle abstraction de production, aucun commit, push ou publish depuis le moteur.
 
 ## Gel architectural
 
