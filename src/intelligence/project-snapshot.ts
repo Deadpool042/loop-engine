@@ -37,7 +37,12 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
   const roadmapAvailable = roadmapPaths.length > 0;
 
   const roadmapCandidates = findRoadmapCandidates(project, projectPath);
-  const selectedRoadmapCandidate = selectRoadmapCandidate(roadmapCandidates);
+  const selectableRoadmapCandidates = roadmapCandidates.filter(
+    (candidate) => candidate.status !== "unknown",
+  );
+  const selectedRoadmapCandidate = selectRoadmapCandidate(
+    selectableRoadmapCandidates,
+  );
 
   const roadmapStats = {
     total: roadmapCandidates.length,
@@ -64,7 +69,7 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
   const roadmapSummary = {
     active: roadmapStats.total - roadmapStats.done,
     done: roadmapStats.done,
-    selectable: roadmapCandidates.filter(
+    selectable: selectableRoadmapCandidates.filter(
       (candidate) => candidate.status !== "done",
     ).length,
     hasBlocked: roadmapStats.blocked > 0,
