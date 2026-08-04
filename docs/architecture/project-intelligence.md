@@ -59,6 +59,28 @@ Chaque candidat est classé en trois niveaux :
 - `warning` : candidat sensible qui nécessite une revue humaine renforcée.
 - `blocked` : candidat trop risqué pour être démarré directement.
 
+---
+
+## GUI Cockpit (V1)
+
+Vocabulaire introduit par le cadrage de l'interface graphique de pilotage
+(voir `gui-cockpit.md` et [ADR-0006](adr/0006-gui-cockpit-external-json-consumer.md)).
+
+- **GUI Cockpit** : application desktop locale qui pilote visuellement
+  Loop Engine. C'est un consommateur JSON externe au moteur, au même
+  titre qu'OpenClaw ou n8n — jamais un module interne.
+- **Section** : bloc repliable de l'écran Détail projet correspondant à
+  une commande CLI (`status`, `next`, `context`, `prompt`, `review`,
+  `plan`). Une section a un cycle de vie propre : repliée → en
+  chargement → chargée/en cache → en erreur.
+- **Chargement eager** : chargement automatique d'une section dès
+  l'ouverture du projet (`status`, `next`).
+- **Chargement lazy** : chargement d'une section déclenché uniquement au
+  premier dépliage par l'opérateur (`context`, `prompt`, `review`,
+  `plan`), puis mis en cache pour la session.
+- **Opérateur** : persona unique de la GUI Cockpit V1 — l'utilisateur
+  solo qui pilote ses propres projets locaux.
+
 Chaque candidat expose aussi une `reason` déterministe expliquant le classement.
 
 Exemples :

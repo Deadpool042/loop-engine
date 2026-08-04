@@ -17,6 +17,7 @@
     "ci": "pnpm run validate && pnpm run audit:strict && pnpm run audit:profiles",
     "audit:profiles": "tsx scripts/audit-profile-check.ts",
     "audit:release-check": "tsx scripts/audit-release-check.ts",
+    "prototype:gui-cockpit": "tsx scripts/prototype-gui-cockpit-server.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
