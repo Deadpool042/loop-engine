@@ -153,6 +153,30 @@ describe("createClaudeCodeCliLoopExecutor", () => {
     }
   });
 
+  it("classifies max-turn exhaustion before generic non-zero exit failure", async () => {
+    const { cwd, cleanup } = setupCleanWorktree();
+    try {
+      const executor = createClaudeCodeCliLoopExecutor({
+        executable: FAKE_CLAUDE,
+        timeoutMs: 5_000,
+      });
+      process.env.FAKE_CLAUDE_MODE = "max_turns";
+      const result = await executor(fakePlan(cwd));
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "provider_max_turns",
+      );
+      assert.equal(
+        JSON.stringify(result).includes("Reached maximum number of turns"),
+        false,
+      );
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      cleanup();
+    }
+  });
+
   it("fails with provider_invalid_output on unparsable JSON", async () => {
     const { cwd, cleanup } = setupCleanWorktree();
     try {
