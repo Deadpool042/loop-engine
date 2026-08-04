@@ -38,6 +38,8 @@ export interface LoopGuiApi {
     projectName: string,
     refresh?: boolean,
   ): Promise<ProjectPlanReport>;
+  validateProject(projectName: string): Promise<void>;
+  openProjectFolder(projectName: string): Promise<void>;
 }
 
 export const EXPOSED_API_METHODS = [
@@ -50,6 +52,8 @@ export const EXPOSED_API_METHODS = [
   "loadProjectPrompt",
   "loadProjectReview",
   "loadProjectPlan",
+  "validateProject",
+  "openProjectFolder",
 ] as const;
 
 export function createLoopGuiApi(bridge: Bridge): LoopGuiApi {
@@ -123,6 +127,25 @@ export function createLoopGuiApi(bridge: Bridge): LoopGuiApi {
         projectName,
         refresh === true,
       ) as Promise<ProjectPlanReport>;
+    },
+    validateProject: (projectName: string) => {
+      if (typeof projectName !== "string" || projectName.trim().length === 0) {
+        return Promise.reject(
+          new TypeError("projectName must be a non-empty string"),
+        );
+      }
+      return bridge.invoke(CHANNELS.validateProject, projectName) as Promise<void>;
+    },
+    openProjectFolder: (projectName: string) => {
+      if (typeof projectName !== "string" || projectName.trim().length === 0) {
+        return Promise.reject(
+          new TypeError("projectName must be a non-empty string"),
+        );
+      }
+      return bridge.invoke(
+        CHANNELS.openProjectFolder,
+        projectName,
+      ) as Promise<void>;
     },
   };
 }

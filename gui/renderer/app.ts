@@ -1,8 +1,9 @@
 // Renderer entry point. Runs in a sandboxed, isolated browser context —
 // the only privileged surface it can reach is `window.loopGuiApi`
-// (see main/preload.ts), a narrow typed API with exactly nine methods.
+// (see main/preload.ts), a narrow typed API with exactly eleven methods.
 // No child_process, no fs, no generic execute().
 import type { LoopGuiApi } from "../main/preload-api.js";
+import { promptCopyText } from "./project-actions.js";
 import {
   goToDashboard,
   goToSettings,
@@ -362,6 +363,86 @@ function renderSplitView(root: HTMLElement): void {
   renderProjectDetail(detailPane, selectedProject);
 }
 
+function ensureSectionOpen(
+  projectName: string,
+  id: "review" | "prompt",
+): void {
+  const state = sectionsFor(projectName);
+
+  if (!state.open[id]) {
+    sectionsByProject.set(projectName, toggleSection(state, id));
+  }
+}
+
+function actionStatusLabel<T>(state: LazySectionState<T> | undefined): string {
+  if (!state) {
+    return "";
+  }
+  if (state.status === "loading") {
+    return `<span class="dim">…</span>`;
+  }
+  if (state.status === "error") {
+    return `<span class="error-text">${escapeHtml(state.message)}</span>`;
+  }
+  return `<span class="good">OK</span>`;
+}
+
+function renderActionsBar(projectName: string): HTMLElement {
+  const element = document.createElement("div");
+
+  element.className = "actions-bar";
+
+  const validateState = validateLoader.stateByProject.get(projectName);
+  const openFolderState = openFolderLoader.stateByProject.get(projectName);
+  const canCopyPrompt =
+    promptCopyText(promptLoader.stateByProject.get(projectName)) !== null;
+
+  element.innerHTML = `
+    <button class="ghost action-validate">Validate</button>
+    ${actionStatusLabel(validateState)}
+    <button class="ghost action-review">Review</button>
+    <button class="ghost action-prompt">Prompt</button>
+    <button class="ghost action-open-folder">Open Folder</button>
+    ${actionStatusLabel(openFolderState)}
+    <button class="ghost action-copy-prompt" ${canCopyPrompt ? "" : "disabled"}>Copy Prompt</button>
+  `;
+
+  element
+    .querySelector(".action-validate")
+    ?.addEventListener("click", () => {
+      validateLoader.load(projectName, false);
+      rerenderDetailIfSelected(projectName);
+    });
+
+  element.querySelector(".action-review")?.addEventListener("click", () => {
+    ensureSectionOpen(projectName, "review");
+    rerenderDetailIfSelected(projectName);
+  });
+
+  element.querySelector(".action-prompt")?.addEventListener("click", () => {
+    ensureSectionOpen(projectName, "prompt");
+    rerenderDetailIfSelected(projectName);
+  });
+
+  element
+    .querySelector(".action-open-folder")
+    ?.addEventListener("click", () => {
+      openFolderLoader.load(projectName, false);
+      rerenderDetailIfSelected(projectName);
+    });
+
+  element
+    .querySelector(".action-copy-prompt")
+    ?.addEventListener("click", () => {
+      const text = promptCopyText(promptLoader.stateByProject.get(projectName));
+      if (text !== null) {
+        void copyToClipboard(text);
+      }
+    });
+
+  return element;
+}
+
 function renderProjectDetail(
   root: HTMLElement,
   projectName: string,
@@ -395,16 +476,21 @@ function renderProjectDetail(
       <span class="mono dim">${escapeHtml(project.path)}</span>
     </div>
 
+    <div id="actions-bar"></div>
+
     <div id="sections"></div>
   `;
 
+  const actionsBarRoot = root.querySelector<HTMLElement>("#actions-bar");
   const sectionsRoot = root.querySelector<HTMLElement>("#sections");
 
-  if (!sectionsRoot) {
-    throw new Error("missing sections root");
+  if (!actionsBarRoot || !sectionsRoot) {
+    throw new Error("missing detail panel elements");
   }
 
   const state = sectionsFor(projectName);
+
+  actionsBarRoot.appendChild(renderActionsBar(projectName));
 
   sectionsRoot.appendChild(
     renderSection(
@@ -574,6 +660,16 @@ const reviewLoader = createSectionLoader<ProjectReviewReport>({
 const planLoader = createSectionLoader<ProjectPlanReport>({
   fetch: (projectName, refresh) =>
     window.loopGuiApi.loadProjectPlan(projectName, refresh),
+  onSettled: rerenderDetailIfSelected,
+});
+
+const validateLoader = createSectionLoader<void>({
+  fetch: (projectName) => window.loopGuiApi.validateProject(projectName),
+  onSettled: rerenderDetailIfSelected,
+});
+
+const openFolderLoader = createSectionLoader<void>({
+  fetch: (projectName) => window.loopGuiApi.openProjectFolder(projectName),
   onSettled: rerenderDetailIfSelected,
 });
 

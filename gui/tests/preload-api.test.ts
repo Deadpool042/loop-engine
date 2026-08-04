@@ -47,6 +47,8 @@ test("each exposed method maps to a distinct, known IPC channel", () => {
   void api.loadProjectPrompt("loop-engine");
   void api.loadProjectReview("loop-engine");
   void api.loadProjectPlan("loop-engine");
+  void api.validateProject("loop-engine");
+  void api.openProjectFolder("loop-engine");
 
   const channelsUsed = bridge.calls.map((c) => c.channel);
   assert.deepEqual(channelsUsed.sort(), Object.values(CHANNELS).sort());
@@ -175,6 +177,44 @@ test("loadProjectPlan rejects an empty project name before it ever reaches the b
   const api = createLoopGuiApi(bridge);
 
   await assert.rejects(() => api.loadProjectPlan(" "), TypeError);
+  assert.equal(bridge.calls.length, 0, "the bridge must never see the invalid call");
+});
+
+test("validateProject forwards only the project name, no command/args/executable", () => {
+  const bridge = fakeBridge();
+  const api = createLoopGuiApi(bridge);
+
+  void api.validateProject("loop-engine");
+
+  const call = bridge.calls.find((c) => c.channel === CHANNELS.validateProject);
+  assert.ok(call);
+  assert.deepEqual(call.args, ["loop-engine"]);
+});
+
+test("validateProject rejects an empty project name before it ever reaches the bridge", async () => {
+  const bridge = fakeBridge();
+  const api = createLoopGuiApi(bridge);
+
+  await assert.rejects(() => api.validateProject(" "), TypeError);
+  assert.equal(bridge.calls.length, 0, "the bridge must never see the invalid call");
+});
+
+test("openProjectFolder forwards only the project name, never a path", () => {
+  const bridge = fakeBridge();
+  const api = createLoopGuiApi(bridge);
+
+  void api.openProjectFolder("loop-engine");
+
+  const call = bridge.calls.find((c) => c.channel === CHANNELS.openProjectFolder);
+  assert.ok(call);
+  assert.deepEqual(call.args, ["loop-engine"]);
+});
+
+test("openProjectFolder rejects an empty project name before it ever reaches the bridge", async () => {
+  const bridge = fakeBridge();
+  const api = createLoopGuiApi(bridge);
+
+  await assert.rejects(() => api.openProjectFolder(" "), TypeError);
   assert.equal(bridge.calls.length, 0, "the bridge must never see the invalid call");
 });
 
