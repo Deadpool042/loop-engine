@@ -22,6 +22,7 @@ import {
   type SectionsState,
 } from "../shared/sections.js";
 import type { WorkspaceSummary } from "../shared/workspace-summary.js";
+import { createSectionLoader, type LazySectionState } from "./section-loader.js";
 
 type SummaryProject = Readonly<{
   project: Readonly<{
@@ -552,134 +553,29 @@ function renderNextSection(
   return element;
 }
 
-type LazySectionState<T> =
-  | Readonly<{ status: "loading" }>
-  | Readonly<{ status: "success"; value: T }>
-  | Readonly<{ status: "error"; message: string }>;
+const contextLoader = createSectionLoader<ProjectContextReport>({
+  fetch: (projectName, refresh) =>
+    window.loopGuiApi.loadProjectContext(projectName, refresh),
+  onSettled: rerenderDetailIfSelected,
+});
 
-const contextStateByProject = new Map<
-  string,
-  LazySectionState<ProjectContextReport>
->();
-const contextRequestInFlight = new Set<string>();
+const promptLoader = createSectionLoader<ProjectPromptReport>({
+  fetch: (projectName, refresh) =>
+    window.loopGuiApi.loadProjectPrompt(projectName, refresh),
+  onSettled: rerenderDetailIfSelected,
+});
 
-const promptStateByProject = new Map<
-  string,
-  LazySectionState<ProjectPromptReport>
->();
-const promptRequestInFlight = new Set<string>();
+const reviewLoader = createSectionLoader<ProjectReviewReport>({
+  fetch: (projectName, refresh) =>
+    window.loopGuiApi.loadProjectReview(projectName, refresh),
+  onSettled: rerenderDetailIfSelected,
+});
 
-const reviewStateByProject = new Map<
-  string,
-  LazySectionState<ProjectReviewReport>
->();
-const reviewRequestInFlight = new Set<string>();
-
-const planStateByProject = new Map<
-  string,
-  LazySectionState<ProjectPlanReport>
->();
-const planRequestInFlight = new Set<string>();
-
-function loadContext(projectName: string, refresh: boolean): void {
-  if (contextRequestInFlight.has(projectName)) {
-    return;
-  }
-
-  contextRequestInFlight.add(projectName);
-  contextStateByProject.set(projectName, { status: "loading" });
-
-  window.loopGuiApi
-    .loadProjectContext(projectName, refresh)
-    .then((value) => {
-      contextStateByProject.set(projectName, { status: "success", value });
-    })
-    .catch((error: unknown) => {
-      contextStateByProject.set(projectName, {
-        status: "error",
-        message: error instanceof Error ? error.message : "Erreur inconnue",
-      });
-    })
-    .finally(() => {
-      contextRequestInFlight.delete(projectName);
-      rerenderDetailIfSelected(projectName);
-    });
-}
-
-function loadPrompt(projectName: string, refresh: boolean): void {
-  if (promptRequestInFlight.has(projectName)) {
-    return;
-  }
-
-  promptRequestInFlight.add(projectName);
-  promptStateByProject.set(projectName, { status: "loading" });
-
-  window.loopGuiApi
-    .loadProjectPrompt(projectName, refresh)
-    .then((value) => {
-      promptStateByProject.set(projectName, { status: "success", value });
-    })
-    .catch((error: unknown) => {
-      promptStateByProject.set(projectName, {
-        status: "error",
-        message: error instanceof Error ? error.message : "Erreur inconnue",
-      });
-    })
-    .finally(() => {
-      promptRequestInFlight.delete(projectName);
-      rerenderDetailIfSelected(projectName);
-    });
-}
-
-function loadReview(projectName: string, refresh: boolean): void {
-  if (reviewRequestInFlight.has(projectName)) {
-    return;
-  }
-
-  reviewRequestInFlight.add(projectName);
-  reviewStateByProject.set(projectName, { status: "loading" });
-
-  window.loopGuiApi
-    .loadProjectReview(projectName, refresh)
-    .then((value) => {
-      reviewStateByProject.set(projectName, { status: "success", value });
-    })
-    .catch((error: unknown) => {
-      reviewStateByProject.set(projectName, {
-        status: "error",
-        message: error instanceof Error ? error.message : "Erreur inconnue",
-      });
-    })
-    .finally(() => {
-      reviewRequestInFlight.delete(projectName);
-      rerenderDetailIfSelected(projectName);
-    });
-}
-
-function loadPlan(projectName: string, refresh: boolean): void {
-  if (planRequestInFlight.has(projectName)) {
-    return;
-  }
-
-  planRequestInFlight.add(projectName);
-  planStateByProject.set(projectName, { status: "loading" });
-
-  window.loopGuiApi
-    .loadProjectPlan(projectName, refresh)
-    .then((value) => {
-      planStateByProject.set(projectName, { status: "success", value });
-    })
-    .catch((error: unknown) => {
-      planStateByProject.set(projectName, {
-        status: "error",
-        message: error instanceof Error ? error.message : "Erreur inconnue",
-      });
-    })
-    .finally(() => {
-      planRequestInFlight.delete(projectName);
-      rerenderDetailIfSelected(projectName);
-    });
-}
+const planLoader = createSectionLoader<ProjectPlanReport>({
+  fetch: (projectName, refresh) =>
+    window.loopGuiApi.loadProjectPlan(projectName, refresh),
+  onSettled: rerenderDetailIfSelected,
+});
 
 async function copyToClipboard(text: string): Promise<void> {
   await navigator.clipboard.writeText(text);
@@ -789,8 +685,8 @@ function renderContextSection(
     state,
     "context",
     "Contexte",
-    contextStateByProject,
-    loadContext,
+    contextLoader.stateByProject,
+    contextLoader.load,
   );
 }
 
@@ -803,8 +699,8 @@ function renderPromptSection(
     state,
     "prompt",
     "Prompt",
-    promptStateByProject,
-    loadPrompt,
+    promptLoader.stateByProject,
+    promptLoader.load,
   );
 }
 
@@ -817,8 +713,8 @@ function renderReviewSection(
     state,
     "review",
     "Review",
-    reviewStateByProject,
-    loadReview,
+    reviewLoader.stateByProject,
+    reviewLoader.load,
   );
 }
 
@@ -831,8 +727,8 @@ function renderPlanSection(
     state,
     "plan",
     "Plan (prévisionnel)",
-    planStateByProject,
-    loadPlan,
+    planLoader.stateByProject,
+    planLoader.load,
     `<div class="plan-preview-banner">Prévisualisation uniquement — aucune modification appliquée.</div>`,
   );
 }

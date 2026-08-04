@@ -19,6 +19,7 @@ import { GuiConfigStore } from "./config-store.js";
 import { NodeProcessRunner } from "./node-process-runner.js";
 import { ProjectNextGateway } from "./project-next-gateway.js";
 import { ProjectSectionGateway } from "./project-section-gateway.js";
+import { registerProjectSectionHandler } from "./register-project-section-handler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -101,116 +102,36 @@ function registerIpcHandlers(
     return gateway.load(projectName);
   });
 
-  ipcMain.handle(
+  registerProjectSectionHandler(
+    ipcMain,
     CHANNELS.loadProjectContext,
-    async (_event, projectName: unknown, refresh: unknown) => {
-      if (typeof projectName !== "string" || projectName.trim().length === 0) {
-        throw new TypeError("projectName must be a non-empty string");
-      }
-
-      const config = await store.load();
-      if (config.repoPath === null) {
-        throw new Error("Loop Engine repository path is not configured");
-      }
-
-      let gateway = contextGateways.get(config.repoPath);
-      if (!gateway) {
-        gateway = new ProjectSectionGateway((name) =>
-          contextClient.loadProjectContext(config.repoPath as string, name),
-        );
-        contextGateways.set(config.repoPath, gateway);
-      }
-
-      if (refresh === true) {
-        gateway.invalidate(projectName);
-      }
-
-      return gateway.load(projectName);
-    },
+    store,
+    contextGateways,
+    (repoPath) => (name) => contextClient.loadProjectContext(repoPath, name),
   );
 
-  ipcMain.handle(
+  registerProjectSectionHandler(
+    ipcMain,
     CHANNELS.loadProjectPrompt,
-    async (_event, projectName: unknown, refresh: unknown) => {
-      if (typeof projectName !== "string" || projectName.trim().length === 0) {
-        throw new TypeError("projectName must be a non-empty string");
-      }
-
-      const config = await store.load();
-      if (config.repoPath === null) {
-        throw new Error("Loop Engine repository path is not configured");
-      }
-
-      let gateway = promptGateways.get(config.repoPath);
-      if (!gateway) {
-        gateway = new ProjectSectionGateway((name) =>
-          promptClient.loadProjectPrompt(config.repoPath as string, name),
-        );
-        promptGateways.set(config.repoPath, gateway);
-      }
-
-      if (refresh === true) {
-        gateway.invalidate(projectName);
-      }
-
-      return gateway.load(projectName);
-    },
+    store,
+    promptGateways,
+    (repoPath) => (name) => promptClient.loadProjectPrompt(repoPath, name),
   );
 
-  ipcMain.handle(
+  registerProjectSectionHandler(
+    ipcMain,
     CHANNELS.loadProjectReview,
-    async (_event, projectName: unknown, refresh: unknown) => {
-      if (typeof projectName !== "string" || projectName.trim().length === 0) {
-        throw new TypeError("projectName must be a non-empty string");
-      }
-
-      const config = await store.load();
-      if (config.repoPath === null) {
-        throw new Error("Loop Engine repository path is not configured");
-      }
-
-      let gateway = reviewGateways.get(config.repoPath);
-      if (!gateway) {
-        gateway = new ProjectSectionGateway((name) =>
-          reviewClient.loadProjectReview(config.repoPath as string, name),
-        );
-        reviewGateways.set(config.repoPath, gateway);
-      }
-
-      if (refresh === true) {
-        gateway.invalidate(projectName);
-      }
-
-      return gateway.load(projectName);
-    },
+    store,
+    reviewGateways,
+    (repoPath) => (name) => reviewClient.loadProjectReview(repoPath, name),
   );
 
-  ipcMain.handle(
+  registerProjectSectionHandler(
+    ipcMain,
     CHANNELS.loadProjectPlan,
-    async (_event, projectName: unknown, refresh: unknown) => {
-      if (typeof projectName !== "string" || projectName.trim().length === 0) {
-        throw new TypeError("projectName must be a non-empty string");
-      }
-
-      const config = await store.load();
-      if (config.repoPath === null) {
-        throw new Error("Loop Engine repository path is not configured");
-      }
-
-      let gateway = planGateways.get(config.repoPath);
-      if (!gateway) {
-        gateway = new ProjectSectionGateway((name) =>
-          planClient.loadProjectPlan(config.repoPath as string, name),
-        );
-        planGateways.set(config.repoPath, gateway);
-      }
-
-      if (refresh === true) {
-        gateway.invalidate(projectName);
-      }
-
-      return gateway.load(projectName);
-    },
+    store,
+    planGateways,
+    (repoPath) => (name) => planClient.loadProjectPlan(repoPath, name),
   );
 }
 
