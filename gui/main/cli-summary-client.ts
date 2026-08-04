@@ -5,28 +5,14 @@ import {
   type WorkspaceSummary,
 } from "../shared/workspace-summary.js";
 
-export type SummaryProcessRequest = Readonly<{
-  executable: string;
-  args: readonly string[];
-  cwd: string;
-}>;
-
-export type SummaryProcessResult = Readonly<{
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-}>;
-
-export interface SummaryProcessRunner {
-  run(request: SummaryProcessRequest): Promise<SummaryProcessResult>;
-}
+import type { ProcessRunner } from "./process-runner.js";
 
 export interface LoopCliSummaryClient {
   loadWorkspaceSummary(repoPath: string): Promise<WorkspaceSummary>;
 }
 
 export class DefaultLoopCliSummaryClient implements LoopCliSummaryClient {
-  constructor(private readonly runner: SummaryProcessRunner) {}
+  constructor(private readonly runner: ProcessRunner) {}
 
   async loadWorkspaceSummary(repoPath: string): Promise<WorkspaceSummary> {
     if (typeof repoPath !== "string" || repoPath.trim().length === 0) {

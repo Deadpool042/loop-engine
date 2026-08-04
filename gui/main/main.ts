@@ -9,9 +9,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHANNELS } from "../shared/ipc-channels.js";
 import { FsConfigIO } from "./config-io-fs.js";
+import { DefaultLoopCliNextClient } from "./cli-next-client.js";
 import { DefaultLoopCliSummaryClient } from "./cli-summary-client.js";
 import { GuiConfigStore } from "./config-store.js";
 import { NodeProcessRunner } from "./node-process-runner.js";
+import { ProjectNextGateway } from "./project-next-gateway.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -23,7 +25,9 @@ function createConfigStore(): GuiConfigStore {
 function registerIpcHandlers(
   store: GuiConfigStore,
   summaryClient: DefaultLoopCliSummaryClient,
+  nextClient: DefaultLoopCliNextClient,
 ): void {
+  const nextGateways = new Map<string, ProjectNextGateway>();
   ipcMain.handle(CHANNELS.getConfig, async () => store.load());
 
   ipcMain.handle(CHANNELS.saveRepoPath, async (_event, repoPath: unknown) => {
@@ -51,6 +55,25 @@ function registerIpcHandlers(
     }
     return summaryClient.loadWorkspaceSummary(config.repoPath);
   });
+
+  ipcMain.handle(CHANNELS.loadProjectNext, async (_event, projectName: unknown) => {
+    if (typeof projectName !== "string" || projectName.trim().length === 0) {
+      throw new TypeError("projectName must be a non-empty string");
+    }
+
+    const config = await store.load();
+    if (config.repoPath === null) {
+      throw new Error("Loop Engine repository path is not configured");
+    }
+
+    let gateway = nextGateways.get(config.repoPath);
+    if (!gateway) {
+      gateway = new ProjectNextGateway(nextClient, config.repoPath);
+      nextGateways.set(config.repoPath, gateway);
+    }
+
+    return gateway.load(projectName);
+  });
 }
 
 async function createWindow(): Promise<void> {
@@ -60,7 +83,7 @@ async function createWindow(): Promise<void> {
     minWidth: 760,
     minHeight: 480,
     webPreferences: {
-      preload: join(__dirname, "preload.js"),
+      preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -75,7 +98,8 @@ app.whenReady().then(async () => {
   const summaryClient = new DefaultLoopCliSummaryClient(
     new NodeProcessRunner(),
   );
-  registerIpcHandlers(store, summaryClient);
+  const nextClient = new DefaultLoopCliNextClient(new NodeProcessRunner());
+  registerIpcHandlers(store, summaryClient, nextClient);
   await createWindow();
 
   app.on("activate", () => {
