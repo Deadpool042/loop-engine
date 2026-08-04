@@ -6,7 +6,9 @@
 import { CHANNELS } from "../shared/ipc-channels.js";
 import type { ProjectContextReport } from "../shared/project-context.js";
 import type { ProjectNextReport } from "../shared/project-next.js";
+import type { ProjectPlanReport } from "../shared/project-plan.js";
 import type { ProjectPromptReport } from "../shared/project-prompt.js";
+import type { ProjectReviewReport } from "../shared/project-review.js";
 import type { WorkspaceSummary } from "../shared/workspace-summary.js";
 import type { GuiConfig } from "./config-store.js";
 
@@ -28,6 +30,14 @@ export interface LoopGuiApi {
     projectName: string,
     refresh?: boolean,
   ): Promise<ProjectPromptReport>;
+  loadProjectReview(
+    projectName: string,
+    refresh?: boolean,
+  ): Promise<ProjectReviewReport>;
+  loadProjectPlan(
+    projectName: string,
+    refresh?: boolean,
+  ): Promise<ProjectPlanReport>;
 }
 
 export const EXPOSED_API_METHODS = [
@@ -38,6 +48,8 @@ export const EXPOSED_API_METHODS = [
   "loadProjectNext",
   "loadProjectContext",
   "loadProjectPrompt",
+  "loadProjectReview",
+  "loadProjectPlan",
 ] as const;
 
 export function createLoopGuiApi(bridge: Bridge): LoopGuiApi {
@@ -87,6 +99,30 @@ export function createLoopGuiApi(bridge: Bridge): LoopGuiApi {
         projectName,
         refresh === true,
       ) as Promise<ProjectPromptReport>;
+    },
+    loadProjectReview: (projectName: string, refresh = false) => {
+      if (typeof projectName !== "string" || projectName.trim().length === 0) {
+        return Promise.reject(
+          new TypeError("projectName must be a non-empty string"),
+        );
+      }
+      return bridge.invoke(
+        CHANNELS.loadProjectReview,
+        projectName,
+        refresh === true,
+      ) as Promise<ProjectReviewReport>;
+    },
+    loadProjectPlan: (projectName: string, refresh = false) => {
+      if (typeof projectName !== "string" || projectName.trim().length === 0) {
+        return Promise.reject(
+          new TypeError("projectName must be a non-empty string"),
+        );
+      }
+      return bridge.invoke(
+        CHANNELS.loadProjectPlan,
+        projectName,
+        refresh === true,
+      ) as Promise<ProjectPlanReport>;
     },
   };
 }
