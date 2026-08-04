@@ -257,6 +257,15 @@ export function createClaudeCodeCliLoopExecutor(
         modifiedFiles,
       );
     }
+
+    const output = parseClaudeCodeJsonOutput(result.stdout);
+    if (output?.is_error === true && output.subtype === "error_max_turns") {
+      return failure(
+        "provider_max_turns",
+        "Claude Code exhausted the configured turn limit.",
+        modifiedFiles,
+      );
+    }
     if (result.exitCode !== 0) {
       return failure(
         "provider_failed",
@@ -264,8 +273,6 @@ export function createClaudeCodeCliLoopExecutor(
         modifiedFiles,
       );
     }
-
-    const output = parseClaudeCodeJsonOutput(result.stdout);
     if (output === null) {
       return failure(
         "provider_invalid_output",
