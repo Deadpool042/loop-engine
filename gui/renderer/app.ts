@@ -1,6 +1,6 @@
 // Renderer entry point. Runs in a sandboxed, isolated browser context —
 // the only privileged surface it can reach is `window.loopGuiApi`
-// (see main/preload.ts), a narrow typed API with exactly four methods.
+// (see main/preload.ts), a narrow typed API with exactly seven methods.
 // No child_process, no fs, no generic execute().
 import type { LoopGuiApi } from "../main/preload-api.js";
 import { FIXTURE_DETAIL } from "../shared/fixtures.js";
@@ -11,7 +11,9 @@ import {
   selectProject,
   type NavState,
 } from "../shared/navigation.js";
+import type { ProjectContextReport } from "../shared/project-context.js";
 import type { ProjectNextReport } from "../shared/project-next.js";
+import type { ProjectPromptReport } from "../shared/project-prompt.js";
 import {
   EAGER_SECTIONS,
   initialSections,
@@ -402,15 +404,6 @@ function renderProjectDetail(
     throw new Error("missing sections root");
   }
 
-  if (!detail) {
-    sectionsRoot.innerHTML = `
-      <div class="empty-state">
-        Les sections détaillées ne sont pas encore connectées pour ce projet.
-      </div>
-    `;
-    return;
-  }
-
   const state = sectionsFor(projectName);
 
   sectionsRoot.appendChild(
@@ -425,14 +418,14 @@ function renderProjectDetail(
   );
 
   sectionsRoot.appendChild(renderNextSection(projectName, state));
+  sectionsRoot.appendChild(renderContextSection(projectName, state));
+  sectionsRoot.appendChild(renderPromptSection(projectName, state));
 
   const fixtureSectionSpecs: Array<{
-    id: "context" | "prompt" | "review" | "plan";
+    id: "review" | "plan";
     title: string;
     kind: "text" | "json";
   }> = [
-    { id: "context", title: "Contexte", kind: "text" },
-    { id: "prompt", title: "Prompt", kind: "text" },
     { id: "review", title: "Review", kind: "json" },
     { id: "plan", title: "Plan (prévisionnel)", kind: "json" },
   ];
@@ -445,7 +438,7 @@ function renderProjectDetail(
         spec.title,
         spec.kind,
         state,
-        detail[spec.id],
+        detail?.[spec.id],
       ),
     );
   }
@@ -580,6 +573,198 @@ function renderNextSection(
   return element;
 }
 
+type LazySectionState<T> =
+  | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "success"; value: T }>
+  | Readonly<{ status: "error"; message: string }>;
+
+const contextStateByProject = new Map<
+  string,
+  LazySectionState<ProjectContextReport>
+>();
+const contextRequestInFlight = new Set<string>();
+
+const promptStateByProject = new Map<
+  string,
+  LazySectionState<ProjectPromptReport>
+>();
+const promptRequestInFlight = new Set<string>();
+
+function loadContext(projectName: string, refresh: boolean): void {
+  if (contextRequestInFlight.has(projectName)) {
+    return;
+  }
+
+  contextRequestInFlight.add(projectName);
+  contextStateByProject.set(projectName, { status: "loading" });
+
+  window.loopGuiApi
+    .loadProjectContext(projectName, refresh)
+    .then((value) => {
+      contextStateByProject.set(projectName, { status: "success", value });
+    })
+    .catch((error: unknown) => {
+      contextStateByProject.set(projectName, {
+        status: "error",
+        message: error instanceof Error ? error.message : "Erreur inconnue",
+      });
+    })
+    .finally(() => {
+      contextRequestInFlight.delete(projectName);
+      rerenderDetailIfSelected(projectName);
+    });
+}
+
+function loadPrompt(projectName: string, refresh: boolean): void {
+  if (promptRequestInFlight.has(projectName)) {
+    return;
+  }
+
+  promptRequestInFlight.add(projectName);
+  promptStateByProject.set(projectName, { status: "loading" });
+
+  window.loopGuiApi
+    .loadProjectPrompt(projectName, refresh)
+    .then((value) => {
+      promptStateByProject.set(projectName, { status: "success", value });
+    })
+    .catch((error: unknown) => {
+      promptStateByProject.set(projectName, {
+        status: "error",
+        message: error instanceof Error ? error.message : "Erreur inconnue",
+      });
+    })
+    .finally(() => {
+      promptRequestInFlight.delete(projectName);
+      rerenderDetailIfSelected(projectName);
+    });
+}
+
+async function copyToClipboard(text: string): Promise<void> {
+  await navigator.clipboard.writeText(text);
+}
+
+function renderLazyJsonSection<T>(
+  projectName: string,
+  state: SectionsState,
+  sectionId: "context" | "prompt",
+  title: string,
+  stateByProject: Map<string, LazySectionState<T>>,
+  load: (projectName: string, refresh: boolean) => void,
+): HTMLElement {
+  const isOpenSection = state.open[sectionId];
+  const element = document.createElement("div");
+
+  element.className = "section" + (isOpenSection ? " open" : "");
+
+  element.innerHTML = `
+    <div class="section-head">
+      <span class="caret">▸</span>
+      <strong>${escapeHtml(title)}</strong>
+      ${
+        EAGER_SECTIONS.includes(sectionId)
+          ? `<span class="eager-tag">auto</span>`
+          : ""
+      }
+    </div>
+
+    <div class="section-body"></div>
+  `;
+
+  const head = element.querySelector<HTMLElement>(".section-head");
+  const body = element.querySelector<HTMLElement>(".section-body");
+
+  if (!head || !body) {
+    throw new Error("missing section elements");
+  }
+
+  if (isOpenSection) {
+    let sectionState = stateByProject.get(projectName);
+
+    if (!sectionState) {
+      load(projectName, false);
+      sectionState = { status: "loading" };
+    }
+
+    if (sectionState.status === "loading") {
+      body.innerHTML = `<div class="empty-state">Chargement…</div>`;
+    } else if (sectionState.status === "error") {
+      body.innerHTML = `
+        <div class="error-text">${escapeHtml(sectionState.message)}</div>
+        <button class="ghost retry-section">Réessayer</button>
+      `;
+
+      body.querySelector(".retry-section")?.addEventListener("click", () => {
+        stateByProject.delete(projectName);
+        rerenderDetailIfSelected(projectName);
+      });
+    } else {
+      const text = JSON.stringify(sectionState.value, null, 2);
+
+      body.innerHTML = `
+        <div class="section-toolbar">
+          <button class="ghost refresh-section">Actualiser</button>
+          <button class="ghost copy-section">Copier</button>
+        </div>
+      `;
+
+      const pre = document.createElement("pre");
+
+      pre.className = "json-panel mono";
+      pre.textContent = text;
+
+      body.appendChild(pre);
+
+      body.querySelector(".refresh-section")?.addEventListener("click", () => {
+        stateByProject.delete(projectName);
+        load(projectName, true);
+        rerenderDetailIfSelected(projectName);
+      });
+
+      body.querySelector(".copy-section")?.addEventListener("click", () => {
+        void copyToClipboard(text);
+      });
+    }
+  }
+
+  head.addEventListener("click", () => {
+    const next = toggleSection(sectionsFor(projectName), sectionId);
+
+    sectionsByProject.set(projectName, next);
+    rerenderDetailIfSelected(projectName);
+  });
+
+  return element;
+}
+
+function renderContextSection(
+  projectName: string,
+  state: SectionsState,
+): HTMLElement {
+  return renderLazyJsonSection(
+    projectName,
+    state,
+    "context",
+    "Contexte",
+    contextStateByProject,
+    loadContext,
+  );
+}
+
+function renderPromptSection(
+  projectName: string,
+  state: SectionsState,
+): HTMLElement {
+  return renderLazyJsonSection(
+    projectName,
+    state,
+    "prompt",
+    "Prompt",
+    promptStateByProject,
+    loadPrompt,
+  );
+}
+
 function renderSection(
   projectName: string,
   id: "status" | "next" | "context" | "prompt" | "review" | "plan",
@@ -625,6 +810,8 @@ function renderSection(
       }
 
       textPanel.textContent = String(content);
+    } else if (content === undefined) {
+      body.innerHTML = `<div class="empty-state">Aucune donnée disponible pour ce projet.</div>`;
     } else {
       const pre = document.createElement("pre");
 

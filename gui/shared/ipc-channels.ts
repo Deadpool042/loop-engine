@@ -8,6 +8,8 @@ export const CHANNELS = {
   pickRepoDirectory: "gui:pick-repo-directory",
   loadWorkspaceSummary: "gui:load-workspace-summary",
   loadProjectNext: "gui:load-project-next",
+  loadProjectContext: "gui:load-project-context",
+  loadProjectPrompt: "gui:load-project-prompt",
 } as const;
 
 export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
