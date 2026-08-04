@@ -29,6 +29,8 @@ const CANDIDATE_PATTERNS = [
   "prochain",
   "Prochain lot",
   "prochain lot",
+  "Lot ",
+  "lot ",
   "H1-L",
   "H2-L",
   "H3-L",
@@ -123,19 +125,11 @@ function isMarkdownHeading(line: string): boolean {
   return /^#{1,6}(\s|$)/.test(line);
 }
 
-function isExplicitLotCandidate(line: string): boolean {
-  return /^lot\s+\S/i.test(line);
-}
-
 function isCandidateLine(line: string): boolean {
   if (isMarkdownHeading(line)) {
     return false;
   }
-
-  return (
-    isExplicitLotCandidate(line) ||
-    CANDIDATE_PATTERNS.some((pattern) => line.includes(pattern))
-  );
+  return CANDIDATE_PATTERNS.some((pattern) => line.includes(pattern));
 }
 
 export function findRoadmapCandidates(
