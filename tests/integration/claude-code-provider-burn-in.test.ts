@@ -97,20 +97,21 @@ describe("claude code provider burn-in", () => {
       });
       assert.equal(typeof application.loopExecutor, "function");
 
-      process.env.FAKE_CLAUDE_MODE = "nonzero_exit_with_file";
+      process.env.FAKE_CLAUDE_MODE = "success_with_file";
       const result = await application.loopExecutor!(burnInPlan(cwd));
 
-      assert.deepEqual(result.modifiedFiles, ["provider-leftover.txt"]);
+      assert.equal(result.status, "completed");
+      assert.deepEqual(result.modifiedFiles, ["provider-created.txt"]);
       assert.equal(
-        readFileSync(join(cwd, "provider-leftover.txt"), "utf8"),
-        "leftover\n",
+        readFileSync(join(cwd, "provider-created.txt"), "utf8"),
+        "created\n",
       );
 
       const status = execFileSync("git", ["status", "--porcelain=v1"], {
         cwd,
         encoding: "utf8",
       });
-      assert.equal(status.trim(), "?? provider-leftover.txt");
+      assert.equal(status.trim(), "?? provider-created.txt");
     } finally {
       delete process.env.FAKE_CLAUDE_MODE;
       cleanup();

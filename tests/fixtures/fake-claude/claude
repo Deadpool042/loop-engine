@@ -56,6 +56,12 @@ switch (mode) {
     setInterval(() => {}, 1000);
     break;
   }
+  case "success_with_file": {
+    writeFileSync(join(cwd, "provider-created.txt"), "created\n");
+    write({ subtype: "success", is_error: false, num_turns: 1 });
+    process.exit(0);
+    break;
+  }
   default: {
     process.exit(1);
   }
