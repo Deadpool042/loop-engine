@@ -1,8 +1,14 @@
 // Renderer entry point. Runs in a sandboxed, isolated browser context —
 // the only privileged surface it can reach is `window.loopGuiApi`
-// (see main/preload.ts), a narrow typed API with exactly eleven methods.
+// (see main/preload.ts), a narrow typed API with exactly twelve methods.
 // No child_process, no fs, no generic execute().
 import type { LoopGuiApi } from "../main/preload-api.js";
+import {
+  toGuiExecutionError,
+  type GuiExecutionError,
+} from "../shared/gui-execution-error.js";
+import { renderSharedErrorPanel } from "./error-panel.js";
+import { escapeHtml } from "./html.js";
 import { promptCopyText } from "./project-actions.js";
 import {
   goToDashboard,
@@ -23,7 +29,11 @@ import {
   type SectionsState,
 } from "../shared/sections.js";
 import type { WorkspaceSummary } from "../shared/workspace-summary.js";
-import { createSectionLoader, type LazySectionState } from "./section-loader.js";
+import {
+  createSectionLoader,
+  type LazySectionState,
+  type SectionLoader,
+} from "./section-loader.js";
 
 type SummaryProject = Readonly<{
   project: Readonly<{
@@ -38,11 +48,6 @@ type SummaryProject = Readonly<{
   validation: unknown;
   health: string;
 }>;
-
-type NextState =
-  | Readonly<{ status: "loading" }>
-  | Readonly<{ status: "success"; report: ProjectNextReport }>
-  | Readonly<{ status: "error"; message: string }>;
 
 declare global {
   interface Window {
@@ -59,8 +64,13 @@ if (!app) {
 let nav: NavState = { screen: { name: "settings" } };
 let currentRepoPath: string | null = null;
 let workspaceSummary: WorkspaceSummary | null = null;
-let workspaceSummaryError: string | null = null;
+let workspaceSummaryError: GuiExecutionError | null = null;
 let workspaceSummaryLoading = false;
+// Prefill-only suggestion from a single automatic first-launch detection
+// attempt (or a later manual "Auto-détecter" click). Never saved on its
+// own — the user must still confirm with "Enregistrer".
+let suggestedRepoPath: string | null = null;
+let autoDetecting = false;
 
 const sectionsByProject = new Map<string, SectionsState>();
 
@@ -86,7 +96,25 @@ async function boot(): Promise<void> {
     return;
   }
 
+  // First launch, no configured path yet: try exactly one automatic
+  // detection to prefill the field. Never saves — the user must still
+  // click "Enregistrer" — and stays on Réglages either way.
   render();
+  await runAutoDetect();
+}
+
+async function runAutoDetect(): Promise<void> {
+  autoDetecting = true;
+  render();
+
+  try {
+    suggestedRepoPath = await window.loopGuiApi.autoDetectRepoPath();
+  } catch {
+    suggestedRepoPath = null;
+  } finally {
+    autoDetecting = false;
+    render();
+  }
 }
 
 function healthBadge(health: string): string {
@@ -103,12 +131,6 @@ function cleanBadge(clean: boolean): string {
   return `<span class="badge ${cssClass}">${label}</span>`;
 }
 
-function escapeHtml(value: string): string {
-  const div = document.createElement("div");
-  div.textContent = value;
-  return div.innerHTML;
-}
-
 async function refreshWorkspaceSummary(): Promise<void> {
   workspaceSummaryLoading = true;
   workspaceSummaryError = null;
@@ -118,8 +140,7 @@ async function refreshWorkspaceSummary(): Promise<void> {
     workspaceSummary = await window.loopGuiApi.loadWorkspaceSummary();
   } catch (error) {
     workspaceSummary = null;
-    workspaceSummaryError =
-      error instanceof Error ? error.message : "Erreur inconnue";
+    workspaceSummaryError = toGuiExecutionError(error);
   } finally {
     workspaceSummaryLoading = false;
     render();
@@ -156,9 +177,12 @@ function renderSettings(root: HTMLElement): void {
           type="text"
           id="repo-path-input"
           placeholder="/chemin/vers/loop-engine"
-          value="${currentRepoPath ? escapeHtml(currentRepoPath) : ""}"
+          value="${escapeHtml(currentRepoPath ?? suggestedRepoPath ?? "")}"
         />
         <button id="browse-btn" class="ghost">Parcourir…</button>
+        <button id="auto-detect-btn" class="ghost" ${autoDetecting ? "disabled" : ""}>
+          ${autoDetecting ? "Détection…" : "Auto-détecter"}
+        </button>
       </div>
 
       <div class="settings-actions">
@@ -188,6 +212,10 @@ function renderSettings(root: HTMLElement): void {
     if (picked) {
       input.value = picked;
     }
+  });
+
+  root.querySelector("#auto-detect-btn")?.addEventListener("click", () => {
+    void runAutoDetect();
   });
 
   root.querySelector("#save-btn")?.addEventListener("click", async () => {
@@ -294,21 +322,18 @@ function renderSplitView(root: HTMLElement): void {
   }
 
   if (workspaceSummaryError) {
-    rows.innerHTML = `
-      <div class="empty-state">
-        <div class="error-text">
-          ${escapeHtml(workspaceSummaryError)}
-        </div>
-        <button id="retry-summary" class="ghost">Réessayer</button>
-      </div>
-    `;
-
-    rows.querySelector("#retry-summary")?.addEventListener("click", () => {
-      void refreshWorkspaceSummary();
-    });
-
-    detailPane.innerHTML =
-      `<div class="empty-state">Impossible de charger les projets.</div>`;
+    rows.innerHTML = `<div class="empty-state">Impossible de charger les projets.</div>`;
+    detailPane.innerHTML = "";
+    detailPane.appendChild(
+      renderSharedErrorPanel(workspaceSummaryError, {
+        onRetry: () => void refreshWorkspaceSummary(),
+        onOpenSettings: () => {
+          nav = goToSettings(nav);
+          render();
+        },
+        onCopyDetails: (details) => void copyToClipboard(details),
+      }),
+    );
     return;
   }
 
@@ -382,9 +407,33 @@ function actionStatusLabel<T>(state: LazySectionState<T> | undefined): string {
     return `<span class="dim">…</span>`;
   }
   if (state.status === "error") {
-    return `<span class="error-text">${escapeHtml(state.message)}</span>`;
+    return `<span class="error-text">échec</span>`;
   }
   return `<span class="good">OK</span>`;
+}
+
+function renderActionErrorPanel<T>(
+  projectName: string,
+  loader: SectionLoader<T>,
+): HTMLElement | null {
+  const state = loader.stateByProject.get(projectName);
+
+  if (!state || state.status !== "error") {
+    return null;
+  }
+
+  return renderSharedErrorPanel(state.error, {
+    onRetry: () => {
+      loader.stateByProject.delete(projectName);
+      loader.load(projectName, false);
+      rerenderDetailIfSelected(projectName);
+    },
+    onOpenSettings: () => {
+      nav = goToSettings(nav);
+      render();
+    },
+    onCopyDetails: (details) => void copyToClipboard(details),
+  });
 }
 
 function renderActionsBar(projectName: string): HTMLElement {
@@ -398,13 +447,15 @@ function renderActionsBar(projectName: string): HTMLElement {
     promptCopyText(promptLoader.stateByProject.get(projectName)) !== null;
 
   element.innerHTML = `
-    <button class="ghost action-validate">Validate</button>
-    ${actionStatusLabel(validateState)}
-    <button class="ghost action-review">Review</button>
-    <button class="ghost action-prompt">Prompt</button>
-    <button class="ghost action-open-folder">Open Folder</button>
-    ${actionStatusLabel(openFolderState)}
-    <button class="ghost action-copy-prompt" ${canCopyPrompt ? "" : "disabled"}>Copy Prompt</button>
+    <div class="actions-bar-row">
+      <button class="ghost action-validate">Validate</button>
+      ${actionStatusLabel(validateState)}
+      <button class="ghost action-review">Review</button>
+      <button class="ghost action-prompt">Prompt</button>
+      <button class="ghost action-open-folder">Open Folder</button>
+      ${actionStatusLabel(openFolderState)}
+      <button class="ghost action-copy-prompt" ${canCopyPrompt ? "" : "disabled"}>Copy Prompt</button>
+    </div>
   `;
 
   element
@@ -439,6 +490,16 @@ function renderActionsBar(projectName: string): HTMLElement {
         void copyToClipboard(text);
       }
     });
+
+  const validateErrorPanel = renderActionErrorPanel(projectName, validateLoader);
+  if (validateErrorPanel) {
+    element.appendChild(validateErrorPanel);
+  }
+
+  const openFolderErrorPanel = renderActionErrorPanel(projectName, openFolderLoader);
+  if (openFolderErrorPanel) {
+    element.appendChild(openFolderErrorPanel);
+  }
 
   return element;
 }
@@ -526,34 +587,6 @@ function statusContent(summaryProject: SummaryProject): Readonly<{
   };
 }
 
-const nextStateByProject = new Map<string, NextState>();
-const nextRequestInFlight = new Set<string>();
-
-function loadNext(projectName: string): void {
-  if (nextRequestInFlight.has(projectName)) {
-    return;
-  }
-
-  nextRequestInFlight.add(projectName);
-  nextStateByProject.set(projectName, { status: "loading" });
-
-  window.loopGuiApi
-    .loadProjectNext(projectName)
-    .then((report) => {
-      nextStateByProject.set(projectName, { status: "success", report });
-    })
-    .catch((error: unknown) => {
-      nextStateByProject.set(projectName, {
-        status: "error",
-        message: error instanceof Error ? error.message : "Erreur inconnue",
-      });
-    })
-    .finally(() => {
-      nextRequestInFlight.delete(projectName);
-      rerenderDetailIfSelected(projectName);
-    });
-}
-
 function rerenderDetailIfSelected(projectName: string): void {
   if (
     nav.screen.name !== "project-detail" ||
@@ -600,30 +633,34 @@ function renderNextSection(
   }
 
   if (isOpenSection) {
-    let nextState = nextStateByProject.get(projectName);
+    let nextState = nextLoader.stateByProject.get(projectName);
 
     if (!nextState) {
-      loadNext(projectName);
+      nextLoader.load(projectName, false);
       nextState = { status: "loading" };
     }
 
     if (nextState.status === "loading") {
       body.innerHTML = `<div class="empty-state">Chargement…</div>`;
     } else if (nextState.status === "error") {
-      body.innerHTML = `
-        <div class="error-text">${escapeHtml(nextState.message)}</div>
-        <button class="ghost retry-next">Réessayer</button>
-      `;
-
-      body.querySelector(".retry-next")?.addEventListener("click", () => {
-        nextStateByProject.delete(projectName);
-        rerenderDetailIfSelected(projectName);
-      });
+      body.appendChild(
+        renderSharedErrorPanel(nextState.error, {
+          onRetry: () => {
+            nextLoader.stateByProject.delete(projectName);
+            rerenderDetailIfSelected(projectName);
+          },
+          onOpenSettings: () => {
+            nav = goToSettings(nav);
+            render();
+          },
+          onCopyDetails: (details) => void copyToClipboard(details),
+        }),
+      );
     } else {
       const pre = document.createElement("pre");
 
       pre.className = "json-panel mono";
-      pre.textContent = JSON.stringify(nextState.report, null, 2);
+      pre.textContent = JSON.stringify(nextState.value, null, 2);
 
       body.appendChild(pre);
     }
@@ -638,6 +675,11 @@ function renderNextSection(
 
   return element;
 }
+
+const nextLoader = createSectionLoader<ProjectNextReport>({
+  fetch: (projectName) => window.loopGuiApi.loadProjectNext(projectName),
+  onSettled: rerenderDetailIfSelected,
+});
 
 const contextLoader = createSectionLoader<ProjectContextReport>({
   fetch: (projectName, refresh) =>
@@ -723,15 +765,19 @@ function renderLazyJsonSection<T>(
     if (sectionState.status === "loading") {
       body.innerHTML = `<div class="empty-state">Chargement…</div>`;
     } else if (sectionState.status === "error") {
-      body.innerHTML = `
-        <div class="error-text">${escapeHtml(sectionState.message)}</div>
-        <button class="ghost retry-section">Réessayer</button>
-      `;
-
-      body.querySelector(".retry-section")?.addEventListener("click", () => {
-        stateByProject.delete(projectName);
-        rerenderDetailIfSelected(projectName);
-      });
+      body.appendChild(
+        renderSharedErrorPanel(sectionState.error, {
+          onRetry: () => {
+            stateByProject.delete(projectName);
+            rerenderDetailIfSelected(projectName);
+          },
+          onOpenSettings: () => {
+            nav = goToSettings(nav);
+            render();
+          },
+          onCopyDetails: (details) => void copyToClipboard(details),
+        }),
+      );
     } else {
       const text = JSON.stringify(sectionState.value, null, 2);
 

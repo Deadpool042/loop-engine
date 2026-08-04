@@ -50,6 +50,17 @@ input[type="text"] {
 .settings-row { display: flex; gap: 8px; margin-bottom: 14px; }
 .settings-actions { display: flex; gap: 8px; }
 .error-text { color: var(--bad); font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+.good { color: var(--good); font-size: 12px; }
+
+/* Shared error panel — Next, Context, Prompt, Review, Plan, Validate, Open Folder, Summary */
+.error-panel { background: var(--bg-panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-top: 10px; }
+.error-title { color: var(--bad); font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.error-details { color: var(--text-dim); font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 200px; overflow-y: auto; margin: 0 0 10px; }
+.error-actions { display: flex; gap: 8px; }
+
+/* Project actions bar */
+.actions-bar { padding: 10px 0; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+.actions-bar-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* Split view */
 .split-view { display: flex; height: 100%; }

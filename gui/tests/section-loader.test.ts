@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { createSectionLoader } from "../renderer/section-loader.js";
+import { encodeGuiExecutionError } from "../shared/gui-execution-error.js";
 
 function flush(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
@@ -60,7 +61,7 @@ describe("createSectionLoader", () => {
     assert.equal(calls, 1);
   });
 
-  it("stores an error state with a message and does not throw", async () => {
+  it("stores a classified GuiExecutionError and does not throw", async () => {
     const loader = createSectionLoader<string>({
       fetch: () => Promise.reject(new Error("boom")),
       onSettled: () => {
@@ -71,10 +72,45 @@ describe("createSectionLoader", () => {
     loader.load("loop-engine", false);
     await flush();
 
-    assert.deepEqual(loader.stateByProject.get("loop-engine"), {
-      status: "error",
-      message: "boom",
+    const state = loader.stateByProject.get("loop-engine");
+
+    assert.equal(state?.status, "error");
+    if (state?.status === "error") {
+      assert.equal(state.error.kind, "invalid_output");
+      assert.equal(state.error.details, "boom");
+    }
+  });
+
+  it("recovers the structured GuiExecutionError from an encoded IPC rejection", async () => {
+    const loader = createSectionLoader<string>({
+      fetch: () =>
+        Promise.reject(
+          new Error(
+            encodeGuiExecutionError({
+              kind: "process_exit_failed",
+              message: "La commande a échoué.",
+              details: "unknown project",
+              exitCode: 1,
+            }),
+          ),
+        ),
+      onSettled: () => {
+        /* noop */
+      },
     });
+
+    loader.load("loop-engine", false);
+    await flush();
+
+    const state = loader.stateByProject.get("loop-engine");
+
+    assert.equal(state?.status, "error");
+    if (state?.status === "error" && state.error.kind === "process_exit_failed") {
+      assert.equal(state.error.exitCode, 1);
+      assert.equal(state.error.details, "unknown project");
+    } else {
+      assert.fail("expected a decoded process_exit_failed error");
+    }
   });
 
   it("does not permanently block a retry after an error: a later load call re-fetches", async () => {

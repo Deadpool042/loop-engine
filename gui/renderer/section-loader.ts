@@ -1,14 +1,17 @@
 // Shared lazy-loading state machine for a project detail section backed by
-// a refreshable async fetch (context, prompt, review, plan). Mirrors the
-// exact loading/success/error + single-flight contract that used to be
-// duplicated once per section in app.ts. Does not itself dedupe against a
-// cached value — like the original per-section loaders, that decision stays
-// with the caller (renderLazyJsonSection), which only calls load() when no
-// state is present yet, or explicitly on refresh.
+// a refreshable async fetch (context, prompt, review, plan, next, validate,
+// open folder). Mirrors the exact loading/success/error + single-flight
+// contract that used to be duplicated once per section in app.ts. Does not
+// itself dedupe against a cached value — like the original per-section
+// loaders, that decision stays with the caller (renderLazyJsonSection),
+// which only calls load() when no state is present yet, or explicitly on
+// refresh.
+import { toGuiExecutionError, type GuiExecutionError } from "../shared/gui-execution-error.js";
+
 export type LazySectionState<T> =
   | Readonly<{ status: "loading" }>
   | Readonly<{ status: "success"; value: T }>
-  | Readonly<{ status: "error"; message: string }>;
+  | Readonly<{ status: "error"; error: GuiExecutionError }>;
 
 export interface SectionLoaderDeps<T> {
   fetch(projectName: string, refresh: boolean): Promise<T>;
@@ -42,7 +45,7 @@ export function createSectionLoader<T>(
       .catch((error: unknown) => {
         stateByProject.set(projectName, {
           status: "error",
-          message: error instanceof Error ? error.message : "Erreur inconnue",
+          error: toGuiExecutionError(error),
         });
       })
       .finally(() => {

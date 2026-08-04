@@ -18,11 +18,19 @@ import { DefaultLoopCliSummaryClient } from "./cli-summary-client.js";
 import { DefaultLoopCliValidateClient } from "./cli-validate-client.js";
 import { DefaultLoopCliOpenFolderClient } from "./open-project-folder-client.js";
 import { GuiConfigStore } from "./config-store.js";
+import { FsPathMarkerCheck } from "./fs-path-marker-check.js";
 import { NodeProcessRunner } from "./node-process-runner.js";
 import { ProjectNextGateway } from "./project-next-gateway.js";
 import { ProjectSectionGateway } from "./project-section-gateway.js";
 import { registerProjectActionHandler } from "./register-project-action-handler.js";
 import { registerProjectSectionHandler } from "./register-project-section-handler.js";
+import {
+  boundedParents,
+  detectRepoPath,
+  type PathMarkerCheck,
+} from "./repo-path-detector.js";
+
+const MAX_APP_DIR_PARENT_LEVELS = 8;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -41,6 +49,7 @@ function registerIpcHandlers(
   planClient: DefaultLoopCliPlanClient,
   validateClient: DefaultLoopCliValidateClient,
   openFolderClient: DefaultLoopCliOpenFolderClient,
+  pathMarkerCheck: PathMarkerCheck,
 ): void {
   const nextGateways = new Map<string, ProjectNextGateway>();
   const contextGateways = new Map<
@@ -152,6 +161,18 @@ function registerIpcHandlers(
     store,
     (repoPath, name) => openFolderClient.openProjectFolder(repoPath, name),
   );
+
+  // Never accepts a path/argument from the renderer (decision: settings
+  // recovery lot). Only ever inspects a bounded set of candidates built
+  // entirely in the main process — see repo-path-detector.ts.
+  ipcMain.handle(CHANNELS.autoDetectRepoPath, async () => {
+    return detectRepoPath(pathMarkerCheck, {
+      configuredRepoPath: async () => (await store.load()).repoPath,
+      cwd: () => process.cwd(),
+      appDirParents: () => boundedParents(__dirname, MAX_APP_DIR_PARENT_LEVELS),
+      extraCandidates: () => [],
+    });
+  });
 }
 
 async function createWindow(): Promise<void> {
@@ -199,6 +220,7 @@ app.whenReady().then(async () => {
     planClient,
     validateClient,
     openFolderClient,
+    new FsPathMarkerCheck(),
   );
   await createWindow();
 

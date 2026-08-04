@@ -14,6 +14,7 @@ export const CHANNELS = {
   loadProjectPlan: "gui:load-project-plan",
   validateProject: "gui:validate-project",
   openProjectFolder: "gui:open-project-folder",
+  autoDetectRepoPath: "gui:auto-detect-repo-path",
 } as const;
 
 export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
