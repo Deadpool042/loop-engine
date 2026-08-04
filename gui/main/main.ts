@@ -9,7 +9,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHANNELS } from "../shared/ipc-channels.js";
 import { FsConfigIO } from "./config-io-fs.js";
+import { DefaultLoopCliSummaryClient } from "./cli-summary-client.js";
 import { GuiConfigStore } from "./config-store.js";
+import { NodeProcessRunner } from "./node-process-runner.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -18,7 +20,10 @@ function createConfigStore(): GuiConfigStore {
   return new GuiConfigStore(io);
 }
 
-function registerIpcHandlers(store: GuiConfigStore): void {
+function registerIpcHandlers(
+  store: GuiConfigStore,
+  summaryClient: DefaultLoopCliSummaryClient,
+): void {
   ipcMain.handle(CHANNELS.getConfig, async () => store.load());
 
   ipcMain.handle(CHANNELS.saveRepoPath, async (_event, repoPath: unknown) => {
@@ -37,6 +42,14 @@ function registerIpcHandlers(store: GuiConfigStore): void {
       return null;
     }
     return result.filePaths[0];
+  });
+
+  ipcMain.handle(CHANNELS.loadWorkspaceSummary, async () => {
+    const config = await store.load();
+    if (config.repoPath === null) {
+      throw new Error("Loop Engine repository path is not configured");
+    }
+    return summaryClient.loadWorkspaceSummary(config.repoPath);
   });
 }
 
@@ -59,7 +72,10 @@ async function createWindow(): Promise<void> {
 
 app.whenReady().then(async () => {
   const store = createConfigStore();
-  registerIpcHandlers(store);
+  const summaryClient = new DefaultLoopCliSummaryClient(
+    new NodeProcessRunner(),
+  );
+  registerIpcHandlers(store, summaryClient);
   await createWindow();
 
   app.on("activate", () => {

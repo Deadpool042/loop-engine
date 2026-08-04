@@ -41,6 +41,7 @@ test("each exposed method maps to a distinct, known IPC channel", () => {
   void api.getConfig();
   void api.saveRepoPath("/tmp/repo");
   void api.pickRepoDirectory();
+  void api.loadWorkspaceSummary();
 
   const channelsUsed = bridge.calls.map((c) => c.channel);
   assert.deepEqual(channelsUsed.sort(), Object.values(CHANNELS).sort());
@@ -69,12 +70,13 @@ test("saveRepoPath rejects a non-string argument before it ever reaches the brid
   assert.equal(bridge.calls.length, 0, "the bridge must never see the invalid call");
 });
 
-test("getConfig and pickRepoDirectory take no arguments", () => {
+test("read-only methods take no arguments", () => {
   const bridge = fakeBridge();
   const api = createLoopGuiApi(bridge);
 
   void api.getConfig();
   void api.pickRepoDirectory();
+  void api.loadWorkspaceSummary();
 
   for (const call of bridge.calls) {
     assert.deepEqual(call.args, []);

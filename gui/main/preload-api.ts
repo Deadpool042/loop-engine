@@ -4,6 +4,7 @@
 // — see gui/tests/preload-api.test.ts, which asserts this list stays
 // narrow and typed (no generic execute(command: string) escape hatch).
 import { CHANNELS } from "../shared/ipc-channels.js";
+import type { WorkspaceSummary } from "../shared/workspace-summary.js";
 import type { GuiConfig } from "./config-store.js";
 
 export interface Bridge {
@@ -14,9 +15,15 @@ export interface LoopGuiApi {
   getConfig(): Promise<GuiConfig>;
   saveRepoPath(repoPath: string): Promise<GuiConfig>;
   pickRepoDirectory(): Promise<string | null>;
+  loadWorkspaceSummary(): Promise<WorkspaceSummary>;
 }
 
-export const EXPOSED_API_METHODS = ["getConfig", "saveRepoPath", "pickRepoDirectory"] as const;
+export const EXPOSED_API_METHODS = [
+  "getConfig",
+  "saveRepoPath",
+  "pickRepoDirectory",
+  "loadWorkspaceSummary",
+] as const;
 
 export function createLoopGuiApi(bridge: Bridge): LoopGuiApi {
   return {
@@ -27,6 +34,9 @@ export function createLoopGuiApi(bridge: Bridge): LoopGuiApi {
       }
       return bridge.invoke(CHANNELS.saveRepoPath, repoPath) as Promise<GuiConfig>;
     },
-    pickRepoDirectory: () => bridge.invoke(CHANNELS.pickRepoDirectory) as Promise<string | null>,
+    pickRepoDirectory: () =>
+      bridge.invoke(CHANNELS.pickRepoDirectory) as Promise<string | null>,
+    loadWorkspaceSummary: () =>
+      bridge.invoke(CHANNELS.loadWorkspaceSummary) as Promise<WorkspaceSummary>,
   };
 }
