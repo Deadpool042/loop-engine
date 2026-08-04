@@ -25,6 +25,17 @@ switch (mode) {
     process.exit(0);
     break;
   }
+  case "max_turns": {
+    write({
+      subtype: "error_max_turns",
+      is_error: true,
+      terminal_reason: "max_turns",
+      num_turns: 21,
+      errors: ["Reached maximum number of turns (20)"],
+    });
+    process.exit(1);
+    break;
+  }
   case "invalid_json": {
     process.stdout.write("not json at all");
     process.exit(0);
