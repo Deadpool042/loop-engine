@@ -1,9 +1,8 @@
 // Renderer entry point. Runs in a sandboxed, isolated browser context —
 // the only privileged surface it can reach is `window.loopGuiApi`
-// (see main/preload.ts), a narrow typed API with exactly seven methods.
+// (see main/preload.ts), a narrow typed API with exactly nine methods.
 // No child_process, no fs, no generic execute().
 import type { LoopGuiApi } from "../main/preload-api.js";
-import { FIXTURE_DETAIL } from "../shared/fixtures.js";
 import {
   goToDashboard,
   goToSettings,
@@ -13,7 +12,9 @@ import {
 } from "../shared/navigation.js";
 import type { ProjectContextReport } from "../shared/project-context.js";
 import type { ProjectNextReport } from "../shared/project-next.js";
+import type { ProjectPlanReport } from "../shared/project-plan.js";
 import type { ProjectPromptReport } from "../shared/project-prompt.js";
+import type { ProjectReviewReport } from "../shared/project-review.js";
 import {
   EAGER_SECTIONS,
   initialSections,
@@ -377,8 +378,6 @@ function renderProjectDetail(
       }
     : undefined;
 
-  const detail = FIXTURE_DETAIL[projectName];
-
   if (!project || !summaryProject) {
     root.innerHTML = `
       <div class="empty-state">
@@ -420,28 +419,8 @@ function renderProjectDetail(
   sectionsRoot.appendChild(renderNextSection(projectName, state));
   sectionsRoot.appendChild(renderContextSection(projectName, state));
   sectionsRoot.appendChild(renderPromptSection(projectName, state));
-
-  const fixtureSectionSpecs: Array<{
-    id: "review" | "plan";
-    title: string;
-    kind: "text" | "json";
-  }> = [
-    { id: "review", title: "Review", kind: "json" },
-    { id: "plan", title: "Plan (prévisionnel)", kind: "json" },
-  ];
-
-  for (const spec of fixtureSectionSpecs) {
-    sectionsRoot.appendChild(
-      renderSection(
-        projectName,
-        spec.id,
-        spec.title,
-        spec.kind,
-        state,
-        detail?.[spec.id],
-      ),
-    );
-  }
+  sectionsRoot.appendChild(renderReviewSection(projectName, state));
+  sectionsRoot.appendChild(renderPlanSection(projectName, state));
 }
 
 function statusContent(summaryProject: SummaryProject): Readonly<{
@@ -590,6 +569,18 @@ const promptStateByProject = new Map<
 >();
 const promptRequestInFlight = new Set<string>();
 
+const reviewStateByProject = new Map<
+  string,
+  LazySectionState<ProjectReviewReport>
+>();
+const reviewRequestInFlight = new Set<string>();
+
+const planStateByProject = new Map<
+  string,
+  LazySectionState<ProjectPlanReport>
+>();
+const planRequestInFlight = new Set<string>();
+
 function loadContext(projectName: string, refresh: boolean): void {
   if (contextRequestInFlight.has(projectName)) {
     return;
@@ -640,6 +631,56 @@ function loadPrompt(projectName: string, refresh: boolean): void {
     });
 }
 
+function loadReview(projectName: string, refresh: boolean): void {
+  if (reviewRequestInFlight.has(projectName)) {
+    return;
+  }
+
+  reviewRequestInFlight.add(projectName);
+  reviewStateByProject.set(projectName, { status: "loading" });
+
+  window.loopGuiApi
+    .loadProjectReview(projectName, refresh)
+    .then((value) => {
+      reviewStateByProject.set(projectName, { status: "success", value });
+    })
+    .catch((error: unknown) => {
+      reviewStateByProject.set(projectName, {
+        status: "error",
+        message: error instanceof Error ? error.message : "Erreur inconnue",
+      });
+    })
+    .finally(() => {
+      reviewRequestInFlight.delete(projectName);
+      rerenderDetailIfSelected(projectName);
+    });
+}
+
+function loadPlan(projectName: string, refresh: boolean): void {
+  if (planRequestInFlight.has(projectName)) {
+    return;
+  }
+
+  planRequestInFlight.add(projectName);
+  planStateByProject.set(projectName, { status: "loading" });
+
+  window.loopGuiApi
+    .loadProjectPlan(projectName, refresh)
+    .then((value) => {
+      planStateByProject.set(projectName, { status: "success", value });
+    })
+    .catch((error: unknown) => {
+      planStateByProject.set(projectName, {
+        status: "error",
+        message: error instanceof Error ? error.message : "Erreur inconnue",
+      });
+    })
+    .finally(() => {
+      planRequestInFlight.delete(projectName);
+      rerenderDetailIfSelected(projectName);
+    });
+}
+
 async function copyToClipboard(text: string): Promise<void> {
   await navigator.clipboard.writeText(text);
 }
@@ -647,10 +688,11 @@ async function copyToClipboard(text: string): Promise<void> {
 function renderLazyJsonSection<T>(
   projectName: string,
   state: SectionsState,
-  sectionId: "context" | "prompt",
+  sectionId: "context" | "prompt" | "review" | "plan",
   title: string,
   stateByProject: Map<string, LazySectionState<T>>,
   load: (projectName: string, refresh: boolean) => void,
+  bannerHtml?: string,
 ): HTMLElement {
   const isOpenSection = state.open[sectionId];
   const element = document.createElement("div");
@@ -702,6 +744,7 @@ function renderLazyJsonSection<T>(
       const text = JSON.stringify(sectionState.value, null, 2);
 
       body.innerHTML = `
+        ${bannerHtml ?? ""}
         <div class="section-toolbar">
           <button class="ghost refresh-section">Actualiser</button>
           <button class="ghost copy-section">Copier</button>
@@ -762,6 +805,35 @@ function renderPromptSection(
     "Prompt",
     promptStateByProject,
     loadPrompt,
+  );
+}
+
+function renderReviewSection(
+  projectName: string,
+  state: SectionsState,
+): HTMLElement {
+  return renderLazyJsonSection(
+    projectName,
+    state,
+    "review",
+    "Review",
+    reviewStateByProject,
+    loadReview,
+  );
+}
+
+function renderPlanSection(
+  projectName: string,
+  state: SectionsState,
+): HTMLElement {
+  return renderLazyJsonSection(
+    projectName,
+    state,
+    "plan",
+    "Plan (prévisionnel)",
+    planStateByProject,
+    loadPlan,
+    `<div class="plan-preview-banner">Prévisualisation uniquement — aucune modification appliquée.</div>`,
   );
 }
 

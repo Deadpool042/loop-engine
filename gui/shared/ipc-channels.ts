@@ -10,6 +10,8 @@ export const CHANNELS = {
   loadProjectNext: "gui:load-project-next",
   loadProjectContext: "gui:load-project-context",
   loadProjectPrompt: "gui:load-project-prompt",
+  loadProjectReview: "gui:load-project-review",
+  loadProjectPlan: "gui:load-project-plan",
 } as const;
 
 export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
