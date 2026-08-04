@@ -4,7 +4,7 @@
 //
 // summary, next, context, prompt, review and plan are all wired to the real
 // Loop CLI (gui-cockpit.md §9, Lot 5).
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHANNELS } from "../shared/ipc-channels.js";
@@ -15,10 +15,13 @@ import { DefaultLoopCliPlanClient } from "./cli-plan-client.js";
 import { DefaultLoopCliPromptClient } from "./cli-prompt-client.js";
 import { DefaultLoopCliReviewClient } from "./cli-review-client.js";
 import { DefaultLoopCliSummaryClient } from "./cli-summary-client.js";
+import { DefaultLoopCliValidateClient } from "./cli-validate-client.js";
+import { DefaultLoopCliOpenFolderClient } from "./open-project-folder-client.js";
 import { GuiConfigStore } from "./config-store.js";
 import { NodeProcessRunner } from "./node-process-runner.js";
 import { ProjectNextGateway } from "./project-next-gateway.js";
 import { ProjectSectionGateway } from "./project-section-gateway.js";
+import { registerProjectActionHandler } from "./register-project-action-handler.js";
 import { registerProjectSectionHandler } from "./register-project-section-handler.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -36,6 +39,8 @@ function registerIpcHandlers(
   promptClient: DefaultLoopCliPromptClient,
   reviewClient: DefaultLoopCliReviewClient,
   planClient: DefaultLoopCliPlanClient,
+  validateClient: DefaultLoopCliValidateClient,
+  openFolderClient: DefaultLoopCliOpenFolderClient,
 ): void {
   const nextGateways = new Map<string, ProjectNextGateway>();
   const contextGateways = new Map<
@@ -133,6 +138,20 @@ function registerIpcHandlers(
     planGateways,
     (repoPath) => (name) => planClient.loadProjectPlan(repoPath, name),
   );
+
+  registerProjectActionHandler(
+    ipcMain,
+    CHANNELS.validateProject,
+    store,
+    (repoPath, name) => validateClient.validateProject(repoPath, name),
+  );
+
+  registerProjectActionHandler(
+    ipcMain,
+    CHANNELS.openProjectFolder,
+    store,
+    (repoPath, name) => openFolderClient.openProjectFolder(repoPath, name),
+  );
 }
 
 async function createWindow(): Promise<void> {
@@ -164,6 +183,12 @@ app.whenReady().then(async () => {
   const promptClient = new DefaultLoopCliPromptClient(new NodeProcessRunner());
   const reviewClient = new DefaultLoopCliReviewClient(new NodeProcessRunner());
   const planClient = new DefaultLoopCliPlanClient(new NodeProcessRunner());
+  const validateClient = new DefaultLoopCliValidateClient(
+    new NodeProcessRunner(),
+  );
+  const openFolderClient = new DefaultLoopCliOpenFolderClient(contextClient, {
+    openPath: (path: string) => shell.openPath(path),
+  });
   registerIpcHandlers(
     store,
     summaryClient,
@@ -172,6 +197,8 @@ app.whenReady().then(async () => {
     promptClient,
     reviewClient,
     planClient,
+    validateClient,
+    openFolderClient,
   );
   await createWindow();
 

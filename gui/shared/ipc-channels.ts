@@ -12,6 +12,8 @@ export const CHANNELS = {
   loadProjectPrompt: "gui:load-project-prompt",
   loadProjectReview: "gui:load-project-review",
   loadProjectPlan: "gui:load-project-plan",
+  validateProject: "gui:validate-project",
+  openProjectFolder: "gui:open-project-folder",
 } as const;
 
 export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
