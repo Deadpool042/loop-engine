@@ -49,6 +49,7 @@ test("each exposed method maps to a distinct, known IPC channel", () => {
   void api.loadProjectPlan("loop-engine");
   void api.validateProject("loop-engine");
   void api.openProjectFolder("loop-engine");
+  void api.autoDetectRepoPath();
 
   const channelsUsed = bridge.calls.map((c) => c.channel);
   assert.deepEqual(channelsUsed.sort(), Object.values(CHANNELS).sort());
@@ -225,6 +226,7 @@ test("read-only methods take no arguments", () => {
   void api.getConfig();
   void api.pickRepoDirectory();
   void api.loadWorkspaceSummary();
+  void api.autoDetectRepoPath();
 
   for (const call of bridge.calls) {
     assert.deepEqual(call.args, []);

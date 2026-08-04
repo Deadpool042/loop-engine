@@ -1,6 +1,7 @@
 // Resolves a project's absolute path via the existing, already-trusted
 // context client (never from renderer-supplied input) and hands it to an
 // injected folder opener. The renderer only ever sends a project name.
+import { encodeGuiExecutionError } from "../shared/gui-execution-error.js";
 import type { LoopCliContextClient } from "./cli-context-client.js";
 
 export interface FolderOpener {
@@ -26,7 +27,13 @@ export class DefaultLoopCliOpenFolderClient implements LoopCliOpenFolderClient {
     const errorMessage = await this.opener.openPath(report.project.path);
 
     if (errorMessage) {
-      throw new Error(errorMessage);
+      throw new Error(
+        encodeGuiExecutionError({
+          kind: "process_start_failed",
+          message: "Impossible d'ouvrir le dossier du projet.",
+          details: errorMessage,
+        }),
+      );
     }
   }
 }

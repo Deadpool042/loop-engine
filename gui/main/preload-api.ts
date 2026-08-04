@@ -40,6 +40,7 @@ export interface LoopGuiApi {
   ): Promise<ProjectPlanReport>;
   validateProject(projectName: string): Promise<void>;
   openProjectFolder(projectName: string): Promise<void>;
+  autoDetectRepoPath(): Promise<string | null>;
 }
 
 export const EXPOSED_API_METHODS = [
@@ -54,6 +55,7 @@ export const EXPOSED_API_METHODS = [
   "loadProjectPlan",
   "validateProject",
   "openProjectFolder",
+  "autoDetectRepoPath",
 ] as const;
 
 export function createLoopGuiApi(bridge: Bridge): LoopGuiApi {
@@ -147,5 +149,7 @@ export function createLoopGuiApi(bridge: Bridge): LoopGuiApi {
         projectName,
       ) as Promise<void>;
     },
+    autoDetectRepoPath: () =>
+      bridge.invoke(CHANNELS.autoDetectRepoPath) as Promise<string | null>,
   };
 }
