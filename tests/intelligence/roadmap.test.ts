@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { type ProjectConfig } from "../../src/core/config.js";
 import {
@@ -437,5 +438,35 @@ describe("roadmap candidate priority", () => {
     } finally {
       cleanup();
     }
+  });
+});
+
+describe("loop-engine burn-in candidate", () => {
+  it("selects the deterministic Burn-in 1 candidate", () => {
+    const currentDir = dirname(fileURLToPath(import.meta.url));
+    const repoRoot = resolve(currentDir, "..", "..");
+    const project: ProjectConfig = {
+      name: "loop-engine",
+      path: ".",
+      type: "node-cli",
+      required_docs: ["README.md", "docs/architecture/project-intelligence.md"],
+      validation: ["pnpm run validate"],
+      roadmap: ["docs/roadmap/loop-engine.md"],
+    };
+
+    const candidates = findRoadmapCandidates(project, repoRoot);
+    const selected = selectRoadmapCandidate(candidates);
+
+    assert.ok(selected, "expected an active Burn-in 1 candidate");
+    assert.match(selected!.text, /Burn-in 1/);
+    assert.match(
+      selected!.text,
+      /tests\/integration\/claude-code-provider-burn-in\.test\.ts/,
+    );
+    assert.match(selected!.text, /tests\/fixtures\/fake-claude\/claude/);
+    assert.match(
+      selected!.text,
+      /pnpm exec tsx --test tests\/integration\/claude-code-provider-burn-in\.test\.ts/,
+    );
   });
 });
