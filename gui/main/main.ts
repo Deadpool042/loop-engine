@@ -2,18 +2,21 @@
 // Owns the BrowserWindow, the config store, and the exhaustive set of
 // ipcMain handlers (exactly the channels in shared/ipc-channels.ts).
 //
-// Lot 1 scope only: no CLI spawning, no summary/status/next/context/
-// prompt/review/plan wiring. Those are a later lot (gui-cockpit.md §9).
+// summary, next, context and prompt are wired to the real Loop CLI. review
+// and plan remain fixture-backed (gui-cockpit.md §9, Lot 6).
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CHANNELS } from "../shared/ipc-channels.js";
 import { FsConfigIO } from "./config-io-fs.js";
+import { DefaultLoopCliContextClient } from "./cli-context-client.js";
 import { DefaultLoopCliNextClient } from "./cli-next-client.js";
+import { DefaultLoopCliPromptClient } from "./cli-prompt-client.js";
 import { DefaultLoopCliSummaryClient } from "./cli-summary-client.js";
 import { GuiConfigStore } from "./config-store.js";
 import { NodeProcessRunner } from "./node-process-runner.js";
 import { ProjectNextGateway } from "./project-next-gateway.js";
+import { ProjectSectionGateway } from "./project-section-gateway.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -26,8 +29,19 @@ function registerIpcHandlers(
   store: GuiConfigStore,
   summaryClient: DefaultLoopCliSummaryClient,
   nextClient: DefaultLoopCliNextClient,
+  contextClient: DefaultLoopCliContextClient,
+  promptClient: DefaultLoopCliPromptClient,
 ): void {
   const nextGateways = new Map<string, ProjectNextGateway>();
+  const contextGateways = new Map<
+    string,
+    ProjectSectionGateway<Awaited<ReturnType<DefaultLoopCliContextClient["loadProjectContext"]>>>
+  >();
+  const promptGateways = new Map<
+    string,
+    ProjectSectionGateway<Awaited<ReturnType<DefaultLoopCliPromptClient["loadProjectPrompt"]>>>
+  >();
+
   ipcMain.handle(CHANNELS.getConfig, async () => store.load());
 
   ipcMain.handle(CHANNELS.saveRepoPath, async (_event, repoPath: unknown) => {
@@ -74,6 +88,62 @@ function registerIpcHandlers(
 
     return gateway.load(projectName);
   });
+
+  ipcMain.handle(
+    CHANNELS.loadProjectContext,
+    async (_event, projectName: unknown, refresh: unknown) => {
+      if (typeof projectName !== "string" || projectName.trim().length === 0) {
+        throw new TypeError("projectName must be a non-empty string");
+      }
+
+      const config = await store.load();
+      if (config.repoPath === null) {
+        throw new Error("Loop Engine repository path is not configured");
+      }
+
+      let gateway = contextGateways.get(config.repoPath);
+      if (!gateway) {
+        gateway = new ProjectSectionGateway((name) =>
+          contextClient.loadProjectContext(config.repoPath as string, name),
+        );
+        contextGateways.set(config.repoPath, gateway);
+      }
+
+      if (refresh === true) {
+        gateway.invalidate(projectName);
+      }
+
+      return gateway.load(projectName);
+    },
+  );
+
+  ipcMain.handle(
+    CHANNELS.loadProjectPrompt,
+    async (_event, projectName: unknown, refresh: unknown) => {
+      if (typeof projectName !== "string" || projectName.trim().length === 0) {
+        throw new TypeError("projectName must be a non-empty string");
+      }
+
+      const config = await store.load();
+      if (config.repoPath === null) {
+        throw new Error("Loop Engine repository path is not configured");
+      }
+
+      let gateway = promptGateways.get(config.repoPath);
+      if (!gateway) {
+        gateway = new ProjectSectionGateway((name) =>
+          promptClient.loadProjectPrompt(config.repoPath as string, name),
+        );
+        promptGateways.set(config.repoPath, gateway);
+      }
+
+      if (refresh === true) {
+        gateway.invalidate(projectName);
+      }
+
+      return gateway.load(projectName);
+    },
+  );
 }
 
 async function createWindow(): Promise<void> {
@@ -99,7 +169,17 @@ app.whenReady().then(async () => {
     new NodeProcessRunner(),
   );
   const nextClient = new DefaultLoopCliNextClient(new NodeProcessRunner());
-  registerIpcHandlers(store, summaryClient, nextClient);
+  const contextClient = new DefaultLoopCliContextClient(
+    new NodeProcessRunner(),
+  );
+  const promptClient = new DefaultLoopCliPromptClient(new NodeProcessRunner());
+  registerIpcHandlers(
+    store,
+    summaryClient,
+    nextClient,
+    contextClient,
+    promptClient,
+  );
   await createWindow();
 
   app.on("activate", () => {

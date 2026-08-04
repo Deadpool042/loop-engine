@@ -43,6 +43,8 @@ test("each exposed method maps to a distinct, known IPC channel", () => {
   void api.pickRepoDirectory();
   void api.loadWorkspaceSummary();
   void api.loadProjectNext("loop-engine");
+  void api.loadProjectContext("loop-engine");
+  void api.loadProjectPrompt("loop-engine");
 
   const channelsUsed = bridge.calls.map((c) => c.channel);
   assert.deepEqual(channelsUsed.sort(), Object.values(CHANNELS).sort());
@@ -87,6 +89,48 @@ test("loadProjectNext rejects an empty project name before it ever reaches the b
   const api = createLoopGuiApi(bridge);
 
   await assert.rejects(() => api.loadProjectNext(" "), TypeError);
+  assert.equal(bridge.calls.length, 0, "the bridge must never see the invalid call");
+});
+
+test("loadProjectContext forwards the project name and refresh flag on the dedicated channel", () => {
+  const bridge = fakeBridge();
+  const api = createLoopGuiApi(bridge);
+
+  void api.loadProjectContext("loop-engine");
+  void api.loadProjectContext("loop-engine", true);
+
+  const calls = bridge.calls.filter((c) => c.channel === CHANNELS.loadProjectContext);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0]?.args, ["loop-engine", false]);
+  assert.deepEqual(calls[1]?.args, ["loop-engine", true]);
+});
+
+test("loadProjectContext rejects an empty project name before it ever reaches the bridge", async () => {
+  const bridge = fakeBridge();
+  const api = createLoopGuiApi(bridge);
+
+  await assert.rejects(() => api.loadProjectContext(" "), TypeError);
+  assert.equal(bridge.calls.length, 0, "the bridge must never see the invalid call");
+});
+
+test("loadProjectPrompt forwards the project name and refresh flag on the dedicated channel", () => {
+  const bridge = fakeBridge();
+  const api = createLoopGuiApi(bridge);
+
+  void api.loadProjectPrompt("loop-engine");
+  void api.loadProjectPrompt("loop-engine", true);
+
+  const calls = bridge.calls.filter((c) => c.channel === CHANNELS.loadProjectPrompt);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0]?.args, ["loop-engine", false]);
+  assert.deepEqual(calls[1]?.args, ["loop-engine", true]);
+});
+
+test("loadProjectPrompt rejects an empty project name before it ever reaches the bridge", async () => {
+  const bridge = fakeBridge();
+  const api = createLoopGuiApi(bridge);
+
+  await assert.rejects(() => api.loadProjectPrompt(" "), TypeError);
   assert.equal(bridge.calls.length, 0, "the bridge must never see the invalid call");
 });
 

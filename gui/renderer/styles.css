@@ -82,6 +82,7 @@ input[type="text"] {
 }
 .section-body { padding: 0; }
 .section.open .section-body { padding: 0 14px 14px; }
+.section-toolbar { display: flex; gap: 8px; margin-bottom: 8px; }
 
 .text-panel {
   background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
