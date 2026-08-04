@@ -10,7 +10,13 @@ import { createClaudeCodeCliLoopExecutor } from "../../src/loop/claude-code-cli-
 import type { LoopExecutionPlan } from "../../src/loop/execution-plan.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-const FAKE_CLAUDE = resolve(currentDir, "..", "fixtures", "fake-claude", "claude");
+const FAKE_CLAUDE = resolve(
+  currentDir,
+  "..",
+  "fixtures",
+  "fake-claude",
+  "claude",
+);
 
 function setupCleanWorktree(): { cwd: string; cleanup: () => void } {
   const cwd = mkdtempSync(join(tmpdir(), "loop-claude-executor-"));
@@ -77,7 +83,6 @@ function fakePlan(cwd: string): LoopExecutionPlan {
     },
   });
 }
-
 
 describe("createClaudeCodeCliLoopExecutor", () => {
   it("accepts only an executable named claude", () => {
@@ -182,11 +187,13 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         result.status === "failed" ? result.failure.code : null,
         "provider_failed",
       );
-      assert.deepEqual(
-        result.status === "failed" ? result.modifiedFiles : [],
-        ["provider-leftover.txt"],
+      assert.deepEqual(result.status === "failed" ? result.modifiedFiles : [], [
+        "provider-leftover.txt",
+      ]);
+      assert.equal(
+        readFileSync(join(cwd, "provider-leftover.txt"), "utf8"),
+        "leftover\n",
       );
-      assert.equal(readFileSync(join(cwd, "provider-leftover.txt"), "utf8"), "leftover\n");
     } finally {
       delete process.env.FAKE_CLAUDE_MODE;
       cleanup();
@@ -227,6 +234,44 @@ describe("createClaudeCodeCliLoopExecutor", () => {
       assert.equal(serialized.includes("error_during_execution"), false);
     } finally {
       delete process.env.FAKE_CLAUDE_MODE;
+      cleanup();
+    }
+  });
+
+  it("passes roadmap protection constraints to Claude Code", async () => {
+    const { cwd, cleanup } = setupCleanWorktree();
+    const capturePath = join(cwd, "claude-arguments.json");
+
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success";
+      process.env.FAKE_CLAUDE_CAPTURE_ARGS = capturePath;
+
+      const executor = createClaudeCodeCliLoopExecutor({
+        executable: FAKE_CLAUDE,
+        timeoutMs: 5_000,
+      });
+
+      const result = await executor(fakePlan(cwd));
+
+      assert.equal(result.status, "completed");
+
+      const capturedArgs = JSON.parse(
+        readFileSync(capturePath, "utf8"),
+      ) as string[];
+
+      const prompt = capturedArgs.at(-1) ?? "";
+
+      assert.match(
+        prompt,
+        /Do not modify the roadmap or mark the selected candidate complete\./,
+      );
+      assert.match(
+        prompt,
+        /Implement only the target files explicitly named by the selected candidate\./,
+      );
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      delete process.env.FAKE_CLAUDE_CAPTURE_ARGS;
       cleanup();
     }
   });
