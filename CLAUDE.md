@@ -10,6 +10,16 @@ Cette page constitue la source de vérité du produit et définit l'objectif fin
 
 Claude doit s’y référer avant toute évolution structurante.
 
+## Agent skills
+
+### Issue tracker
+
+Issues tracked as GitHub issues via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout — `docs/architecture/project-intelligence.md` + `docs/architecture/adr/`. See `docs/agents/domain.md`.
+
 ## What this is
 
 Loop Engine is a local CLI orchestrator for projects declared in `projects.yaml`. It exposes project inspection, roadmap selection, bounded context, validation, audit, declarative Runtime contracts, guarded inbound execution and a bounded LoopRunner cycle.
