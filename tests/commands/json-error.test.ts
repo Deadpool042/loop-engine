@@ -1,17 +1,68 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
-function runFailingCommand(args: string[]): string {
+const currentDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(currentDir, "..", "..");
+const tsxExecutable = resolve(
+  repoRoot,
+  "node_modules",
+  ".bin",
+  process.platform === "win32" ? "tsx.cmd" : "tsx",
+);
+const cliPath = resolve(repoRoot, "src", "cli.ts");
+
+function runFailingCommand(args: string[], cwd = repoRoot): string {
   try {
-    return execFileSync("pnpm", ["exec", "tsx", "src/cli.ts", ...args], {
-      cwd: process.cwd(),
+    return execFileSync(tsxExecutable, [cliPath, ...args], {
+      cwd,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (error) {
     return String((error as { stdout?: unknown }).stdout ?? "");
   }
+}
+
+function setupRunnableProject(): {
+  cwd: string;
+  projectName: string;
+  cleanup: () => void;
+} {
+  const cwd = mkdtempSync(join(tmpdir(), "loop-json-error-"));
+  const projectName = "run-fixture";
+
+  writeFileSync(
+    join(cwd, "projects.yaml"),
+    [
+      "projects:",
+      `  - name: ${projectName}`,
+      "    path: .",
+      "    type: test",
+      "    required_docs: []",
+      "    validation: []",
+      "    roadmap:",
+      "      - roadmap.md",
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(join(cwd, "roadmap.md"), "- [ ] Exercise executor boundary\n");
+
+  execFileSync("git", ["init", "-q"], { cwd });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd });
+  execFileSync("git", ["add", "projects.yaml", "roadmap.md"], { cwd });
+  execFileSync("git", ["commit", "-q", "-m", "fixture baseline"], { cwd });
+
+  return {
+    cwd,
+    projectName,
+    cleanup: () => rmSync(cwd, { recursive: true, force: true }),
+  };
 }
 
 describe("json errors", () => {
@@ -42,23 +93,29 @@ describe("json errors", () => {
   });
 
   it("returns a failed LoopRunResult when execute has no concrete executor", () => {
-    const output = runFailingCommand([
-      "run", "loop-engine", "--mode", "execute", "--json",
-    ]);
-    const json = JSON.parse(output) as {
-      schemaVersion?: unknown;
-      mode?: unknown;
-      status?: unknown;
-      failure?: { code?: unknown; message?: unknown };
-      commit?: unknown;
-      publication?: unknown;
-    };
-    assert.equal(json.schemaVersion, 1);
-    assert.equal(json.mode, "execute");
-    assert.equal(json.status, "failed");
-    assert.equal(json.failure?.code, "executor_unavailable");
-    assert.equal(json.commit, null);
-    assert.equal(json.publication, null);
+    const fixture = setupRunnableProject();
+    try {
+      const output = runFailingCommand(
+        ["run", fixture.projectName, "--mode", "execute", "--json"],
+        fixture.cwd,
+      );
+      const json = JSON.parse(output) as {
+        schemaVersion?: unknown;
+        mode?: unknown;
+        status?: unknown;
+        failure?: { code?: unknown; message?: unknown };
+        commit?: unknown;
+        publication?: unknown;
+      };
+      assert.equal(json.schemaVersion, 1);
+      assert.equal(json.mode, "execute");
+      assert.equal(json.status, "failed");
+      assert.equal(json.failure?.code, "executor_unavailable");
+      assert.equal(json.commit, null);
+      assert.equal(json.publication, null);
+    } finally {
+      fixture.cleanup();
+    }
   });
 
   it("requires an explicit commit message for commit mode", () => {
@@ -191,31 +248,39 @@ describe("json errors", () => {
   });
 
   it("wires Claude Code through the CLI and reaches the concrete executor boundary", () => {
-    const output = runFailingCommand([
-      "run",
-      "loop-engine",
-      "--mode",
-      "execute",
-      "--provider",
-      "claude_code",
-      "--provider-executable",
-      "/definitely-missing/claude",
-      "--json",
-    ]);
-    const json = JSON.parse(output) as {
-      mode?: unknown;
-      status?: unknown;
-      failure?: { code?: unknown };
-      agentPolicy?: { selection?: { profile?: { runtime?: unknown } } };
-    };
-    assert.equal(json.mode, "execute");
-    assert.equal(json.status, "failed");
-    assert.equal(
-      ["provider_unavailable", "worktree_not_clean"].includes(
-        String(json.failure?.code),
-      ),
-      true,
-    );
-    assert.equal(json.agentPolicy?.selection?.profile?.runtime, "claude_code");
+    const fixture = setupRunnableProject();
+    try {
+      const output = runFailingCommand(
+        [
+          "run",
+          fixture.projectName,
+          "--mode",
+          "execute",
+          "--provider",
+          "claude_code",
+          "--provider-executable",
+          "/definitely-missing/claude",
+          "--json",
+        ],
+        fixture.cwd,
+      );
+      const json = JSON.parse(output) as {
+        mode?: unknown;
+        status?: unknown;
+        failure?: { code?: unknown };
+        agentPolicy?: { selection?: { profile?: { runtime?: unknown } } };
+      };
+      assert.equal(json.mode, "execute");
+      assert.equal(json.status, "failed");
+      assert.equal(
+        ["provider_unavailable", "worktree_not_clean"].includes(
+          String(json.failure?.code),
+        ),
+        true,
+      );
+      assert.equal(json.agentPolicy?.selection?.profile?.runtime, "claude_code");
+    } finally {
+      fixture.cleanup();
+    }
   });
 });
