@@ -1,15 +1,13 @@
 import { spawn } from "node:child_process";
 
 import type {
-  SummaryProcessRequest,
-  SummaryProcessResult,
-  SummaryProcessRunner,
-} from "./cli-summary-client.js";
+  ProcessRequest,
+  ProcessResult,
+  ProcessRunner,
+} from "./process-runner.js";
 
-export class NodeProcessRunner implements SummaryProcessRunner {
-  async run(
-    request: SummaryProcessRequest,
-  ): Promise<SummaryProcessResult> {
+export class NodeProcessRunner implements ProcessRunner {
+  async run(request: ProcessRequest): Promise<ProcessResult> {
     return await new Promise((resolve, reject) => {
       const child = spawn(request.executable, request.args, {
         cwd: request.cwd,
@@ -22,17 +20,17 @@ export class NodeProcessRunner implements SummaryProcessRunner {
       child.stdout.setEncoding("utf8");
       child.stderr.setEncoding("utf8");
 
-      child.stdout.on("data", (chunk) => {
+      child.stdout.on("data", (chunk: string) => {
         stdout += chunk;
       });
 
-      child.stderr.on("data", (chunk) => {
+      child.stderr.on("data", (chunk: string) => {
         stderr += chunk;
       });
 
-      child.on("error", reject);
+      child.once("error", reject);
 
-      child.on("close", (code) => {
+      child.once("close", (code) => {
         resolve({
           exitCode: code ?? -1,
           stdout,

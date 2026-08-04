@@ -4,6 +4,7 @@
 // — see gui/tests/preload-api.test.ts, which asserts this list stays
 // narrow and typed (no generic execute(command: string) escape hatch).
 import { CHANNELS } from "../shared/ipc-channels.js";
+import type { ProjectNextReport } from "../shared/project-next.js";
 import type { WorkspaceSummary } from "../shared/workspace-summary.js";
 import type { GuiConfig } from "./config-store.js";
 
@@ -16,6 +17,7 @@ export interface LoopGuiApi {
   saveRepoPath(repoPath: string): Promise<GuiConfig>;
   pickRepoDirectory(): Promise<string | null>;
   loadWorkspaceSummary(): Promise<WorkspaceSummary>;
+  loadProjectNext(projectName: string): Promise<ProjectNextReport>;
 }
 
 export const EXPOSED_API_METHODS = [
@@ -23,6 +25,7 @@ export const EXPOSED_API_METHODS = [
   "saveRepoPath",
   "pickRepoDirectory",
   "loadWorkspaceSummary",
+  "loadProjectNext",
 ] as const;
 
 export function createLoopGuiApi(bridge: Bridge): LoopGuiApi {
@@ -38,5 +41,16 @@ export function createLoopGuiApi(bridge: Bridge): LoopGuiApi {
       bridge.invoke(CHANNELS.pickRepoDirectory) as Promise<string | null>,
     loadWorkspaceSummary: () =>
       bridge.invoke(CHANNELS.loadWorkspaceSummary) as Promise<WorkspaceSummary>,
+    loadProjectNext: (projectName: string) => {
+      if (typeof projectName !== "string" || projectName.trim().length === 0) {
+        return Promise.reject(
+          new TypeError("projectName must be a non-empty string"),
+        );
+      }
+      return bridge.invoke(
+        CHANNELS.loadProjectNext,
+        projectName,
+      ) as Promise<ProjectNextReport>;
+    },
   };
 }

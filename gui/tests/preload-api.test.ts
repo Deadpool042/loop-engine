@@ -42,6 +42,7 @@ test("each exposed method maps to a distinct, known IPC channel", () => {
   void api.saveRepoPath("/tmp/repo");
   void api.pickRepoDirectory();
   void api.loadWorkspaceSummary();
+  void api.loadProjectNext("loop-engine");
 
   const channelsUsed = bridge.calls.map((c) => c.channel);
   assert.deepEqual(channelsUsed.sort(), Object.values(CHANNELS).sort());
@@ -67,6 +68,25 @@ test("saveRepoPath rejects a non-string argument before it ever reaches the brid
 
   // @ts-expect-error — exercising the runtime guard against a malicious/careless caller
   await assert.rejects(() => api.saveRepoPath(1234), TypeError);
+  assert.equal(bridge.calls.length, 0, "the bridge must never see the invalid call");
+});
+
+test("loadProjectNext forwards exactly the project name on the dedicated channel", () => {
+  const bridge = fakeBridge();
+  const api = createLoopGuiApi(bridge);
+
+  void api.loadProjectNext("loop-engine");
+
+  const call = bridge.calls.find((c) => c.channel === CHANNELS.loadProjectNext);
+  assert.ok(call);
+  assert.deepEqual(call.args, ["loop-engine"]);
+});
+
+test("loadProjectNext rejects an empty project name before it ever reaches the bridge", async () => {
+  const bridge = fakeBridge();
+  const api = createLoopGuiApi(bridge);
+
+  await assert.rejects(() => api.loadProjectNext(" "), TypeError);
   assert.equal(bridge.calls.length, 0, "the bridge must never see the invalid call");
 });
 

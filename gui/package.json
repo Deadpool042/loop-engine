@@ -5,7 +5,7 @@
   "type": "module",
   "description": "GUI Cockpit — Electron desktop shell for Loop Engine. Isolated package: never installed or built by the root repo. See docs/architecture/gui-cockpit.md.",
   "scripts": {
-    "build": "tsc -p tsconfig.json && node build-copy-static.mjs",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.preload.json && node build-copy-static.mjs",
     "start": "pnpm run build && electron dist/main/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx --test tests/**/*.test.ts"

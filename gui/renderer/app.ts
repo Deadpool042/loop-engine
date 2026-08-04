@@ -11,6 +11,7 @@ import {
   selectProject,
   type NavState,
 } from "../shared/navigation.js";
+import type { ProjectNextReport } from "../shared/project-next.js";
 import {
   EAGER_SECTIONS,
   initialSections,
@@ -28,10 +29,15 @@ type SummaryProject = Readonly<{
     branch: string;
     clean: boolean;
   }>;
-  health: Readonly<{
-    status: string;
-  }>;
+  docs: unknown;
+  validation: unknown;
+  health: string;
 }>;
+
+type NextState =
+  | Readonly<{ status: "loading" }>
+  | Readonly<{ status: "success"; report: ProjectNextReport }>
+  | Readonly<{ status: "error"; message: string }>;
 
 declare global {
   interface Window {
@@ -217,6 +223,8 @@ function isSummaryProject(value: unknown): value is SummaryProject {
   if (
     !("project" in value) ||
     !("git" in value) ||
+    !("docs" in value) ||
+    !("validation" in value) ||
     !("health" in value)
   ) {
     return false;
@@ -239,10 +247,7 @@ function isSummaryProject(value: unknown): value is SummaryProject {
     typeof git.branch === "string" &&
     "clean" in git &&
     typeof git.clean === "boolean" &&
-    typeof health === "object" &&
-    health !== null &&
-    "status" in health &&
-    typeof health.status === "string"
+    typeof health === "string"
   );
 }
 
@@ -316,7 +321,7 @@ function renderSplitView(root: HTMLElement): void {
       name: summaryProject.project.name,
       path: summaryProject.project.path,
       git: summaryProject.git,
-      health: summaryProject.health.status,
+      health: summaryProject.health,
     };
 
     const row = document.createElement("div");
@@ -366,13 +371,13 @@ function renderProjectDetail(
         name: summaryProject.project.name,
         path: summaryProject.project.path,
         git: summaryProject.git,
-        health: summaryProject.health.status,
+        health: summaryProject.health,
       }
     : undefined;
 
   const detail = FIXTURE_DETAIL[projectName];
 
-  if (!project) {
+  if (!project || !summaryProject) {
     root.innerHTML = `
       <div class="empty-state">
         Projet inconnu : ${escapeHtml(projectName)}
@@ -408,20 +413,31 @@ function renderProjectDetail(
 
   const state = sectionsFor(projectName);
 
-  const sectionSpecs: Array<{
-    id: keyof typeof detail;
+  sectionsRoot.appendChild(
+    renderSection(
+      projectName,
+      "status",
+      "Statut",
+      "json",
+      state,
+      statusContent(summaryProject),
+    ),
+  );
+
+  sectionsRoot.appendChild(renderNextSection(projectName, state));
+
+  const fixtureSectionSpecs: Array<{
+    id: "context" | "prompt" | "review" | "plan";
     title: string;
     kind: "text" | "json";
   }> = [
-    { id: "status", title: "Statut", kind: "json" },
-    { id: "next", title: "Prochaine action", kind: "json" },
     { id: "context", title: "Contexte", kind: "text" },
     { id: "prompt", title: "Prompt", kind: "text" },
     { id: "review", title: "Review", kind: "json" },
     { id: "plan", title: "Plan (prévisionnel)", kind: "json" },
   ];
 
-  for (const spec of sectionSpecs) {
+  for (const spec of fixtureSectionSpecs) {
     sectionsRoot.appendChild(
       renderSection(
         projectName,
@@ -433,6 +449,135 @@ function renderProjectDetail(
       ),
     );
   }
+}
+
+function statusContent(summaryProject: SummaryProject): Readonly<{
+  project: unknown;
+  git: unknown;
+  docs: unknown;
+  validation: unknown;
+  health: unknown;
+}> {
+  return {
+    project: summaryProject.project,
+    git: summaryProject.git,
+    docs: summaryProject.docs,
+    validation: summaryProject.validation,
+    health: summaryProject.health,
+  };
+}
+
+const nextStateByProject = new Map<string, NextState>();
+const nextRequestInFlight = new Set<string>();
+
+function loadNext(projectName: string): void {
+  if (nextRequestInFlight.has(projectName)) {
+    return;
+  }
+
+  nextRequestInFlight.add(projectName);
+  nextStateByProject.set(projectName, { status: "loading" });
+
+  window.loopGuiApi
+    .loadProjectNext(projectName)
+    .then((report) => {
+      nextStateByProject.set(projectName, { status: "success", report });
+    })
+    .catch((error: unknown) => {
+      nextStateByProject.set(projectName, {
+        status: "error",
+        message: error instanceof Error ? error.message : "Erreur inconnue",
+      });
+    })
+    .finally(() => {
+      nextRequestInFlight.delete(projectName);
+      rerenderDetailIfSelected(projectName);
+    });
+}
+
+function rerenderDetailIfSelected(projectName: string): void {
+  if (
+    nav.screen.name !== "project-detail" ||
+    nav.screen.project !== projectName
+  ) {
+    return;
+  }
+
+  const detailPane = document.getElementById("detail-pane");
+
+  if (detailPane) {
+    renderProjectDetail(detailPane, projectName);
+  }
+}
+
+function renderNextSection(
+  projectName: string,
+  state: SectionsState,
+): HTMLElement {
+  const isOpenSection = state.open.next;
+  const element = document.createElement("div");
+
+  element.className = "section" + (isOpenSection ? " open" : "");
+
+  element.innerHTML = `
+    <div class="section-head">
+      <span class="caret">▸</span>
+      <strong>Prochaine action</strong>
+      ${
+        EAGER_SECTIONS.includes("next")
+          ? `<span class="eager-tag">auto</span>`
+          : ""
+      }
+    </div>
+
+    <div class="section-body"></div>
+  `;
+
+  const head = element.querySelector<HTMLElement>(".section-head");
+  const body = element.querySelector<HTMLElement>(".section-body");
+
+  if (!head || !body) {
+    throw new Error("missing section elements");
+  }
+
+  if (isOpenSection) {
+    let nextState = nextStateByProject.get(projectName);
+
+    if (!nextState) {
+      loadNext(projectName);
+      nextState = { status: "loading" };
+    }
+
+    if (nextState.status === "loading") {
+      body.innerHTML = `<div class="empty-state">Chargement…</div>`;
+    } else if (nextState.status === "error") {
+      body.innerHTML = `
+        <div class="error-text">${escapeHtml(nextState.message)}</div>
+        <button class="ghost retry-next">Réessayer</button>
+      `;
+
+      body.querySelector(".retry-next")?.addEventListener("click", () => {
+        nextStateByProject.delete(projectName);
+        rerenderDetailIfSelected(projectName);
+      });
+    } else {
+      const pre = document.createElement("pre");
+
+      pre.className = "json-panel mono";
+      pre.textContent = JSON.stringify(nextState.report, null, 2);
+
+      body.appendChild(pre);
+    }
+  }
+
+  head.addEventListener("click", () => {
+    const next = toggleSection(sectionsFor(projectName), "next");
+
+    sectionsByProject.set(projectName, next);
+    rerenderDetailIfSelected(projectName);
+  });
+
+  return element;
 }
 
 function renderSection(

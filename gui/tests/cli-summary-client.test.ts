@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import {
-  DefaultLoopCliSummaryClient,
-  type SummaryProcessRequest,
-  type SummaryProcessRunner,
-} from "../main/cli-summary-client.js";
+import { DefaultLoopCliSummaryClient } from "../main/cli-summary-client.js";
+import type {
+  ProcessRequest,
+  ProcessRunner,
+} from "../main/process-runner.js";
 
-class FakeRunner implements SummaryProcessRunner {
-  readonly requests: SummaryProcessRequest[] = [];
+class FakeRunner implements ProcessRunner {
+  readonly requests: ProcessRequest[] = [];
 
   constructor(private readonly result: {
     exitCode: number;
@@ -16,7 +16,7 @@ class FakeRunner implements SummaryProcessRunner {
     stderr: string;
   }) {}
 
-  async run(request: SummaryProcessRequest) {
+  async run(request: ProcessRequest) {
     this.requests.push(request);
     return this.result;
   }
