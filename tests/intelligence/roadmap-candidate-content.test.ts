@@ -39,7 +39,7 @@ describe("roadmap candidate content", () => {
   it("captures indented continuation lines in the selected candidate", () => {
     withRoadmap(
       [
-        "- [ ] [P1] Créer le fichier cible", 
+        "- [ ] [P1] Créer le fichier cible",
         "  Le fichier doit être docs/result.md.",
         "  Il doit contenir exactement la preuve attendue.",
       ].join("\n"),
@@ -62,7 +62,7 @@ describe("roadmap candidate content", () => {
   it("uses continuation content for safety classification", () => {
     withRoadmap(
       [
-        "- [ ] Préparer la prochaine opération", 
+        "- [ ] Préparer la prochaine opération",
         "  Effectuer ensuite la mise en production.",
       ].join("\n"),
       (project, projectPath) => {
@@ -77,7 +77,7 @@ describe("roadmap candidate content", () => {
   it("stops before the next candidate and keeps both candidates distinct", () => {
     withRoadmap(
       [
-        "- [ ] Premier lot", 
+        "- [ ] Premier lot",
         "  Créer docs/first.md.",
         "- [ ] Deuxième lot",
         "  Créer docs/second.md.",
@@ -116,7 +116,7 @@ describe("roadmap candidate content", () => {
   it("does not create a duplicate candidate from a continuation containing lot", () => {
     withRoadmap(
       [
-        "- [ ] Stabiliser le parser", 
+        "- [ ] Stabiliser le parser",
         "  Le prochain lot doit rester dans ce candidat.",
       ].join("\n"),
       (project, projectPath) => {
