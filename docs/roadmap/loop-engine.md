@@ -27,7 +27,7 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 
 ## Gel architectural
 
-- Decision gate levé : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).
+- Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).
 - Prochain candidat explicite : durcir le format de roadmap candidate (ou la construction du prompt) pour que le contenu cible reste toujours capté sur la ligne candidate, évitant la classe d'échec observée aux runs 1–3 du burn-in 5.
 - Une abstraction nouvelle exige deux usages réels, deux implémentations réelles ou une frontière externe démontrée.
 - Les objets intermédiaires internes restent libres de refactor et ne deviennent pas des contrats versionnés par défaut.
