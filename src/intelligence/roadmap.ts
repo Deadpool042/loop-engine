@@ -132,6 +132,12 @@ function isCandidateLine(line: string): boolean {
   return CANDIDATE_PATTERNS.some((pattern) => line.includes(pattern));
 }
 
+function isCandidateStart(line: string): boolean {
+  return /^(?:- \[[ xX]\]|TODO\b|À faire\b|A faire\b|Prochain\b|prochain\b|Lot\b|lot\b|H[1-3]-L|⏳)/.test(
+    line,
+  );
+}
+
 function isIndentedContinuation(line: string): boolean {
   return /^\s+\S/.test(line);
 }
@@ -150,7 +156,7 @@ function collectCandidateText(
     if (
       trimmed.length === 0 ||
       isMarkdownHeading(trimmed) ||
-      isCandidateLine(trimmed) ||
+      isCandidateStart(trimmed) ||
       !isIndentedContinuation(rawLine)
     ) {
       break;
