@@ -232,8 +232,7 @@ export function selectRoadmapCandidate(
   candidates: readonly RoadmapCandidate[],
 ): RoadmapCandidate | null {
   const activeCandidates = candidates.filter(
-    (candidate) =>
-      candidate.status !== "done" && candidate.status !== "unknown",
+    (candidate) => candidate.status !== "done",
   );
 
   const safeCandidate = selectByPriority(
