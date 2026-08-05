@@ -18,25 +18,6 @@ export type RoadmapCandidate = Readonly<{
   priority: RoadmapPriority;
 }>;
 
-const CANDIDATE_PATTERNS = [
-  "- [ ]",
-  "- [x]",
-  "- [X]",
-  "TODO",
-  "À faire",
-  "A faire",
-  "Prochain",
-  "prochain",
-  "Prochain lot",
-  "prochain lot",
-  "Lot ",
-  "lot ",
-  "H1-L",
-  "H2-L",
-  "H3-L",
-  "⏳",
-] as const;
-
 const BLOCKED_PATTERNS = [
   "production finale",
   "mise en production",
@@ -125,14 +106,11 @@ function isMarkdownHeading(line: string): boolean {
   return /^#{1,6}(\s|$)/.test(line);
 }
 
-function isCandidateLine(line: string): boolean {
+function isCandidateStart(line: string): boolean {
   if (isMarkdownHeading(line)) {
     return false;
   }
-  return CANDIDATE_PATTERNS.some((pattern) => line.includes(pattern));
-}
 
-function isCandidateStart(line: string): boolean {
   return /^(?:- \[[ xX]\]|TODO\b|À faire\b|A faire\b|Prochain\b|prochain\b|Lot\b|lot\b|H[1-3]-L|⏳)/.test(
     line,
   );
@@ -192,7 +170,7 @@ export function findRoadmapCandidates(
       const line = lines[index] ?? "";
       const trimmed = line.trim();
 
-      if (trimmed.length === 0 || !isCandidateLine(trimmed)) {
+      if (trimmed.length === 0 || !isCandidateStart(trimmed)) {
         continue;
       }
 
