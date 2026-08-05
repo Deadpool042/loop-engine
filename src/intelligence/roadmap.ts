@@ -18,25 +18,6 @@ export type RoadmapCandidate = Readonly<{
   priority: RoadmapPriority;
 }>;
 
-const CANDIDATE_PATTERNS = [
-  "- [ ]",
-  "- [x]",
-  "- [X]",
-  "TODO",
-  "À faire",
-  "A faire",
-  "Prochain",
-  "prochain",
-  "Prochain lot",
-  "prochain lot",
-  "Lot ",
-  "lot ",
-  "H1-L",
-  "H2-L",
-  "H3-L",
-  "⏳",
-] as const;
-
 const BLOCKED_PATTERNS = [
   "production finale",
   "mise en production",
@@ -125,17 +106,22 @@ function isMarkdownHeading(line: string): boolean {
   return /^#{1,6}(\s|$)/.test(line);
 }
 
-function isCandidateLine(line: string): boolean {
+function isCandidateStart(line: string): boolean {
   if (isMarkdownHeading(line)) {
     return false;
   }
-  return CANDIDATE_PATTERNS.some((pattern) => line.includes(pattern));
-}
 
-function isCandidateStart(line: string): boolean {
   return /^(?:- \[[ xX]\]|TODO\b|À faire\b|A faire\b|Prochain\b|prochain\b|Lot\b|lot\b|H[1-3]-L|⏳)/.test(
     line,
   );
+}
+
+function isRoadmapInventoryEntry(line: string): boolean {
+  if (isMarkdownHeading(line)) {
+    return false;
+  }
+
+  return isCandidateStart(line) || /^-\s+\S/.test(line);
 }
 
 function isIndentedContinuation(line: string): boolean {
@@ -156,7 +142,7 @@ function collectCandidateText(
     if (
       trimmed.length === 0 ||
       isMarkdownHeading(trimmed) ||
-      isCandidateStart(trimmed) ||
+      isRoadmapInventoryEntry(trimmed) ||
       !isIndentedContinuation(rawLine)
     ) {
       break;
@@ -192,11 +178,14 @@ export function findRoadmapCandidates(
       const line = lines[index] ?? "";
       const trimmed = line.trim();
 
-      if (trimmed.length === 0 || !isCandidateLine(trimmed)) {
+      if (trimmed.length === 0 || !isRoadmapInventoryEntry(trimmed)) {
         continue;
       }
 
-      const collected = collectCandidateText(lines, index);
+      const explicitCandidate = isCandidateStart(trimmed);
+      const collected = explicitCandidate
+        ? collectCandidateText(lines, index)
+        : { text: trimmed, endIndex: index };
       const classification = classifyCandidateLine(collected.text);
 
       candidates.push({
@@ -205,8 +194,10 @@ export function findRoadmapCandidates(
         text: collected.text,
         kind: classification.kind,
         reason: classification.reason,
-        status: detectCandidateStatus(trimmed),
-        priority: detectCandidatePriority(trimmed),
+        status: explicitCandidate ? detectCandidateStatus(trimmed) : "unknown",
+        priority: explicitCandidate
+          ? detectCandidatePriority(trimmed)
+          : "default",
       });
 
       index = collected.endIndex;

@@ -127,4 +127,31 @@ describe("roadmap candidate content", () => {
       },
     );
   });
+
+  it("ignores prose that only mentions a candidate keyword", () => {
+    withRoadmap(
+      [
+        "Cette section décrit le prochain lot sans le déclarer.",
+        "Le lot précédent reste documenté ici.",
+      ].join("\n"),
+      (project, projectPath) => {
+        assert.deepEqual(findRoadmapCandidates(project, projectPath), []);
+      },
+    );
+  });
+
+  it("keeps explicit non-checkbox candidate formats", () => {
+    withRoadmap(
+      ["TODO Ajouter la preuve", "Prochain lot : valider le rapport"].join(
+        "\n",
+      ),
+      (project, projectPath) => {
+        const candidates = findRoadmapCandidates(project, projectPath);
+
+        assert.equal(candidates.length, 2);
+        assert.equal(candidates[0]?.line, 1);
+        assert.equal(candidates[1]?.line, 2);
+      },
+    );
+  });
 });
