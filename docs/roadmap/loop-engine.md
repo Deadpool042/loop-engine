@@ -25,7 +25,7 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 
 ## Gel architectural
 
-- Prochain decision gate : intégrer `runLoopExecute`/`runLoopCommit` en conditions réelles sur un projet non-fixture, avec commit borné explicite, avant tout nouveau lot V15+.
+- Aucun nouveau lot V15+ avant l'intégration de `runLoopExecute`/`runLoopCommit` en conditions réelles sur un projet non-fixture, avec commit borné explicite.
 - Une abstraction nouvelle exige deux usages réels, deux implémentations réelles ou une frontière externe démontrée.
 - Les objets intermédiaires internes restent libres de refactor et ne deviennent pas des contrats versionnés par défaut.
 - Les prochains changements doivent rendre la boucle plus utilisable, plus sûre ou plus observable dans un scénario exécuté.
