@@ -74,6 +74,7 @@ export function printNextProjectAction(
     terminal.section("Selected roadmap candidate");
 
     const selectedCandidate = snapshot.roadmap.selectedCandidate;
+    const hasSelectableCandidate = snapshot.roadmap.summary.selectable > 0;
 
     if (selectedCandidate) {
       if (selectedCandidate.kind === "safe") {
@@ -103,8 +104,10 @@ export function printNextProjectAction(
           "Candidate looks compatible with a small reversible lot.",
         );
       }
+    } else if (hasSelectableCandidate) {
+      terminal.warning("No roadmap candidate could be selected.");
     } else {
-      terminal.warning("No roadmap candidate detected.");
+      terminal.success("No selectable roadmap candidate remains.");
     }
 
     terminal.section("Next action");
@@ -114,6 +117,11 @@ export function printNextProjectAction(
     } else if (selectedCandidate?.kind === "warning") {
       terminal.warning("Review this candidate carefully before starting.");
       terminal.info("Prefer a smaller safe prerequisite if possible.");
+    } else if (!selectedCandidate && !hasSelectableCandidate) {
+      terminal.success("Roadmap has no remaining actionable candidate.");
+      terminal.info(
+        "Record a new explicit roadmap item only after its prerequisite or decision gate is satisfied.",
+      );
     } else {
       terminal.info("Open the roadmap and select the next safe micro-lot.");
     }
