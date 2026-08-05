@@ -116,6 +116,14 @@ function isCandidateStart(line: string): boolean {
   );
 }
 
+function isRoadmapInventoryEntry(line: string): boolean {
+  if (isMarkdownHeading(line)) {
+    return false;
+  }
+
+  return isCandidateStart(line) || /^-\s+\S/.test(line);
+}
+
 function isIndentedContinuation(line: string): boolean {
   return /^\s+\S/.test(line);
 }
@@ -134,7 +142,7 @@ function collectCandidateText(
     if (
       trimmed.length === 0 ||
       isMarkdownHeading(trimmed) ||
-      isCandidateStart(trimmed) ||
+      isRoadmapInventoryEntry(trimmed) ||
       !isIndentedContinuation(rawLine)
     ) {
       break;
@@ -170,11 +178,14 @@ export function findRoadmapCandidates(
       const line = lines[index] ?? "";
       const trimmed = line.trim();
 
-      if (trimmed.length === 0 || !isCandidateStart(trimmed)) {
+      if (trimmed.length === 0 || !isRoadmapInventoryEntry(trimmed)) {
         continue;
       }
 
-      const collected = collectCandidateText(lines, index);
+      const explicitCandidate = isCandidateStart(trimmed);
+      const collected = explicitCandidate
+        ? collectCandidateText(lines, index)
+        : { text: trimmed, endIndex: index };
       const classification = classifyCandidateLine(collected.text);
 
       candidates.push({
@@ -183,8 +194,10 @@ export function findRoadmapCandidates(
         text: collected.text,
         kind: classification.kind,
         reason: classification.reason,
-        status: detectCandidateStatus(trimmed),
-        priority: detectCandidatePriority(trimmed),
+        status: explicitCandidate ? detectCandidateStatus(trimmed) : "unknown",
+        priority: explicitCandidate
+          ? detectCandidatePriority(trimmed)
+          : "default",
       });
 
       index = collected.endIndex;
@@ -219,7 +232,8 @@ export function selectRoadmapCandidate(
   candidates: readonly RoadmapCandidate[],
 ): RoadmapCandidate | null {
   const activeCandidates = candidates.filter(
-    (candidate) => candidate.status !== "done",
+    (candidate) =>
+      candidate.status !== "done" && candidate.status !== "unknown",
   );
 
   const safeCandidate = selectByPriority(
