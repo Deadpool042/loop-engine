@@ -17,6 +17,7 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 - [x] Lot V14.5 — Concrete Inbound Security and Adapter Pilot : identité par clé API configurée, ACL tenant/rôle/projet/opération, replay fichier atomique persistant et adapter unique vers V14.3
 - [x] Lot V14.6 — Real Provider Pilot and Controlled Commit Mode : providers CLI concrets, invocation bornée et redacted, commit uniquement en mode explicite ; publish reste différé
 - [x] Lot V22.0 — contenu multi-ligne des candidats roadmap conservé et classifié dans le prompt d'exécution
+- [x] Lot V22.1 — frontière candidate explicite, inventaire de prose conservé et sélection exécutable protégée
 
 ## Lot actif — burn-in vertical
 
@@ -30,7 +31,7 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 
 - Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).
 - [x] V22.0 — Durcir le contenu des candidats multi-lignes afin de conserver le chemin cible et les contraintes dans le prompt.
-- [ ] [P1] V22.1 — Exiger une frontière candidate explicite en début de ligne afin que la prose contenant « prochain lot », « lot » ou « TODO » ne soit jamais sélectionnée comme travail exécutable.
+- [x] V22.1 — Exiger une frontière candidate explicite en début de ligne afin que la prose contenant « prochain lot », « lot » ou « TODO » ne soit jamais sélectionnée comme travail exécutable.
   Préserver les formats explicites historiques (`- [ ]`, `TODO`, `Prochain`, `Lot`, `H1-L` à `H3-L`, `⏳`) et livrer la couverture adversariale dans le même lot.
 - Une abstraction nouvelle exige deux usages réels, deux implémentations réelles ou une frontière externe démontrée.
 - Les objets intermédiaires internes restent libres de refactor et ne deviennent pas des contrats versionnés par défaut.
