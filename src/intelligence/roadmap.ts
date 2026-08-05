@@ -132,6 +132,46 @@ function isCandidateLine(line: string): boolean {
   return CANDIDATE_PATTERNS.some((pattern) => line.includes(pattern));
 }
 
+function isCandidateStart(line: string): boolean {
+  return /^(?:- \[[ xX]\]|TODO\b|À faire\b|A faire\b|Prochain\b|prochain\b|Lot\b|lot\b|H[1-3]-L|⏳)/.test(
+    line,
+  );
+}
+
+function isIndentedContinuation(line: string): boolean {
+  return /^\s+\S/.test(line);
+}
+
+function collectCandidateText(
+  lines: readonly string[],
+  candidateIndex: number,
+): Readonly<{ text: string; endIndex: number }> {
+  const parts = [lines[candidateIndex]?.trim() ?? ""];
+  let endIndex = candidateIndex;
+
+  for (let index = candidateIndex + 1; index < lines.length; index += 1) {
+    const rawLine = lines[index] ?? "";
+    const trimmed = rawLine.trim();
+
+    if (
+      trimmed.length === 0 ||
+      isMarkdownHeading(trimmed) ||
+      isCandidateStart(trimmed) ||
+      !isIndentedContinuation(rawLine)
+    ) {
+      break;
+    }
+
+    parts.push(trimmed);
+    endIndex = index;
+  }
+
+  return {
+    text: parts.join(" "),
+    endIndex,
+  };
+}
+
 export function findRoadmapCandidates(
   project: ProjectConfig,
   projectPath: string,
@@ -148,25 +188,29 @@ export function findRoadmapCandidates(
 
     const lines = readFileSync(absolutePath, "utf8").split("\n");
 
-    lines.forEach((line, index) => {
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index] ?? "";
       const trimmed = line.trim();
 
       if (trimmed.length === 0 || !isCandidateLine(trimmed)) {
-        return;
+        continue;
       }
 
-      const classification = classifyCandidateLine(trimmed);
+      const collected = collectCandidateText(lines, index);
+      const classification = classifyCandidateLine(collected.text);
 
       candidates.push({
         path: roadmapPath,
         line: index + 1,
-        text: trimmed,
+        text: collected.text,
         kind: classification.kind,
         reason: classification.reason,
         status: detectCandidateStatus(trimmed),
         priority: detectCandidatePriority(trimmed),
       });
-    });
+
+      index = collected.endIndex;
+    }
   }
 
   return candidates;
