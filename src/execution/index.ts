@@ -17,5 +17,6 @@ export * from "./project-lock-manager.js";
 export * from "./isolated-worker-platform.js";
 export * from "./adapters/local-project-lock-manager.js";
 export * from "./adapters/local-workspace-manager.js";
+export * from "./adapters/git-worktree-workspace-manager.js";
 export * from "./adapters/loop-run.js";
 export * from "./render/text.js";

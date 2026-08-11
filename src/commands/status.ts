@@ -8,6 +8,16 @@ export function printStatus(
   application: LoopApplicationAssembly,
   config: LoopApplicationConfig,
 ): void {
+  if (process.argv.includes("--json")) {
+    console.log(
+      JSON.stringify({
+        schemaVersion: 1 as const,
+        projects: application.generateWorkspaceReports(config),
+      }),
+    );
+    return;
+  }
+
   terminal.header("Status");
 
   for (const [index, snapshot] of application

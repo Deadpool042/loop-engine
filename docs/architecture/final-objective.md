@@ -18,6 +18,8 @@ Le choix de l'agent qui exécuterait un micro-lot est lui-même déterministe et
 
 Le contexte préparé pour ce micro-lot est lui aussi construit localement, de façon déterministe et bornée : un constructeur de contexte (`src/context/`) transforme un `ProjectSnapshot` et le budget de contexte prévisionnel en un paquet de fichiers borné, déduplicé, jamais en dépassement de budget. Voir `docs/architecture/minimal-context-builder.md`.
 
+L'impact documentaire d'un changement est qualifié localement avant tout appel IA : `src/documentation/documentation-impact.ts` transforme une liste de chemins modifiés en `DocumentationImpactReport` déterministe. Le rapport indique les documents d'architecture concernés et si une revue sémantique est requise ; il ne modifie aucun fichier et ne déclenche aucun modèle. L'objectif est de réserver l'IA aux changements réellement sémantiques et de conserver une auto-documentation gouvernée, explicable et à coût nul par défaut.
+
 Le comportement par défaut reste non destructif : pas d'appel IA automatique, pas de commit automatique, pas de push automatique, pas de modification des projets observés. Ces garanties ne s'effacent jamais devant un mode explicitement sélectionné : pas de commit automatique et pas de push automatique restent la règle tant qu'un mode `commit` ou `publish` n'a pas été explicitement demandé par l'humain.
 
 Claude doit donc améliorer le moteur, préserver les garde-fous, respecter les contrats JSON et travailler par petits lots vérifiables.
