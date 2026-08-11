@@ -52,3 +52,8 @@ export {
   type LoopProviderRegistration,
   type LoopProviderRegistry,
 } from "./provider-registry.js";
+
+export {
+  createIsolatedProviderRunExecute,
+  type IsolatedProviderExecutionOptions,
+} from "./isolated-provider-execution.js";

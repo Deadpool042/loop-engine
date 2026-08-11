@@ -6,6 +6,12 @@ Status: IMPLEMENTED
 
 V16.1 introduces the first operational slice of the isolated durable worker platform: exclusive project locking and deterministic workspace lifecycle management.
 
+The provider-backed `execute` composition now consumes this slice directly:
+it resolves the source repository outside the generic workspace manager,
+acquires the local project lock, creates a detached Git worktree, runs the
+provider and configured validation against that same worktree, then releases
+the worktree and lock. The source repository remains unchanged by `execute`.
+
 ## Public contracts
 
 The execution module exposes two ports:
@@ -45,6 +51,11 @@ The adapter is single-host and process-independent for acquisition because the f
 `createGitWorktreeWorkspaceManager` materializes a detached Git worktree per `(projectId, attemptId)` under an injected workspace root. The adapter resolves the source repository through an injected `projectId -> repositoryPath` function, so Git and project-location concerns remain outside the generic `WorkspaceManager` contract.
 
 Allocation uses `git worktree add --detach` from an explicit repository and defaults to `HEAD` unless a `baseRef` is injected. Release uses `git worktree remove --force` and performs defensive filesystem cleanup. The adapter does not create, commit, or push a branch.
+
+The existing controlled `commit` mode deliberately remains outside this first
+composition step: it still commits its validated source-worktree delta. No
+automatic cherry-pick, merge, copy or promotion is performed from an isolated
+`execute` worktree.
 
 ## Guaranteed invariants
 

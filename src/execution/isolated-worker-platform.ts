@@ -22,8 +22,7 @@ export type IsolatedWorkerExecutionSuccess<Result> = Readonly<{
 }>;
 
 export type IsolatedWorkerExecutionResult<Result> =
-  | IsolatedWorkerExecutionFailure
-  | IsolatedWorkerExecutionSuccess<Result>;
+  IsolatedWorkerExecutionFailure | IsolatedWorkerExecutionSuccess<Result>;
 
 export type IsolatedWorkerOperation<Result> = (
   workspace: WorkspaceHandle,
@@ -54,6 +53,8 @@ export function createIsolatedWorkerPlatform(
         });
       }
 
+      let primaryError: unknown;
+
       try {
         const workspace = await workspaces.allocate(request);
 
@@ -64,11 +65,33 @@ export function createIsolatedWorkerPlatform(
             status: "completed",
             result,
           });
+        } catch (error) {
+          primaryError = error;
+          throw error;
         } finally {
-          await workspaces.release(workspace);
+          try {
+            await workspaces.release(workspace);
+          } catch (error) {
+            if (primaryError === undefined) {
+              primaryError = error;
+              throw error;
+            }
+          }
         }
+      } catch (error) {
+        if (primaryError === undefined) {
+          primaryError = error;
+        }
+
+        throw error;
       } finally {
-        await projectLocks.release(acquisition.handle);
+        try {
+          await projectLocks.release(acquisition.handle);
+        } catch (error) {
+          if (primaryError === undefined) {
+            throw error;
+          }
+        }
       }
     },
   });

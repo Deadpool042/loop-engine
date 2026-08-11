@@ -2,7 +2,7 @@
 
 ## Status
 
-V14.14 — provider registry assembly implemented.
+V16.2 — provider registry assembly and isolated provider execution wired.
 
 ## Goal
 
@@ -84,6 +84,19 @@ execution.
 
 No provider is constructed for ordinary commands or for LoopRunner plan mode.
 
+## Isolated provider execution
+
+When a concrete provider is configured, the assembly wires `execute` through
+the existing local project lock, Git worktree workspace manager and isolated
+worker platform. The configured project path is resolved at this composition
+boundary; providers and validation then receive the same detached worktree
+path. The source repository is not modified by `execute`, and the worktree and
+lock are released on every outcome.
+
+`commit` deliberately remains outside this wrapper: its existing bounded
+commit path still acts on an explicit source worktree. This lot adds no
+promotion, cherry-pick, merge or push from an isolated execution.
+
 ## Determinism and effects
 
 Creating an assembly without provider configuration:
@@ -117,6 +130,8 @@ It tightens two invariants:
 1. a configured concrete executor and the agent profile selected by policy must
    originate from the same provider assembly;
 2. every provider must be resolved through a unique registry entry.
+3. a configured provider cannot receive the configured source repository as
+   its working directory during `execute`.
 
 ## Enforcement
 

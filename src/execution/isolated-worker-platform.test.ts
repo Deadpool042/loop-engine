@@ -134,3 +134,48 @@ test("releases workspace and project lock when execution fails", async () => {
 
   assert.deepEqual(events, ["workspace-released", "lock-released"]);
 });
+
+test("preserves the operation failure when workspace cleanup also fails", async () => {
+  const events: string[] = [];
+  const operationFailure = new Error("provider failed");
+
+  const platform = createIsolatedWorkerPlatform(
+    createProjectLockManager(
+      async () => ({
+        acquired: true,
+        handle: {
+          lockId: "lock-1",
+          projectId: "project-a",
+          attemptId: "attempt-1",
+        },
+      }),
+      async () => {
+        events.push("lock-released");
+      },
+    ),
+    createWorkspaceManager(
+      async () => ({
+        workspaceId: "workspace-1",
+        projectId: "project-a",
+        attemptId: "attempt-1",
+        path: "/tmp/workspace-1",
+      }),
+      async () => {
+        events.push("workspace-release-attempted");
+        throw new Error("workspace cleanup failed");
+      },
+    ),
+  );
+
+  await assert.rejects(
+    platform.execute(
+      { projectId: "project-a", attemptId: "attempt-1" },
+      async () => {
+        throw operationFailure;
+      },
+    ),
+    operationFailure,
+  );
+
+  assert.deepEqual(events, ["workspace-release-attempted", "lock-released"]);
+});

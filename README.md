@@ -30,8 +30,8 @@ Le mode d'inspection et le mode `plan` ne modifient pas les dépôts pilotés. L
 - Pas de commit automatique.
 - Pas de push automatique.
 - Le mode par défaut (`plan`) ne modifie rien.
-- `execute` doit être demandé explicitement et nécessite un exécuteur concret injecté ; la CLI standard échoue fermée tant qu'aucun provider n'est configuré.
-- `commit` et `publish` restent non implémentés.
+- `execute` doit être demandé explicitement et nécessite un provider CLI concret explicitement configuré ; il s'exécute dans un Git worktree isolé et temporaire, jamais dans le dépôt source.
+- `commit` exige un message explicite et reste contrôlé ; `publish` reste non implémenté.
 - Les validations locales passent après l'exécution et avant toute future revue, réparation, commit ou publication.
 - Les projets pilotés restent indépendants.
 
@@ -56,8 +56,8 @@ Le mode d'inspection et le mode `plan` ne modifient pas les dépôts pilotés. L
 - `pnpm loop prompt creatyss --json` : génère le contexte de prompt en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop run creatyss` : lance un cycle `plan` du LoopRunner. Le mode `plan` (V7.2) reste le défaut : aucun agent n'est appelé, aucune modification du worktree, aucun commit et aucun push.
 - `pnpm loop run creatyss --mode plan --json` : sortie JSON du cycle (`LoopRunResult`, `schemaVersion: 1`), avec la sélection d'agent prévisionnelle `agentPolicy` et le paquet borné `contextPackage`.
-- `pnpm loop run creatyss --mode execute --max-repairs 1 --json` : lance le cycle V14.4 `plan -> execute -> validate -> repair`, sans commit ni publication. La politique `execute` doit sélectionner un profil et un `LoopExecutor` concret doit être injecté. La CLI standard utilise volontairement un exécuteur indisponible et renvoie un `LoopRunResult` échoué avec `failure.code = "executor_unavailable"` jusqu'au pilote provider V14.6.
-- `pnpm loop run creatyss --mode commit|publish` : rejeté explicitement (`Loop run mode not implemented: <mode>`, code de sortie non nul).
+- `pnpm loop run creatyss --mode execute --provider claude_code --provider-executable claude --json` : exécute le cycle provider → validation dans un Git worktree isolé et temporaire ; le dépôt source reste inchangé et aucun commit ni publication n'est produit.
+- `pnpm loop run creatyss --mode commit --provider codex --provider-executable codex --commit-message "..."` : effectue le commit Git borné existant après validation. `publish` reste rejeté explicitement.
 
 ## Configuration
 
@@ -102,13 +102,13 @@ Cela permet d'utiliser la CLI sur elle-même :
 - `pnpm loop validate loop-engine`
 - `pnpm loop review loop-engine`
 - `pnpm loop run loop-engine --mode plan --json`
-- `pnpm loop run loop-engine --mode execute --json` — vérifie actuellement l'admission puis échoue fermée avec `executor_unavailable`, car aucun provider concret n'est configuré par défaut.
+- `pnpm loop run loop-engine --mode execute --json` — échoue fermée avec `executor_unavailable` tant qu'aucun provider concret n'est explicitement configuré.
 
 La boucle par défaut reste déterministe et non destructive :
 
 - aucun appel IA automatique implicite ;
 - aucune modification en mode `plan` ;
-- aucun commit ni publication en mode `execute` ;
+- aucun commit ni publication en mode `execute`, dont les modifications restent dans un worktree temporaire supprimé en fin de cycle ;
 - validation uniquement après une exécution admise et déclarée réussie.
 
 ## Structure du projet

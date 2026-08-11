@@ -22,6 +22,7 @@ export function createLocalProjectLockManager(
 
   return createProjectLockManager(
     async ({ projectId, attemptId }) => {
+      await mkdir(options.lockRoot, { recursive: true });
       const lockPath = join(options.lockRoot, encodeSegment(projectId));
 
       try {
