@@ -6,6 +6,7 @@ export function printHelp(): void {
   terminal.section("Workspace");
   terminal.info("pnpm loop summary         — vue compacte du workspace");
   terminal.info("pnpm loop summary --json  — vue workspace en JSON");
+  terminal.info("pnpm loop serve-summary   — bridge HTTP read-only de summary");
   terminal.info("pnpm loop status          — état détaillé des projets");
   terminal.info("pnpm loop json-check      — validate all public JSON outputs");
   terminal.info("pnpm run rag-index        — rebuild local RAG index");
