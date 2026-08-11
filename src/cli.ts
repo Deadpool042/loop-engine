@@ -15,6 +15,7 @@ import {
   printWorkspaceSummary,
   printWorkspaceSummaryJson,
 } from "./commands/summary.js";
+import { startWorkspaceSummaryServer } from "./commands/serve-summary.js";
 import { printHelp } from "./commands/help.js";
 import { runJsonCheck } from "./commands/json-check.js";
 import { runRagIndex } from "./commands/rag-index.js";
@@ -109,6 +110,7 @@ const command = process.argv[2] ?? "help";
 if (command === "help" || command === "--help" || command === "-h") printHelp();
 else if (command === "summary" && process.argv.includes("--json"))
   printWorkspaceSummaryJson(application, application.loadConfig());
+else if (command === "serve-summary") startWorkspaceSummaryServer(application);
 else if (command === "status")
   printStatus(application, application.loadConfig());
 else if (command === "summary")

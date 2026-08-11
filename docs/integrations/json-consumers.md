@@ -42,8 +42,7 @@ Le cockpit livré utilise uniquement :
 - `review <project> --json` pour la section Review.
 
 `next` et `prompt` restent des contrats CLI disponibles pour d'autres
-consommateurs ; ils ne sont pas intégrés au cockpit actuel. Aucun contrat
-`serve-summary` n'est présent sur cette branche.
+consommateurs ; ils ne sont pas intégrés au cockpit actuel.
 
 ## Règles d'intégration
 
@@ -72,9 +71,32 @@ par l'utilisateur.
 
 ## n8n
 
-n8n peut lire `summary --json` à intervalle raisonnable pour afficher ou
-notifier les projets dirty. Il ne lance ni correction automatique ni appel IA
-sans action explicite.
+Le CLI direct est le choix par défaut : n8n peut exécuter
+`pnpm exec tsx src/cli.ts summary --json` à intervalle raisonnable pour
+afficher ou notifier les projets dirty. Dans Docker, le nœud Execute Command
+requiert un environnement Node/pnpm et un montage du dépôt adaptés.
+
+`pnpm loop serve-summary` est une option strictement spécifique à n8n Docker
+lorsqu'on veut éviter d'exposer ce dépôt et l'environnement CLI au conteneur.
+Le bridge n'expose que `GET /healthz` et `GET /summary`, ce dernier retournant
+le même contrat que `summary --json`.
+
+```bash
+LOOP_SUMMARY_HOST=0.0.0.0 \
+LOOP_SUMMARY_PORT=4174 \
+LOOP_SUMMARY_TOKEN='<secret hors Git>' \
+pnpm loop serve-summary
+```
+
+Par défaut, il écoute sur `127.0.0.1:4174`. Un bind hors loopback requiert
+`LOOP_SUMMARY_TOKEN`, transmis avec `Authorization: Bearer <token>` pour les
+deux routes. Depuis Docker Desktop, n8n peut joindre le service hôte avec
+`http://host.docker.internal:4174`; sous Linux, configurer
+`host.docker.internal` avec `host-gateway` ou l'équivalent de l'environnement
+Docker utilisé.
+
+Le bridge ne constitue pas une API HTTP générale : aucune route d'écriture,
+aucun dispatcher de commande, aucun appel IA, commit ou push n'est exposé.
 
 ## Garde-fous
 
