@@ -15,6 +15,12 @@ import type { Config, ProjectConfig } from "./config.js";
 import { docExists } from "./docs.js";
 import { isGitRepository } from "./git.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
+import {
+  changedPathsFromGitDiff,
+  createDocumentationImpactReport,
+  mergeChangedPaths,
+  untrackedPathsFromGitStatus,
+} from "../documentation/index.js";
 
 export function generateProjectReport(project: ProjectConfig) {
   return buildProjectSnapshot(project);
@@ -139,19 +145,29 @@ function run(command: string, cwd: string): string {
 
 export function generateReviewReport(project: ProjectConfig) {
   const snapshot = generateProjectReport(project);
+  const diffNameOnly = snapshot.git.requiresGit
+    ? run("git diff --name-only", snapshot.project.path)
+    : "";
+  const gitStatus = snapshot.git.requiresGit
+    ? run("git status --short", snapshot.project.path)
+    : "";
+  const changedPaths = mergeChangedPaths(
+    changedPathsFromGitDiff(diffNameOnly),
+    untrackedPathsFromGitStatus(gitStatus),
+  );
+
   return {
     schemaVersion: 1 as const,
     project: snapshot.project,
     git: snapshot.git,
-    gitStatus: snapshot.git.requiresGit
-      ? run("git status --short", snapshot.project.path)
-      : "",
+    gitStatus,
     diffStat: snapshot.git.requiresGit
       ? run("git diff --stat", snapshot.project.path)
       : "",
     diff: snapshot.git.requiresGit
       ? run("git diff", snapshot.project.path)
       : "",
+    documentationImpact: createDocumentationImpactReport(changedPaths),
     validation: snapshot.validation,
     health: snapshot.health,
   };

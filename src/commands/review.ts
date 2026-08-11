@@ -35,6 +35,20 @@ export function printReviewContext(
     printBlock("Diff", report.diff);
   }
 
+  terminal.section("Documentation impact");
+  if (report.documentationImpact.impacts.length === 0) {
+    terminal.info("No governed documentation impact detected.");
+  } else {
+    for (const impact of report.documentationImpact.impacts) {
+      terminal.info(
+        `${impact.required ? "required" : "optional"}: ${impact.document} — ${impact.reason}`,
+      );
+    }
+  }
+  terminal.info(
+    `Semantic review required: ${report.documentationImpact.semanticReviewRequired ? "yes" : "no"}`,
+  );
+
   terminal.section("Validation");
   if (!snapshot.validation.configured) {
     terminal.warning("No validation command configured.");

@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": ".webpack/main",
+  "config": {
+    "forge": "./forge.config.cjs"
+  },
   "scripts": {
     "loop": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit",
@@ -18,17 +22,36 @@
     "audit:profiles": "tsx scripts/audit-profile-check.ts",
     "audit:release-check": "tsx scripts/audit-release-check.ts",
     "prototype:gui-cockpit": "tsx scripts/prototype-gui-cockpit-server.ts",
+    "gui:start": "electron-forge start",
+    "gui:package": "electron-forge package",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.3.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "yaml": "^2.8.0"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/plugin-webpack": "^7.11.2",
+    "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^26.1.0",
-    "prettier": "^3.9.5"
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "css-loader": "^7.1.2",
+    "electron": "^43.2.0",
+    "postcss": "^8.5.0",
+    "postcss-loader": "^8.2.0",
+    "prettier": "^3.9.5",
+    "style-loader": "^4.0.0",
+    "tailwindcss": "^4.1.0",
+    "ts-loader": "^9.6.2"
   },
   "packageManager": "pnpm@10.33.1+sha512.05ba3c1d5d1c18f68df06470d74055e62d41fc110a0c660db1b2dfb2785327f04cf0f68345d4609bc52089e7fa0343c31593b2f9594e2c5d5da426230acc9820"
 }

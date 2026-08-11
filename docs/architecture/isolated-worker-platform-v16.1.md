@@ -40,7 +40,11 @@ The adapter is single-host and process-independent for acquisition because the f
 
 `createLocalWorkspaceManager` creates one directory per `(projectId, attemptId)` under an injected workspace root and removes it recursively during release.
 
-Git worktree materialization is intentionally outside this slice. The workspace port is already suitable for a later Git-backed adapter without changing Core orchestration.
+### Git worktree workspace manager
+
+`createGitWorktreeWorkspaceManager` materializes a detached Git worktree per `(projectId, attemptId)` under an injected workspace root. The adapter resolves the source repository through an injected `projectId -> repositoryPath` function, so Git and project-location concerns remain outside the generic `WorkspaceManager` contract.
+
+Allocation uses `git worktree add --detach` from an explicit repository and defaults to `HEAD` unless a `baseRef` is injected. Release uses `git worktree remove --force` and performs defensive filesystem cleanup. The adapter does not create, commit, or push a branch.
 
 ## Guaranteed invariants
 

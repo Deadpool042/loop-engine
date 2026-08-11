@@ -23,6 +23,16 @@ describe("json outputs", () => {
     assert.ok(Array.isArray(json.projects));
   });
 
+  it("status --json exposes schemaVersion and projects", () => {
+    const json = runJson("pnpm exec tsx src/cli.ts status --json") as {
+      schemaVersion?: unknown;
+      projects?: unknown;
+    };
+
+    assert.equal(json.schemaVersion, 1);
+    assert.ok(Array.isArray(json.projects));
+  });
+
   it("context --json exposes schemaVersion and docs", () => {
     const json = runJson(
       "pnpm exec tsx src/cli.ts context loop-engine --json",
@@ -56,16 +66,28 @@ describe("json outputs", () => {
     }
   });
 
-  it("review --json exposes schemaVersion and diffStat", () => {
+  it("review --json exposes schemaVersion, diffStat, and documentation impact", () => {
     const json = runJson(
       "pnpm exec tsx src/cli.ts review loop-engine --json",
     ) as {
       schemaVersion?: unknown;
       diffStat?: unknown;
+      documentationImpact?: {
+        changedPaths?: unknown;
+        impacts?: unknown;
+        semanticReviewRequired?: unknown;
+      };
     };
 
     assert.equal(json.schemaVersion, 1);
     assert.equal(typeof json.diffStat, "string");
+    assert.ok(json.documentationImpact);
+    assert.ok(Array.isArray(json.documentationImpact.changedPaths));
+    assert.ok(Array.isArray(json.documentationImpact.impacts));
+    assert.equal(
+      typeof json.documentationImpact.semanticReviewRequired,
+      "boolean",
+    );
   });
 
   it("prompt --json exposes schemaVersion and instructions", () => {

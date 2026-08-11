@@ -2,7 +2,7 @@
 
 ## Statut
 
-Cadrage validé par grilling. Aucune implémentation. Sert de base au prototype puis à l'implémentation.
+Le cockpit livré affiche le `summary --json` dans un split-view et charge les détails `context --json` et `review --json` du projet sélectionné. Il reste un consommateur read-only avec des API preload explicites et un cwd résolu uniquement par le process principal.
 
 ## Objectif
 
@@ -16,25 +16,25 @@ décision structurante (spawn CLI vs couplage in-process vs serveur HTTP).
 
 ## Décisions actées (non renégociables pour le MVP)
 
-| # | Décision |
-|---|---|
-| 1 | Application desktop locale, sans réseau |
-| 2 | Intégration par spawn du CLI (`pnpm loop <cmd> --json`), aucun import de la composition layer |
-| 3 | MVP = lecture seule stricte, `run --mode execute` hors scope |
-| 4 | Rafraîchissement strictement manuel, aucune tâche de fond |
-| 5 | Dashboard multi-projets basé sur `summary --json` |
-| 6 | Commandes MVP : `summary`, `status`, `context`, `next`, `prompt`, `review`, `run --mode plan` |
-| 7 | Stack technique (Electron/Tauri) : ouverte, hors scope de ce cadrage |
-| 8 | Persona unique : opérateur solo |
-| 9 | `context`/`prompt` : affichage brut + copier, aucune édition ni rendu markdown |
-| 10 | Erreurs JSON du CLI : affichage brut et neutre, aucune traduction de code métier |
-| 11 | Appels CLI parallèles autorisés par écran, jamais de doublon sur une action en cours |
-| 12 | Page unique par projet, sections repliables ; `status` + `next` chargés à l'ouverture |
-| 13 | Rafraîchissement par section, bouton dédié à chacune |
-| 14 | Section "Plan" traitée comme les autres sections à la demande |
-| 15 | Chemin du repo configuré une fois, auto-détection au 1er lancement, reconfigurable |
-| 16 | Config GUI stockée hors repo (répertoire de données utilisateur de l'OS) |
-| 17 | Échec de spawn : message générique + détails bruts + copier + lien Réglages |
+| #   | Décision                                                                                                                                     |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Application desktop locale, sans réseau                                                                                                      |
+| 2   | Intégration par spawn du CLI (`pnpm loop <cmd> --json`), aucun import de la composition layer                                                |
+| 3   | MVP = lecture seule stricte, `run --mode execute` hors scope                                                                                 |
+| 4   | Rafraîchissement strictement manuel, aucune tâche de fond                                                                                    |
+| 5   | Dashboard multi-projets basé sur `summary --json`                                                                                            |
+| 6   | Commandes MVP : `summary`, `status`, `context`, `next`, `prompt`, `review`, `run --mode plan`                                                |
+| 7   | Stack technique MVP : Electron Forge 7 + Webpack + React + TypeScript ; renderer sandboxé, `contextIsolation` actif, IPC minimal via preload |
+| 8   | Persona unique : opérateur solo                                                                                                              |
+| 9   | `context`/`prompt` : affichage brut + copier, aucune édition ni rendu markdown                                                               |
+| 10  | Erreurs JSON du CLI : affichage brut et neutre, aucune traduction de code métier                                                             |
+| 11  | Appels CLI parallèles autorisés par écran, jamais de doublon sur une action en cours                                                         |
+| 12  | Page unique par projet, sections repliables ; `status` + `next` chargés à l'ouverture                                                        |
+| 13  | Rafraîchissement par section, bouton dédié à chacune                                                                                         |
+| 14  | Section "Plan" traitée comme les autres sections à la demande                                                                                |
+| 15  | Chemin du repo configuré une fois, auto-détection au 1er lancement, reconfigurable                                                           |
+| 16  | Config GUI stockée hors repo (répertoire de données utilisateur de l'OS)                                                                     |
+| 17  | Échec de spawn : message générique + détails bruts + copier + lien Réglages                                                                  |
 
 ---
 
@@ -62,27 +62,23 @@ Un seul persona pour le MVP (décision 8).
 
 ## 2. Cas d'usage
 
-| ID | Cas d'usage | Commande CLI sous-jacente | Priorité |
-|---|---|---|---|
-| UC-1 | Voir l'état de tous mes projets en un coup d'œil | `summary --json` | MVP |
-| UC-2 | Consulter le statut détaillé d'un projet (branche, dirty, docs manquants, santé) | `status --json`* | MVP |
-| UC-3 | Savoir quelle est la prochaine action sûre sur un projet | `next <project> --json` | MVP |
-| UC-4 | Récupérer le contexte préparé pour coller dans Claude/Codex/ChatGPT | `context <project> --json` | MVP |
-| UC-5 | Récupérer le prompt prêt à l'emploi pour un agent externe | `prompt <project> --json` | MVP |
-| UC-6 | Consulter le rapport de review d'un projet | `review <project> --json` | MVP |
-| UC-7 | Visualiser une planification prévisionnelle (agent envisagé, budget de contexte) sans rien exécuter | `run <project> --mode plan --json` | MVP |
-| UC-8 | Reconfigurer le chemin vers le repo Loop Engine si déplacé/introuvable | — (config GUI locale) | MVP |
-| UC-9 | Comprendre pourquoi un appel a échoué et copier le détail technique | — (gestion d'erreur GUI) | MVP |
-| UC-10 (évolution) | Lancer un audit (`audit --json`) et visualiser les violations | `audit --json` | Post-MVP |
-| UC-11 (évolution) | Vérifier la santé de l'environnement (`doctor`) | `doctor` | Post-MVP |
-| UC-12 (évolution) | Rechercher dans le RAG local | `rag-search` | Post-MVP |
-| UC-13 (évolution) | Déclencher `run --mode execute` avec confirmation | `run --mode execute --json` | Post-MVP, bloqué tant qu'aucun executor concret n'est configuré |
+| ID                | Cas d'usage                                                                                         | Commande CLI sous-jacente          | Priorité                                                        |
+| ----------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------- |
+| UC-1              | Voir l'état de tous mes projets en un coup d'œil                                                    | `summary --json`                   | MVP                                                             |
+| UC-2              | Consulter le statut détaillé d'un projet (branche, dirty, docs manquants, santé)                    | `status --json`                    | MVP                                                             |
+| UC-3              | Savoir quelle est la prochaine action sûre sur un projet                                            | `next <project> --json`            | MVP                                                             |
+| UC-4              | Récupérer le contexte préparé pour coller dans Claude/Codex/ChatGPT                                 | `context <project> --json`         | MVP                                                             |
+| UC-5              | Récupérer le prompt prêt à l'emploi pour un agent externe                                           | `prompt <project> --json`          | MVP                                                             |
+| UC-6              | Consulter le rapport de review d'un projet                                                          | `review <project> --json`          | MVP                                                             |
+| UC-7              | Visualiser une planification prévisionnelle (agent envisagé, budget de contexte) sans rien exécuter | `run <project> --mode plan --json` | MVP                                                             |
+| UC-8              | Reconfigurer le chemin vers le repo Loop Engine si déplacé/introuvable                              | — (config GUI locale)              | MVP                                                             |
+| UC-9              | Comprendre pourquoi un appel a échoué et copier le détail technique                                 | — (gestion d'erreur GUI)           | MVP                                                             |
+| UC-10 (évolution) | Lancer un audit (`audit --json`) et visualiser les violations                                       | `audit --json`                     | Post-MVP                                                        |
+| UC-11 (évolution) | Vérifier la santé de l'environnement (`doctor`)                                                     | `doctor`                           | Post-MVP                                                        |
+| UC-12 (évolution) | Rechercher dans le RAG local                                                                        | `rag-search`                       | Post-MVP                                                        |
+| UC-13 (évolution) | Déclencher `run --mode execute` avec confirmation                                                   | `run --mode execute --json`        | Post-MVP, bloqué tant qu'aucun executor concret n'est configuré |
 
-\* `status` n'a pas de flag `--json` documenté dans `commands.md` actuel au
-même niveau que les autres — **à vérifier en implémentation** ; si `status`
-ne produit pas de JSON structuré, la section "Statut" du MVP s'appuiera sur
-les champs pertinents de `summary --json` filtrés sur le projet sélectionné
-plutôt que d'inventer un contrat. Ce point est noté comme risque (§8, R-3).
+`status --json` est désormais disponible avec une enveloppe versionnée (`schemaVersion: 1`) et la liste des rapports projet. La GUI peut donc consommer ce contrat directement sans dupliquer la logique de statut.
 
 ---
 
@@ -205,7 +201,7 @@ d'accès au moteur, pour respecter "aucune logique métier dans l'UI".
 ### Couche transport (process principal / main process)
 
 - **`CliInvoker`** — unique composant qui sait spawn `pnpm loop <cmd>
-  --json [args]`, capture stdout/stderr/code de sortie, retourne soit
+--json [args]`, capture stdout/stderr/code de sortie, retourne soit
   `{ ok: true, json }`, soit `{ ok: false, kind: "spawn-error", raw }`.
   Ne parse ni n'interprète le contenu JSON métier au-delà de
   `JSON.parse`. Aucune connaissance des codes de domaine
@@ -296,30 +292,26 @@ audités.
 
 ### Côté moteur Loop Engine (existant, non modifié)
 
-| Port consommé | Contrat | Statut |
-|---|---|---|
-| `pnpm loop summary --json` | `schemaVersion: 1`, liste de projets | Existant, stable |
-| `pnpm loop status` | à vérifier — cf. risque R-3 | Existant, format à confirmer |
-| `pnpm loop context <project> --json` | `schemaVersion: 1`, texte de contexte borné | Existant, stable |
-| `pnpm loop next <project> --json` | `schemaVersion: 1`, candidat roadmap | Existant, stable |
-| `pnpm loop prompt <project> --json` | `schemaVersion: 1`, texte prompt | Existant, stable |
-| `pnpm loop review <project> --json` | `schemaVersion: 1`, rapport review | Existant, stable |
-| `pnpm loop run <project> --mode plan --json` | `LoopRunResult` (forecast) | Existant, stable |
-| Enveloppe d'erreur | `{ schemaVersion, ok: false, error }` | Existant, stable |
+| Port consommé                                | Contrat                                      | Statut           |
+| -------------------------------------------- | -------------------------------------------- | ---------------- |
+| `pnpm loop summary --json`                   | `schemaVersion: 1`, liste de projets         | Existant, stable |
+| `pnpm loop status --json`                    | `schemaVersion: 1`, liste de rapports projet | Existant, stable |
+| `pnpm loop context <project> --json`         | `schemaVersion: 1`, texte de contexte borné  | Existant, stable |
+| `pnpm loop next <project> --json`            | `schemaVersion: 1`, candidat roadmap         | Existant, stable |
+| `pnpm loop prompt <project> --json`          | `schemaVersion: 1`, texte prompt             | Existant, stable |
+| `pnpm loop review <project> --json`          | `schemaVersion: 1`, rapport review           | Existant, stable |
+| `pnpm loop run <project> --mode plan --json` | `LoopRunResult` (forecast)                   | Existant, stable |
+| Enveloppe d'erreur                           | `{ schemaVersion, ok: false, error }`        | Existant, stable |
 
-Aucune modification demandée à `src/cli.ts`, `src/commands/`,
-`src/composition/`, `src/core/` ou tout autre module métier. Si `status`
-s'avère ne pas exposer de JSON dédié en implémentation, la GUI n'ajoutera
-pas de flag CLI elle-même — cette décision reviendrait à une évolution du
-moteur, hors scope GUI, à statuer séparément.
+La seule évolution additive du moteur requise par le Lot 1 est le contrat `status --json`, implémenté dans l'adaptateur de commande existant sans modifier le Core ni la composition. Les autres contrats consommés par la GUI restent inchangés.
 
 ### Côté GUI (nouveau, local, hors moteur)
 
-| "Port" interne GUI | Rôle |
-|---|---|
-| `CliInvoker.invoke(cmd, args, cwd)` | Frontière process principal ↔ CLI, seule porte de sortie vers le système |
-| `GuiConfigStore.read()/write()` | Frontière vers le fichier de config GUI local |
-| IPC main ↔ renderer (si Electron) | Frontière entre le composant UI et `CliInvoker`/`GuiConfigStore`, qui vivent côté process principal pour des raisons de sécurité (accès filesystem/process) |
+| "Port" interne GUI                  | Rôle                                                                                                                                                        |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CliInvoker.invoke(cmd, args, cwd)` | Frontière process principal ↔ CLI, seule porte de sortie vers le système                                                                                    |
+| `GuiConfigStore.read()/write()`     | Frontière vers le fichier de config GUI local                                                                                                               |
+| IPC main ↔ renderer (si Electron)   | Frontière entre le composant UI et `CliInvoker`/`GuiConfigStore`, qui vivent côté process principal pour des raisons de sécurité (accès filesystem/process) |
 
 Ces "ports" sont strictement internes à l'application GUI ; ils ne sont pas
 des contrats du moteur Loop Engine et n'ont donc pas vocation à être
@@ -332,16 +324,16 @@ l'implémentation).
 
 ## 8. Risques d'architecture
 
-| # | Risque | Impact | Mitigation |
-|---|---|---|---|
-| R-1 | Dérive de logique métier dans l'UI (ex: un développeur futur ajoute une interprétation de `failure.code` "juste pour l'UX") | Rompt le principe "aucune logique métier dans l'UI", crée une seconde source de vérité qui peut diverger du moteur | Revue de code systématique sur ce point ; `CliInvoker` et les `Panel` restent volontairement "bêtes" (pas de `switch` sur des codes métier) |
-| R-2 | Couplage implicite au format de sortie CLI (parsing fragile si un champ JSON change de forme) | Rupture silencieuse de la GUI sans que le moteur ait rien cassé côté CLI (le contrat `schemaVersion` protège les consommateurs *conformes*, mais un accès direct à un champ non documenté ne l'est pas) | La GUI ne doit lire que des champs documentés dans `docs/integrations/json-consumers.md` / `commands.md` ; tout champ supplémentaire nécessaire à la GUI doit être demandé comme évolution additive du contrat JSON (jamais lu "en douce") |
-| R-3 | `status` n'a peut-être pas de sortie `--json` dédiée au même niveau que les autres commandes (à vérifier dans `src/commands/status.ts`) | Bloque la section "Statut" telle que cadrée, ou force un contournement bricolé | Vérifier en tout premier lot d'implémentation ; si absent, traiter comme une évolution du moteur (ajout d'un flag `--json` à `status`, cohérent avec les autres commandes) plutôt que de dupliquer la logique côté GUI |
-| R-4 | Process CLI zombie ou qui ne se termine jamais (ex: commande qui attend un input) | GUI bloquée en "chargement infini" sur une section | Timeout explicite sur chaque spawn (valeur à définir en implémentation), section passe en erreur de spawn au-delà |
-| R-5 | Chemin du repo mal configuré pointant vers un autre repo Git valide mais qui n'est pas Loop Engine (`pnpm loop` échoue silencieusement ou exécute un autre `loop` du PATH) | Résultats trompeurs si le spawn "réussit" mais sur le mauvais programme | Le spawn utilise le chemin configuré comme `cwd` avec une commande explicite (`pnpm loop`, pas un `loop` du PATH global) ; à défaut de validation active du contenu (décision : pas de logique métier), une erreur de spawn ou un JSON inattendu tombera de toute façon dans le Parcours F |
-| R-6 | Multiplication de process `pnpm` (démarrage lent car `pnpm` résout l'espace de travail à chaque appel) | Latence perçue élevée sur chaque section, dégrade l'expérience malgré la parallélisation actée (décision 11) | À mesurer en prototype ; option de repli (hors scope de ce cadrage) : invoquer `tsx src/cli.ts` directement plutôt que `pnpm loop` pour éviter l'overhead de résolution pnpm — reste un détail d'implémentation, pas un changement de contrat |
-| R-7 | Cache en mémoire par section masque un changement réel survenu entre deux ouvertures d'un projet dans la même session | L'opérateur agit sur une information périmée sans le savoir | Acceptable par design (décision 4 : rafraîchissement explicite uniquement) ; documenté ici pour que ce ne soit pas (re)découvert comme un "bug" en implémentation |
-| R-8 | Répertoire de données utilisateur de l'OS non accessible en écriture (permissions, environnement restreint) | Impossible de persister la config GUI, retour à la reconfiguration à chaque lancement | Traité comme un cas du Parcours F (échec technique, message brut) plutôt que par une logique de repli spécifique |
+| #   | Risque                                                                                                                                                                     | Impact                                                                                                                                                                                                  | Mitigation                                                                                                                                                                                                                                                                                 |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R-1 | Dérive de logique métier dans l'UI (ex: un développeur futur ajoute une interprétation de `failure.code` "juste pour l'UX")                                                | Rompt le principe "aucune logique métier dans l'UI", crée une seconde source de vérité qui peut diverger du moteur                                                                                      | Revue de code systématique sur ce point ; `CliInvoker` et les `Panel` restent volontairement "bêtes" (pas de `switch` sur des codes métier)                                                                                                                                                |
+| R-2 | Couplage implicite au format de sortie CLI (parsing fragile si un champ JSON change de forme)                                                                              | Rupture silencieuse de la GUI sans que le moteur ait rien cassé côté CLI (le contrat `schemaVersion` protège les consommateurs _conformes_, mais un accès direct à un champ non documenté ne l'est pas) | La GUI ne doit lire que des champs documentés dans `docs/integrations/json-consumers.md` / `commands.md` ; tout champ supplémentaire nécessaire à la GUI doit être demandé comme évolution additive du contrat JSON (jamais lu "en douce")                                                 |
+| R-3 | `status --json` était absent au démarrage du Lot 1                                                                                                                         | Risque levé : la section "Statut" dispose désormais d'un contrat JSON versionné sans contournement GUI                                                                                                  | Résolu par une évolution additive de l'adaptateur `status`, couverte par les tests JSON                                                                                                                                                                                                    |
+| R-4 | Process CLI zombie ou qui ne se termine jamais (ex: commande qui attend un input)                                                                                          | GUI bloquée en "chargement infini" sur une section                                                                                                                                                      | Timeout explicite sur chaque spawn (valeur à définir en implémentation), section passe en erreur de spawn au-delà                                                                                                                                                                          |
+| R-5 | Chemin du repo mal configuré pointant vers un autre repo Git valide mais qui n'est pas Loop Engine (`pnpm loop` échoue silencieusement ou exécute un autre `loop` du PATH) | Résultats trompeurs si le spawn "réussit" mais sur le mauvais programme                                                                                                                                 | Le spawn utilise le chemin configuré comme `cwd` avec une commande explicite (`pnpm loop`, pas un `loop` du PATH global) ; à défaut de validation active du contenu (décision : pas de logique métier), une erreur de spawn ou un JSON inattendu tombera de toute façon dans le Parcours F |
+| R-6 | Multiplication de process `pnpm` (démarrage lent car `pnpm` résout l'espace de travail à chaque appel)                                                                     | Latence perçue élevée sur chaque section, dégrade l'expérience malgré la parallélisation actée (décision 11)                                                                                            | À mesurer en prototype ; option de repli (hors scope de ce cadrage) : invoquer `tsx src/cli.ts` directement plutôt que `pnpm loop` pour éviter l'overhead de résolution pnpm — reste un détail d'implémentation, pas un changement de contrat                                              |
+| R-7 | Cache en mémoire par section masque un changement réel survenu entre deux ouvertures d'un projet dans la même session                                                      | L'opérateur agit sur une information périmée sans le savoir                                                                                                                                             | Acceptable par design (décision 4 : rafraîchissement explicite uniquement) ; documenté ici pour que ce ne soit pas (re)découvert comme un "bug" en implémentation                                                                                                                          |
+| R-8 | Répertoire de données utilisateur de l'OS non accessible en écriture (permissions, environnement restreint)                                                                | Impossible de persister la config GUI, retour à la reconfiguration à chaque lancement                                                                                                                   | Traité comme un cas du Parcours F (échec technique, message brut) plutôt que par une logique de repli spécifique                                                                                                                                                                           |
 
 ---
 
@@ -353,8 +345,8 @@ méthode de travail du repo (lots cohérents et réversibles).
 ### Lot 1 — Vérification de contrat et squelette du process principal
 
 - Vérifier le contrat réel de `status` (R-3) ; ajuster le cadrage si besoin.
-- Trancher la stack technique (décision 7, reportée) : Electron par défaut
-  sauf contre-indication trouvée en pratique.
+- Stack technique tranchée : Electron Forge + Webpack + React + TypeScript ;
+  renderer sandboxé avec `contextIsolation`, accès système limité au preload.
 - Implémenter `CliInvoker` (spawn, capture stdout/stderr/code, timeout,
   parsing JSON minimal) avec tests unitaires sur : succès, erreur JSON
   applicative, échec de spawn, timeout.
@@ -422,7 +414,7 @@ méthode de travail du repo (lots cohérents et réversibles).
 - Lot 10 — `validate`, `handoff`.
 - Lot 11 — `rag-search`.
 - Lot 12 (sous réserve d'une nouvelle session de cadrage) — `run --mode
-  execute` avec confirmation explicite, uniquement quand un executor
+execute` avec confirmation explicite, uniquement quand un executor
   concret existera.
 
 ---

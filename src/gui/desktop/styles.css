@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@theme {
+  --color-loop-ink: #1d2430;
+  --color-loop-paper: #f6f7f4;
+  --color-loop-panel: #ffffff;
+  --color-loop-line: #d9ddd7;
+  --color-loop-muted: #657080;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    min-width: 320px;
+    background: var(--color-loop-paper);
+    color: var(--color-loop-ink);
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  }
+  button,
+  input {
+    font: inherit;
+  }
+}
