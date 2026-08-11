@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   mkdir,
   mkdtemp,
@@ -158,6 +159,10 @@ async function assertNoOrphans(root: string): Promise<void> {
   assert.deepEqual(await readdir(join(root, "locks")), []);
 }
 
+function cloneRepository(sourcePath: string, destinationPath: string): void {
+  execFileSync("git", ["clone", "-q", sourcePath, destinationPath]);
+}
+
 function normalizeMacTemporaryPath(path: string): string {
   return path.replace(/^\/private(?=\/var\/folders\/)/, "");
 }
@@ -188,6 +193,7 @@ describe("isolated provider execution", () => {
         await readFile(validationCwdCapture, "utf8")
       ).trim();
       assert.equal(result.status, "completed");
+      assert.equal(result.patchExport, undefined);
       assert.deepEqual(result.modifiedFiles, ["provider-created.txt"]);
       assert.notEqual(providerCwd, project.path);
       assert.ok(
@@ -206,17 +212,19 @@ describe("isolated provider execution", () => {
   it("cleans the worktree and releases the lock after a provider failure", async () => {
     const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
     const project = await createRepository(root, "source");
+    const patchPath = join(root, "provider-failure.patch");
     const app = application([project], root);
 
     try {
       process.env.FAKE_CLAUDE_MODE = "nonzero_exit_with_file";
-      const result = await app.runLoopExecute(
-        project.name,
-        optionsFor([project]),
-      );
+      const result = await app.runLoopExecute(project.name, {
+        ...optionsFor([project]),
+        exportPatchPath: patchPath,
+      });
 
       assert.equal(result.status, "failed");
       assert.equal(result.failure?.code, "provider_failed");
+      await assert.rejects(readFile(patchPath, "utf8"));
       await assertCleanSource(project, "provider-leftover.txt");
       await assertNoOrphans(root);
     } finally {
@@ -228,12 +236,14 @@ describe("isolated provider execution", () => {
   it("cleans the worktree and releases the lock after validation fails", async () => {
     const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
     const project = await createRepository(root, "source");
+    const patchPath = join(root, "validation-failure.patch");
     const app = application([project], root);
 
     try {
       process.env.FAKE_CLAUDE_MODE = "success_with_file";
       const result = await app.runLoopExecute(project.name, {
         ...optionsFor([project]),
+        exportPatchPath: patchPath,
         validator: async () => ({
           status: "failed",
           failedCommand: "test validation",
@@ -244,6 +254,7 @@ describe("isolated provider execution", () => {
 
       assert.equal(result.status, "failed");
       assert.equal(result.failure?.code, "validation_failed");
+      await assert.rejects(readFile(patchPath, "utf8"));
       await assertCleanSource(project, "provider-created.txt");
       await assertNoOrphans(root);
     } finally {
@@ -256,6 +267,7 @@ describe("isolated provider execution", () => {
     const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
     const project = await createRepository(root, "source");
     const providerCwdCapture = join(root, "provider-cwd.txt");
+    const patchPath = join(root, "repair.patch");
     let validatorProjectPath: string | undefined;
     let repairerProjectPath: string | undefined;
     const app = application([project], root);
@@ -266,6 +278,7 @@ describe("isolated provider execution", () => {
       const result = await app.runLoopExecute(project.name, {
         ...optionsFor([project]),
         maxRepairs: 1,
+        exportPatchPath: patchPath,
         validator: async (input) => {
           validatorProjectPath = input.project.path;
           return input.attempt === 1
@@ -298,6 +311,9 @@ describe("isolated provider execution", () => {
 
       const providerCwd = (await readFile(providerCwdCapture, "utf8")).trim();
       assert.equal(result.status, "completed");
+      assert.equal(result.patchExport?.fileCount, 2);
+      assert.equal(result.patchExport?.path, patchPath);
+      assert.match(await readFile(patchPath, "utf8"), /repair-created\.txt/);
       assert.notEqual(repairerProjectPath, project.path);
       assert.equal(
         normalizeMacTemporaryPath(repairerProjectPath ?? ""),
@@ -313,6 +329,93 @@ describe("isolated provider execution", () => {
     } finally {
       delete process.env.FAKE_CLAUDE_MODE;
       delete process.env.FAKE_CLAUDE_CAPTURE_CWD;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("exports a validated patch that Git applies to the original baseline", async () => {
+    const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
+    const project = await createRepository(root, "source");
+    const patchPath = join(root, "validated.patch");
+    const appliedPath = join(root, "applied");
+    const app = application([project], root);
+    const sourceHead = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: project.path,
+      encoding: "utf8",
+    }).trim();
+
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success_with_modified_and_file";
+      const result = await app.runLoopExecute(project.name, {
+        ...optionsFor([project]),
+        exportPatchPath: patchPath,
+      });
+
+      const patch = await readFile(patchPath);
+      assert.equal(result.status, "completed");
+      assert.deepEqual(result.modifiedFiles, [
+        "README.md",
+        "provider-created.txt",
+      ]);
+      assert.deepEqual(result.patchExport, {
+        path: patchPath,
+        sha256: createHash("sha256").update(patch).digest("hex"),
+        fileCount: 2,
+      });
+      assert.equal(
+        await readFile(join(project.path, "README.md"), "utf8"),
+        "source\n",
+      );
+      await assertCleanSource(project, "provider-created.txt");
+      assert.equal(
+        execFileSync("git", ["rev-parse", "HEAD"], {
+          cwd: project.path,
+          encoding: "utf8",
+        }).trim(),
+        sourceHead,
+      );
+      cloneRepository(project.path, appliedPath);
+      execFileSync("git", ["apply", "--check", patchPath], {
+        cwd: appliedPath,
+      });
+      execFileSync("git", ["apply", patchPath], { cwd: appliedPath });
+      assert.equal(
+        await readFile(join(appliedPath, "README.md"), "utf8"),
+        "source\nmodified\n",
+      );
+      assert.equal(
+        await readFile(join(appliedPath, "provider-created.txt"), "utf8"),
+        "created\n",
+      );
+      await assertNoOrphans(root);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed without overwriting an existing patch destination", async () => {
+    const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
+    const project = await createRepository(root, "source");
+    const patchPath = join(root, "existing.patch");
+    const app = application([project], root);
+
+    try {
+      await writeFile(patchPath, "existing\n");
+      process.env.FAKE_CLAUDE_MODE = "success_with_file";
+      const result = await app.runLoopExecute(project.name, {
+        ...optionsFor([project]),
+        exportPatchPath: patchPath,
+      });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.failure?.code, "patch_export_destination_exists");
+      assert.equal(result.patchExport, null);
+      assert.equal(await readFile(patchPath, "utf8"), "existing\n");
+      await assertCleanSource(project, "provider-created.txt");
+      await assertNoOrphans(root);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
       await rm(root, { recursive: true, force: true });
     }
   });

@@ -93,6 +93,11 @@ boundary; providers and validation then receive the same detached worktree
 path. The source repository is not modified by `execute`, and the worktree and
 lock are released on every outcome.
 
+When `execute` receives an explicit patch destination, this same composition
+exports Git's validated binary diff before that cleanup. The result exposes
+only the destination, checksum and file count; no patch is applied, committed,
+promoted or copied back to the source repository.
+
 `commit` deliberately remains outside this wrapper: its existing bounded
 commit path still acts on an explicit source worktree. This lot adds no
 promotion, cherry-pick, merge or push from an isolated execution.

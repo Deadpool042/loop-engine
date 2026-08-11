@@ -81,6 +81,11 @@ opérations de domaine et obtenir les rapports : audit, planification LoopRunner
 snapshots, rapports JSON, RAG et validations configurées. Elles conservent
 seulement le parsing des arguments, le rendu terminal et les codes de sortie.
 
+`run --mode execute --export-patch <path>` est une option explicite de la
+commande : elle délègue l'export du diff validé à la composition isolée, puis
+rend seulement son descripteur borné. `cli.ts` refuse cette option dans les
+autres modes et ne génère, n'applique ni ne promeut aucun patch.
+
 La construction d'un provider concret est interdite dans `commands/`, `cli.ts`
 et `core/`. Core ne dépend jamais de `composition/`.
 

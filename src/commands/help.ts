@@ -49,6 +49,9 @@ export function printHelp(): void {
     "pnpm loop run <project> --mode execute --provider codex --provider-executable codex",
   );
   terminal.info(
+    "--export-patch <path> exports a validated isolated Git patch without applying it",
+  );
+  terminal.info(
     "Options provider: --provider-model <model> --provider-timeout-ms <ms>",
   );
 

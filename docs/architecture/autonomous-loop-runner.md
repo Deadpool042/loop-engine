@@ -83,6 +83,16 @@ Claude Code explicitement configuré, la composition acquiert d'abord un lock pa
 projet puis exécute provider et validation dans un Git worktree isolé et
 temporaire. Le dépôt source ne reçoit aucune modification du mode `execute`.
 
+`--export-patch <path>` est une option opt-in réservée à `execute` avec un
+provider explicite. Après la validation finale réussie, la composition exporte
+le diff Git binaire du worktree isolé vers ce chemin. L'artefact est refusé si
+la destination existe ou si le delta Git ne correspond pas aux fichiers
+modifiés validés. Le parent doit déjà exister : aucune destination implicite
+n'est créée. Le résultat contient seulement `path`, `sha256` et `fileCount`,
+jamais le contenu du patch. L'export ne crée ni commit, ni promotion, ni
+application dans le dépôt source ; l'inspection et un éventuel `git apply`
+restent des actions humaines externes.
+
 ### `commit`
 
 Le mode `commit` exige un message explicite et crée uniquement un commit Git
@@ -177,6 +187,7 @@ pnpm loop run <project> --mode plan
 pnpm loop run <project> --mode plan --json
 pnpm loop run <project> --mode execute
 pnpm loop run <project> --mode execute --max-repairs 1 --json
+pnpm loop run <project> --mode execute --export-patch ./validated.patch --json
 ```
 
 La commande `execute` échoue avec `executor_unavailable` sans provider concret.

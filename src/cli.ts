@@ -247,6 +247,29 @@ else if (command === "review") {
   const providerExecutable = optionValue("--provider-executable");
   const providerModel = optionValue("--provider-model");
   const commitMessage = optionValue("--commit-message");
+  const exportPatchPath = optionValue("--export-patch");
+
+  if (hasOption("--export-patch") && exportPatchPath === undefined) {
+    failOption(
+      json,
+      "missing_export_patch_value",
+      "Missing value for --export-patch",
+    );
+  }
+  if (exportPatchPath !== undefined && mode !== "execute") {
+    failOption(
+      json,
+      "export_patch_execute_only",
+      "--export-patch is only supported in execute mode.",
+    );
+  }
+  if (exportPatchPath !== undefined && providerId === undefined) {
+    failOption(
+      json,
+      "export_patch_requires_provider",
+      "--export-patch requires an explicit provider.",
+    );
+  }
 
   if (
     mode !== "publish" &&
@@ -301,6 +324,7 @@ else if (command === "review") {
       maxRepairs,
       ...(providerId !== undefined ? { provider: providerId } : {}),
       ...(commitMessage !== undefined ? { commitMessage } : {}),
+      ...(exportPatchPath !== undefined ? { exportPatchPath } : {}),
     },
   );
   if (exitCode !== 0) process.exitCode = exitCode;

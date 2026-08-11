@@ -120,7 +120,11 @@ describe("json errors", () => {
 
   it("requires an explicit commit message for commit mode", () => {
     const output = runFailingCommand([
-      "run", "loop-engine", "--mode", "commit", "--json",
+      "run",
+      "loop-engine",
+      "--mode",
+      "commit",
+      "--json",
     ]);
     const json = JSON.parse(output) as { error?: { code?: unknown } };
     assert.equal(json.error?.code, "missing_commit_message");
@@ -128,7 +132,11 @@ describe("json errors", () => {
 
   it("rejects mode publish for the run command", () => {
     const output = runFailingCommand([
-      "run", "loop-engine", "--mode", "publish", "--json",
+      "run",
+      "loop-engine",
+      "--mode",
+      "publish",
+      "--json",
     ]);
     const json = JSON.parse(output) as { error?: { code?: unknown } };
     assert.equal(json.error?.code, "mode_not_implemented");
@@ -152,7 +160,11 @@ describe("json errors", () => {
 
   it("rejects an unrecognized --mode value distinctly from a known but unimplemented mode", () => {
     const output = runFailingCommand([
-      "run", "loop-engine", "--mode", "banana", "--json",
+      "run",
+      "loop-engine",
+      "--mode",
+      "banana",
+      "--json",
     ]);
     const json = JSON.parse(output) as {
       error?: { code?: unknown; message?: unknown };
@@ -163,7 +175,10 @@ describe("json errors", () => {
 
   it("rejects --mode with no value (--mode is the last argument)", () => {
     const output = runFailingCommand([
-      "run", "loop-engine", "--json", "--mode",
+      "run",
+      "loop-engine",
+      "--json",
+      "--mode",
     ]);
     const json = JSON.parse(output) as {
       error?: { code?: unknown; message?: unknown };
@@ -174,7 +189,10 @@ describe("json errors", () => {
 
   it("rejects --mode immediately followed by another flag", () => {
     const output = runFailingCommand([
-      "run", "loop-engine", "--mode", "--json",
+      "run",
+      "loop-engine",
+      "--mode",
+      "--json",
     ]);
     const json = JSON.parse(output) as {
       error?: { code?: unknown; message?: unknown };
@@ -185,7 +203,12 @@ describe("json errors", () => {
 
   it("rejects --max-repairs with no value", () => {
     const output = runFailingCommand([
-      "run", "loop-engine", "--mode", "execute", "--json", "--max-repairs",
+      "run",
+      "loop-engine",
+      "--mode",
+      "execute",
+      "--json",
+      "--max-repairs",
     ]);
     const json = JSON.parse(output) as {
       error?: { code?: unknown; message?: unknown };
@@ -196,13 +219,77 @@ describe("json errors", () => {
 
   it("rejects a negative --max-repairs value", () => {
     const output = runFailingCommand([
-      "run", "loop-engine", "--mode", "execute", "--json", "--max-repairs", "-1",
+      "run",
+      "loop-engine",
+      "--mode",
+      "execute",
+      "--json",
+      "--max-repairs",
+      "-1",
     ]);
     const json = JSON.parse(output) as {
       error?: { code?: unknown; message?: unknown };
     };
     assert.equal(json.error?.code, "invalid_max_repairs");
     assert.equal(json.error?.message, "Invalid --max-repairs value: -1");
+  });
+
+  it("requires a value for --export-patch", () => {
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "execute",
+      "--json",
+      "--export-patch",
+    ]);
+    const json = JSON.parse(output) as {
+      error?: { code?: unknown; message?: unknown };
+    };
+    assert.equal(json.error?.code, "missing_export_patch_value");
+    assert.equal(json.error?.message, "Missing value for --export-patch");
+  });
+
+  for (const mode of ["plan", "commit", "publish"] as const) {
+    it(`rejects --export-patch in ${mode} mode`, () => {
+      const output = runFailingCommand([
+        "run",
+        "loop-engine",
+        "--mode",
+        mode,
+        "--export-patch",
+        "./validated.patch",
+        "--json",
+      ]);
+      const json = JSON.parse(output) as {
+        error?: { code?: unknown; message?: unknown };
+      };
+      assert.equal(json.error?.code, "export_patch_execute_only");
+      assert.equal(
+        json.error?.message,
+        "--export-patch is only supported in execute mode.",
+      );
+    });
+  }
+
+  it("requires an explicit provider for --export-patch", () => {
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--mode",
+      "execute",
+      "--export-patch",
+      "./validated.patch",
+      "--json",
+    ]);
+    const json = JSON.parse(output) as {
+      error?: { code?: unknown; message?: unknown };
+    };
+    assert.equal(json.error?.code, "export_patch_requires_provider");
+    assert.equal(
+      json.error?.message,
+      "--export-patch requires an explicit provider.",
+    );
   });
 
   it("requires a Claude Code executable when the provider is selected", () => {
@@ -278,7 +365,10 @@ describe("json errors", () => {
         ),
         true,
       );
-      assert.equal(json.agentPolicy?.selection?.profile?.runtime, "claude_code");
+      assert.equal(
+        json.agentPolicy?.selection?.profile?.runtime,
+        "claude_code",
+      );
     } finally {
       fixture.cleanup();
     }
