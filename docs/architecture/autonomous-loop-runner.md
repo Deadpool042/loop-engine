@@ -6,7 +6,7 @@
 - Lot V7.2 — `runLoopPlan(...)` et mode `plan` implémentés.
 - Lots V7.4–V7.5 — prévision de politique et contexte borné intégrés au plan.
 - Lot V14.4 — `runLoopExecute(...)`, validation et réparation bornée implémentés.
-- `commit` et `publish` restent non implémentés et renvoient `Loop run mode not implemented: <mode>`.
+- le mode `commit` contrôlé est implémenté ; `publish` reste non implémenté.
 - `--resume` reste futur.
 
 Le contrat détaillé du cycle V14.4 est dans
@@ -32,13 +32,13 @@ contexte ou la validation configurée.
   configurées et l'audit prévu par le projet.
 - **LoopRepairer** — port injecté appelé après une validation échouée et seulement
   tant que le budget le permet.
-- **LoopCommitter** — futur ; absent de V14.4.
+- **LoopCommitter** — frontière Git contrôlée, appelée uniquement par le mode `commit` explicite après validation réussie.
 - **LoopPublisher** — futur ; absent de V14.4.
 - **LoopRunner** — orchestration et machine à états uniquement.
 
-Les **Execution agents** tels que Claude Code, OpenClaw ou un futur adapter Codex
-ne sont pas implémentés par le runner. Une **Interface Agent** ou une externalité
-ne peut être utilisée qu'au travers d'un `LoopExecutor` revu et injecté.
+Les **Execution agents** Claude Code et Codex sont disponibles uniquement par
+configuration explicite. Une **Interface Agent** ou une externalité ne peut être
+utilisée qu'au travers d'un `LoopExecutor` revu et injecté.
 
 ## Modes
 
@@ -77,15 +77,18 @@ Le runner exige une résolution de politique `execute` sélectionnée avant l'ap
 à `LoopExecutor`. L'exécuteur est appelé au plus une fois. Les validations ne
 commencent qu'après un résultat d'exécution `completed`.
 
-La CLI standard ne possède pas encore d'adapter provider concret. Elle utilise
-`unavailableLoopExecutor` et retourne donc un `LoopRunResult` échoué avec
-`failure.code = "executor_unavailable"`. C'est un échec fermé, pas une exécution
-simulée.
+Sans provider explicitement configuré, la CLI utilise `unavailableLoopExecutor`
+et retourne `failure.code = "executor_unavailable"`. Avec le provider Codex ou
+Claude Code explicitement configuré, la composition acquiert d'abord un lock par
+projet puis exécute provider et validation dans un Git worktree isolé et
+temporaire. Le dépôt source ne reçoit aucune modification du mode `execute`.
 
 ### `commit`
 
-Futur. Un futur mode `commit` ne pourra créer un commit qu'après un cycle
-`execute` entièrement validé. V14.4 laisse toujours `commit: null`.
+Le mode `commit` exige un message explicite et crée uniquement un commit Git
+borné après un cycle validé. Il conserve pour l'instant son chemin direct
+historique : l'isolation temporaire est limitée au mode `execute` tant qu'aucune
+promotion explicite depuis un worktree isolé n'a été conçue.
 
 ### `publish`
 
@@ -162,8 +165,8 @@ Une boucle infinie est impossible : `repairAttempts >= maxRepairs` mène à
 - aucun accès provider ou credential ambiant depuis le runner ;
 - aucun `git reset --hard` ;
 - aucun force-push ;
-- aucun commit, push ou tag en V14.4 ;
-- `commit` et `publication` toujours `null` ;
+- aucun commit, push ou tag en mode `execute` ;
+- les worktrees isolés et locks sont libérés en succès comme en échec ;
 - le mode `plan` reste le défaut.
 
 ## CLI actuelle
@@ -176,11 +179,11 @@ pnpm loop run <project> --mode execute
 pnpm loop run <project> --mode execute --max-repairs 1 --json
 ```
 
-La commande `execute` est routée, mais échoue avec `executor_unavailable` sans
-provider concret. Les commandes suivantes restent reconnues puis rejetées :
+La commande `execute` échoue avec `executor_unavailable` sans provider concret.
+Le mode `commit` requiert `--commit-message`. Seule la commande suivante reste
+reconnue puis rejetée :
 
 ```bash
-pnpm loop run <project> --mode commit
 pnpm loop run <project> --mode publish
 ```
 
@@ -197,8 +200,8 @@ ne contourne jamais les politiques ni les modes.
 
 - **n8n** peut enchaîner des appels explicites et lire `LoopRunResult`.
 - **OpenClaw** peut devenir un provider seulement via un adapter futur revu.
-- **Claude Code** peut devenir un `LoopExecutor` seulement via un adapter futur
-  revu, avec permissions et budget explicites.
+- **Claude Code** et **Codex** sont des `LoopExecutor` concrets uniquement
+  lorsqu'ils sont explicitement configurés, avec permissions et budget admis.
 - Une **Interface Agent** doit utiliser les contrats publics et ne peut créer
   d'autorité implicite.
 
@@ -227,7 +230,7 @@ existait déjà sous la forme `null` dans les résultats plan.
 Les futures étapes restent :
 
 - V14.5 — identité, ACL, replay persistants et un adapter inbound ;
-- V14.6 — un provider pilote et un mode commit contrôlé ;
+- réparation provider, promotion explicite d'un worktree isolé et publication ;
 - publication, reprise durable et annulation opérationnelle après revue dédiée.
 
 Toute évolution doit préserver le défaut non destructif, la validation avant

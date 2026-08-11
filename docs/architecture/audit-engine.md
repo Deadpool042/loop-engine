@@ -161,13 +161,18 @@ La commande disponible est :
 - `pnpm exec tsx src/cli.ts audit`
 - `pnpm exec tsx src/cli.ts audit --json`
 
-V1 exécute les règles locales définies dans `src/audit/rules.ts`.
+V1 exécute les règles locales définies dans `src/audit/rules.ts` et
+`src/audit/rules/`.
 
 La première règle active est :
 
 - `JSON-001`
 
 La sortie JSON de `audit` est incluse dans `json-check`.
+
+Les règles d'architecture qui inspectent le source, notamment `AUDIT-495` pour
+la séquence execute/validate/repair, vérifient les invariants de code sans
+dépendre d'un formatage monoligne particulier.
 
 ## Profils d'audit
 

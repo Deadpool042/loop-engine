@@ -5,8 +5,8 @@
 Lot V14.4 — implemented.
 
 This document is the current contract for the LoopRunner `execute` mode. The
-historical `plan` contract remains unchanged. `commit` and `publish` remain
-explicitly unimplemented.
+historical `plan` contract remains unchanged. The later controlled `commit`
+mode is explicit and bounded; `publish` remains unimplemented.
 
 ## Goal
 
@@ -34,10 +34,11 @@ itself, infer authority, commit, push, publish, or discover credentials.
 - `pnpm loop run <project> --mode execute [--max-repairs <n>]` routes to the
   execute cycle.
 
-The CLI intentionally uses `unavailableLoopExecutor` until a reviewed concrete
-provider is supplied in V14.6. Therefore a direct CLI execute request currently
-returns a stable failed `LoopRunResult` with `failure.code =
-"executor_unavailable"`; it never pretends that work was executed.
+Without an explicitly configured provider, the CLI returns a stable failed
+`LoopRunResult` with `failure.code = "executor_unavailable"`. With an explicit
+Codex or Claude Code provider, composition acquires a project lock and runs the
+provider and configured validations in one temporary detached Git worktree. The
+source repository is never modified by `execute`.
 
 ## Ports
 
@@ -149,22 +150,24 @@ failures. Raw exceptions and stack traces are not exposed. Major failure codes:
 
 ## Git and publication boundary
 
-For every V14.4 outcome:
+For every `execute` outcome:
 
 - `commit` is `null`;
 - `publication` is `null`;
 - no commit, push, tag or force operation exists in the execute runner;
-- `commit` and `publish` CLI modes continue to return `mode_not_implemented`.
+- worktree and project lock cleanup run before returning the result;
+- the separate `commit` mode remains controlled and explicit; only `publish`
+  returns `mode_not_implemented`.
 
 ## Explicit non-goals
 
 V14.4 does not add:
 
-- a Claude, Codex, OpenClaw or other provider adapter;
+- a new provider adapter;
 - automatic provider selection outside the existing policy result;
 - concrete identity, ACL, replay persistence or inbound transport;
 - worktree rollback;
-- commit, push, tag or publication;
+- automatic promotion, push, tag or publication;
 - resume persistence or durable cancellation;
 - an unbounded repair loop.
 

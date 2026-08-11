@@ -84,11 +84,11 @@ export function inspectLoopRunnerExecuteInvariant(
   const forbidden = FORBIDDEN_RUNNER_TOKENS.filter((token) =>
     sourceIncludesToken(runnerSource, token),
   );
-  const repairIndex = runnerSource.indexOf(
-    'transition("repairing", "repairing", "completed"',
+  const repairIndex = runnerSource.search(
+    /transition\(\s*"repairing",\s*"repairing",\s*"completed"/,
   );
-  const followingValidationIndex = runnerSource.indexOf(
-    'transition("validating", "validating", "completed", repairResult.details)',
+  const followingValidationIndex = runnerSource.search(
+    /transition\(\s*"validating",\s*"validating",\s*"completed",\s*repairResult\.details\)/,
   );
 
   return Object.freeze({
@@ -110,7 +110,8 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
     id: "AUDIT-495",
     category: "architecture",
     severity: "error",
-    title: "LoopRunner execute mode validates and repairs within a finite budget",
+    title:
+      "LoopRunner execute mode validates and repairs within a finite budget",
     description:
       "The V14.4 execute runner must require policy admission, call one injected executor, validate after execution, repair only within a finite budget, revalidate after repair, report modified files, and never commit or publish itself.",
     metadata: {

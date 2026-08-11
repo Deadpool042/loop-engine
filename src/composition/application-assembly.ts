@@ -33,6 +33,10 @@ import {
 import type { AgentRegistry } from "../agents/registry.js";
 import { createLoopProviderFailoverAssembly } from "./provider-failover-assembly.js";
 import {
+  createIsolatedProviderRunExecute,
+  type IsolatedProviderExecutionOptions,
+} from "./isolated-provider-execution.js";
+import {
   assembleLoopProvider,
   assembleLoopProviders,
   defaultLoopProviderRegistry,
@@ -44,7 +48,10 @@ import {
   type LoopProviderRegistry,
 } from "./provider-registry.js";
 
-export type LoopApplicationCodexProviderOptions = Omit<CodexProviderConfiguration, "id">;
+export type LoopApplicationCodexProviderOptions = Omit<
+  CodexProviderConfiguration,
+  "id"
+>;
 export type LoopApplicationClaudeCodeProviderOptions = Omit<
   ClaudeCodeProviderConfiguration,
   "id"
@@ -60,6 +67,12 @@ export type LoopApplicationAssemblyOptions = Readonly<{
   codexProvider?: LoopApplicationCodexProviderOptions;
   /** @deprecated Prefer provider: { id: "claude_code", ... }. */
   claudeCodeProvider?: LoopApplicationClaudeCodeProviderOptions;
+  isolatedProviderExecution?: Omit<
+    IsolatedProviderExecutionOptions,
+    "executor" | "agentRegistry" | "resolveRepositoryPath"
+  > & {
+    resolveRepositoryPath?: (projectId: string) => string;
+  };
 }>;
 
 export type LoopApplicationAssembly = Readonly<{
@@ -96,9 +109,12 @@ export type LoopApplicationAssembly = Readonly<{
   runLoopPlan: typeof runLoopPlan;
 }>;
 
-export type LoopApplicationConfig = ReturnType<LoopApplicationAssembly["loadConfig"]>;
+export type LoopApplicationConfig = ReturnType<
+  LoopApplicationAssembly["loadConfig"]
+>;
 export type LoopApplicationProject = LoopApplicationConfig["projects"][number];
-export type LoopApplicationRunMode = LoopApplicationAssembly["loopRunModes"][number];
+export type LoopApplicationRunMode =
+  LoopApplicationAssembly["loopRunModes"][number];
 export type LoopApplicationAuditProfile = AuditProfile;
 export type LoopApplicationAuditSelection = AuditRuleSelection;
 export type LoopApplicationAuditReport = AuditReport;
@@ -106,11 +122,14 @@ export type LoopApplicationAuditReport = AuditReport;
 function resolveLegacyProvider(
   options: LoopApplicationAssemblyOptions,
 ): LoopProviderConfiguration | undefined {
-  const legacyCount = Number(options.codexProvider !== undefined) + Number(options.claudeCodeProvider !== undefined);
+  const legacyCount =
+    Number(options.codexProvider !== undefined) +
+    Number(options.claudeCodeProvider !== undefined);
   if (legacyCount > 1) {
     throw new Error("Configure only one legacy provider option.");
   }
-  if (options.codexProvider) return Object.freeze({ id: "codex", ...options.codexProvider });
+  if (options.codexProvider)
+    return Object.freeze({ id: "codex", ...options.codexProvider });
   if (options.claudeCodeProvider) {
     return Object.freeze({ id: "claude_code", ...options.claudeCodeProvider });
   }
@@ -132,11 +151,15 @@ function resolveProviderAssemblies(
       "Configure exactly one of provider, providers, providerAssemblies, or a legacy provider option.",
     );
   }
-  if (options.providerAssemblies) return Object.freeze([...options.providerAssemblies]);
+  if (options.providerAssemblies)
+    return Object.freeze([...options.providerAssemblies]);
   const registry = options.providerRegistry ?? defaultLoopProviderRegistry;
-  if (options.providers) return assembleLoopProviders(registry, options.providers);
+  if (options.providers)
+    return assembleLoopProviders(registry, options.providers);
   const single = options.provider ?? legacyProvider;
-  return single ? Object.freeze([assembleLoopProvider(registry, single)]) : Object.freeze([]);
+  return single
+    ? Object.freeze([assembleLoopProvider(registry, single)])
+    : Object.freeze([]);
 }
 
 export function createLoopApplicationAssembly(
@@ -150,6 +173,25 @@ export function createLoopApplicationAssembly(
           providerAssemblies,
           options.maxProviderAttempts ?? providerAssemblies.length,
         );
+  const isolatedRunExecute =
+    providerDependency === undefined
+      ? undefined
+      : createIsolatedProviderRunExecute({
+          executor: providerDependency.executor,
+          agentRegistry: providerDependency.agentRegistry,
+          resolveRepositoryPath:
+            options.isolatedProviderExecution?.resolveRepositoryPath ??
+            ((projectId) => {
+              const project = findProject(loadConfig(), projectId);
+              if (!project) {
+                throw new Error(
+                  `Unknown project for isolated execution: ${projectId}`,
+                );
+              }
+              return project.path;
+            }),
+          ...(options.isolatedProviderExecution ?? {}),
+        });
 
   return Object.freeze({
     findProject,
@@ -179,13 +221,15 @@ export function createLoopApplicationAssembly(
           loopAgentRegistry: providerDependency.agentRegistry,
           loopExecutor: providerDependency.executor,
           loopProviderId: providerDependency.providerIds[0] as LoopProviderId,
-          loopProviderIds: providerDependency.providerIds as readonly LoopProviderId[],
+          loopProviderIds:
+            providerDependency.providerIds as readonly LoopProviderId[],
           loopProviderMaxAttempts: providerDependency.maxAttempts,
         }),
     loopRunModes: LOOP_RUN_MODES,
     runConfiguredValidations,
     runLoopCommit,
-    runLoopExecute: runLoopExecuteWithProviderFailoverEvidence,
+    runLoopExecute:
+      isolatedRunExecute ?? runLoopExecuteWithProviderFailoverEvidence,
     runLoopPlan,
   });
 }

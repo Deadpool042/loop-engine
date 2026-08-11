@@ -20,7 +20,7 @@ Loop Engine is a local, deterministic CLI orchestrator that reads and inspects a
 - an executable Audit Engine with human and JSON reports, profiles, and a strict CI mode (`audit`);
 - human-readable and JSON reports across the CLI (`--json` on most commands).
 
-Loop Engine now also targets autonomous orchestration by small lots — see `docs/architecture/autonomous-loop-runner.md` for the LoopRunner architecture (planning → executing → validating → repairing → completed/blocked/failed/cancelled, and the `plan`/`execute`/`commit`/`publish` modes). As of V7.2, `pnpm loop run <project>` implements only the `plan` mode (default mode): it plans a cycle via `runLoopPlan` (`src/loop/runner.ts`) without calling any agent, without modifying the worktree, and without committing or pushing. `execute`, `commit`, and `publish` are rejected explicitly and remain for later lots.
+Loop Engine now also targets autonomous orchestration by small lots — see `docs/architecture/autonomous-loop-runner.md` for the LoopRunner architecture (planning → executing → validating → repairing → completed/blocked/failed/cancelled, and the `plan`/`execute`/`commit`/`publish` modes). `plan` remains the default and never calls an agent. An explicitly configured Codex or Claude Code provider runs `execute` in a temporary isolated Git worktree; explicit `commit` remains bounded and `publish` is rejected.
 
 **Core philosophy (non-negotiable, enforced throughout the codebase):**
 
@@ -51,7 +51,7 @@ Run a single test file directly: `pnpm exec tsx --test tests/intelligence/roadma
 
 `pnpm run ci` is the full reference validation and must pass before any commit or release.
 
-CLI commands (see `src/cli.ts` for the full routing table): `help`, `summary [--json]`, `status`, `doctor`, `json-check`, `rag-index`, `rag-search`, `audit [--json] [--strict] [--profile <name>]`, `handoff <project> [--json]`, `context <project> [--json]`, `validate <project>`, `review <project> [--json]`, `next <project> [--json]`, `prompt <project> [--json]`, `run <project> [--mode plan] [--json]` (V7.2: only `--mode plan`, the default, is implemented; `execute`/`commit`/`publish` are rejected with a non-zero exit code).
+CLI commands (see `src/cli.ts` for the full routing table): `help`, `summary [--json]`, `status`, `doctor`, `json-check`, `rag-index`, `rag-search`, `audit [--json] [--strict] [--profile <name>]`, `handoff <project> [--json]`, `context <project> [--json]`, `validate <project>`, `review <project> [--json]`, `next <project> [--json]`, `prompt <project> [--json]`, `run <project> [--mode plan|execute|commit] [--json]`. `execute` requires an explicit provider executable; `commit` additionally requires an explicit message; `publish` is rejected.
 
 Loop Engine is self-hosted: it's declared in `projects.yaml` as project `loop-engine` (path `.`), so `pnpm loop context loop-engine`, `pnpm loop validate loop-engine`, etc. all work against this repo itself.
 

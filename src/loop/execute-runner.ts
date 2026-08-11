@@ -36,6 +36,8 @@ export type LoopRunExecuteOptions = LoopRunPlanOptions &
     validator?: LoopValidator;
     repairer?: LoopRepairer;
     maxRepairs?: number;
+    /** Internal composition override for an already allocated isolated workspace. */
+    executionProjectPath?: string;
   }>;
 
 type ExecuteDependencies = Readonly<{
@@ -53,7 +55,9 @@ type ExecuteDependencies = Readonly<{
   maxRepairs: number;
 }>;
 
-function resolveDependencies(options: LoopRunExecuteOptions): ExecuteDependencies {
+function resolveDependencies(
+  options: LoopRunExecuteOptions,
+): ExecuteDependencies {
   return {
     now: options.now ?? (() => new Date().toISOString()),
     generateRunId: options.generateRunId ?? (() => randomUUID()),
@@ -207,6 +211,11 @@ export async function runLoopExecute(
     );
   }
 
+  const executionProject =
+    options.executionProjectPath === undefined
+      ? project
+      : Object.freeze({ ...project, path: options.executionProjectPath });
+
   const cycle = dependencies.planLoopCycle(project);
   if (cycle.outcome === "blocked") {
     transition("blocked", "blocked", "blocked", [cycle.reason]);
@@ -251,7 +260,7 @@ export async function runLoopExecute(
   const executionPlan = createLoopExecutionPlan(
     Object.freeze({
       runId,
-      project,
+      project: executionProject,
       candidate: cycle.candidate,
       agentPolicy,
       contextPackage,
@@ -303,7 +312,7 @@ export async function runLoopExecute(
       validationAttempt = await dependencies.validator(
         Object.freeze({
           runId,
-          project,
+          project: executionProject,
           candidate: cycle.candidate,
           modifiedFiles: Object.freeze([...modifiedFiles].sort()),
           attempt: validationAttempts,
@@ -339,7 +348,12 @@ export async function runLoopExecute(
     );
 
     if (validationAttempt.status === "passed") {
-      transition("completed", "completed", "completed", validationAttempt.details);
+      transition(
+        "completed",
+        "completed",
+        "completed",
+        validationAttempt.details,
+      );
       return finalize(cycle.candidate, null);
     }
 
@@ -357,7 +371,12 @@ export async function runLoopExecute(
       );
     }
 
-    transition("repairing", "repairing", "completed", validationAttempt.details);
+    transition(
+      "repairing",
+      "repairing",
+      "completed",
+      validationAttempt.details,
+    );
 
     if (!dependencies.repairer) {
       transition("failed", "failed", "failed", [
@@ -386,7 +405,7 @@ export async function runLoopExecute(
       repairResult = await dependencies.repairer(
         Object.freeze({
           runId,
-          project,
+          project: executionProject,
           candidate: cycle.candidate,
           agentPolicy,
           contextPackage,

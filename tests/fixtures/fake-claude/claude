@@ -16,7 +16,8 @@ function resolveOutputFile() {
   }
   const isAbsolute = override.startsWith("/") || override.startsWith("\\");
   const hasTraversal = override.split(/[\\/]/).includes("..");
-  const isSimpleRelativeName = !override.includes("/") && !override.includes("\\");
+  const isSimpleRelativeName =
+    !override.includes("/") && !override.includes("\\");
   if (isAbsolute || hasTraversal || !isSimpleRelativeName) {
     process.stderr.write(
       "FAKE_CLAUDE_OUTPUT_FILE must be a simple relative filename (no absolute path, no '..').\n",
@@ -31,6 +32,10 @@ if (captureArgsPath) {
   writeFileSync(captureArgsPath, JSON.stringify(process.argv.slice(2)));
 }
 const cwd = process.cwd();
+const captureCwdPath = process.env.FAKE_CLAUDE_CAPTURE_CWD;
+if (captureCwdPath) {
+  writeFileSync(captureCwdPath, cwd);
+}
 
 function write(payload) {
   process.stdout.write(JSON.stringify(payload));
