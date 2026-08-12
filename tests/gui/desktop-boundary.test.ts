@@ -55,6 +55,22 @@ describe("GUI desktop execution boundary", () => {
     );
   });
 
+  it("forwards the renderer project-name argument past Electron's IPC event", () => {
+    const mainSource = readFileSync(
+      new URL("../../src/gui/desktop/main.ts", import.meta.url),
+      "utf8",
+    );
+
+    assert.match(
+      mainSource,
+      /ipcMain\.handle\("loop:context", \(_event, projectName\) =>\s*contextHandler\(projectName\),\s*\)/s,
+    );
+    assert.match(
+      mainSource,
+      /ipcMain\.handle\("loop:review", \(_event, projectName\) =>\s*reviewHandler\(projectName\),\s*\)/s,
+    );
+  });
+
   it("passes the renderer project name to review while retaining the trusted cwd", async () => {
     const cwdValues: string[] = [];
     const cliInvoker = createCliInvoker({
