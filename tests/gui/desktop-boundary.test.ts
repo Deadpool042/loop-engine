@@ -5,26 +5,30 @@ import { describe, it } from "node:test";
 import { createCliInvoker } from "../../src/gui/cli-invoker.js";
 import { createLoopDesktopApi } from "../../src/gui/desktop/desktop-api.js";
 import { createContextHandler } from "../../src/gui/desktop/context-handler.js";
+import { createPlanHandler } from "../../src/gui/desktop/plan-handler.js";
 import { createReviewHandler } from "../../src/gui/desktop/review-handler.js";
 import { createSummaryHandler } from "../../src/gui/desktop/summary-handler.js";
 import { resolveLoopEngineRepositoryPath } from "../../src/gui/repo-path-resolver.js";
 
 describe("GUI desktop execution boundary", () => {
-  it("exposes a parameterless renderer summary API", async () => {
-    const calls: Array<readonly [string, string | undefined]> = [];
-    const api = createLoopDesktopApi(async (channel, projectName) => {
-      calls.push([channel, projectName]);
+  it("exposes only explicit renderer APIs", async () => {
+    const calls: Array<readonly string[]> = [];
+    const api = createLoopDesktopApi(async (channel, ...args) => {
+      calls.push([channel, ...args]);
       return { ok: false, kind: "spawn-error", raw: "unavailable" };
     });
 
     assert.equal(api.summary.length, 0);
+    assert.equal(api.plan.length, 2);
     await api.summary();
     await api.context("loop-engine");
     await api.review("loop-engine");
+    await api.plan("lp-infra", "H1-L4");
     assert.deepEqual(calls, [
-      ["loop:summary", undefined],
+      ["loop:summary"],
       ["loop:context", "loop-engine"],
       ["loop:review", "loop-engine"],
+      ["loop:plan", "lp-infra", "H1-L4"],
     ]);
   });
 
@@ -68,6 +72,10 @@ describe("GUI desktop execution boundary", () => {
     assert.match(
       mainSource,
       /ipcMain\.handle\("loop:review", \(_event, projectName\) =>\s*reviewHandler\(projectName\),\s*\)/s,
+    );
+    assert.match(
+      mainSource,
+      /ipcMain\.handle\("loop:plan", \(_event, projectName, candidateId\) =>\s*planHandler\(projectName, candidateId\),\s*\)/s,
     );
   });
 
@@ -117,6 +125,35 @@ describe("GUI desktop execution boundary", () => {
     });
 
     await handler("creatyss");
+
+    assert.deepEqual(cwdValues, ["/trusted/loop-engine"]);
+  });
+
+  it("passes the renderer candidate binding to plan while retaining the trusted cwd", async () => {
+    const cwdValues: string[] = [];
+    const cliInvoker = createCliInvoker({
+      execute: async (_executable, args, cwd) => {
+        assert.deepEqual(args, [
+          "--silent",
+          "loop",
+          "run",
+          "lp-infra",
+          "--candidate",
+          "H1-L4",
+          "--mode",
+          "plan",
+          "--json",
+        ]);
+        cwdValues.push(cwd);
+        return { stdout: "{}", stderr: "", exitCode: 0 };
+      },
+    });
+    const handler = createPlanHandler({
+      cliInvoker,
+      resolveRepositoryPath: () => "/trusted/loop-engine",
+    });
+
+    await handler("lp-infra", "H1-L4");
 
     assert.deepEqual(cwdValues, ["/trusted/loop-engine"]);
   });

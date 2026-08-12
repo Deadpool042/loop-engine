@@ -13,6 +13,7 @@ describe("GUI context contract", () => {
           available: true,
           paths: ["docs/roadmap.md"],
           selectedCandidate: {
+            id: "H1-L4",
             path: "docs/roadmap.md",
             line: 12,
             text: "Next safe lot",
@@ -28,6 +29,7 @@ describe("GUI context contract", () => {
           available: true,
           paths: ["docs/roadmap.md"],
           selectedCandidate: {
+            id: "H1-L4",
             path: "docs/roadmap.md",
             line: 12,
             text: "Next safe lot",

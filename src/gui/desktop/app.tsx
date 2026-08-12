@@ -1,7 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "./components/ui/button.js";
 import { parseContextDetail, type ContextDetail } from "./context-contract.js";
 import { parseReviewDetail, type ReviewDetail } from "./review-contract.js";
+import {
+  formatPlanSteps,
+  hasAddressableCandidate,
+  isPlanForSelectedProject,
+  parsePlanDetail,
+  parsePlanFailure,
+  type PlanDetail,
+} from "./plan-contract.js";
 import {
   parseSummaryResponse,
   type SummaryProject,
@@ -42,6 +50,11 @@ export function App(): React.JSX.Element {
   const [reviewDetail, setReviewDetail] = useState<ReviewDetail | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [planDetail, setPlanDetail] = useState<PlanDetail | null>(null);
+  const [planProjectName, setPlanProjectName] = useState<string | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
+  const planRequestId = useRef(0);
   const selectedProject =
     projects.find((project) => project.project.name === selectedProjectName) ??
     null;
@@ -86,6 +99,71 @@ export function App(): React.JSX.Element {
       active = false;
     };
   }, [selectedProjectName]);
+
+  useEffect(() => {
+    planRequestId.current += 1;
+    setPlanDetail(null);
+    setPlanProjectName(null);
+    setPlanError(null);
+    setPlanLoading(false);
+  }, [selectedProjectName]);
+
+  function selectProject(projectName: string): void {
+    planRequestId.current += 1;
+    setPlanDetail(null);
+    setPlanProjectName(null);
+    setPlanError(null);
+    setPlanLoading(false);
+    setSelectedProjectName(projectName);
+  }
+
+  async function preparePlan(): Promise<void> {
+    const candidate = contextDetail?.roadmap.selectedCandidate;
+    if (selectedProjectName === null || !hasAddressableCandidate(candidate)) return;
+
+    const projectName = selectedProjectName;
+    const candidateId = candidate.id;
+    const requestId = planRequestId.current + 1;
+    planRequestId.current = requestId;
+    setPlanDetail(null);
+    setPlanProjectName(null);
+    setPlanError(null);
+    setPlanLoading(true);
+
+    try {
+      const result = await window.loopDesktop.plan(projectName, candidateId);
+      if (requestId !== planRequestId.current) return;
+      if (!result.ok) {
+        setPlanError(result.raw);
+        return;
+      }
+
+      const failure = parsePlanFailure(result.json);
+      if (failure) {
+        setPlanError(`${failure.code}: ${failure.message}`);
+        return;
+      }
+
+      const plan = parsePlanDetail(result.json);
+      if (plan === null) {
+        setPlanError("La réponse plan ne respecte pas le contrat JSON attendu.");
+        return;
+      }
+      if (plan.project !== projectName || plan.candidate.id !== candidateId) {
+        setPlanError("Le plan retourné ne correspond pas au candidat demandé.");
+        return;
+      }
+
+      setPlanDetail(plan);
+      setPlanProjectName(projectName);
+    } catch {
+      if (requestId === planRequestId.current) {
+        setPlanError("Impossible de préparer le plan.");
+      }
+    } finally {
+      if (requestId === planRequestId.current) setPlanLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (selectedProjectName === null) {
@@ -215,7 +293,7 @@ export function App(): React.JSX.Element {
                 <button
                   key={project.project.name}
                   type="button"
-                  onClick={() => setSelectedProjectName(project.project.name)}
+                  onClick={() => selectProject(project.project.name)}
                   className={`w-full border-b border-loop-line px-5 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-neutral-400 ${selected ? "bg-neutral-100" : "hover:bg-neutral-50"}`}
                 >
                   <span className="flex items-center justify-between gap-3">
@@ -356,17 +434,42 @@ export function App(): React.JSX.Element {
                       ))}
                       {contextDetail.roadmap.selectedCandidate && (
                         <div className="mt-3 rounded-md border border-loop-line p-4 text-sm">
-                          <p className="m-0 font-medium">
-                            {contextDetail.roadmap.selectedCandidate.kind} ·{" "}
-                            {contextDetail.roadmap.selectedCandidate.status}
+                          <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                            Prochain travail recommandé
                           </p>
+                          {contextDetail.roadmap.selectedCandidate.id && (
+                            <p className="mt-2 font-mono text-sm font-semibold">
+                              {contextDetail.roadmap.selectedCandidate.id}
+                            </p>
+                          )}
                           <p className="mt-2">
                             {contextDetail.roadmap.selectedCandidate.text}
+                          </p>
+                          <p className="mt-2 font-medium">
+                            {contextDetail.roadmap.selectedCandidate.kind} ·{" "}
+                            {contextDetail.roadmap.selectedCandidate.status}
                           </p>
                           <p className="mt-2 font-mono text-xs text-loop-muted">
                             {contextDetail.roadmap.selectedCandidate.path}:
                             {contextDetail.roadmap.selectedCandidate.line}
                           </p>
+                          {!hasAddressableCandidate(
+                            contextDetail.roadmap.selectedCandidate,
+                          ) ? (
+                            <p className="mt-3 text-xs text-loop-muted">
+                              Ce candidat ne possède pas d’identifiant adressable ; le plan explicite est indisponible.
+                            </p>
+                          ) : (
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="mt-3"
+                              disabled={planLoading}
+                              onClick={preparePlan}
+                            >
+                              {planLoading ? "Préparation…" : "Préparer le plan"}
+                            </Button>
+                          )}
                         </div>
                       )}
                     </section>
@@ -385,6 +488,84 @@ export function App(): React.JSX.Element {
                         ))}
                       </ul>
                     </section>
+                  </div>
+                )}
+              </section>
+              <section className="mt-8 border-t border-loop-line pt-6">
+                <h3 className="m-0 text-base font-semibold">Plan explicite</h3>
+                {planLoading && (
+                  <p className="mt-3 text-sm text-loop-muted">
+                    Préparation du plan…
+                  </p>
+                )}
+                {planError && (
+                  <pre className="mt-3 overflow-auto whitespace-pre-wrap break-words rounded-md border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900">
+                    {planError}
+                  </pre>
+                )}
+                {planDetail &&
+                  isPlanForSelectedProject(planProjectName, selectedProjectName) && (
+                  <div className="mt-5 grid gap-6">
+                    <section>
+                      <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                        Candidat confirmé
+                      </h4>
+                      <p className="mt-2 font-mono text-sm font-semibold">
+                        {planDetail.candidate.id}
+                      </p>
+                      <p className="mt-2 text-sm">{planDetail.candidate.text}</p>
+                      <p className="mt-2 text-sm font-medium">
+                        {planDetail.candidate.kind} · {planDetail.candidate.status}
+                      </p>
+                      <p className="mt-2 text-xs text-loop-muted">
+                        Projet : {planDetail.project} · mode : plan
+                      </p>
+                    </section>
+                    <section>
+                      <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                        Politique prévisionnelle
+                      </h4>
+                      {planDetail.profile ? (
+                        <p className="mt-2 text-sm">
+                          {planDetail.profile.id} · {planDetail.profile.provider} ·{" "}
+                          {planDetail.profile.model} · effort {planDetail.profile.effort}
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-sm text-loop-muted">
+                          Aucun profil prévisionnel sélectionné.
+                        </p>
+                      )}
+                    </section>
+                    <section>
+                      <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                        Étapes prévues
+                      </h4>
+                      <ul className="mt-2 space-y-1 text-sm">
+                        {formatPlanSteps(planDetail).map((detail, index) => (
+                          <li key={`${index}:${detail}`}>{detail}</li>
+                        ))}
+                      </ul>
+                    </section>
+                    {planDetail.context && (
+                      <section>
+                        <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                          Contexte borné
+                        </h4>
+                        <p className="mt-2 text-sm">
+                          {planDetail.context.files.length} fichier(s) ·{" "}
+                          {planDetail.context.estimatedTokens} tokens estimés
+                          {planDetail.context.truncated ? " · tronqué" : ""}
+                        </p>
+                        <ul className="mt-2 space-y-1 font-mono text-xs text-loop-muted">
+                          {planDetail.context.files.map((path) => (
+                            <li key={path}>{path}</li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+                    <p className="m-0 text-xs text-loop-muted">
+                      Ce plan n’exécute aucun provider.
+                    </p>
                   </div>
                 )}
               </section>

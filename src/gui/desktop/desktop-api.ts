@@ -4,12 +4,13 @@ export type LoopDesktopApi = Readonly<{
   summary: () => Promise<CliInvocationResult>;
   context: (projectName: string) => Promise<CliInvocationResult>;
   review: (projectName: string) => Promise<CliInvocationResult>;
+  plan: (projectName: string, candidateId: string) => Promise<CliInvocationResult>;
 }>;
 
 export function createLoopDesktopApi(
   invoke: (
-    channel: "loop:summary" | "loop:context" | "loop:review",
-    projectName?: string,
+    channel: "loop:summary" | "loop:context" | "loop:review" | "loop:plan",
+    ...args: readonly string[]
   ) => Promise<CliInvocationResult>,
 ): LoopDesktopApi {
   return Object.freeze({
@@ -21,6 +22,9 @@ export function createLoopDesktopApi(
     },
     review(projectName) {
       return invoke("loop:review", projectName);
+    },
+    plan(projectName, candidateId) {
+      return invoke("loop:plan", projectName, candidateId);
     },
   });
 }

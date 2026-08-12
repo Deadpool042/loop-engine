@@ -4,6 +4,7 @@ import { createCliInvoker } from "../cli-invoker.js";
 import { createGuiConfigStore } from "../config-store.js";
 import { resolveLoopEngineRepositoryPath } from "../repo-path-resolver.js";
 import { createContextHandler } from "./context-handler.js";
+import { createPlanHandler } from "./plan-handler.js";
 import { createReviewHandler } from "./review-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 
@@ -60,6 +61,14 @@ const reviewHandler = createReviewHandler({
 });
 ipcMain.handle("loop:review", (_event, projectName) =>
   reviewHandler(projectName),
+);
+
+const planHandler = createPlanHandler({
+  cliInvoker,
+  resolveRepositoryPath,
+});
+ipcMain.handle("loop:plan", (_event, projectName, candidateId) =>
+  planHandler(projectName, candidateId),
 );
 
 app.whenReady().then(async () => {

@@ -6,13 +6,7 @@ export type { LoopDesktopApi } from "./desktop-api.js";
 
 contextBridge.exposeInMainWorld(
   "loopDesktop",
-  createLoopDesktopApi(
-    (channel, projectName) =>
-      (projectName === undefined
-        ? ipcRenderer.invoke(channel)
-        : ipcRenderer.invoke(
-            channel,
-            projectName,
-          )) as Promise<CliInvocationResult>,
+  createLoopDesktopApi((channel, ...args) =>
+    ipcRenderer.invoke(channel, ...args) as Promise<CliInvocationResult>,
   ),
 );
