@@ -1042,7 +1042,20 @@ describe("Core public API", () => {
     );
 
     const result = runLoopPlan("loop-engine");
-    assert.deepEqual(generateExecutionReport(result), result);
+    assert.deepEqual(generateExecutionReport(result), {
+      ...result,
+      patchExport: null,
+    });
+    assert.deepEqual(
+      generateExecutionReport({
+        ...result,
+        patchExport: { path: "/tmp/validated.patch", sha256: "a".repeat(64), fileCount: 2 },
+      }),
+      {
+        ...result,
+        patchExport: { path: "/tmp/validated.patch", sha256: "a".repeat(64), fileCount: 2 },
+      },
+    );
   });
 
   it("keeps CLI adapters behind the application assembly boundary", () => {
