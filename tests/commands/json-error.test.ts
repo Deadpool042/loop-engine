@@ -28,7 +28,7 @@ function runFailingCommand(args: string[], cwd = repoRoot): string {
   }
 }
 
-function setupRunnableProject(): {
+function setupRunnableProject(roadmap = "- [ ] Exercise executor boundary\n"): {
   cwd: string;
   projectName: string;
   cleanup: () => void;
@@ -50,7 +50,7 @@ function setupRunnableProject(): {
       "",
     ].join("\n"),
   );
-  writeFileSync(join(cwd, "roadmap.md"), "- [ ] Exercise executor boundary\n");
+  writeFileSync(join(cwd, "roadmap.md"), roadmap);
 
   execFileSync("git", ["init", "-q"], { cwd });
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
@@ -116,6 +116,99 @@ describe("json errors", () => {
     } finally {
       fixture.cleanup();
     }
+  });
+
+  it("accepts an explicit structured candidate in plan mode", () => {
+    const fixture = setupRunnableProject(
+      [
+        "| Lot | Deliverable | State |",
+        "| --- | --- | --- |",
+        "| H1-L5 | Default | ⬜ À faire |",
+        "| H1-L4 | Explicit | ⬜ À faire |",
+      ].join("\n"),
+    );
+    try {
+      const output = execFileSync(
+        tsxExecutable,
+        [
+          cliPath,
+          "run",
+          fixture.projectName,
+          "--candidate",
+          "H1-L4",
+          "--mode",
+          "plan",
+          "--json",
+        ],
+        { cwd: fixture.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+      );
+      const json = JSON.parse(output) as {
+        candidate?: { id?: unknown; text?: unknown } | null;
+      };
+
+      assert.equal(json.candidate?.id, "H1-L4");
+      assert.match(String(json.candidate?.text), /Explicit/);
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  it("rejects an unknown explicit candidate without falling back to next", () => {
+    const fixture = setupRunnableProject("| H1-L4 | Known | ⬜ À faire |");
+    try {
+      const output = runFailingCommand(
+        [
+          "run",
+          fixture.projectName,
+          "--candidate",
+          "H9-L9",
+          "--mode",
+          "plan",
+          "--json",
+        ],
+        fixture.cwd,
+      );
+      const json = JSON.parse(output) as {
+        status?: unknown;
+        candidate?: unknown;
+        failure?: { code?: unknown };
+      };
+
+      assert.equal(json.status, "blocked");
+      assert.equal(json.candidate, null);
+      assert.equal(json.failure?.code, "candidate_not_found");
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  it("rejects --candidate without an identifier", () => {
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--candidate",
+      "--mode",
+      "plan",
+      "--json",
+    ]);
+    const json = JSON.parse(output) as { error?: { code?: unknown } };
+
+    assert.equal(json.error?.code, "missing_candidate_value");
+  });
+
+  it("rejects --candidate outside plan and execute modes", () => {
+    const output = runFailingCommand([
+      "run",
+      "loop-engine",
+      "--candidate",
+      "H1-L4",
+      "--mode",
+      "commit",
+      "--json",
+    ]);
+    const json = JSON.parse(output) as { error?: { code?: unknown } };
+
+    assert.equal(json.error?.code, "candidate_plan_or_execute_only");
   });
 
   it("requires an explicit commit message for commit mode", () => {

@@ -60,6 +60,11 @@ Dans une ligne de tableau structurée, `✅` ou `Terminé` signifie `done` et
 Lorsqu'une roadmap contient de telles lignes, ses puces descriptives non
 explicites ne sont pas ajoutées à l'inventaire des lots.
 
+Les lots de tableau structurés exposent leur première cellule `H<n>-L<n>`
+(suffixe alphabétique optionnel) comme identifiant stable `candidate.id`.
+Les formats historiques sans cette cellule restent lisibles, mais ne sont pas
+adressables explicitement.
+
 V1.2 ne doit pas encore essayer de résoudre toutes les dépendances entre lots.
 
 ⸻

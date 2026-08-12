@@ -46,7 +46,10 @@ type ExecuteDependencies = Readonly<{
   now: () => string;
   generateRunId: () => string;
   loadConfig: () => Config;
-  planLoopCycle: (project: ProjectConfig) => LoopPlan;
+  planLoopCycle: (
+    project: ProjectConfig,
+    options?: { candidateId?: string },
+  ) => LoopPlan;
   agentPolicy: AgentPolicy;
   agentRegistry: AgentRegistry;
   resolvePolicy: typeof resolvePolicy;
@@ -218,13 +221,16 @@ export async function runLoopExecute(
       ? project
       : Object.freeze({ ...project, path: options.executionProjectPath });
 
-  const cycle = dependencies.planLoopCycle(project);
+  const cycle = dependencies.planLoopCycle(
+    project,
+    options.candidateId === undefined ? {} : { candidateId: options.candidateId },
+  );
   if (cycle.outcome === "blocked") {
     transition("blocked", "blocked", "blocked", [cycle.reason]);
     return finalize(
       cycle.candidate,
       Object.freeze({
-        code: "no_safe_candidate",
+        code: cycle.code ?? "no_safe_candidate",
         message: cycle.reason,
         details: Object.freeze(cycle.candidate ? [cycle.candidate.text] : []),
       }),

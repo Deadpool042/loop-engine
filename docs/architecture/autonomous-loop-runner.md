@@ -185,6 +185,7 @@ Une boucle infinie est impossible : `repairAttempts >= maxRepairs` mène à
 pnpm loop run <project>
 pnpm loop run <project> --mode plan
 pnpm loop run <project> --mode plan --json
+pnpm loop run <project> --candidate H1-L4 --mode plan --json
 pnpm loop run <project> --mode execute
 pnpm loop run <project> --mode execute --max-repairs 1 --json
 pnpm loop run <project> --mode execute --export-patch ./validated.patch --json
@@ -200,7 +201,6 @@ pnpm loop run <project> --mode publish
 
 Options futures non implémentées :
 
-- `--candidate <id>` ;
 - `--dry-run` comme alias forcé de plan ;
 - `--resume <runId>` avec journal durable.
 
@@ -246,3 +246,13 @@ Les futures étapes restent :
 
 Toute évolution doit préserver le défaut non destructif, la validation avant
 commit et l'absence de publication implicite.
+
+## Liaison explicite d'un candidat
+
+`run <project> --candidate <id>` résout le candidat dans le snapshot courant,
+avant le plan comme avant l'exécution. Un identifiant explicite ne tombe jamais
+silencieusement sur le candidat `next` : identifiant inconnu, ambigu, terminé,
+bloqué, non admissible ou indisponible pour une roadmap historique provoquent
+un résultat fail-closed. L'exécution relit donc l'état courant et refuse le
+même identifiant s'il est devenu inadmissible ; elle ne le remplace pas par un
+autre candidat.

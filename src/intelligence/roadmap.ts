@@ -9,6 +9,7 @@ export type RoadmapCandidateStatus =
 export type RoadmapPriority = "p1" | "p2" | "p3" | "default";
 
 export type RoadmapCandidate = Readonly<{
+  id?: string;
   path: string;
   line: number;
   text: string;
@@ -83,6 +84,7 @@ function detectTableCandidateStatus(
 }
 
 function parseStructuredTableLotRow(line: string): Readonly<{
+  id: string;
   text: string;
   status: RoadmapCandidateStatus;
 }> | null {
@@ -95,6 +97,7 @@ function parseStructuredTableLotRow(line: string): Readonly<{
   }
 
   return {
+    id: match[1] ?? "",
     text: line,
     status: detectTableCandidateStatus(match[3] ?? ""),
   };
@@ -219,6 +222,7 @@ export function findRoadmapCandidates(
         const classification = classifyCandidateLine(tableLot.text);
 
         candidates.push({
+          id: tableLot.id,
           path: roadmapPath,
           line: index + 1,
           text: tableLot.text,

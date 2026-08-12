@@ -70,6 +70,7 @@ function printLoopRunResult(
 }
 
 export type RunLoopRunCommandOptions = Readonly<{
+  candidateId?: string;
   maxRepairs?: number;
   provider?: LoopProviderId;
   commitMessage?: string;
@@ -98,6 +99,18 @@ export async function runLoopRunCommand(
       json,
       "mode_not_implemented",
       "Loop run mode not implemented: publish",
+    );
+  }
+
+  if (
+    options.candidateId !== undefined &&
+    mode !== "plan" &&
+    mode !== "execute"
+  ) {
+    return printCommandError(
+      json,
+      "candidate_plan_or_execute_only",
+      "--candidate is only supported in plan or execute mode.",
     );
   }
 
@@ -132,9 +145,16 @@ export async function runLoopRunCommand(
   const { runLoopCommit, runLoopExecute, runLoopPlan } = application;
   let result: Awaited<ReturnType<typeof runLoopExecute>>;
   if (mode === "plan") {
-    result = runLoopPlan(project.name);
+    result = runLoopPlan(project.name, {
+      ...(options.candidateId === undefined
+        ? {}
+        : { candidateId: options.candidateId }),
+    });
   } else if (mode === "execute") {
     result = await runLoopExecute(project.name, {
+      ...(options.candidateId === undefined
+        ? {}
+        : { candidateId: options.candidateId }),
       maxRepairs: options.maxRepairs ?? 0,
       ...(options.exportPatchPath === undefined
         ? {}

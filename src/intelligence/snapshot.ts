@@ -32,6 +32,7 @@ export type ProjectSnapshot = Readonly<{
     available: boolean;
     paths: readonly string[];
     candidates: readonly Readonly<{
+      id?: string;
       path: string;
       line: number;
       text: string;
@@ -41,6 +42,7 @@ export type ProjectSnapshot = Readonly<{
       priority: "p1" | "p2" | "p3" | "default";
     }>[];
     selectedCandidate: Readonly<{
+      id?: string;
       path: string;
       line: number;
       text: string;
