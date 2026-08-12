@@ -19,7 +19,12 @@ projects:
     required_docs:
       - README.md
       - docs
-    validation: []
+    validation:
+      - git diff HEAD --check
+      - bash -n templates/infra/backup-offsite-template.sh
+      - bash -n templates/infra/deploy-vps-template.sh
+    roadmap:
+      - docs/roadmap/projet-lp-infra.md
 
   - name: n8n
     path: ../n8n
