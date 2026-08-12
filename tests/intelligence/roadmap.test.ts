@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -287,6 +287,51 @@ describe("roadmap candidate status", () => {
     try {
       const candidates = findRoadmapCandidates(project, projectPath);
 
+      assert.equal(candidates[0]?.status, "unknown");
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+describe("roadmap structured markdown tables", () => {
+  it("recognizes lot rows and their explicit status without inventorying descriptive bullets", () => {
+    const currentDir = dirname(fileURLToPath(import.meta.url));
+    const content = readFileSync(
+      resolve(currentDir, "..", "fixtures", "roadmaps", "structured-lots-table.md"),
+      "utf8",
+    );
+    const { project, projectPath, cleanup } = setupRoadmap(content);
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates.length, 26);
+      assert.equal(candidates.filter((candidate) => candidate.status === "done").length, 10);
+      assert.equal(candidates.filter((candidate) => candidate.status === "todo").length, 16);
+      assert.equal(candidates.filter((candidate) => candidate.status === "unknown").length, 0);
+      assert.match(candidates[9]?.text ?? "", /H1-L3B/);
+      assert.equal(candidates[9]?.status, "done");
+      assert.match(candidates[10]?.text ?? "", /H1-L4/);
+      assert.equal(candidates[10]?.status, "todo");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("keeps an unrecognized table state explicit as unknown", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "| Lot | Deliverable | State |",
+        "| --- | --- | --- |",
+        "| H6-L1 | Future work | Pending review |",
+      ].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates.length, 1);
       assert.equal(candidates[0]?.status, "unknown");
     } finally {
       cleanup();
