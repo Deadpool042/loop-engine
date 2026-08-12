@@ -25,8 +25,12 @@ import type {
 export type LoopRunPlanOptions = Readonly<{
   now?: () => string;
   generateRunId?: () => string;
+  candidateId?: string;
   loadConfig?: () => Config;
-  planLoopCycle?: (project: ProjectConfig) => LoopPlan;
+  planLoopCycle?: (
+    project: ProjectConfig,
+    options?: { candidateId?: string },
+  ) => LoopPlan;
   agentPolicy?: AgentPolicy;
   agentRegistry?: AgentRegistry;
   resolvePolicy?: typeof resolvePolicy;
@@ -132,13 +136,16 @@ export function runLoopPlan(
     });
   }
 
-  const cycle = plan(project);
+  const cycle = plan(
+    project,
+    options.candidateId === undefined ? {} : { candidateId: options.candidateId },
+  );
 
   if (cycle.outcome === "blocked") {
     transition("blocked", "blocked", "blocked", [cycle.reason]);
 
     return finalize(cycle.candidate, {
-      code: "no_safe_candidate",
+      code: cycle.code ?? "no_safe_candidate",
       message: cycle.reason,
       details: cycle.candidate ? [cycle.candidate.text] : [],
     });

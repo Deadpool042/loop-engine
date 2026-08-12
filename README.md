@@ -56,6 +56,7 @@ Le mode d'inspection et le mode `plan` ne modifient pas les dépôts pilotés. L
 - `pnpm loop prompt creatyss --json` : génère le contexte de prompt en JSON pour scripts, OpenClaw, n8n ou dashboard.
 - `pnpm loop run creatyss` : lance un cycle `plan` du LoopRunner. Le mode `plan` (V7.2) reste le défaut : aucun agent n'est appelé, aucune modification du worktree, aucun commit et aucun push.
 - `pnpm loop run creatyss --mode plan --json` : sortie JSON du cycle (`LoopRunResult`, `schemaVersion: 1`), avec la sélection d'agent prévisionnelle `agentPolicy` et le paquet borné `contextPackage`.
+- `pnpm loop run lp-infra --candidate H1-L4 --mode plan --json` : planifie exactement un lot de roadmap structuré adressable ; un identifiant invalide ou devenu non admissible est refusé sans repli sur `next`.
 - `pnpm loop run creatyss --mode execute --provider claude_code --provider-executable claude --json` : exécute le cycle provider → validation dans un Git worktree isolé et temporaire ; le dépôt source reste inchangé et aucun commit ni publication n'est produit.
 - `pnpm loop run creatyss --mode execute --provider codex --provider-executable codex --export-patch ./artifacts/creatyss.patch --json` : après une exécution et validation réussies, exporte le diff Git binaire du worktree isolé vers le chemin explicite, sans l'appliquer au dépôt source.
 - `pnpm loop run creatyss --mode commit --provider codex --provider-executable codex --commit-message "..."` : effectue le commit Git borné existant après validation. `publish` reste rejeté explicitement.

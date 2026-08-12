@@ -43,6 +43,9 @@ export function printHelp(): void {
     "pnpm loop run <project> --mode plan — prépare un cycle sans appeler d'agent",
   );
   terminal.info(
+    "--candidate <id> fixe un lot de roadmap structuré pour plan ou execute",
+  );
+  terminal.info(
     "pnpm loop run <project> --mode execute --provider claude_code --provider-executable claude",
   );
   terminal.info(

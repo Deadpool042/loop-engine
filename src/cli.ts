@@ -246,8 +246,20 @@ else if (command === "review") {
 
   const providerExecutable = optionValue("--provider-executable");
   const providerModel = optionValue("--provider-model");
+  const candidateId = optionValue("--candidate");
   const commitMessage = optionValue("--commit-message");
   const exportPatchPath = optionValue("--export-patch");
+
+  if (hasOption("--candidate") && candidateId === undefined) {
+    failOption(json, "missing_candidate_value", "Missing value for --candidate");
+  }
+  if (candidateId !== undefined && mode !== "plan" && mode !== "execute") {
+    failOption(
+      json,
+      "candidate_plan_or_execute_only",
+      "--candidate is only supported in plan or execute mode.",
+    );
+  }
 
   if (hasOption("--export-patch") && exportPatchPath === undefined) {
     failOption(
@@ -321,6 +333,7 @@ else if (command === "review") {
     mode,
     json,
     {
+      ...(candidateId !== undefined ? { candidateId } : {}),
       maxRepairs,
       ...(providerId !== undefined ? { provider: providerId } : {}),
       ...(commitMessage !== undefined ? { commitMessage } : {}),
