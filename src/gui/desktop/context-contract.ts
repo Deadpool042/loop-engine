@@ -7,6 +7,7 @@ export type ContextDetail = Readonly<{
     available: boolean;
     paths: readonly string[];
     selectedCandidate: Readonly<{
+      id?: string;
       path: string;
       line: number;
       text: string;
@@ -36,6 +37,7 @@ function isSelectedCandidate(
   if (!isRecord(value)) return false;
   return (
     typeof value.path === "string" &&
+    (value.id === undefined || typeof value.id === "string") &&
     typeof value.line === "number" &&
     typeof value.text === "string" &&
     (value.kind === "safe" ||
@@ -80,6 +82,9 @@ export function parseContextDetail(value: unknown): ContextDetail | null {
         value.roadmap.selectedCandidate === null
           ? null
           : Object.freeze({
+              ...(value.roadmap.selectedCandidate.id === undefined
+                ? {}
+                : { id: value.roadmap.selectedCandidate.id }),
               path: value.roadmap.selectedCandidate.path,
               line: value.roadmap.selectedCandidate.line,
               text: value.roadmap.selectedCandidate.text,

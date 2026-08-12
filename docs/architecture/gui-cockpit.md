@@ -18,7 +18,7 @@ L'écran unique utilise un split-view desktop :
 
 - la liste de projets à gauche ;
 - le résumé du projet sélectionné à droite ;
-- les sections indépendantes `Context` et `Review` dans le détail.
+- les sections indépendantes `Context`, `Plan explicite` et `Review` dans le détail.
 
 L'utilisateur déclenche `summary()` avec le bouton Actualiser. Le premier
 projet disponible est alors sélectionné ; un changement de sélection déclenche
@@ -29,6 +29,12 @@ Les champs affichés proviennent des contrats CLI : nom, type, chemin, branche,
 état Git, health, contexte et données structurées de review. React ne recalcule
 ni le statut Git, ni l'impact documentaire, ni la validation.
 
+Quand le candidat recommandé par `Context` expose un identifiant stable, le
+cockpit peut demander un plan explicite pour ce couple projet + candidat. Il
+affiche alors le candidat, la politique prévisionnelle, les étapes et le
+contexte borné retournés par le moteur. Cette action prépare uniquement un plan
+et n'appelle aucun provider.
+
 ### Frontière de confiance
 
 Le preload expose seulement les API explicites suivantes :
@@ -37,10 +43,11 @@ Le preload expose seulement les API explicites suivantes :
 window.loopDesktop.summary()
 window.loopDesktop.context(projectName)
 window.loopDesktop.review(projectName)
+window.loopDesktop.plan(projectName, candidateId)
 ```
 
 Elles correspondent uniquement aux canaux `loop:summary`, `loop:context` et
-`loop:review`. Il n'existe aucun IPC générique de la forme commande +
+`loop:review`, `loop:plan`. Il n'existe aucun IPC générique de la forme commande +
 arguments, et `ipcRenderer` n'est pas exposé au renderer.
 
 Le renderer ne peut jamais fournir le `cwd`. Le process principal résout le
@@ -50,7 +57,7 @@ et du package `loop-engine` avant de déléguer au `CliInvoker`.
 
 La fenêtre conserve `contextIsolation: true`, `nodeIntegration: false` et
 `sandbox: true`. Le cockpit ne propose aucune action de commit, push, merge,
-validation ou exécution.
+validation ou exécution provider.
 
 ### Intégration CLI
 
@@ -61,6 +68,7 @@ Le process principal invoque exclusivement :
 | `loop:summary` | `pnpm loop summary --json` |
 | `loop:context` | `pnpm loop context <project> --json` |
 | `loop:review` | `pnpm loop review <project> --json` |
+| `loop:plan` | `pnpm loop run <project> --candidate <id> --mode plan --json` |
 
 Le `CliInvoker` se limite au lancement, au délai d'expiration et au parsing
 JSON. Les contrats renderer ne lisent que les champs affichés et rejettent les
@@ -69,9 +77,9 @@ réponses invalides.
 ## Cible et lots futurs
 
 Les éléments suivants sont des pistes historiques ou des évolutions possibles,
-pas des capacités du cockpit livré : `status`, `next`, `prompt`, `plan`,
-`validate`, les réglages exposés à l'utilisateur, les actions sur le système
-de fichiers et toute commande d'écriture.
+pas des capacités du cockpit livré : `status`, `next`, `prompt`, `validate`,
+les réglages exposés à l'utilisateur, l'exécution provider, les actions sur le
+système de fichiers et toute commande d'écriture.
 
 Toute évolution devra conserver les principes ci-dessus : contrat JSON public,
 IPC explicite et minimal, résolution du repository côté main process, et
