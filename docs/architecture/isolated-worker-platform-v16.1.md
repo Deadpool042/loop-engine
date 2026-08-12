@@ -57,6 +57,14 @@ composition step: it still commits its validated source-worktree delta. No
 automatic cherry-pick, merge, copy or promotion is performed from an isolated
 `execute` worktree.
 
+An explicit `execute --export-patch <path>` may export the final validated
+worktree delta with Git's native binary patch format before cleanup. New files
+are made visible only through intent-to-add entries in the disposable worktree;
+the source repository index is never touched. Export writes atomically to a
+non-existing explicit destination whose parent already exists, then still
+performs normal workspace and lock cleanup. Applying the patch remains a
+separate human Git action.
+
 ## Guaranteed invariants
 
 - conflicting attempts on the same project cannot execute concurrently;

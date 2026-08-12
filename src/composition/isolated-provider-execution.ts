@@ -12,6 +12,10 @@ import type { LoopExecutor } from "../loop/execution.js";
 import { runLoopExecuteWithProviderFailoverEvidence } from "../loop/provider-failover-runner.js";
 import type { LoopRunResult } from "../loop/types.js";
 import type { AgentRegistry } from "../agents/registry.js";
+import {
+  exportValidatedGitPatch,
+  ValidatedGitPatchExportError,
+} from "./validated-git-patch-export.js";
 
 const DEFAULT_ROOT = join(tmpdir(), "loop-engine-isolated-provider-execution");
 
@@ -91,13 +95,51 @@ export function createIsolatedProviderRunExecute(
     try {
       const outcome = await platform.execute(
         Object.freeze({ projectId: projectName, attemptId }),
-        async (workspace) =>
-          execute(projectName, {
+        async (workspace) => {
+          const result = await execute(projectName, {
             ...runOptions,
             executor,
             agentRegistry: runOptions.agentRegistry ?? options.agentRegistry,
             executionProjectPath: workspace.path,
-          }),
+          });
+
+          if (
+            runOptions.exportPatchPath === undefined ||
+            result.status !== "completed" ||
+            result.validation?.status !== "passed"
+          ) {
+            return result;
+          }
+
+          try {
+            const patchExport = await exportValidatedGitPatch({
+              worktreePath: workspace.path,
+              destinationPath: runOptions.exportPatchPath,
+              modifiedFiles: result.modifiedFiles,
+            });
+            return Object.freeze({ ...result, patchExport });
+          } catch (error) {
+            const code =
+              error instanceof ValidatedGitPatchExportError
+                ? error.code
+                : "patch_export_failed";
+            return Object.freeze({
+              ...result,
+              status: "failed" as const,
+              patchExport: null,
+              failure: Object.freeze({
+                code,
+                message:
+                  code === "patch_export_destination_exists"
+                    ? "Patch export destination already exists."
+                    : "Unable to export the validated Git patch.",
+                details: Object.freeze([
+                  "Patch export diagnostics are redacted.",
+                ]),
+              }),
+            });
+          }
+        },
       );
 
       return outcome.status === "completed"

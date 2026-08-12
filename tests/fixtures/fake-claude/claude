@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { writeFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const mode = process.env.FAKE_CLAUDE_MODE ?? "success";
@@ -86,6 +86,13 @@ switch (mode) {
   case "success_with_file": {
     const outputFile = resolveOutputFile();
     writeFileSync(join(cwd, outputFile), "created\n");
+    write({ subtype: "success", is_error: false, num_turns: 1 });
+    process.exit(0);
+    break;
+  }
+  case "success_with_modified_and_file": {
+    appendFileSync(join(cwd, "README.md"), "modified\n");
+    writeFileSync(join(cwd, "provider-created.txt"), "created\n");
     write({ subtype: "success", is_error: false, num_turns: 1 });
     process.exit(0);
     break;

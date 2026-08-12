@@ -13,7 +13,10 @@ export type JsonErrorCode =
   | "missing_provider_executable"
   | "invalid_provider_executable"
   | "agent_policy_rejected"
-  | "missing_commit_message";
+  | "missing_commit_message"
+  | "missing_export_patch_value"
+  | "export_patch_execute_only"
+  | "export_patch_requires_provider";
 
 export function printJsonError(code: JsonErrorCode, message: string): void {
   console.log(

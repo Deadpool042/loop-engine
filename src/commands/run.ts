@@ -56,6 +56,11 @@ function printLoopRunResult(
   terminal.info(
     result.commit ? `Commit: ${result.commit.sha}` : "Commit: not performed.",
   );
+  if (result.patchExport) {
+    terminal.info(
+      `Patch export: ${result.patchExport.path} (${result.patchExport.fileCount} files, sha256 ${result.patchExport.sha256})`,
+    );
+  }
   terminal.info("Publication: not performed.");
 
   if (result.failure) {
@@ -68,6 +73,7 @@ export type RunLoopRunCommandOptions = Readonly<{
   maxRepairs?: number;
   provider?: LoopProviderId;
   commitMessage?: string;
+  exportPatchPath?: string;
 }>;
 
 function printCommandError(
@@ -130,6 +136,9 @@ export async function runLoopRunCommand(
   } else if (mode === "execute") {
     result = await runLoopExecute(project.name, {
       maxRepairs: options.maxRepairs ?? 0,
+      ...(options.exportPatchPath === undefined
+        ? {}
+        : { exportPatchPath: options.exportPatchPath }),
       ...executionDependencies,
     });
   } else {

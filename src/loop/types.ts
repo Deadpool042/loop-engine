@@ -36,6 +36,11 @@ export type LoopRunValidation = Readonly<{
   exitCode: number;
 }>;
 export type LoopRunCommit = Readonly<{ sha: string; message: string }>;
+export type LoopRunPatchExport = Readonly<{
+  path: string;
+  sha256: string;
+  fileCount: number;
+}>;
 export type LoopRunResult = Readonly<{
   schemaVersion: 1;
   runId: string;
@@ -49,6 +54,7 @@ export type LoopRunResult = Readonly<{
   validation: LoopRunValidation | null;
   modifiedFiles: readonly string[];
   commit: LoopRunCommit | null;
+  patchExport?: LoopRunPatchExport | null;
   publication: null;
   failure: LoopRunFailure | null;
   agentPolicy: AgentPolicyResolution | null;

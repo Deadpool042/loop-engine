@@ -38,6 +38,8 @@ export type LoopRunExecuteOptions = LoopRunPlanOptions &
     maxRepairs?: number;
     /** Internal composition override for an already allocated isolated workspace. */
     executionProjectPath?: string;
+    /** Explicit composition-only destination for a validated isolated patch. */
+    exportPatchPath?: string;
   }>;
 
 type ExecuteDependencies = Readonly<{
