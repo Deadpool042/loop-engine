@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { type ProjectConfig } from "../../src/core/config.js";
 import { buildProjectSnapshot } from "../../src/intelligence/project-snapshot.js";
@@ -70,6 +71,29 @@ describe("project snapshot roadmap selection", () => {
         snapshot.roadmap.selectedCandidate?.text ?? "",
         /Ajouter le prochain burn-in contrôlé/,
       );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("selects the first remaining structured-table lot", () => {
+    const currentDir = fileURLToPath(new URL(".", import.meta.url));
+    const roadmap = readFileSync(
+      join(currentDir, "..", "fixtures", "roadmaps", "structured-lots-table.md"),
+      "utf8",
+    );
+    const { project, cleanup } = setupProject(roadmap);
+
+    try {
+      const snapshot = buildProjectSnapshot(project);
+
+      assert.equal(snapshot.roadmap.stats.total, 26);
+      assert.equal(snapshot.roadmap.stats.done, 10);
+      assert.equal(snapshot.roadmap.stats.todo, 16);
+      assert.equal(snapshot.roadmap.stats.unknown, 0);
+      assert.equal(snapshot.roadmap.summary.selectable, 16);
+      assert.match(snapshot.roadmap.selectedCandidate?.text ?? "", /H1-L4/);
+      assert.equal(snapshot.roadmap.selectedCandidate?.status, "todo");
     } finally {
       cleanup();
     }

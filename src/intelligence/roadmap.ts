@@ -68,6 +68,38 @@ function detectCandidateStatus(line: string): RoadmapCandidateStatus {
   return "unknown";
 }
 
+function detectTableCandidateStatus(
+  stateCell: string,
+): RoadmapCandidateStatus {
+  if (/✅|\bterminé\b/i.test(stateCell)) {
+    return "done";
+  }
+
+  if (/⬜|\bà faire\b/i.test(stateCell)) {
+    return "todo";
+  }
+
+  return "unknown";
+}
+
+function parseStructuredTableLotRow(line: string): Readonly<{
+  text: string;
+  status: RoadmapCandidateStatus;
+}> | null {
+  const match = line.match(
+    /^\|\s*(H\d+-L\d+[A-Za-z]?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$/,
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    text: line,
+    status: detectTableCandidateStatus(match[3] ?? ""),
+  };
+}
+
 function classifyCandidateLine(line: string): Readonly<{
   kind: RoadmapCandidateKind;
   reason: string;
@@ -173,16 +205,40 @@ export function findRoadmapCandidates(
     }
 
     const lines = readFileSync(absolutePath, "utf8").split("\n");
+    const hasStructuredTableLots = lines.some((line) =>
+      parseStructuredTableLotRow(line.trim()),
+    );
 
     for (let index = 0; index < lines.length; index += 1) {
       const line = lines[index] ?? "";
       const trimmed = line.trim();
+
+      const tableLot = parseStructuredTableLotRow(trimmed);
+
+      if (tableLot) {
+        const classification = classifyCandidateLine(tableLot.text);
+
+        candidates.push({
+          path: roadmapPath,
+          line: index + 1,
+          text: tableLot.text,
+          kind: classification.kind,
+          reason: classification.reason,
+          status: tableLot.status,
+          priority: detectCandidatePriority(tableLot.text),
+        });
+        continue;
+      }
 
       if (trimmed.length === 0 || !isRoadmapInventoryEntry(trimmed)) {
         continue;
       }
 
       const explicitCandidate = isCandidateStart(trimmed);
+
+      if (hasStructuredTableLots && !explicitCandidate) {
+        continue;
+      }
       const collected = explicitCandidate
         ? collectCandidateText(lines, index)
         : { text: trimmed, endIndex: index };

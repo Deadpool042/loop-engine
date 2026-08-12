@@ -31,6 +31,7 @@ Les lignes candidates peuvent être détectées via :
 - titres de lot ;
 - marqueurs de statut ;
 - sections explicites.
+- lignes de tableau structurées `| H<n>-L<n><suffixe?> | livrable | état |`.
 
 Exemples :
 
@@ -53,6 +54,11 @@ V1.2 peut détecter :
 - candidat terminé ;
 - candidat sensible ;
 - candidat bloqué.
+
+Dans une ligne de tableau structurée, `✅` ou `Terminé` signifie `done` et
+`⬜` ou `À faire` signifie `todo`. Les autres états restent `unknown`.
+Lorsqu'une roadmap contient de telles lignes, ses puces descriptives non
+explicites ne sont pas ajoutées à l'inventaire des lots.
 
 V1.2 ne doit pas encore essayer de résoudre toutes les dépendances entre lots.
 
