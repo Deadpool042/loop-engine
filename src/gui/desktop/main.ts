@@ -46,14 +46,20 @@ ipcMain.handle(
   }),
 );
 
-ipcMain.handle(
-  "loop:context",
-  createContextHandler({ cliInvoker, resolveRepositoryPath }),
+const contextHandler = createContextHandler({
+  cliInvoker,
+  resolveRepositoryPath,
+});
+ipcMain.handle("loop:context", (_event, projectName) =>
+  contextHandler(projectName),
 );
 
-ipcMain.handle(
-  "loop:review",
-  createReviewHandler({ cliInvoker, resolveRepositoryPath }),
+const reviewHandler = createReviewHandler({
+  cliInvoker,
+  resolveRepositoryPath,
+});
+ipcMain.handle("loop:review", (_event, projectName) =>
+  reviewHandler(projectName),
 );
 
 app.whenReady().then(async () => {
