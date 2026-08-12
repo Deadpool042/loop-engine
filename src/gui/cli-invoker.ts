@@ -99,7 +99,7 @@ export function createCliInvoker(options: {
 
   return Object.freeze({
     async invoke(command, args, cwd) {
-      const invocationArgs = ["loop", command, ...args, "--json"];
+      const invocationArgs = ["--silent", "loop", command, ...args, "--json"];
 
       try {
         const result = await execute(executable, invocationArgs, cwd, timeoutMs);
