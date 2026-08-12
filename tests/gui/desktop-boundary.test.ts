@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { createCliInvoker } from "../../src/gui/cli-invoker.js";
@@ -27,11 +28,44 @@ describe("GUI desktop execution boundary", () => {
     ]);
   });
 
+  it("returns the summary invocation result through the renderer bridge", async () => {
+    const expected = {
+      ok: true as const,
+      json: { schemaVersion: 1, projects: [] },
+      exitCode: 0,
+    };
+    const api = createLoopDesktopApi(async (channel) => {
+      assert.equal(channel, "loop:summary");
+      return expected;
+    });
+
+    assert.deepEqual(await api.summary(), expected);
+  });
+
+  it("uses Forge's generated preload entry for the renderer bridge", () => {
+    const mainSource = readFileSync(
+      new URL("../../src/gui/desktop/main.ts", import.meta.url),
+      "utf8",
+    );
+
+    assert.match(mainSource, /preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY/);
+    assert.match(
+      mainSource,
+      /declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string/,
+    );
+  });
+
   it("passes the renderer project name to review while retaining the trusted cwd", async () => {
     const cwdValues: string[] = [];
     const cliInvoker = createCliInvoker({
       execute: async (_executable, args, cwd) => {
-        assert.deepEqual(args, ["loop", "review", "creatyss", "--json"]);
+        assert.deepEqual(args, [
+          "--silent",
+          "loop",
+          "review",
+          "creatyss",
+          "--json",
+        ]);
         cwdValues.push(cwd);
         return { stdout: "{}", stderr: "", exitCode: 0 };
       },
@@ -50,7 +84,13 @@ describe("GUI desktop execution boundary", () => {
     const cwdValues: string[] = [];
     const cliInvoker = createCliInvoker({
       execute: async (_executable, args, cwd) => {
-        assert.deepEqual(args, ["loop", "context", "creatyss", "--json"]);
+        assert.deepEqual(args, [
+          "--silent",
+          "loop",
+          "context",
+          "creatyss",
+          "--json",
+        ]);
         cwdValues.push(cwd);
         return { stdout: "{}", stderr: "", exitCode: 0 };
       },

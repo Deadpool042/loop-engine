@@ -8,7 +8,7 @@ describe("GUI CliInvoker", () => {
     const invoker = createCliInvoker({
       execute: async (executable, args, cwd, timeoutMs) => {
         assert.equal(executable, "pnpm");
-        assert.deepEqual(args, ["loop", "summary", "--json"]);
+        assert.deepEqual(args, ["--silent", "loop", "summary", "--json"]);
         assert.equal(cwd, "/repo");
         assert.equal(timeoutMs, 15_000);
         return { stdout: '{"schemaVersion":1}', stderr: "", exitCode: 0 };
@@ -20,6 +20,18 @@ describe("GUI CliInvoker", () => {
       json: { schemaVersion: 1 },
       exitCode: 0,
     });
+  });
+
+  it("suppresses pnpm script output so the public JSON contract remains parseable", async () => {
+    const invoker = createCliInvoker({
+      execute: async (_executable, args) => {
+        assert.deepEqual(args, ["--silent", "loop", "summary", "--json"]);
+        return { stdout: '{"schemaVersion":1}', stderr: "", exitCode: 0 };
+      },
+    });
+
+    const result = await invoker.invoke("summary", [], "/repo");
+    assert.equal(result.ok, true);
   });
 
   it("preserves valid application JSON even with a non-zero exit", async () => {

@@ -27,7 +27,7 @@ async function createMainWindow(): Promise<void> {
     minHeight: 640,
     show: false,
     webPreferences: {
-      preload: join(__dirname, "preload.js"),
+      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -73,3 +73,4 @@ app.on("window-all-closed", () => {
 });
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
+declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
