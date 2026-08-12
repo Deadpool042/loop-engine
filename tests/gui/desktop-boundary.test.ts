@@ -12,7 +12,7 @@ import { resolveLoopEngineRepositoryPath } from "../../src/gui/repo-path-resolve
 
 describe("GUI desktop execution boundary", () => {
   it("exposes only explicit renderer APIs", async () => {
-    const calls: Array<readonly string[]> = [];
+    const calls: Array<readonly unknown[]> = [];
     const api = createLoopDesktopApi(async (channel, ...args) => {
       calls.push([channel, ...args]);
       return { ok: false, kind: "spawn-error", raw: "unavailable" };
@@ -20,15 +20,18 @@ describe("GUI desktop execution boundary", () => {
 
     assert.equal(api.summary.length, 0);
     assert.equal(api.plan.length, 2);
+    assert.equal(api.execute.length, 1);
     await api.summary();
     await api.context("loop-engine");
     await api.review("loop-engine");
     await api.plan("lp-infra", "H1-L4");
+    await api.execute({ projectName: "lp-infra", candidateId: "H1-L4", provider: "codex" });
     assert.deepEqual(calls, [
       ["loop:summary"],
       ["loop:context", "loop-engine"],
       ["loop:review", "loop-engine"],
       ["loop:plan", "lp-infra", "H1-L4"],
+      ["loop:execute", { projectName: "lp-infra", candidateId: "H1-L4", provider: "codex" }],
     ]);
   });
 
@@ -77,6 +80,7 @@ describe("GUI desktop execution boundary", () => {
       mainSource,
       /ipcMain\.handle\("loop:plan", \(_event, projectName, candidateId\) =>\s*planHandler\(projectName, candidateId\),\s*\)/s,
     );
+    assert.match(mainSource, /ipcMain\.handle\("loop:execute", \(_event, request\) =>\s*executionCloseGuard\.run\(\(\) => executeHandler\(request\)\),\s*\)/s);
   });
 
   it("passes the renderer project name to review while retaining the trusted cwd", async () => {

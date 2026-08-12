@@ -249,6 +249,7 @@ export function generateExecutionReport(result: LoopRunResult): LoopRunResult {
     validation: result.validation,
     modifiedFiles: result.modifiedFiles,
     commit: result.commit,
+    patchExport: result.patchExport ?? null,
     publication: result.publication,
     failure: result.failure,
     agentPolicy: result.agentPolicy,

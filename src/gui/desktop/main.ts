@@ -1,14 +1,19 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { join } from "node:path";
 import { createCliInvoker } from "../cli-invoker.js";
 import { createGuiConfigStore } from "../config-store.js";
 import { resolveLoopEngineRepositoryPath } from "../repo-path-resolver.js";
 import { createContextHandler } from "./context-handler.js";
 import { createPlanHandler } from "./plan-handler.js";
+import { createExecuteHandler, DESKTOP_EXECUTE_CLI_TIMEOUT_MS } from "./execute-handler.js";
+import { createExecutionWindowCloseGuard } from "./execution-window-close-guard.js";
 import { createReviewHandler } from "./review-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 
 const cliInvoker = createCliInvoker();
+const executeCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_EXECUTE_CLI_TIMEOUT_MS });
+const executionCloseGuard = createExecutionWindowCloseGuard();
+let mainWindow: BrowserWindow | null = null;
 
 function resolveRepositoryPath(): string | null {
   const configStore = createGuiConfigStore(
@@ -36,7 +41,11 @@ async function createMainWindow(): Promise<void> {
   });
 
   window.once("ready-to-show", () => window.show());
+  window.on("close", (event) => {
+    executionCloseGuard.preventClose(event);
+  });
   await window.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  mainWindow = window;
 }
 
 ipcMain.handle(
@@ -69,6 +78,25 @@ const planHandler = createPlanHandler({
 });
 ipcMain.handle("loop:plan", (_event, projectName, candidateId) =>
   planHandler(projectName, candidateId),
+);
+
+const executeHandler = createExecuteHandler({
+  cliInvoker: executeCliInvoker,
+  resolveRepositoryPath,
+  async choosePatchDestination() {
+    const options = {
+      title: "Exporter le patch validé",
+      defaultPath: "loop-engine-validated.patch",
+      filters: [{ name: "Git patch", extensions: ["patch"] }],
+    };
+    const result = mainWindow
+      ? await dialog.showSaveDialog(mainWindow, options)
+      : await dialog.showSaveDialog(options);
+    return result.canceled || !result.filePath ? null : result.filePath;
+  },
+});
+ipcMain.handle("loop:execute", (_event, request) =>
+  executionCloseGuard.run(() => executeHandler(request)),
 );
 
 app.whenReady().then(async () => {

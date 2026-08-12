@@ -8,7 +8,7 @@ export type CliInvocationSuccess = Readonly<{
 
 export type CliInvocationFailure = Readonly<{
   ok: false;
-  kind: "spawn-error";
+  kind: "spawn-error" | "cancelled";
   raw: string;
 }>;
 

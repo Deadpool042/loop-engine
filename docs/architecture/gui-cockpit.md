@@ -44,10 +44,11 @@ window.loopDesktop.summary()
 window.loopDesktop.context(projectName)
 window.loopDesktop.review(projectName)
 window.loopDesktop.plan(projectName, candidateId)
+window.loopDesktop.execute({ projectName, candidateId, provider })
 ```
 
 Elles correspondent uniquement aux canaux `loop:summary`, `loop:context` et
-`loop:review`, `loop:plan`. Il n'existe aucun IPC générique de la forme commande +
+`loop:review`, `loop:plan`, `loop:execute`. Il n'existe aucun IPC générique de la forme commande +
 arguments, et `ipcRenderer` n'est pas exposé au renderer.
 
 Le renderer ne peut jamais fournir le `cwd`. Le process principal résout le
@@ -57,7 +58,7 @@ et du package `loop-engine` avant de déléguer au `CliInvoker`.
 
 La fenêtre conserve `contextIsolation: true`, `nodeIntegration: false` et
 `sandbox: true`. Le cockpit ne propose aucune action de commit, push, merge,
-validation ou exécution provider.
+validation ou exécution provider, sauf l'exécution isolée explicitement confirmée d'un candidat adressable. Le renderer ne transmet alors que projet, candidat et provider approuvé ; le main process impose l'exécutable, le timeout, le cwd de confiance et le dialogue natif de destination du patch. Aucun commit, push, merge ou application de patch n'est exposé.
 
 ### Intégration CLI
 
@@ -69,10 +70,18 @@ Le process principal invoque exclusivement :
 | `loop:context` | `pnpm loop context <project> --json` |
 | `loop:review` | `pnpm loop review <project> --json` |
 | `loop:plan` | `pnpm loop run <project> --candidate <id> --mode plan --json` |
+| `loop:execute` | `pnpm loop run <project> --candidate <id> --mode execute ... --export-patch <native destination> --json` |
 
 Le `CliInvoker` se limite au lancement, au délai d'expiration et au parsing
 JSON. Les contrats renderer ne lisent que les champs affichés et rejettent les
 réponses invalides.
+
+Les lectures conservent leur délai court. `loop:execute` utilise un invoker
+distinct borné à 15 minutes : il couvre au plus 10 minutes de Claude Code,
+les validations, le nettoyage et une marge, sans délai infini ni réglage
+contrôlable par le renderer. Une fermeture normale de la fenêtre est bloquée
+pendant cette invocation ; l'arrêt forcé du processus reste hors garantie de
+cleanup.
 
 ## Cible et lots futurs
 

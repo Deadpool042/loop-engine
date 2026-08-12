@@ -10,6 +10,7 @@ import {
   parsePlanFailure,
   type PlanDetail,
 } from "./plan-contract.js";
+import type { DesktopExecuteProvider } from "./execute-handler.js";
 import {
   parseSummaryResponse,
   type SummaryProject,
@@ -54,6 +55,10 @@ export function App(): React.JSX.Element {
   const [planProjectName, setPlanProjectName] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
+  const [executeProvider, setExecuteProvider] = useState<DesktopExecuteProvider>("claude_code");
+  const [executeLoading, setExecuteLoading] = useState(false);
+  const [executeMessage, setExecuteMessage] = useState<string | null>(null);
+  const [executeResult, setExecuteResult] = useState<Record<string, unknown> | null>(null);
   const planRequestId = useRef(0);
   const selectedProject =
     projects.find((project) => project.project.name === selectedProjectName) ??
@@ -156,12 +161,42 @@ export function App(): React.JSX.Element {
 
       setPlanDetail(plan);
       setPlanProjectName(projectName);
+      if (plan.profile?.provider === "openai") setExecuteProvider("codex");
+      if (plan.profile?.provider === "anthropic") setExecuteProvider("claude_code");
     } catch {
       if (requestId === planRequestId.current) {
         setPlanError("Impossible de préparer le plan.");
       }
     } finally {
       if (requestId === planRequestId.current) setPlanLoading(false);
+    }
+  }
+
+  async function executePlan(): Promise<void> {
+    const candidate = planDetail?.candidate;
+    if (selectedProjectName === null || !candidate) return;
+    setExecuteLoading(true);
+    setExecuteMessage(null);
+    setExecuteResult(null);
+    try {
+      const result = await window.loopDesktop.execute({
+        projectName: selectedProjectName,
+        candidateId: candidate.id,
+        provider: executeProvider,
+      });
+      if (!result.ok) {
+        setExecuteMessage(
+          result.kind === "cancelled" ? "Exécution annulée avant démarrage." : result.raw,
+        );
+      } else if (typeof result.json === "object" && result.json !== null && !Array.isArray(result.json)) {
+        setExecuteResult(result.json as Record<string, unknown>);
+      } else {
+        setExecuteMessage("La réponse execute ne respecte pas le contrat JSON attendu.");
+      }
+    } catch {
+      setExecuteMessage("Impossible de lancer l’exécution isolée.");
+    } finally {
+      setExecuteLoading(false);
     }
   }
 
@@ -566,6 +601,27 @@ export function App(): React.JSX.Element {
                     <p className="m-0 text-xs text-loop-muted">
                       Ce plan n’exécute aucun provider.
                     </p>
+                    <section className="border-t border-loop-line pt-6">
+                      <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                        Exécution isolée confirmée
+                      </h4>
+                      <p className="mt-2 text-sm">Projet : {planDetail.project} · candidat : {planDetail.candidate.id}</p>
+                      <label className="mt-3 block text-sm" htmlFor="execute-provider">
+                        Provider approuvé
+                      </label>
+                      <select id="execute-provider" className="mt-1 rounded border border-loop-line bg-white p-2 text-sm" value={executeProvider} disabled={executeLoading} onChange={(event) => setExecuteProvider(event.target.value as DesktopExecuteProvider)}>
+                        <option value="claude_code">Claude Code</option>
+                        <option value="codex">Codex</option>
+                      </select>
+                      <p className="mt-3 text-sm">Validations prévues : {contextDetail?.validation.commands.length ?? 0} · maxRepairs : 0</p>
+                      <p className="mt-2 text-sm text-loop-muted">Le provider s’exécute dans un worktree Git isolé, mais n’est pas sandboxé au niveau du système d’exploitation.</p>
+                      <p className="mt-2 text-sm text-loop-muted">Le dépôt source ne sera pas modifié et le patch ne sera pas appliqué automatiquement.</p>
+                      <Button type="button" size="sm" className="mt-3" disabled={executeLoading} onClick={executePlan}>
+                        {executeLoading ? "Exécution isolée en cours…" : "Confirmer et choisir la destination du patch"}
+                      </Button>
+                      {executeMessage && <p className="mt-3 text-sm text-loop-muted">{executeMessage}</p>}
+                      {executeResult && <div className="mt-3 text-sm"><p>Résultat : {String(executeResult.status ?? "inconnu")}</p><p>Patch exporté : {executeResult.patchExport ? "oui" : "non"}</p><p>Dépôt source non modifié.</p>{typeof executeResult.patchExport === "object" && executeResult.patchExport !== null && <pre className="mt-2 overflow-auto rounded bg-neutral-100 p-3 text-xs">{JSON.stringify(executeResult.patchExport, null, 2)}</pre>}{typeof executeResult.failure === "object" && executeResult.failure !== null && <pre className="mt-2 overflow-auto rounded bg-rose-50 p-3 text-xs text-rose-900">{JSON.stringify(executeResult.failure, null, 2)}</pre>}</div>}
+                    </section>
                   </div>
                 )}
               </section>
