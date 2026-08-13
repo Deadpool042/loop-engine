@@ -33,6 +33,7 @@ export type ProjectSnapshot = Readonly<{
     paths: readonly string[];
     candidates: readonly Readonly<{
       id?: string;
+      phaseId?: string;
       path: string;
       line: number;
       text: string;
@@ -40,9 +41,22 @@ export type ProjectSnapshot = Readonly<{
       reason: string;
       status: "todo" | "in_progress" | "done" | "unknown";
       priority: "p1" | "p2" | "p3" | "default";
+      admissibility?: Readonly<{
+        state: "admissible" | "not_admissible";
+        reason: "no_phase_gate" | "phase_open" | "phase_closed" | "phase_gate_invalid";
+        blockedBy?: string;
+      }>;
+    }>[];
+    phaseGates: readonly Readonly<{
+      path: string;
+      line: number;
+      phaseId: string;
+      state: "open" | "closed";
+      blockedBy?: string;
     }>[];
     selectedCandidate: Readonly<{
       id?: string;
+      phaseId?: string;
       path: string;
       line: number;
       text: string;
@@ -50,6 +64,15 @@ export type ProjectSnapshot = Readonly<{
       reason: string;
       status: "todo" | "in_progress" | "done" | "unknown";
       priority: "p1" | "p2" | "p3" | "default";
+      admissibility?: Readonly<{
+        state: "admissible" | "not_admissible";
+        reason:
+          | "no_phase_gate"
+          | "phase_open"
+          | "phase_closed"
+          | "phase_gate_invalid";
+        blockedBy?: string;
+      }>;
     }> | null;
     stats: Readonly<{
       total: number;

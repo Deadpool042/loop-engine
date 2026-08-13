@@ -75,4 +75,26 @@ describe("next command", () => {
       fixture.cleanup();
     }
   });
+
+  it("reports a closed phase gate without selecting its todo lot", () => {
+    const fixture = setupProject(
+      [
+        "<!-- loop-engine:phase-gate phase=H1 state=closed blockedBy=H0-RC -->",
+        "| H1-L4 | Runbook rollback | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    try {
+      const output = execFileSync(tsxExecutable, [cliPath, "next", "fixture"], {
+        cwd: fixture.cwd,
+        encoding: "utf8",
+      });
+
+      assert.match(output, /Phase H1 closed by gate H0-RC\./);
+      assert.match(output, /Selectable: 0/);
+      assert.doesNotMatch(output, /Runbook rollback/);
+    } finally {
+      fixture.cleanup();
+    }
+  });
 });

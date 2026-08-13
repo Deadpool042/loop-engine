@@ -65,7 +65,39 @@ Les lots de tableau structurés exposent leur première cellule `H<n>-L<n>`
 Les formats historiques sans cette cellule restent lisibles, mais ne sont pas
 adressables explicitement.
 
-V1.2 ne doit pas encore essayer de résoudre toutes les dépendances entre lots.
+### Gates de phase opt-in
+
+Une roadmap peut fermer explicitement une phase structurée au moyen d'un
+commentaire Markdown sur une ligne :
+
+```md
+<!-- loop-engine:phase-gate phase=H1 state=closed blockedBy=H0-RC -->
+```
+
+Les seules formes valides sont :
+
+```md
+<!-- loop-engine:phase-gate phase=H1 state=open -->
+<!-- loop-engine:phase-gate phase=H1 state=closed blockedBy=H0-RC -->
+```
+
+`phase` est un identifiant d'horizon (`H<n>`), `state` vaut `open` ou
+`closed`, et une phase fermée exige un identifiant de gate stable dans
+`blockedBy`. Cette déclaration est opt-in : une roadmap sans gate conserve
+strictement son comportement historique.
+
+L'état documentaire d'un lot et son admissibilité sont distincts. Ainsi,
+`H1-L4` marqué `todo` reste présent dans l'inventaire, mais devient
+`not_admissible` si la phase `H1` est fermée. Les candidats non admissibles ne
+sont pas sélectionnés par `next`, et un `run --candidate` les refuse sans
+substituer un autre lot.
+
+Une déclaration de gate invalide, ou deux déclarations pour la même phase,
+ferme l'admissibilité de la phase concernée. Loop Engine ne déduit jamais une
+ouverture depuis une phrase de documentation ou une dépendance Markdown libre.
+
+Ce contrat ne résout pas un graphe générique de dépendances entre lots et
+n'utilise aucun NLP.
 
 ⸻
 

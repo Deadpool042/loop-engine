@@ -76,6 +76,39 @@ describe("project snapshot roadmap selection", () => {
     }
   });
 
+  it("keeps closed-phase todo candidates in inventory without selecting them", () => {
+    const { project, cleanup } = setupProject(
+      [
+        "<!-- loop-engine:phase-gate phase=H1 state=closed blockedBy=H0-RC -->",
+        "| H1-L4 | Runbook rollback | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    try {
+      const snapshot = buildProjectSnapshot(project);
+
+      assert.equal(snapshot.roadmap.stats.todo, 1);
+      assert.equal(snapshot.roadmap.summary.selectable, 0);
+      assert.equal(snapshot.roadmap.selectedCandidate, null);
+      assert.deepEqual(snapshot.roadmap.candidates[0]?.admissibility, {
+        state: "not_admissible",
+        reason: "phase_closed",
+        blockedBy: "H0-RC",
+      });
+      assert.deepEqual(snapshot.roadmap.phaseGates, [
+        {
+          path: "roadmap.md",
+          line: 1,
+          phaseId: "H1",
+          state: "closed",
+          blockedBy: "H0-RC",
+        },
+      ]);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("selects the first remaining structured-table lot", () => {
     const currentDir = fileURLToPath(new URL(".", import.meta.url));
     const roadmap = readFileSync(
@@ -94,6 +127,10 @@ describe("project snapshot roadmap selection", () => {
       assert.equal(snapshot.roadmap.summary.selectable, 16);
       assert.match(snapshot.roadmap.selectedCandidate?.text ?? "", /H1-L4/);
       assert.equal(snapshot.roadmap.selectedCandidate?.status, "todo");
+      assert.deepEqual(snapshot.roadmap.selectedCandidate?.admissibility, {
+        state: "admissible",
+        reason: "no_phase_gate",
+      });
     } finally {
       cleanup();
     }

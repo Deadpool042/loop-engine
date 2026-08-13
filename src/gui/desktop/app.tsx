@@ -467,6 +467,15 @@ export function App(): React.JSX.Element {
                           {path}
                         </p>
                       ))}
+                      {contextDetail.roadmap.phaseGates
+                        .filter((gate) => gate.state === "closed")
+                        .map((gate) => (
+                          <p key={gate.phaseId} className="mt-2 text-sm text-loop-muted">
+                            Phase {gate.phaseId} fermée
+                            {gate.blockedBy ? ` par la gate ${gate.blockedBy}.` : "."}
+                            {" Les candidats de cette phase ne sont pas admissibles."}
+                          </p>
+                        ))}
                       {contextDetail.roadmap.selectedCandidate && (
                         <div className="mt-3 rounded-md border border-loop-line p-4 text-sm">
                           <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">

@@ -56,6 +56,14 @@ export function printNextProjectAction(
       terminal.success(roadmapPath);
     }
 
+    for (const gate of snapshot.roadmap.phaseGates) {
+      if (gate.state === "closed") {
+        terminal.warning(
+          `Phase ${gate.phaseId} closed${gate.blockedBy ? ` by gate ${gate.blockedBy}` : ""}.`,
+        );
+      }
+    }
+
     terminal.section("Roadmap candidates");
 
     const safeCount = snapshot.roadmap.stats.safe;

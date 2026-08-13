@@ -212,4 +212,66 @@ describe("explicit roadmap candidate binding", () => {
       rmSync(projectPath, { recursive: true, force: true });
     }
   });
+
+  it("rejects a confirmed candidate when its phase closes before execute", async () => {
+    const projectPath = mkdtempSync(join(tmpdir(), "loop-phase-recheck-"));
+    const roadmapPath = join(projectPath, "roadmap.md");
+    const project: ProjectConfig = {
+      name: "fixture",
+      path: projectPath,
+      type: "test",
+      required_docs: [],
+      validation: [],
+      roadmap: ["roadmap.md"],
+      requires_git: false,
+    };
+    const config: Config = { projects: [project] };
+
+    try {
+      writeFileSync(
+        roadmapPath,
+        [
+          "<!-- loop-engine:phase-gate phase=H1 state=open -->",
+          "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+          "| H1-L5 | Other candidate | ⬜ À faire |",
+        ].join("\n"),
+      );
+      assert.equal(
+        runLoopPlan(project.name, { loadConfig: () => config, candidateId: "H1-L4" }).status,
+        "completed",
+      );
+
+      writeFileSync(
+        roadmapPath,
+        [
+          "<!-- loop-engine:phase-gate phase=H1 state=closed blockedBy=H0-RC -->",
+          "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+          "| H1-L5 | Other candidate | ⬜ À faire |",
+        ].join("\n"),
+      );
+      const rejectedPlan = runLoopPlan(project.name, {
+        loadConfig: () => config,
+        candidateId: "H1-L4",
+      });
+      assert.equal(rejectedPlan.status, "blocked");
+      assert.equal(rejectedPlan.failure?.code, "candidate_phase_closed");
+
+      let executorCalls = 0;
+      const execution = await runLoopExecute(project.name, {
+        loadConfig: () => config,
+        candidateId: "H1-L4",
+        executor: async () => {
+          executorCalls += 1;
+          return { status: "completed", modifiedFiles: [], details: [] };
+        },
+      });
+
+      assert.equal(execution.status, "blocked");
+      assert.equal(execution.failure?.code, "candidate_phase_closed");
+      assert.equal(execution.candidate?.id, "H1-L4");
+      assert.equal(executorCalls, 0);
+    } finally {
+      rmSync(projectPath, { recursive: true, force: true });
+    }
+  });
 });
