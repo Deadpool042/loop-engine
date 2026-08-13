@@ -256,3 +256,8 @@ bloqué, non admissible ou indisponible pour une roadmap historique provoquent
 un résultat fail-closed. L'exécution relit donc l'état courant et refuse le
 même identifiant s'il est devenu inadmissible ; elle ne le remplace pas par un
 autre candidat.
+
+Une gate de phase explicite évaluée par le Roadmap Reader fait partie de cette
+relecture. Une phase qui se ferme entre le plan et `execute` bloque l'exécution
+avant toute résolution de provider ou création de changement ; l'identifiant
+confirmé n'est jamais remplacé par un autre candidat.

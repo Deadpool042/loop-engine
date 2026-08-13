@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { type ProjectConfig } from "../../src/core/config.js";
 import {
+  analyzeRoadmaps,
   findRoadmapCandidates,
   selectRoadmapCandidate,
   type RoadmapCandidate,
@@ -157,6 +158,96 @@ describe("selectRoadmapCandidate", () => {
 });
 
 describe("findRoadmapCandidates", () => {
+  it("keeps a todo table lot while recording a closed phase gate as non-admissible", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "<!-- loop-engine:phase-gate phase=H1 state=closed blockedBy=H0-RC -->",
+        "| H1-L4 | Runbook rollback | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    try {
+      const analysis = analyzeRoadmaps(project, projectPath);
+
+      assert.deepEqual(analysis.phaseGates, [
+        {
+          path: "roadmap.md",
+          line: 1,
+          phaseId: "H1",
+          state: "closed",
+          blockedBy: "H0-RC",
+        },
+      ]);
+      assert.equal(analysis.candidates[0]?.status, "todo");
+      assert.equal(analysis.candidates[0]?.phaseId, "H1");
+      assert.deepEqual(analysis.candidates[0]?.admissibility, {
+        state: "not_admissible",
+        reason: "phase_closed",
+        blockedBy: "H0-RC",
+      });
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("accepts an explicitly open phase and leaves roadmaps without gates unchanged", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "<!-- loop-engine:phase-gate phase=H1 state=open -->",
+        "| H1-L4 | Explicitly opened | ⬜ À faire |",
+        "| H2-L1 | Historical default | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.deepEqual(candidates[0]?.admissibility, {
+        state: "admissible",
+        reason: "phase_open",
+      });
+      assert.deepEqual(candidates[1]?.admissibility, {
+        state: "admissible",
+        reason: "no_phase_gate",
+      });
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("fails closed when a phase gate declaration is invalid or ambiguous", () => {
+    const cases = [
+      {
+        name: "invalid",
+        roadmap: [
+          "<!-- loop-engine:phase-gate phase=H1 state=closed -->",
+          "| H1-L4 | Pending | ⬜ À faire |",
+        ].join("\n"),
+      },
+      {
+        name: "ambiguous",
+        roadmap: [
+          "<!-- loop-engine:phase-gate phase=H1 state=open -->",
+          "<!-- loop-engine:phase-gate phase=H1 state=closed blockedBy=H0-RC -->",
+          "| H1-L4 | Pending | ⬜ À faire |",
+        ].join("\n"),
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      const { project, projectPath, cleanup } = setupRoadmap(testCase.roadmap);
+      try {
+        const candidate = findRoadmapCandidates(project, projectPath)[0];
+        assert.deepEqual(candidate?.admissibility, {
+          state: "not_admissible",
+          reason: "phase_gate_invalid",
+        }, testCase.name);
+      } finally {
+        cleanup();
+      }
+    }
+  });
+
   it("classifies safe roadmap candidates", () => {
     const { project, projectPath, cleanup } = setupRoadmap(
       "- [ ] Petite mise à jour documentation",

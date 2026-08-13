@@ -12,6 +12,13 @@ describe("GUI context contract", () => {
         roadmap: {
           available: true,
           paths: ["docs/roadmap.md"],
+          phaseGates: [
+            {
+              phaseId: "H1",
+              state: "closed",
+              blockedBy: "H0-RC",
+            },
+          ],
           selectedCandidate: {
             id: "H1-L4",
             path: "docs/roadmap.md",
@@ -28,6 +35,13 @@ describe("GUI context contract", () => {
         roadmap: {
           available: true,
           paths: ["docs/roadmap.md"],
+          phaseGates: [
+            {
+              phaseId: "H1",
+              state: "closed",
+              blockedBy: "H0-RC",
+            },
+          ],
           selectedCandidate: {
             id: "H1-L4",
             path: "docs/roadmap.md",

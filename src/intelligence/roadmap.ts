@@ -7,9 +7,23 @@ export type RoadmapCandidateKind = "safe" | "warning" | "blocked";
 export type RoadmapCandidateStatus =
   "todo" | "in_progress" | "done" | "unknown";
 export type RoadmapPriority = "p1" | "p2" | "p3" | "default";
+export type RoadmapPhaseGateState = "open" | "closed";
+export type RoadmapCandidateAdmissibility = Readonly<{
+  state: "admissible" | "not_admissible";
+  reason: "no_phase_gate" | "phase_open" | "phase_closed" | "phase_gate_invalid";
+  blockedBy?: string;
+}>;
+export type RoadmapPhaseGate = Readonly<{
+  path: string;
+  line: number;
+  phaseId: string;
+  state: RoadmapPhaseGateState;
+  blockedBy?: string;
+}>;
 
 export type RoadmapCandidate = Readonly<{
   id?: string;
+  phaseId?: string;
   path: string;
   line: number;
   text: string;
@@ -17,6 +31,12 @@ export type RoadmapCandidate = Readonly<{
   reason: string;
   status: RoadmapCandidateStatus;
   priority: RoadmapPriority;
+  admissibility?: RoadmapCandidateAdmissibility;
+}>;
+
+export type RoadmapAnalysis = Readonly<{
+  candidates: readonly RoadmapCandidate[];
+  phaseGates: readonly RoadmapPhaseGate[];
 }>;
 
 const BLOCKED_PATTERNS = [
@@ -101,6 +121,73 @@ function parseStructuredTableLotRow(line: string): Readonly<{
     text: line,
     status: detectTableCandidateStatus(match[3] ?? ""),
   };
+}
+
+type ParsedPhaseGate =
+  | Readonly<{ outcome: "valid"; phaseId: string; state: RoadmapPhaseGateState; blockedBy?: string }>
+  | Readonly<{ outcome: "invalid"; phaseId?: string }>;
+
+function parsePhaseGate(line: string): ParsedPhaseGate | null {
+  if (!line.includes("loop-engine:phase-gate")) return null;
+
+  const match = line.match(
+    /^<!--\s*loop-engine:phase-gate\s+phase=(H\d+)\s+state=(open|closed)(?:\s+blockedBy=([A-Za-z0-9][A-Za-z0-9-]*))?\s*-->$/,
+  );
+  if (!match) {
+    const phaseMatch = line.match(/\bphase=(H\d+)\b/);
+    return phaseMatch?.[1]
+      ? { outcome: "invalid", phaseId: phaseMatch[1] }
+      : { outcome: "invalid" };
+  }
+
+  const phaseId = match[1]!;
+  const state = match[2] as RoadmapPhaseGateState;
+  const blockedBy = match[3];
+  if ((state === "closed" && blockedBy === undefined) || (state === "open" && blockedBy !== undefined)) {
+    return { outcome: "invalid", phaseId };
+  }
+
+  return {
+    outcome: "valid",
+    phaseId,
+    state,
+    ...(blockedBy === undefined ? {} : { blockedBy }),
+  };
+}
+
+function phaseIdFromCandidateId(id: string | undefined): string | undefined {
+  return id?.match(/^(H\d+)-L\d+[A-Za-z]?$/)?.[1];
+}
+
+function admissibilityForCandidate(options: {
+  candidate: RoadmapCandidate;
+  gates: ReadonlyMap<string, RoadmapPhaseGate>;
+  invalidPhases: ReadonlySet<string>;
+  invalidPaths: ReadonlySet<string>;
+}): RoadmapCandidateAdmissibility {
+  const phaseId = options.candidate.phaseId;
+  if (
+    (phaseId !== undefined && options.invalidPhases.has(phaseId)) ||
+    options.invalidPaths.has(options.candidate.path)
+  ) {
+    return Object.freeze({ state: "not_admissible", reason: "phase_gate_invalid" });
+  }
+
+  if (phaseId === undefined) {
+    return Object.freeze({ state: "admissible", reason: "no_phase_gate" });
+  }
+
+  const gate = options.gates.get(phaseId);
+  if (!gate) return Object.freeze({ state: "admissible", reason: "no_phase_gate" });
+  if (gate.state === "open") {
+    return Object.freeze({ state: "admissible", reason: "phase_open" });
+  }
+
+  return Object.freeze({
+    state: "not_admissible",
+    reason: "phase_closed",
+    ...(gate.blockedBy === undefined ? {} : { blockedBy: gate.blockedBy }),
+  });
 }
 
 function classifyCandidateLine(line: string): Readonly<{
@@ -193,12 +280,15 @@ function collectCandidateText(
   };
 }
 
-export function findRoadmapCandidates(
+export function analyzeRoadmaps(
   project: ProjectConfig,
   projectPath: string,
-): readonly RoadmapCandidate[] {
+): RoadmapAnalysis {
   const roadmapPaths = project.roadmap ?? [];
   const candidates: RoadmapCandidate[] = [];
+  const gates: RoadmapPhaseGate[] = [];
+  const invalidPhases = new Set<string>();
+  const invalidPaths = new Set<string>();
 
   for (const roadmapPath of roadmapPaths) {
     const absolutePath = resolve(projectPath, roadmapPath);
@@ -216,10 +306,28 @@ export function findRoadmapCandidates(
       const line = lines[index] ?? "";
       const trimmed = line.trim();
 
+      const phaseGate = parsePhaseGate(trimmed);
+      if (phaseGate) {
+        if (phaseGate.outcome === "invalid") {
+          if (phaseGate.phaseId) invalidPhases.add(phaseGate.phaseId);
+          else invalidPaths.add(roadmapPath);
+        } else {
+          gates.push({
+            path: roadmapPath,
+            line: index + 1,
+            phaseId: phaseGate.phaseId,
+            state: phaseGate.state,
+            ...(phaseGate.blockedBy === undefined ? {} : { blockedBy: phaseGate.blockedBy }),
+          });
+        }
+        continue;
+      }
+
       const tableLot = parseStructuredTableLotRow(trimmed);
 
       if (tableLot) {
         const classification = classifyCandidateLine(tableLot.text);
+        const phaseId = phaseIdFromCandidateId(tableLot.id);
 
         candidates.push({
           id: tableLot.id,
@@ -230,6 +338,7 @@ export function findRoadmapCandidates(
           reason: classification.reason,
           status: tableLot.status,
           priority: detectCandidatePriority(tableLot.text),
+          ...(phaseId === undefined ? {} : { phaseId }),
         });
         continue;
       }
@@ -264,7 +373,45 @@ export function findRoadmapCandidates(
     }
   }
 
-  return candidates;
+  const gatesByPhase = new Map<string, RoadmapPhaseGate>();
+  for (const gate of gates) {
+    if (gatesByPhase.has(gate.phaseId)) {
+      invalidPhases.add(gate.phaseId);
+      gatesByPhase.delete(gate.phaseId);
+    } else if (!invalidPhases.has(gate.phaseId)) {
+      gatesByPhase.set(gate.phaseId, gate);
+    }
+  }
+
+  const phaseGates = gates.filter((gate) => !invalidPhases.has(gate.phaseId));
+  const analyzedCandidates = candidates.map((candidate) => {
+    const phaseId = candidate.phaseId ?? phaseIdFromCandidateId(candidate.id);
+    const candidateWithPhase = Object.freeze({
+      ...candidate,
+      ...(phaseId === undefined ? {} : { phaseId }),
+    });
+    return Object.freeze({
+      ...candidateWithPhase,
+      admissibility: admissibilityForCandidate({
+        candidate: candidateWithPhase,
+        gates: gatesByPhase,
+        invalidPhases,
+        invalidPaths,
+      }),
+    });
+  });
+
+  return Object.freeze({
+    candidates: Object.freeze(analyzedCandidates),
+    phaseGates: Object.freeze(phaseGates),
+  });
+}
+
+export function findRoadmapCandidates(
+  project: ProjectConfig,
+  projectPath: string,
+): readonly RoadmapCandidate[] {
+  return analyzeRoadmaps(project, projectPath).candidates;
 }
 
 const PRIORITY_ORDER: readonly RoadmapPriority[] = [
@@ -292,7 +439,9 @@ export function selectRoadmapCandidate(
   candidates: readonly RoadmapCandidate[],
 ): RoadmapCandidate | null {
   const activeCandidates = candidates.filter(
-    (candidate) => candidate.status !== "done",
+    (candidate) =>
+      candidate.status !== "done" &&
+      candidate.admissibility?.state !== "not_admissible",
   );
 
   const safeCandidate = selectByPriority(

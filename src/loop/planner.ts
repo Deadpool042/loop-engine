@@ -23,7 +23,9 @@ export type LoopPlan =
         | "candidate_ambiguous"
         | "candidate_done"
         | "candidate_blocked"
-        | "candidate_not_admissible";
+        | "candidate_not_admissible"
+        | "candidate_phase_closed"
+        | "candidate_phase_gate_invalid";
     }>;
 
 export type LoopPlanOptions = Readonly<{
@@ -107,6 +109,23 @@ export function planLoopCycle(
         candidate,
         code: "candidate_not_admissible",
         reason: `Roadmap candidate is not admissible: ${requestedCandidateId}`,
+      };
+    }
+
+    if (candidate.admissibility?.state === "not_admissible") {
+      const code =
+        candidate.admissibility.reason === "phase_closed"
+          ? "candidate_phase_closed"
+          : "candidate_phase_gate_invalid";
+      const blockedBy = candidate.admissibility.blockedBy;
+      return {
+        outcome: "blocked",
+        candidate,
+        code,
+        reason:
+          code === "candidate_phase_closed"
+            ? `Roadmap candidate phase is closed: ${requestedCandidateId}${blockedBy ? ` (blocked by ${blockedBy})` : ""}`
+            : `Roadmap phase gate is invalid: ${requestedCandidateId}`,
       };
     }
 

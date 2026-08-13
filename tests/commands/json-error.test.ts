@@ -182,6 +182,49 @@ describe("json errors", () => {
     }
   });
 
+  it("returns a structured refusal for an explicit candidate in a closed phase", () => {
+    const fixture = setupRunnableProject(
+      [
+        "<!-- loop-engine:phase-gate phase=H1 state=closed blockedBy=H0-RC -->",
+        "| H1-L4 | Pending runbook | ⬜ À faire |",
+      ].join("\n"),
+    );
+    try {
+      const output = runFailingCommand(
+        [
+          "run",
+          fixture.projectName,
+          "--candidate",
+          "H1-L4",
+          "--mode",
+          "plan",
+          "--json",
+        ],
+        fixture.cwd,
+      );
+      const json = JSON.parse(output) as {
+        status?: unknown;
+        candidate?: {
+          status?: unknown;
+          admissibility?: { state?: unknown; reason?: unknown; blockedBy?: unknown };
+        } | null;
+        failure?: { code?: unknown; message?: unknown };
+      };
+
+      assert.equal(json.status, "blocked");
+      assert.equal(json.failure?.code, "candidate_phase_closed");
+      assert.match(String(json.failure?.message), /blocked by H0-RC/);
+      assert.equal(json.candidate?.status, "todo");
+      assert.deepEqual(json.candidate?.admissibility, {
+        state: "not_admissible",
+        reason: "phase_closed",
+        blockedBy: "H0-RC",
+      });
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
   it("rejects --candidate without an identifier", () => {
     const output = runFailingCommand([
       "run",

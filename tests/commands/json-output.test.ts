@@ -54,12 +54,14 @@ describe("json outputs", () => {
         selectedCandidate?: {
           priority?: unknown;
         } | null;
+        phaseGates?: unknown;
       };
     };
 
     assert.equal(json.schemaVersion, 1);
     assert.ok(json.roadmap);
     assert.ok("selectedCandidate" in json.roadmap);
+    assert.ok(Array.isArray(json.roadmap.phaseGates));
 
     if (json.roadmap.selectedCandidate) {
       assert.equal(typeof json.roadmap.selectedCandidate.priority, "string");

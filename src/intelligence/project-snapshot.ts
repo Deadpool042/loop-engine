@@ -8,7 +8,7 @@ import {
   getGitStatusText,
   getLastCommit,
 } from "../core/git.js";
-import { findRoadmapCandidates, selectRoadmapCandidate } from "./roadmap.js";
+import { analyzeRoadmaps, selectRoadmapCandidate } from "./roadmap.js";
 import { type ProjectSnapshot } from "./snapshot.js";
 
 export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
@@ -36,9 +36,12 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
 
   const roadmapAvailable = roadmapPaths.length > 0;
 
-  const roadmapCandidates = findRoadmapCandidates(project, projectPath);
+  const roadmapAnalysis = analyzeRoadmaps(project, projectPath);
+  const roadmapCandidates = roadmapAnalysis.candidates;
   const selectableRoadmapCandidates = roadmapCandidates.filter(
-    (candidate) => candidate.status !== "unknown",
+    (candidate) =>
+      candidate.status !== "unknown" &&
+      candidate.admissibility?.state !== "not_admissible",
   );
   const selectedRoadmapCandidate = selectRoadmapCandidate(
     selectableRoadmapCandidates,
@@ -107,6 +110,7 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
       available: roadmapAvailable,
       paths: roadmapPaths,
       candidates: roadmapCandidates,
+      phaseGates: roadmapAnalysis.phaseGates,
       selectedCandidate: selectedRoadmapCandidate,
       stats: roadmapStats,
       summary: roadmapSummary,
