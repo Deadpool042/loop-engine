@@ -577,6 +577,54 @@ describe("roadmap candidate priority", () => {
   });
 });
 
+describe("execution projection contract", () => {
+  it("returns no candidate when the projection declares no actionable code", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "# Projection d’exécution — Loop Engine",
+        "",
+        "État : `NO_ACTIONABLE_CODE`.",
+        "",
+        "Aucun lot Code n’est actionnable par défaut.",
+      ].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+      const selected = selectRoadmapCandidate(candidates);
+
+      assert.equal(candidates.length, 0);
+      assert.equal(selected, null);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("exposes a revalidated structured lot as an addressable candidate", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "# Projection d’exécution — Loop Engine",
+        "",
+        "| Lot | Livrable | État |",
+        "| --- | --- | --- |",
+        "| H4-L12 | Corriger un lot réel revalidé | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+      const selected = selectRoadmapCandidate(candidates);
+
+      assert.equal(candidates.length, 1);
+      assert.equal(selected?.id, "H4-L12");
+      assert.equal(selected?.status, "todo");
+      assert.equal(selected?.kind, "safe");
+    } finally {
+      cleanup();
+    }
+  });
+});
+
 describe("loop-engine burn-in candidate", () => {
   // Burn-in 1 and Burn-in 2 are both marked [x] done in
   // docs/roadmap/loop-engine.md, so neither is selectable anymore
