@@ -6,12 +6,13 @@ projects:
       - AGENTS.md
       - docs/architecture
       - docs/domains
-      - docs/roadmap/projet-creatyss.md
+      - docs/roadmap/README.md
+      - docs/roadmap/loop-engine.md
     validation:
       - pnpm run typecheck
       - pnpm run lint
     roadmap:
-      - docs/roadmap/projet-creatyss.md
+      - docs/roadmap/loop-engine.md
 
   - name: lp-infra
     path: ../lp-infra
