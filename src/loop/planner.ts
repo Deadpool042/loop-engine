@@ -1,4 +1,5 @@
 import type { ProjectConfig } from "../core/config.js";
+import { resolveExecutionAuthorization } from "../governance/execution-authorization.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import type { ProjectSnapshot } from "../intelligence/snapshot.js";
@@ -12,6 +13,10 @@ export type LoopPlan =
       // via buildMinimalContext(snapshot, budget) without a second, duplicate
       // buildProjectSnapshot call — see docs/architecture/minimal-context-builder.md.
       snapshot: ProjectSnapshot;
+      // Set only when the project opted into the project-owned, SHA-bound
+      // execution decision contract and this candidate was authorized by it
+      // (rather than by heuristic roadmap selection).
+      authorizedBy?: "execution_decision";
     }>
   | Readonly<{
       outcome: "blocked";
@@ -25,7 +30,15 @@ export type LoopPlan =
         | "candidate_blocked"
         | "candidate_not_admissible"
         | "candidate_phase_closed"
-        | "candidate_phase_gate_invalid";
+        | "candidate_phase_gate_invalid"
+        | "candidate_authorization_mismatch"
+        | "decision_missing"
+        | "decision_malformed"
+        | "project_mismatch"
+        | "sha_stale"
+        | "decision_blocked"
+        | "decision_revalidation_required"
+        | "decision_no_actionable_work";
     }>;
 
 export type LoopPlanOptions = Readonly<{
@@ -46,7 +59,38 @@ export function planLoopCycle(
   options: LoopPlanOptions = {},
 ): LoopPlan {
   const snapshot = buildProjectSnapshot(project);
-  const requestedCandidateId = options.candidateId;
+
+  const authorization = resolveExecutionAuthorization(
+    project,
+    snapshot.project.path,
+    snapshot.git.lastCommit?.hash ?? null,
+  );
+
+  if (authorization.governed && !authorization.authorized) {
+    return {
+      outcome: "blocked",
+      candidate: null,
+      code: authorization.code,
+      reason: authorization.reason,
+    };
+  }
+
+  let requestedCandidateId = options.candidateId;
+
+  if (authorization.governed) {
+    if (
+      requestedCandidateId !== undefined &&
+      requestedCandidateId !== authorization.candidateId
+    ) {
+      return {
+        outcome: "blocked",
+        candidate: null,
+        code: "candidate_authorization_mismatch",
+        reason: `Requested candidate ${requestedCandidateId} does not match the execution decision's authorized candidate ${authorization.candidateId}.`,
+      };
+    }
+    requestedCandidateId = authorization.candidateId;
+  }
 
   if (requestedCandidateId !== undefined) {
     const addressableCandidates = snapshot.roadmap.candidates.filter(
@@ -137,6 +181,7 @@ export function planLoopCycle(
         ...PLANNED_STEPS_AFTER_CANDIDATE,
       ],
       snapshot,
+      ...(authorization.governed ? { authorizedBy: "execution_decision" as const } : {}),
     };
   }
 

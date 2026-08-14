@@ -222,7 +222,7 @@ export async function runLoopExecute(
       : Object.freeze({ ...project, path: options.executionProjectPath });
 
   const cycle = dependencies.planLoopCycle(
-    project,
+    executionProject,
     options.candidateId === undefined ? {} : { candidateId: options.candidateId },
   );
   if (cycle.outcome === "blocked") {

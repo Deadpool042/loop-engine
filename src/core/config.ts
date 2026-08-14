@@ -10,6 +10,9 @@ export type ProjectConfig = {
   roadmap?: string[];
   optional?: boolean;
   requires_git?: boolean;
+  // Opt-in, project-relative path to an explicit, SHA-bound execution
+  // authorization file (see src/governance/execution-decision.ts).
+  execution_decision?: string;
 };
 
 export type Config = {
