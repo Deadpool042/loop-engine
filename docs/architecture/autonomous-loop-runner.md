@@ -261,3 +261,22 @@ Une gate de phase explicite évaluée par le Roadmap Reader fait partie de cette
 relecture. Une phase qui se ferme entre le plan et `execute` bloque l'exécution
 avant toute résolution de provider ou création de changement ; l'identifiant
 confirmé n'est jamais remplacé par un autre candidat.
+
+## Décision d'exécution projet V1
+
+Un projet peut activer une décision explicite via `execution_decision`, un
+chemin projet relatif non vide dans `projects.yaml`. Sans cette clé, le projet
+reste legacy et conserve la sélection heuristique historique.
+
+Le document YAML V1 contient `version: 1`, le `project` attendu, une décision
+parmi `READY`, `BLOCKED`, `REVALIDATION_REQUIRED` ou `NO_ACTIONABLE_WORK`, et
+`source.gitHead` au format SHA complet. `source.document` est optionnel.
+`READY` exige `decision.candidate.id`; les trois autres états bloquent toujours.
+Les champs `reason` et `nextAction` sont seulement informatifs et n'accordent
+jamais d'autorisation. Une décision absente, invalide, rattachée à un autre
+projet ou stale bloque sans repli vers une suggestion roadmap.
+
+Pour `execute` provider-backed, le planner relit cette décision et le HEAD dans
+le worktree isolé réellement remis au provider avant son appel. La décision
+READY doit donc correspondre au candidat et au SHA de ce worktree, pas seulement
+au checkout source. Une divergence bloque avant tout appel provider.

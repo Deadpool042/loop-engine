@@ -1,0 +1,402 @@
+import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, it } from "node:test";
+
+import type { Config, ProjectConfig } from "../../src/core/config.js";
+import { runLoopExecute } from "../../src/loop/execute-runner.js";
+import { planLoopCycle } from "../../src/loop/planner.js";
+import { runLoopPlan } from "../../src/loop/runner.js";
+
+function initGitRepo(projectPath: string): string {
+  const run = (command: string) =>
+    execSync(command, { cwd: projectPath, stdio: "pipe" });
+
+  run("git init -q");
+  run('git -c user.email=test@example.com -c user.name=test add -A');
+  run(
+    'git -c user.email=test@example.com -c user.name=test commit -q -m "initial"',
+  );
+
+  return execSync("git rev-parse HEAD", { cwd: projectPath, encoding: "utf8" }).trim();
+}
+
+function setupGovernedProject(options: {
+  roadmap: string;
+  decisionYaml: (headSha: string) => string;
+  projectName?: string;
+}): { project: ProjectConfig; projectPath: string; headSha: string } {
+  const projectPath = mkdtempSync(join(tmpdir(), "loop-governed-"));
+  writeFileSync(join(projectPath, "roadmap.md"), options.roadmap);
+
+  const headSha = initGitRepo(projectPath);
+
+  writeFileSync(
+    join(projectPath, "decision.yaml"),
+    options.decisionYaml(headSha),
+  );
+
+  const project: ProjectConfig = {
+    name: options.projectName ?? "fixture",
+    path: projectPath,
+    type: "test",
+    required_docs: [],
+    validation: [],
+    roadmap: ["roadmap.md"],
+    execution_decision: "decision.yaml",
+  };
+
+  return { project, projectPath, headSha };
+}
+
+function readyDecision(headSha: string, candidateId: string, project = "fixture"): string {
+  return [
+    "version: 1",
+    `project: ${project}`,
+    "decision:",
+    "  state: READY",
+    "  candidate:",
+    `    id: ${candidateId}`,
+    "source:",
+    `  gitHead: ${headSha}`,
+  ].join("\n");
+}
+
+describe("project-owned execution decision governance", () => {
+  it("authorizes plan when READY, SHA matches, and the candidate is admissible", () => {
+    const { project } = setupGovernedProject({
+      roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+      decisionYaml: (sha) => readyDecision(sha, "H1-L4"),
+    });
+
+    try {
+      const plan = planLoopCycle(project);
+      assert.equal(plan.outcome, "ready");
+      if (plan.outcome === "ready") {
+        assert.equal(plan.candidate.id, "H1-L4");
+        assert.equal(plan.authorizedBy, "execution_decision");
+      }
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks fail-closed when source.gitHead does not match the evaluated HEAD", () => {
+    const { project } = setupGovernedProject({
+      roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+      decisionYaml: () => readyDecision("b".repeat(40), "H1-L4"),
+    });
+
+    try {
+      const plan = planLoopCycle(project);
+      assert.equal(plan.outcome, "blocked");
+      assert.equal(plan.code, "sha_stale");
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks fail-closed when the decision file is absent", () => {
+    const projectPath = mkdtempSync(join(tmpdir(), "loop-governed-missing-"));
+    writeFileSync(join(projectPath, "roadmap.md"), "| H1-L4 | Item | ⬜ À faire |");
+    initGitRepo(projectPath);
+    const project: ProjectConfig = {
+      name: "fixture",
+      path: projectPath,
+      type: "test",
+      required_docs: [],
+      validation: [],
+      roadmap: ["roadmap.md"],
+      execution_decision: "decision.yaml",
+    };
+
+    try {
+      const plan = planLoopCycle(project);
+      assert.equal(plan.outcome, "blocked");
+      assert.equal(plan.code, "decision_missing");
+    } finally {
+      rmSync(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks fail-closed when the decision file is malformed", () => {
+    const { project } = setupGovernedProject({
+      roadmap: "| H1-L4 | Item | ⬜ À faire |",
+      decisionYaml: () => "not: [valid, decision",
+    });
+
+    try {
+      const plan = planLoopCycle(project);
+      assert.equal(plan.outcome, "blocked");
+      assert.equal(plan.code, "decision_malformed");
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks deterministically when execution_decision is not a non-empty string", () => {
+    for (const executionDecision of [null, 42, "   "] as const) {
+      const projectPath = mkdtempSync(join(tmpdir(), "loop-governed-invalid-config-"));
+      writeFileSync(join(projectPath, "roadmap.md"), "| H1-L4 | Item | ⬜ À faire |");
+      initGitRepo(projectPath);
+      const project: ProjectConfig = {
+        name: "fixture",
+        path: projectPath,
+        type: "test",
+        required_docs: [],
+        validation: [],
+        roadmap: ["roadmap.md"],
+        execution_decision: executionDecision as unknown as string,
+      };
+
+      try {
+        const plan = planLoopCycle(project);
+        assert.equal(plan.outcome, "blocked");
+        assert.equal(plan.code, "decision_malformed");
+      } finally {
+        rmSync(projectPath, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("blocks fail-closed on a project mismatch", () => {
+    const { project } = setupGovernedProject({
+      roadmap: "| H1-L4 | Item | ⬜ À faire |",
+      decisionYaml: (sha) => readyDecision(sha, "H1-L4", "some-other-project"),
+    });
+
+    try {
+      const plan = planLoopCycle(project);
+      assert.equal(plan.outcome, "blocked");
+      assert.equal(plan.code, "project_mismatch");
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks fail-closed for a READY decision without decision.candidate.id", () => {
+    const { project } = setupGovernedProject({
+      roadmap: "| H1-L4 | Item | ⬜ À faire |",
+      decisionYaml: (sha) =>
+        ["version: 1", "project: fixture", "decision:", "  state: READY", "source:", `  gitHead: ${sha}`].join(
+          "\n",
+        ),
+    });
+
+    try {
+      const plan = planLoopCycle(project);
+      assert.equal(plan.outcome, "blocked");
+      assert.equal(plan.code, "decision_malformed");
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks fail-closed for an unknown authorized candidate", () => {
+    const { project } = setupGovernedProject({
+      roadmap: "| H1-L4 | Item | ⬜ À faire |",
+      decisionYaml: (sha) => readyDecision(sha, "H9-L9"),
+    });
+
+    try {
+      const plan = planLoopCycle(project);
+      assert.equal(plan.outcome, "blocked");
+      assert.equal(plan.code, "candidate_not_found");
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks fail-closed for an authorized candidate that is done, blocked, or not admissible", () => {
+    const cases = [
+      { roadmap: "| H1-L4 | Item | ✅ Terminé |", code: "candidate_done" },
+      { roadmap: "| H1-L4 | Production finale | ⬜ À faire |", code: "candidate_blocked" },
+      { roadmap: "| H1-L4 | Item | En attente |", code: "candidate_not_admissible" },
+    ] as const;
+
+    for (const testCase of cases) {
+      const { project } = setupGovernedProject({
+        roadmap: testCase.roadmap,
+        decisionYaml: (sha) => readyDecision(sha, "H1-L4"),
+      });
+
+      try {
+        const plan = planLoopCycle(project);
+        assert.equal(plan.outcome, "blocked", testCase.code);
+        assert.equal(plan.code, testCase.code, testCase.code);
+      } finally {
+        rmSync(project.path, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("authorizes no candidate for BLOCKED, REVALIDATION_REQUIRED, and NO_ACTIONABLE_WORK", () => {
+    const states = [
+      "BLOCKED",
+      "REVALIDATION_REQUIRED",
+      "NO_ACTIONABLE_WORK",
+    ] as const;
+
+    for (const state of states) {
+      const { project } = setupGovernedProject({
+        roadmap: "| H1-L4 | Item | ⬜ À faire |",
+        decisionYaml: (sha) =>
+          [
+            "version: 1",
+            "project: fixture",
+            "decision:",
+            `  state: ${state}`,
+            "source:",
+            `  gitHead: ${sha}`,
+          ].join("\n"),
+      });
+
+      try {
+        const plan = planLoopCycle(project);
+        assert.equal(plan.outcome, "blocked", state);
+        assert.equal(plan.code, state.toLowerCase() === "blocked" ? "decision_blocked" : `decision_${state.toLowerCase()}`, state);
+      } finally {
+        rmSync(project.path, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("rejects a governed candidateId request that does not match the authorized candidate", () => {
+    const { project } = setupGovernedProject({
+      roadmap: [
+        "| H1-L4 | Authorized candidate | ⬜ À faire |",
+        "| H1-L5 | Other candidate | ⬜ À faire |",
+      ].join("\n"),
+      decisionYaml: (sha) => readyDecision(sha, "H1-L4"),
+    });
+
+    try {
+      const plan = planLoopCycle(project, { candidateId: "H1-L5" });
+      assert.equal(plan.outcome, "blocked");
+      assert.equal(plan.code, "candidate_authorization_mismatch");
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves existing heuristic behavior for a non opted-in (legacy) project", () => {
+    const projectPath = mkdtempSync(join(tmpdir(), "loop-legacy-"));
+    writeFileSync(
+      join(projectPath, "roadmap.md"),
+      "| H1-L4 | Legacy candidate | ⬜ À faire |",
+    );
+    const project: ProjectConfig = {
+      name: "fixture",
+      path: projectPath,
+      type: "test",
+      required_docs: [],
+      validation: [],
+      roadmap: ["roadmap.md"],
+      requires_git: false,
+    };
+
+    try {
+      const plan = planLoopCycle(project);
+      assert.equal(plan.outcome, "ready");
+      if (plan.outcome === "ready") {
+        assert.equal(plan.candidate.id, "H1-L4");
+        assert.equal(plan.authorizedBy, undefined);
+      }
+    } finally {
+      rmSync(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  it("prevents the executor from ever being called when governance blocks the cycle", async () => {
+    const { project } = setupGovernedProject({
+      roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+      decisionYaml: () => readyDecision("b".repeat(40), "H1-L4"),
+    });
+    const config: Config = { projects: [project] };
+
+    try {
+      let executorCalls = 0;
+      const execution = await runLoopExecute(project.name, {
+        loadConfig: () => config,
+        executor: async () => {
+          executorCalls += 1;
+          return { status: "completed", modifiedFiles: [], details: [] };
+        },
+      });
+
+      assert.equal(execution.status, "blocked");
+      assert.equal(execution.failure?.code, "sha_stale");
+      assert.equal(executorCalls, 0);
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("revalidates the isolated worktree decision before calling the executor", async () => {
+    const source = setupGovernedProject({
+      roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+      decisionYaml: (sha) => readyDecision(sha, "H1-L4"),
+    });
+    const worktree = setupGovernedProject({
+      roadmap: "| H1-L4 | Worktree candidate | ⬜ À faire |",
+      decisionYaml: () => readyDecision(source.headSha, "H1-L4"),
+    });
+    const config: Config = { projects: [source.project] };
+
+    try {
+      assert.notEqual(worktree.headSha, source.headSha);
+      let executorCalls = 0;
+      const execution = await runLoopExecute(source.project.name, {
+        loadConfig: () => config,
+        executionProjectPath: worktree.projectPath,
+        executor: async () => {
+          executorCalls += 1;
+          return { status: "completed", modifiedFiles: [], details: [] };
+        },
+      });
+
+      assert.equal(execution.status, "blocked");
+      assert.equal(execution.failure?.code, "sha_stale");
+      assert.equal(executorCalls, 0);
+    } finally {
+      rmSync(source.project.path, { recursive: true, force: true });
+      rmSync(worktree.project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("authorizes plan and execute end-to-end when governed, READY, and fresh", async () => {
+    const { project } = setupGovernedProject({
+      roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+      decisionYaml: (sha) => readyDecision(sha, "H1-L4"),
+    });
+    const config: Config = { projects: [project] };
+
+    try {
+      const plan = runLoopPlan(project.name, { loadConfig: () => config });
+      assert.equal(plan.status, "completed");
+      assert.equal(plan.candidate?.id, "H1-L4");
+
+      let executedCandidateId: string | undefined;
+      const execution = await runLoopExecute(project.name, {
+        loadConfig: () => config,
+        executor: async (executionPlan) => {
+          executedCandidateId = executionPlan.candidate.id;
+          return { status: "completed", modifiedFiles: [], details: [] };
+        },
+        validator: async () => ({
+          status: "passed",
+          failedCommand: null,
+          exitCode: 0,
+          details: [],
+        }),
+      });
+
+      assert.equal(execution.status, "completed");
+      assert.equal(executedCandidateId, "H1-L4");
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+});
