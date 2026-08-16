@@ -16,6 +16,7 @@ projects:
 
   - name: lp-infra
     path: ../lp-infra-runtime
+    execution_decision: .governance/execution-decision.yaml
     type: infra
     required_docs:
       - README.md
