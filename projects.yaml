@@ -15,7 +15,7 @@ projects:
       - docs/roadmap/loop-engine.md
 
   - name: lp-infra
-    path: ../lp-infra
+    path: ../lp-infra-runtime
     type: infra
     required_docs:
       - README.md
