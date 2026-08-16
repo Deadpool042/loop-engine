@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, execSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -62,6 +62,28 @@ function readyDecision(headSha: string, candidateId: string, project = "fixture"
     "source:",
     `  gitHead: ${headSha}`,
   ].join("\n");
+}
+
+function createIsolatedWorktree(sourcePath: string, headSha: string): {
+  path: string;
+  cleanup: () => void;
+} {
+  const path = mkdtempSync(join(tmpdir(), "loop-governed-worktree-"));
+  execFileSync("git", ["worktree", "add", "--detach", path, headSha], {
+    cwd: sourcePath,
+    stdio: "pipe",
+  });
+
+  return {
+    path,
+    cleanup: () => {
+      execFileSync("git", ["worktree", "remove", "--force", path], {
+        cwd: sourcePath,
+        stdio: "pipe",
+      });
+      rmSync(path, { recursive: true, force: true });
+    },
+  };
 }
 
 describe("project-owned execution decision governance", () => {
@@ -334,23 +356,80 @@ describe("project-owned execution decision governance", () => {
     }
   });
 
-  it("revalidates the isolated worktree decision before calling the executor", async () => {
+  it("reads an uncommitted canonical decision while validating the real isolated worktree HEAD", async () => {
     const source = setupGovernedProject({
       roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
       decisionYaml: (sha) => readyDecision(sha, "H1-L4"),
     });
-    const worktree = setupGovernedProject({
-      roadmap: "| H1-L4 | Worktree candidate | ⬜ À faire |",
-      decisionYaml: () => readyDecision(source.headSha, "H1-L4"),
-    });
+    const worktree = createIsolatedWorktree(source.projectPath, source.headSha);
     const config: Config = { projects: [source.project] };
 
     try {
-      assert.notEqual(worktree.headSha, source.headSha);
+      assert.equal(existsSync(join(worktree.path, "decision.yaml")), false);
+      let executorCalls = 0;
+      let authorizedBy: string | undefined;
+      const execution = await runLoopExecute(source.project.name, {
+        loadConfig: () => config,
+        executionProjectPath: worktree.path,
+        planLoopCycle: (project, options) => {
+          const plan = planLoopCycle(project, options);
+          authorizedBy = plan.outcome === "ready" ? plan.authorizedBy : undefined;
+          return plan;
+        },
+        executor: async () => {
+          executorCalls += 1;
+          return { status: "completed", modifiedFiles: [], details: [] };
+        },
+        validator: async () => ({
+          status: "passed",
+          failedCommand: null,
+          exitCode: 0,
+          details: [],
+        }),
+      });
+
+      assert.equal(execution.status, "completed");
+      assert.equal(execution.candidate?.id, "H1-L4");
+      assert.equal(execution.failure, null);
+      assert.equal(authorizedBy, "execution_decision");
+      assert.equal(executorCalls, 1);
+    } finally {
+      worktree.cleanup();
+      rmSync(source.projectPath, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks before execution when the canonical decision SHA diverges from the isolated worktree", async () => {
+    const source = setupGovernedProject({
+      roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+      decisionYaml: (sha) => readyDecision(sha, "H1-L4"),
+    });
+    const worktree = createIsolatedWorktree(source.projectPath, source.headSha);
+    const config: Config = { projects: [source.project] };
+
+    try {
+      writeFileSync(join(source.projectPath, "source-change.md"), "source change\n");
+      execFileSync("git", ["add", "source-change.md"], {
+        cwd: source.projectPath,
+        stdio: "pipe",
+      });
+      execSync('git -c user.email=test@example.com -c user.name=test commit -qm "source change"', {
+        cwd: source.projectPath,
+        stdio: "pipe",
+      });
+      const sourceHead = execSync("git rev-parse HEAD", {
+        cwd: source.projectPath,
+        encoding: "utf8",
+      }).trim();
+      writeFileSync(
+        join(source.projectPath, "decision.yaml"),
+        readyDecision(sourceHead, "H1-L4"),
+      );
+
       let executorCalls = 0;
       const execution = await runLoopExecute(source.project.name, {
         loadConfig: () => config,
-        executionProjectPath: worktree.projectPath,
+        executionProjectPath: worktree.path,
         executor: async () => {
           executorCalls += 1;
           return { status: "completed", modifiedFiles: [], details: [] };
@@ -361,8 +440,37 @@ describe("project-owned execution decision governance", () => {
       assert.equal(execution.failure?.code, "sha_stale");
       assert.equal(executorCalls, 0);
     } finally {
-      rmSync(source.project.path, { recursive: true, force: true });
-      rmSync(worktree.project.path, { recursive: true, force: true });
+      worktree.cleanup();
+      rmSync(source.projectPath, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks before execution when the canonical checkout has no decision", async () => {
+    const source = setupGovernedProject({
+      roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+      decisionYaml: (sha) => readyDecision(sha, "H1-L4"),
+    });
+    const worktree = createIsolatedWorktree(source.projectPath, source.headSha);
+    const config: Config = { projects: [source.project] };
+
+    try {
+      rmSync(join(source.projectPath, "decision.yaml"));
+      let executorCalls = 0;
+      const execution = await runLoopExecute(source.project.name, {
+        loadConfig: () => config,
+        executionProjectPath: worktree.path,
+        executor: async () => {
+          executorCalls += 1;
+          return { status: "completed", modifiedFiles: [], details: [] };
+        },
+      });
+
+      assert.equal(execution.status, "blocked");
+      assert.equal(execution.failure?.code, "decision_missing");
+      assert.equal(executorCalls, 0);
+    } finally {
+      worktree.cleanup();
+      rmSync(source.projectPath, { recursive: true, force: true });
     }
   });
 
