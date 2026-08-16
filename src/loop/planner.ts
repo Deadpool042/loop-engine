@@ -43,6 +43,8 @@ export type LoopPlan =
 
 export type LoopPlanOptions = Readonly<{
   candidateId?: string;
+  /** Canonical project path used to resolve a project-scoped execution decision. */
+  executionDecisionProjectPath?: string;
 }>;
 
 const PLANNED_STEPS_AFTER_CANDIDATE = [
@@ -62,7 +64,7 @@ export function planLoopCycle(
 
   const authorization = resolveExecutionAuthorization(
     project,
-    snapshot.project.path,
+    options.executionDecisionProjectPath ?? snapshot.project.path,
     snapshot.git.lastCommit?.hash ?? null,
   );
 

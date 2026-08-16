@@ -48,7 +48,10 @@ type ExecuteDependencies = Readonly<{
   loadConfig: () => Config;
   planLoopCycle: (
     project: ProjectConfig,
-    options?: { candidateId?: string },
+    options?: {
+      candidateId?: string;
+      executionDecisionProjectPath?: string;
+    },
   ) => LoopPlan;
   agentPolicy: AgentPolicy;
   agentRegistry: AgentRegistry;
@@ -223,7 +226,14 @@ export async function runLoopExecute(
 
   const cycle = dependencies.planLoopCycle(
     executionProject,
-    options.candidateId === undefined ? {} : { candidateId: options.candidateId },
+    Object.freeze({
+      ...(options.candidateId === undefined
+        ? {}
+        : { candidateId: options.candidateId }),
+      ...(options.executionProjectPath === undefined
+        ? {}
+        : { executionDecisionProjectPath: project.path }),
+    }),
   );
   if (cycle.outcome === "blocked") {
     transition("blocked", "blocked", "blocked", [cycle.reason]);

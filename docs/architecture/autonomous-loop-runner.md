@@ -276,7 +276,10 @@ Les champs `reason` et `nextAction` sont seulement informatifs et n'accordent
 jamais d'autorisation. Une décision absente, invalide, rattachée à un autre
 projet ou stale bloque sans repli vers une suggestion roadmap.
 
-Pour `execute` provider-backed, le planner relit cette décision et le HEAD dans
-le worktree isolé réellement remis au provider avant son appel. La décision
-READY doit donc correspondre au candidat et au SHA de ce worktree, pas seulement
-au checkout source. Une divergence bloque avant tout appel provider.
+Pour `execute` provider-backed, `execution_decision` est résolu contre le chemin
+canonique du projet déclaré dans `projects.yaml`, y compris lorsque le provider
+reçoit un worktree isolé. Le HEAD comparé reste celui du checkout/worktree
+réellement exécuté avant l'appel provider. La décision READY lie donc le candidat
+au SHA de ce worktree, sans devoir être présente dans le commit qu'elle autorise :
+cette séparation project-scoped évite toute circularité entre son contenu et le
+SHA autorisé. Une divergence bloque avant tout appel provider.
