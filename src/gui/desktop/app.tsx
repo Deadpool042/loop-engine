@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./components/ui/button.js";
+import { formatCandidateState, formatCandidateTitle } from "./candidate-display.js";
 import { parseContextDetail, type ContextDetail } from "./context-contract.js";
 import { parseReviewDetail, type ReviewDetail } from "./review-contract.js";
 import {
@@ -494,10 +495,10 @@ export function App(): React.JSX.Element {
                           </p>
                         )}
                         <h4 className="mt-2 text-lg font-semibold leading-7">
-                          {contextDetail.roadmap.selectedCandidate.text}
+                          {formatCandidateTitle(contextDetail.roadmap.selectedCandidate)}
                         </h4>
                         <p className="mt-3 text-sm text-loop-muted">
-                          {contextDetail.roadmap.selectedCandidate.kind} · {contextDetail.roadmap.selectedCandidate.status}
+                          {formatCandidateState(contextDetail.roadmap.selectedCandidate)}
                         </p>
                         {!hasAddressableCandidate(contextDetail.roadmap.selectedCandidate) ? (
                           <p className="mt-4 text-sm text-rose-700">
