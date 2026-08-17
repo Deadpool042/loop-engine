@@ -11,6 +11,7 @@ import {
   type PlanDetail,
 } from "./plan-contract.js";
 import type { DesktopExecuteProvider } from "./execute-handler.js";
+import { buildGuidedFlowSteps } from "./guided-flow.js";
 import {
   parseSummaryResponse,
   type SummaryProject,
@@ -63,6 +64,17 @@ export function App(): React.JSX.Element {
   const selectedProject =
     projects.find((project) => project.project.name === selectedProjectName) ??
     null;
+  const selectedCandidate = contextDetail?.roadmap.selectedCandidate ?? null;
+  const guidedFlowSteps = buildGuidedFlowSteps({
+    hasProject: selectedProject !== null,
+    contextLoading,
+    hasCandidate: selectedCandidate !== null,
+    candidateAddressable: hasAddressableCandidate(selectedCandidate),
+    hasPlan:
+      planDetail !== null &&
+      isPlanForSelectedProject(planProjectName, selectedProjectName),
+    hasExecutionOutcome: executeResult !== null || executeMessage !== null,
+  });
 
   useEffect(() => {
     if (selectedProjectName === null) {
@@ -281,15 +293,41 @@ export function App(): React.JSX.Element {
             Loop Engine
           </h1>
           <span className="text-xs text-loop-muted">
-            Cockpit local · lecture seule
+            Cockpit local · exécution gouvernée
           </span>
         </div>
         <span className="text-xs font-medium uppercase tracking-[0.16em] text-loop-muted">
-          Summary
+          Développement
         </span>
       </header>
 
-      <section className="flex shrink-0 justify-end border-b border-loop-line bg-loop-panel px-5 py-3">
+      <section className="flex shrink-0 items-center justify-between gap-4 border-b border-loop-line bg-loop-panel px-5 py-3">
+        <ol className="flex min-w-0 flex-1 items-center gap-2" aria-label="Progression du développement">
+          {guidedFlowSteps.map((step, index) => {
+            const tone =
+              step.status === "done"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : step.status === "active"
+                  ? "border-neutral-900 bg-neutral-900 text-white"
+                  : step.status === "blocked"
+                    ? "border-rose-200 bg-rose-50 text-rose-900"
+                    : "border-loop-line bg-white text-loop-muted";
+            return (
+              <li key={step.id} className="flex min-w-0 items-center gap-2">
+                <span
+                  className={`inline-flex min-w-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${tone}`}
+                  aria-current={step.status === "active" ? "step" : undefined}
+                >
+                  <span aria-hidden="true">{index + 1}</span>
+                  <span className="truncate">{step.label}</span>
+                </span>
+                {index < guidedFlowSteps.length - 1 && (
+                  <span aria-hidden="true" className="h-px w-4 shrink-0 bg-loop-line" />
+                )}
+              </li>
+            );
+          })}
+        </ol>
         <Button type="button" disabled={loading} onClick={refreshSummary}>
           {loading ? "Chargement…" : "Actualiser"}
         </Button>
