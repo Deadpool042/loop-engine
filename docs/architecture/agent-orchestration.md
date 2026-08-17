@@ -51,7 +51,7 @@ Le fournisseur du modèle sous-jacent : `anthropic`, `openai`, `google`, `github
 
 ### Modèle (`model: string`)
 
-Le modèle est une chaîne libre, **jamais figée** dans une union de type — les identifiants de modèle changent trop souvent pour être codés en dur (ex. `"claude-sonnet-5"`, `"gpt-5-codex"`). Le typage porte sur runtime/provider/capacités/permissions/effort/budget, jamais sur la liste des modèles possibles.
+Le modèle est une chaîne libre, **jamais figée** dans une union de type — les identifiants de modèle changent trop souvent pour être codés en dur (ex. `"claude-sonnet-5"`, `"gpt-5.6-terra"`). Le typage porte sur runtime/provider/capacités/permissions/effort/budget, jamais sur la liste des modèles possibles.
 
 ### `AgentCapability`
 

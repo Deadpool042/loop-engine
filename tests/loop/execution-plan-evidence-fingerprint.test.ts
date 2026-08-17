@@ -15,7 +15,7 @@ function evidence(): LoopExecutionPlanEvidence {
     provider: "openai",
     runtime: "codex",
     profileId: "codex-medium",
-    model: "gpt-5-codex",
+    model: "gpt-5.6-terra",
     effort: "medium",
     budget: { maxInputTokens: 10_000, maxOutputTokens: 4_000 },
     policy: {
@@ -83,7 +83,7 @@ test("execution report emits evidence and matching fingerprint together", () => 
         id: "codex-medium",
         provider: "openai",
         runtime: "codex",
-        model: "gpt-5-codex",
+        model: "gpt-5.6-terra",
         effort: "medium",
         budget: { maxInputTokens: 10_000, maxOutputTokens: 4_000 },
       },

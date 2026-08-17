@@ -21,7 +21,7 @@ test("projects bounded immutable evidence from an admitted execution policy", ()
         id: "codex-medium",
         provider: "openai",
         runtime: "codex",
-        model: "gpt-5-codex",
+        model: "gpt-5.6-terra",
         effort: "medium",
         budget: { maxInputTokens: 10_000, maxOutputTokens: 4_000 },
       },

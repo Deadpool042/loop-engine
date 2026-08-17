@@ -14,7 +14,7 @@ createLoopApplicationAssembly({
     {
       id: "codex",
       executable: "/usr/local/bin/codex",
-      model: "gpt-5-codex",
+      model: "gpt-5.6-terra",
     },
     {
       id: "claude_code",
