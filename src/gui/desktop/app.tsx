@@ -81,6 +81,10 @@ export function App(): React.JSX.Element {
   const focusedStepId = getFocusedGuidedFlowStepId(guidedFlowSteps);
 
   useEffect(() => {
+    void refreshSummary();
+  }, []);
+
+  useEffect(() => {
     if (selectedProjectName === null) {
       setContextDetail(null);
       setContextError(null);
@@ -465,7 +469,7 @@ export function App(): React.JSX.Element {
               </dl>
               {focusedStepId === "work" && (
               <section className="mt-8 border-t border-loop-line pt-6">
-                <h3 className="m-0 text-base font-semibold">Contexte projet</h3>
+                <h3 className="m-0 text-base font-semibold">Travail recommandé</h3>
                 {contextLoading && (
                   <p className="mt-3 text-sm text-loop-muted">
                     Chargement du contexte…
@@ -478,6 +482,39 @@ export function App(): React.JSX.Element {
                 )}
                 {contextDetail && (
                   <div className="mt-5 grid gap-6">
+                    {contextDetail.roadmap.selectedCandidate && (
+                      <section className="rounded-lg border border-loop-line bg-white p-5">
+                        <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                          Prochain travail recommandé
+                        </p>
+                        {contextDetail.roadmap.selectedCandidate.id && (
+                          <p className="mt-3 font-mono text-sm font-semibold">
+                            {contextDetail.roadmap.selectedCandidate.id}
+                          </p>
+                        )}
+                        <h4 className="mt-2 text-lg font-semibold leading-7">
+                          {contextDetail.roadmap.selectedCandidate.text}
+                        </h4>
+                        <p className="mt-3 text-sm text-loop-muted">
+                          {contextDetail.roadmap.selectedCandidate.kind} · {contextDetail.roadmap.selectedCandidate.status}
+                        </p>
+                        {!hasAddressableCandidate(contextDetail.roadmap.selectedCandidate) ? (
+                          <p className="mt-4 text-sm text-rose-700">
+                            Ce travail n’est pas adressable automatiquement. Vérifiez la roadmap avant de continuer.
+                          </p>
+                        ) : (
+                          <Button type="button" className="mt-5" disabled={planLoading} onClick={preparePlan}>
+                            {planLoading ? "Préparation…" : "Préparer ce travail"}
+                          </Button>
+                        )}
+                      </section>
+                    )}
+                    {!contextDetail.roadmap.selectedCandidate && (
+                      <p className="text-sm text-loop-muted">Aucun prochain travail recommandé par la roadmap.</p>
+                    )}
+                    <details className="rounded-md border border-loop-line bg-neutral-50 p-4">
+                      <summary className="cursor-pointer text-sm font-medium">Détails techniques</summary>
+                      <div className="mt-5 grid gap-6">
                     <section>
                       <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
                         Documentation
@@ -519,46 +556,6 @@ export function App(): React.JSX.Element {
                             {" Les candidats de cette phase ne sont pas admissibles."}
                           </p>
                         ))}
-                      {contextDetail.roadmap.selectedCandidate && (
-                        <div className="mt-3 rounded-md border border-loop-line p-4 text-sm">
-                          <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
-                            Prochain travail recommandé
-                          </p>
-                          {contextDetail.roadmap.selectedCandidate.id && (
-                            <p className="mt-2 font-mono text-sm font-semibold">
-                              {contextDetail.roadmap.selectedCandidate.id}
-                            </p>
-                          )}
-                          <p className="mt-2">
-                            {contextDetail.roadmap.selectedCandidate.text}
-                          </p>
-                          <p className="mt-2 font-medium">
-                            {contextDetail.roadmap.selectedCandidate.kind} ·{" "}
-                            {contextDetail.roadmap.selectedCandidate.status}
-                          </p>
-                          <p className="mt-2 font-mono text-xs text-loop-muted">
-                            {contextDetail.roadmap.selectedCandidate.path}:
-                            {contextDetail.roadmap.selectedCandidate.line}
-                          </p>
-                          {!hasAddressableCandidate(
-                            contextDetail.roadmap.selectedCandidate,
-                          ) ? (
-                            <p className="mt-3 text-xs text-loop-muted">
-                              Ce candidat ne possède pas d’identifiant adressable ; le plan explicite est indisponible.
-                            </p>
-                          ) : (
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="mt-3"
-                              disabled={planLoading}
-                              onClick={preparePlan}
-                            >
-                              {planLoading ? "Préparation…" : "Préparer le plan"}
-                            </Button>
-                          )}
-                        </div>
-                      )}
                     </section>
                     <section>
                       <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
@@ -575,6 +572,8 @@ export function App(): React.JSX.Element {
                         ))}
                       </ul>
                     </section>
+                      </div>
+                    </details>
                   </div>
                 )}
               </section>
