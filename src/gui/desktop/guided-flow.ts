@@ -30,6 +30,16 @@ const labels: Record<GuidedFlowStepId, string> = {
   result: "Résultat",
 };
 
+export function getFocusedGuidedFlowStepId(
+  steps: readonly GuidedFlowStep[],
+): GuidedFlowStepId {
+  return (
+    steps.find((step) => step.status === "active")?.id ??
+    steps.find((step) => step.status === "blocked")?.id ??
+    "project"
+  );
+}
+
 export function buildGuidedFlowSteps(
   state: GuidedFlowState,
 ): readonly GuidedFlowStep[] {

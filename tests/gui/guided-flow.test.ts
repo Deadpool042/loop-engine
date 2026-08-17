@@ -1,7 +1,10 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildGuidedFlowSteps } from "../../src/gui/desktop/guided-flow.js";
+import {
+  buildGuidedFlowSteps,
+  getFocusedGuidedFlowStepId,
+} from "../../src/gui/desktop/guided-flow.js";
 
 test("starts on project selection when no project is selected", () => {
   assert.deepEqual(
@@ -68,4 +71,18 @@ test("marks work as blocked when the candidate cannot be addressed", () => {
 
   assert.equal(steps.find((step) => step.id === "work")?.status, "blocked");
   assert.equal(steps.find((step) => step.id === "prepare")?.status, "pending");
+  assert.equal(getFocusedGuidedFlowStepId(steps), "work");
+});
+
+test("focuses the active step before any pending step", () => {
+  const steps = buildGuidedFlowSteps({
+    hasProject: true,
+    contextLoading: false,
+    hasCandidate: true,
+    candidateAddressable: true,
+    hasPlan: true,
+    hasExecutionOutcome: false,
+  });
+
+  assert.equal(getFocusedGuidedFlowStepId(steps), "execute");
 });
