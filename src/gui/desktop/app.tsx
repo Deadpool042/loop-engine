@@ -73,6 +73,7 @@ export function App(): React.JSX.Element {
     contextLoading,
     hasCandidate: selectedCandidate !== null,
     candidateAddressable: hasAddressableCandidate(selectedCandidate),
+    planLoading,
     hasPlan:
       planDetail !== null &&
       isPlanForSelectedProject(planProjectName, selectedProjectName),

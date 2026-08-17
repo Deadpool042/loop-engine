@@ -13,6 +13,7 @@ test("starts on project selection when no project is selected", () => {
       contextLoading: false,
       hasCandidate: false,
       candidateAddressable: false,
+      planLoading: false,
       hasPlan: false,
       hasExecutionOutcome: false,
     }).map((step) => [step.id, step.status]),
@@ -26,22 +27,45 @@ test("starts on project selection when no project is selected", () => {
   );
 });
 
-test("advances through work, preparation, execution, and result", () => {
-  const work = buildGuidedFlowSteps({
+test("keeps work active while an addressable candidate awaits confirmation", () => {
+  const steps = buildGuidedFlowSteps({
     hasProject: true,
     contextLoading: false,
     hasCandidate: true,
     candidateAddressable: true,
+    planLoading: false,
     hasPlan: false,
     hasExecutionOutcome: false,
   });
-  assert.equal(work.find((step) => step.id === "prepare")?.status, "active");
 
+  assert.equal(steps.find((step) => step.id === "work")?.status, "active");
+  assert.equal(steps.find((step) => step.id === "prepare")?.status, "pending");
+  assert.equal(getFocusedGuidedFlowStepId(steps), "work");
+});
+
+test("focuses preparation while the confirmed work is being prepared", () => {
+  const steps = buildGuidedFlowSteps({
+    hasProject: true,
+    contextLoading: false,
+    hasCandidate: true,
+    candidateAddressable: true,
+    planLoading: true,
+    hasPlan: false,
+    hasExecutionOutcome: false,
+  });
+
+  assert.equal(steps.find((step) => step.id === "work")?.status, "done");
+  assert.equal(steps.find((step) => step.id === "prepare")?.status, "active");
+  assert.equal(getFocusedGuidedFlowStepId(steps), "prepare");
+});
+
+test("advances from a prepared plan to execution and result", () => {
   const execute = buildGuidedFlowSteps({
     hasProject: true,
     contextLoading: false,
     hasCandidate: true,
     candidateAddressable: true,
+    planLoading: false,
     hasPlan: true,
     hasExecutionOutcome: false,
   });
@@ -52,6 +76,7 @@ test("advances through work, preparation, execution, and result", () => {
     contextLoading: false,
     hasCandidate: true,
     candidateAddressable: true,
+    planLoading: false,
     hasPlan: true,
     hasExecutionOutcome: true,
   });
@@ -65,6 +90,7 @@ test("marks work as blocked when the candidate cannot be addressed", () => {
     contextLoading: false,
     hasCandidate: true,
     candidateAddressable: false,
+    planLoading: false,
     hasPlan: false,
     hasExecutionOutcome: false,
   });
@@ -72,17 +98,4 @@ test("marks work as blocked when the candidate cannot be addressed", () => {
   assert.equal(steps.find((step) => step.id === "work")?.status, "blocked");
   assert.equal(steps.find((step) => step.id === "prepare")?.status, "pending");
   assert.equal(getFocusedGuidedFlowStepId(steps), "work");
-});
-
-test("focuses the active step before any pending step", () => {
-  const steps = buildGuidedFlowSteps({
-    hasProject: true,
-    contextLoading: false,
-    hasCandidate: true,
-    candidateAddressable: true,
-    hasPlan: true,
-    hasExecutionOutcome: false,
-  });
-
-  assert.equal(getFocusedGuidedFlowStepId(steps), "execute");
 });
