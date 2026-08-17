@@ -24,6 +24,13 @@ function buildPrompt(plan: LoopExecutionPlan): string {
     `Project: ${plan.project.name}`,
     `Execution plan: provider=${plan.provider}, runtime=${plan.runtime}, profile=${plan.profileId}, model=${plan.model}, effort=${plan.effort}`,
     `Allowed context files: ${files || "none"}`,
+    ...(plan.allowedPaths === undefined
+      ? []
+      : [
+          "Writable file scope:",
+          ...plan.allowedPaths.map((path) => `- ${path}`),
+          "Do not modify files outside this scope.",
+        ]),
     "Stay inside the current worktree. Do not commit, push, tag, publish, alter credentials, or expose secrets.",
     "Do not modify the roadmap or mark the selected candidate complete.",
     "Implement only the target files explicitly named by the selected candidate.",

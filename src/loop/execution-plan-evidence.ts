@@ -16,6 +16,7 @@ export type LoopExecutionPlanEvidence = Readonly<{
   model: string;
   effort: AgentEffort;
   budget: AgentBudget;
+  allowedPaths?: readonly string[];
   policy: Readonly<{
     id: string;
     mode: "execute" | "commit";
@@ -32,6 +33,7 @@ export type LoopExecutionPlanEvidence = Readonly<{
  */
 export function projectLoopExecutionPlanEvidence(
   resolution: AgentPolicyResolution | null,
+  allowedPaths?: readonly string[] | null,
 ): LoopExecutionPlanEvidence | null {
   if (
     resolution?.status !== "resolved" ||
@@ -52,6 +54,9 @@ export function projectLoopExecutionPlanEvidence(
     // not the provider profile's own declared effort. See LoopExecutionPlan.effort.
     effort: resolution.requirements.minimumEffort,
     budget: Object.freeze({ ...profile.budget }),
+    ...(allowedPaths === undefined || allowedPaths === null
+      ? {}
+      : { allowedPaths: Object.freeze([...allowedPaths].sort()) }),
     policy: Object.freeze({
       id: resolution.policyId,
       mode: resolution.mode,

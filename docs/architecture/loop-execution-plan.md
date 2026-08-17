@@ -20,6 +20,7 @@ The plan records:
 
 - the run, project and selected roadmap candidate;
 - the bounded context package;
+- for governed READY decisions, the immutable authorized writable file scope;
 - the selected provider, runtime, profile, model and effort;
 - the selected profile budget;
 - the policy identity, mode, required capabilities and permissions;
@@ -51,6 +52,7 @@ candidate + policy + context
 
 This removes policy/provider drift and closes the reconstruction gap: a provider
 cannot silently recalculate, widen or replace the admitted execution identity.
+Changing the authorized writable file scope changes the plan evidence fingerprint.
 The runner's `ready` evidence records the selected profile and the
 provider/runtime/model tuple without exposing executable paths or provider
 output.

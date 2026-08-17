@@ -30,6 +30,10 @@ if (captureCwd) writeFileSync(captureCwd, process.cwd());
 const mode = process.env.FAKE_CODEX_MODE ?? "success";
 if (mode === "hang") setInterval(() => {}, 1000);
 if (mode === "nonzero") process.exit(9);
+if (mode === "nonzero_after_write") {
+  writeFileSync("outside.md", "partial provider change\\n");
+  process.exit(9);
+}
 process.stdout.write(JSON.stringify({ type: "task.completed" }) + "\\n");
 `,
   );
@@ -120,6 +124,21 @@ describe("createCodexCliLoopExecutor", () => {
       assert.equal(result.status, "failed");
       assert.equal(result.status === "failed" ? result.failure.code : null, "provider_failed");
       assert.equal(JSON.stringify(result).includes("Codex CLI execution failed."), true);
+    } finally {
+      delete process.env.FAKE_CODEX_MODE;
+      cleanup();
+    }
+  });
+
+  it("reports provider modifications even when Codex exits non-zero", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    try {
+      process.env.FAKE_CODEX_MODE = "nonzero_after_write";
+      const result = await createCodexCliLoopExecutor({ executable, timeoutMs: 5_000 })(fakePlan(cwd));
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.status === "failed" ? result.failure.code : null, "provider_failed");
+      assert.deepEqual(result.modifiedFiles, ["outside.md"]);
     } finally {
       delete process.env.FAKE_CODEX_MODE;
       cleanup();

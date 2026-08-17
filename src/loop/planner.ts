@@ -17,6 +17,7 @@ export type LoopPlan =
       // execution decision contract and this candidate was authorized by it
       // (rather than by heuristic roadmap selection).
       authorizedBy?: "execution_decision";
+      allowedPaths?: readonly string[];
     }>
   | Readonly<{
       outcome: "blocked";
@@ -34,6 +35,8 @@ export type LoopPlan =
         | "candidate_authorization_mismatch"
         | "decision_missing"
         | "decision_malformed"
+        | "scope_missing"
+        | "scope_malformed"
         | "project_mismatch"
         | "sha_stale"
         | "decision_blocked"
@@ -183,7 +186,12 @@ export function planLoopCycle(
         ...PLANNED_STEPS_AFTER_CANDIDATE,
       ],
       snapshot,
-      ...(authorization.governed ? { authorizedBy: "execution_decision" as const } : {}),
+      ...(authorization.governed
+        ? {
+            authorizedBy: "execution_decision" as const,
+            allowedPaths: authorization.allowedPaths,
+          }
+        : {}),
     };
   }
 

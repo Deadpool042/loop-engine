@@ -7,6 +7,8 @@ import { parseExecutionDecisionFile } from "./execution-decision.js";
 export type ExecutionAuthorizationBlockedCode =
   | "decision_missing"
   | "decision_malformed"
+  | "scope_missing"
+  | "scope_malformed"
   | "project_mismatch"
   | "sha_stale"
   | "decision_blocked"
@@ -19,6 +21,7 @@ export type ExecutionAuthorizationResult =
       governed: true;
       authorized: true;
       candidateId: string;
+      allowedPaths: readonly string[];
     }>
   | Readonly<{
       governed: true;
@@ -78,7 +81,7 @@ export function resolveExecutionAuthorization(
 
   const parsed = parseExecutionDecisionFile(raw);
   if (!parsed.ok) {
-    return blocked("decision_malformed", parsed.reason);
+    return blocked(parsed.code ?? "decision_malformed", parsed.reason);
   }
 
   const { decision } = parsed;
@@ -119,7 +122,12 @@ export function resolveExecutionAuthorization(
         );
       }
 
-      return { governed: true, authorized: true, candidateId };
+      return {
+        governed: true,
+        authorized: true,
+        candidateId,
+        allowedPaths: decision.decision.candidate!.allowedPaths!,
+      };
     }
   }
 }

@@ -12,7 +12,10 @@ import type { LoopRunResult } from "../loop/types.js";
 export function generateExecutionReportWithEvidence(
   result: LoopRunResult,
 ): LoopRunResult {
-  const executionPlanEvidence = projectLoopExecutionPlanEvidence(result.agentPolicy);
+  const executionPlanEvidence = projectLoopExecutionPlanEvidence(
+    result.agentPolicy,
+    result.writableFileScope,
+  );
   const providerFailoverEvidence = result.providerFailoverEvidence ?? null;
 
   return Object.freeze({

@@ -23,15 +23,26 @@ function buildPrompt(plan: LoopExecutionPlan): string {
     `Project: ${plan.project.name}`,
     `Execution plan: provider=${plan.provider}, runtime=${plan.runtime}, profile=${plan.profileId}, model=${plan.model}, effort=${plan.effort}`,
     `Allowed context files: ${files || "none"}`,
+    ...(plan.allowedPaths === undefined
+      ? []
+      : [
+          "Writable file scope:",
+          ...plan.allowedPaths.map((path) => `- ${path}`),
+          "Do not modify files outside this scope.",
+        ]),
     "Stay inside the current worktree. Do not commit, push, tag, publish, or expose secrets.",
     "Finish by leaving the intended source changes in the worktree.",
   ].join("\n");
 }
 
-function failure(code: string, message: string): LoopExecutorResult {
+function failure(
+  code: string,
+  message: string,
+  modifiedFiles: readonly string[] = [],
+): LoopExecutorResult {
   return Object.freeze({
     status: "failed" as const,
-    modifiedFiles: Object.freeze([]),
+    modifiedFiles: Object.freeze([...modifiedFiles]),
     failure: Object.freeze({
       code,
       message,
@@ -178,19 +189,23 @@ export function createCodexCliLoopExecutor(
       timeoutMs,
       maxOutputBytes,
     );
-    if (result.exitCode === 124)
-      return failure(
-        "provider_limit_exceeded",
-        "Codex execution exceeded a configured limit.",
-      );
-    if (result.exitCode !== 0)
-      return failure("provider_failed", "Codex CLI execution failed.");
-
     const modifiedFiles = await readModifiedFiles(cwd);
     if (modifiedFiles === null)
       return failure(
         "worktree_status_failed",
         "Unable to inspect provider modifications.",
+      );
+    if (result.exitCode === 124)
+      return failure(
+        "provider_limit_exceeded",
+        "Codex execution exceeded a configured limit.",
+        modifiedFiles,
+      );
+    if (result.exitCode !== 0)
+      return failure(
+        "provider_failed",
+        "Codex CLI execution failed.",
+        modifiedFiles,
       );
     return Object.freeze({
       status: "completed" as const,
