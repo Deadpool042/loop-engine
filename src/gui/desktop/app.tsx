@@ -11,7 +11,10 @@ import {
   type PlanDetail,
 } from "./plan-contract.js";
 import type { DesktopExecuteProvider } from "./execute-handler.js";
-import { buildGuidedFlowSteps } from "./guided-flow.js";
+import {
+  buildGuidedFlowSteps,
+  getFocusedGuidedFlowStepId,
+} from "./guided-flow.js";
 import {
   parseSummaryResponse,
   type SummaryProject,
@@ -75,6 +78,7 @@ export function App(): React.JSX.Element {
       isPlanForSelectedProject(planProjectName, selectedProjectName),
     hasExecutionOutcome: executeResult !== null || executeMessage !== null,
   });
+  const focusedStepId = getFocusedGuidedFlowStepId(guidedFlowSteps);
 
   useEffect(() => {
     if (selectedProjectName === null) {
@@ -459,6 +463,7 @@ export function App(): React.JSX.Element {
                   </dd>
                 </div>
               </dl>
+              {focusedStepId === "work" && (
               <section className="mt-8 border-t border-loop-line pt-6">
                 <h3 className="m-0 text-base font-semibold">Contexte projet</h3>
                 {contextLoading && (
@@ -573,8 +578,16 @@ export function App(): React.JSX.Element {
                   </div>
                 )}
               </section>
+              )}
+              {(focusedStepId === "prepare" || focusedStepId === "execute" || focusedStepId === "result") && (
               <section className="mt-8 border-t border-loop-line pt-6">
-                <h3 className="m-0 text-base font-semibold">Plan explicite</h3>
+                <h3 className="m-0 text-base font-semibold">
+                  {focusedStepId === "prepare"
+                    ? "Préparation"
+                    : focusedStepId === "execute"
+                      ? "Exécution"
+                      : "Résultat"}
+                </h3>
                 {planLoading && (
                   <p className="mt-3 text-sm text-loop-muted">
                     Préparation du plan…
@@ -672,6 +685,8 @@ export function App(): React.JSX.Element {
                   </div>
                 )}
               </section>
+              )}
+              {focusedStepId === "result" && (
               <section className="mt-8 border-t border-loop-line pt-6">
                 <h3 className="m-0 text-base font-semibold">Review</h3>
                 {reviewLoading && (
@@ -777,6 +792,7 @@ export function App(): React.JSX.Element {
                   </div>
                 )}
               </section>
+              )}
             </article>
           )}
         </section>
