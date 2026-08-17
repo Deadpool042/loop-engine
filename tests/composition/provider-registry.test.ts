@@ -34,6 +34,19 @@ describe("LoopProviderRegistry", () => {
     assert.equal(Object.isFrozen(profile), true);
   });
 
+  it("uses the configured Codex default model and effort when no override is supplied", () => {
+    const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
+      id: "codex",
+      executable: "/usr/local/bin/codex",
+    });
+
+    assert.deepEqual(assembly.agentRegistry.profiles.map((profile) => ({
+      id: profile.id,
+      model: profile.model,
+      effort: profile.effort,
+    })), [{ id: "configured.codex", model: "gpt-5.6-terra", effort: "medium" }]);
+  });
+
   it("rejects duplicate provider registrations deterministically", () => {
     assert.throws(
       () =>

@@ -45,7 +45,7 @@ test("falls back after a recoverable provider failure", async () => {
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
     attempts: [
-      { plan: plan("openai", "gpt-5-codex"), executor: failed("provider_timeout") },
+      { plan: plan("openai", "gpt-5.6-terra"), executor: failed("provider_timeout") },
       { plan: plan("anthropic", "claude-sonnet"), executor: completed("src/result.ts") },
     ],
   });
@@ -72,7 +72,7 @@ test("stops immediately on a terminal provider failure", async () => {
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
     attempts: [
-      { plan: plan("openai", "gpt-5-codex"), executor: failed("policy_rejected") },
+      { plan: plan("openai", "gpt-5.6-terra"), executor: failed("policy_rejected") },
       { plan: plan("anthropic", "claude-sonnet"), executor: fallback },
     ],
   });

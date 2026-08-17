@@ -14,7 +14,9 @@ const ARCHITECTURE_FILE =
 const REQUIRED_PROVIDER_TOKENS = Object.freeze([
   'basename(options.executable.trim()) !== "codex"',
   "return async (plan)",
-  'const args = ["exec", "--full-auto", "--model", plan.model]',
+  '"--sandbox"',
+  '"workspace-write"',
+  '"--json"',
   'plan.provider !== "openai" || plan.runtime !== "codex"',
   "shell: false",
   "maxOutputBytes",
@@ -42,6 +44,7 @@ const REQUIRED_COMMAND_TOKENS = Object.freeze([
   'mode === "publish"',
 ]);
 const FORBIDDEN_TOKENS = Object.freeze([
+  "--full-auto",
   "git push",
   "git tag",
   "reset --hard",

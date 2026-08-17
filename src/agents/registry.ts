@@ -76,7 +76,7 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     id: "codex.medium",
     runtime: "codex",
     provider: "openai",
-    model: "gpt-5-codex",
+    model: "gpt-5.6-terra",
     effort: "medium",
     capabilities: ["code_edit", "shell_exec", "test_execution"],
     permissions: ["read_only", "write_worktree", "shell_exec"],

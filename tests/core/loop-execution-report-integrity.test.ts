@@ -13,7 +13,7 @@ function evidence(): LoopExecutionPlanEvidence {
     provider: "openai",
     runtime: "codex",
     profileId: "codex-medium",
-    model: "gpt-5-codex",
+    model: "gpt-5.6-terra",
     effort: "medium",
     budget: {
       maxTokens: 10_000,

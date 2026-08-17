@@ -162,7 +162,14 @@ export function createCodexCliLoopExecutor(
         "Codex execution requires a clean worktree.",
       );
 
-    const args = ["exec", "--full-auto", "--model", plan.model];
+    const args = [
+      "exec",
+      "--sandbox",
+      "workspace-write",
+      "--model",
+      plan.model,
+      "--json",
+    ];
     args.push(buildPrompt(plan));
     const result = await runProcess(
       options.executable.trim(),
