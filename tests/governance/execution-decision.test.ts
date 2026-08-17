@@ -13,6 +13,8 @@ function validYaml(overrides: Record<string, string> = {}): string {
     "  state: READY",
     "  candidate:",
     "    id: C7-L1",
+    "    allowedPaths:",
+    "      - docs/platform/**",
     "source:",
     `  gitHead: ${SHA}`,
   ];
@@ -26,6 +28,7 @@ describe("parseExecutionDecisionFile", () => {
     if (result.ok) {
       assert.equal(result.decision.decision.state, "READY");
       assert.equal(result.decision.decision.candidate?.id, "C7-L1");
+      assert.deepEqual(result.decision.decision.candidate?.allowedPaths, ["docs/platform/**"]);
       assert.equal(result.decision.source.gitHead, SHA);
     }
   });
@@ -96,6 +99,21 @@ describe("parseExecutionDecisionFile", () => {
 
     const result = parseExecutionDecisionFile(yaml);
     assert.equal(result.ok, false);
+  });
+
+  it("classifies a missing READY writable file scope separately", () => {
+    const result = parseExecutionDecisionFile([
+      "version: 1",
+      "project: fixture",
+      "decision:",
+      "  state: READY",
+      "  candidate:",
+      "    id: C7-L1",
+      "source:",
+      `  gitHead: ${SHA}`,
+    ].join("\n"));
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.code, "scope_missing");
   });
 
   it("rejects a gitHead that is not a full 40-character SHA", () => {

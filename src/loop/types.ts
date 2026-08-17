@@ -59,6 +59,7 @@ export type LoopRunResult = Readonly<{
   failure: LoopRunFailure | null;
   agentPolicy: AgentPolicyResolution | null;
   contextPackage: MinimalContextPackage | null;
+  writableFileScope?: readonly string[] | null;
   executionPlanEvidence?: LoopExecutionPlanEvidence | null;
   executionPlanFingerprint?: LoopExecutionPlanFingerprint | null;
   providerFailoverEvidence?: LoopProviderFailoverEvidence | null;

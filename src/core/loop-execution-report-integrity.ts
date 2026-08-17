@@ -92,6 +92,7 @@ function isExecutionPlanEvidence(
     isNonEmptyString(value.model) &&
     isMember(AGENT_EFFORTS, value.effort) &&
     isAgentBudget(value.budget) &&
+    (value.allowedPaths === undefined || isStringArray(value.allowedPaths)) &&
     isNonEmptyString(value.policy.id) &&
     (value.policy.mode === "execute" || value.policy.mode === "commit") &&
     Array.isArray(value.policy.requiredCapabilities) &&

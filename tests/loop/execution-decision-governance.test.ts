@@ -59,6 +59,8 @@ function readyDecision(headSha: string, candidateId: string, project = "fixture"
     "  state: READY",
     "  candidate:",
     `    id: ${candidateId}`,
+    "    allowedPaths:",
+    "      - src/**",
     "source:",
     `  gitHead: ${headSha}`,
   ].join("\n");
@@ -155,6 +157,29 @@ describe("project-owned execution decision governance", () => {
       assert.equal(plan.code, "decision_malformed");
     } finally {
       rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("blocks READY decisions with a missing or malformed writable file scope", () => {
+    for (const decisionYaml of [
+      (sha: string) => [
+        "version: 1", "project: fixture", "decision:", "  state: READY", "  candidate:", "    id: H1-L4", "source:", `  gitHead: ${sha}`,
+      ].join("\n"),
+      (sha: string) => [
+        "version: 1", "project: fixture", "decision:", "  state: READY", "  candidate:", "    id: H1-L4", "    allowedPaths:", "      - docs/*/README.md", "source:", `  gitHead: ${sha}`,
+      ].join("\n"),
+    ]) {
+      const { project } = setupGovernedProject({
+        roadmap: "| H1-L4 | Item | ⬜ À faire |",
+        decisionYaml,
+      });
+      try {
+        const plan = planLoopCycle(project);
+        assert.equal(plan.outcome, "blocked");
+        assert.ok(plan.code === "scope_missing" || plan.code === "scope_malformed");
+      } finally {
+        rmSync(project.path, { recursive: true, force: true });
+      }
     }
   });
 

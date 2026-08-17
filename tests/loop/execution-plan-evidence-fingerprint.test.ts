@@ -66,6 +66,18 @@ test("detects evidence drift", () => {
   );
 });
 
+test("detects writable file scope drift", () => {
+  const original = { ...evidence(), allowedPaths: ["docs/platform/**"] };
+  const fingerprint = fingerprintLoopExecutionPlanEvidence(original);
+  assert.equal(
+    verifyLoopExecutionPlanEvidenceFingerprint(
+      { ...original, allowedPaths: ["docs/roadmap/**"] },
+      fingerprint,
+    ),
+    false,
+  );
+});
+
 test("execution report emits evidence and matching fingerprint together", () => {
   const policy = {
     status: "resolved",

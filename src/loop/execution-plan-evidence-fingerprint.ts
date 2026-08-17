@@ -29,6 +29,9 @@ export function canonicalizeLoopExecutionPlanEvidence(
     model: evidence.model,
     effort: evidence.effort,
     budget: evidence.budget,
+    ...(evidence.allowedPaths === undefined
+      ? {}
+      : { allowedPaths: canonicalStringArray(evidence.allowedPaths) }),
     policy: {
       id: evidence.policy.id,
       mode: evidence.policy.mode,

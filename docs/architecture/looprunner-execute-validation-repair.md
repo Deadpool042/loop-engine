@@ -18,6 +18,7 @@ plan candidate
 -> build bounded context
 -> call one injected LoopExecutor
 -> collect reported modified files
+-> enforce the governed writable file scope
 -> run configured validations and audit commands
 -> optionally call one injected LoopRepairer per failed validation
 -> stop after maxRepairs
@@ -127,6 +128,24 @@ populates it with its documented value.
 The runner merges file paths reported by the executor and repairer ports,
 removes empty values and duplicates, and returns a stable sorted array. The
 runner never derives a commit from this list.
+
+For a project-owned `execution_decision` in `READY`, the candidate also carries
+a non-empty `allowedPaths` list. V1 accepts only exact relative POSIX paths
+(for example `README.md`) and terminal recursive prefixes (for example
+`docs/platform/**`). The prompt informs the provider of this scope, but the
+post-executor scope guard is the authority: a reported path outside it fails
+with `scope_violation` before validation, repair, patch export, commit or
+publication. The same guard runs again after every repair. Legacy projects
+without `execution_decision` retain their existing advisory execution behavior.
+
+### Rename and copy inventory limitation
+
+The provider adapters preserve Git's NUL-delimited porcelain parsing. Their
+current V1 `modifiedFiles` contract records the destination path for rename and
+copy entries, then skips the source record. Added, modified and deleted paths
+are covered by the scope guard. Extending scope authority to both rename/copy
+endpoints would also require aligning the patch-export inventory contract, so
+it remains explicit follow-up debt rather than widening this micro-lot.
 
 ## Repair budget
 

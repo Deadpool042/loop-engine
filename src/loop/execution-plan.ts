@@ -21,6 +21,7 @@ export type CreateLoopExecutionPlanInput = Readonly<{
   candidate: RoadmapCandidate;
   agentPolicy: AgentPolicyResolution;
   contextPackage: MinimalContextPackage;
+  allowedPaths?: readonly string[];
 }>;
 
 export type LoopExecutionPlan = Readonly<{
@@ -29,6 +30,7 @@ export type LoopExecutionPlan = Readonly<{
   project: ProjectConfig;
   candidate: RoadmapCandidate;
   contextPackage: MinimalContextPackage;
+  allowedPaths?: readonly string[];
   provider: AgentProvider;
   runtime: AgentRuntime;
   profileId: string;
@@ -84,6 +86,9 @@ export function createLoopExecutionPlan(
     project: input.project,
     candidate: input.candidate,
     contextPackage: input.contextPackage,
+    ...(input.allowedPaths === undefined
+      ? {}
+      : { allowedPaths: Object.freeze([...input.allowedPaths]) }),
     provider: profile.provider,
     runtime: profile.runtime,
     profileId: profile.id,

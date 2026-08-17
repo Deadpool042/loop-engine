@@ -1,4 +1,5 @@
 import YAML from "yaml";
+import { parseAllowedPaths } from "../loop/file-scope.js";
 
 export const EXECUTION_DECISION_STATES = [
   "READY",
@@ -18,7 +19,7 @@ export type ExecutionDecisionFile = Readonly<{
     state: ExecutionDecisionState;
     reason?: string;
     nextAction?: string;
-    candidate?: Readonly<{ id: string }>;
+    candidate?: Readonly<{ id: string; allowedPaths?: readonly string[] }>;
   }>;
   source: Readonly<{
     document?: string;
@@ -28,7 +29,7 @@ export type ExecutionDecisionFile = Readonly<{
 
 export type ExecutionDecisionParseResult =
   | Readonly<{ ok: true; decision: ExecutionDecisionFile }>
-  | Readonly<{ ok: false; reason: string }>;
+  | Readonly<{ ok: false; reason: string; code?: "scope_missing" | "scope_malformed" }>;
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -92,7 +93,7 @@ export function parseExecutionDecisionFile(
   }
   const state = stateRaw as ExecutionDecisionState;
 
-  let candidate: Readonly<{ id: string }> | undefined;
+  let candidate: Readonly<{ id: string; allowedPaths?: readonly string[] }> | undefined;
   if (decisionRaw.candidate !== undefined) {
     if (
       !isPlainObject(decisionRaw.candidate) ||
@@ -111,6 +112,11 @@ export function parseExecutionDecisionFile(
       ok: false,
       reason: "Execution decision state READY requires decision.candidate.id.",
     };
+  }
+  if (state === "READY") {
+    const scope = parseAllowedPaths((decisionRaw.candidate as Record<string, unknown>).allowedPaths);
+    if (!scope.ok) return { ok: false, code: scope.code, reason: scope.reason };
+    candidate = { ...candidate!, allowedPaths: scope.allowedPaths };
   }
 
   const sourceRaw = parsed.source;

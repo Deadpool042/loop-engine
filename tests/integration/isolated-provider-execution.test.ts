@@ -263,6 +263,82 @@ describe("isolated provider execution", () => {
     }
   });
 
+  it("quarantines an out-of-scope isolated provider delta before validation or patch export", async () => {
+    const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
+    const project = await createRepository(root, "source");
+    const patchPath = join(root, "scope-violation.patch");
+    const app = application([project], root);
+    let validatorCalls = 0;
+
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success_with_file";
+      const result = await app.runLoopExecute(project.name, {
+        ...optionsFor([project]),
+        planLoopCycle: (executionProject) => ({
+          outcome: "ready" as const,
+          candidate: candidate(),
+          plannedSteps: ["Execute", "Validate"],
+          snapshot: snapshot(executionProject),
+          authorizedBy: "execution_decision" as const,
+          allowedPaths: ["docs/platform/**"],
+        }),
+        exportPatchPath: patchPath,
+        validator: async () => {
+          validatorCalls += 1;
+          return { status: "passed" as const, failedCommand: null, exitCode: 0, details: [] };
+        },
+      });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.failure?.code, "scope_violation");
+      assert.equal(result.validation, null);
+      assert.equal(result.patchExport, undefined);
+      assert.equal(validatorCalls, 0);
+      await assert.rejects(readFile(patchPath, "utf8"));
+      await assertCleanSource(project, "provider-created.txt");
+      await assertNoOrphans(root);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps a deleted tracked file in the scoped Git inventory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
+    const project = await createRepository(root, "source");
+    const app = application([project], root);
+
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success_with_deleted_file";
+      const result = await app.runLoopExecute(project.name, {
+        ...optionsFor([project]),
+        planLoopCycle: (executionProject) => ({
+          outcome: "ready" as const,
+          candidate: candidate(),
+          plannedSteps: ["Execute", "Validate"],
+          snapshot: snapshot(executionProject),
+          authorizedBy: "execution_decision" as const,
+          allowedPaths: ["README.md"],
+        }),
+      });
+
+      assert.equal(result.status, "completed");
+      assert.deepEqual(result.modifiedFiles, ["README.md"]);
+      assert.equal(await readFile(join(project.path, "README.md"), "utf8"), "source\n");
+      assert.equal(
+        execFileSync("git", ["status", "--porcelain=v1"], {
+          cwd: project.path,
+          encoding: "utf8",
+        }),
+        "",
+      );
+      await assertNoOrphans(root);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("runs a bounded injected repairer in the provider and validator worktree", async () => {
     const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
     const project = await createRepository(root, "source");

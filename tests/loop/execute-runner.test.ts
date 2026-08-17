@@ -98,6 +98,130 @@ function deterministicOptions() {
 }
 
 describe("runLoopExecute", () => {
+  it("blocks a governed scope violation before validation or repair", async () => {
+    let executorCalls = 0;
+    let validatorCalls = 0;
+    let repairCalls = 0;
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      planLoopCycle: () => ({
+        outcome: "ready" as const,
+        candidate: fixtureCandidate(),
+        plannedSteps: [],
+        snapshot: fixtureSnapshot(fixtureProject(), fixtureCandidate()),
+        authorizedBy: "execution_decision" as const,
+        allowedPaths: ["docs/platform/**"],
+      }),
+      maxRepairs: 1,
+      executor: async () => {
+        executorCalls += 1;
+        return {
+          status: "completed",
+          modifiedFiles: ["docs/platform/README.md", "docs/roadmap/projet-lp-infra.md"],
+          details: [],
+        };
+      },
+      validator: async () => {
+        validatorCalls += 1;
+        return { status: "passed", failedCommand: null, exitCode: 0, details: [] };
+      },
+      repairer: async () => {
+        repairCalls += 1;
+        return { status: "completed", modifiedFiles: [], details: [] };
+      },
+    });
+
+    assert.equal(executorCalls, 1);
+    assert.equal(validatorCalls, 0);
+    assert.equal(repairCalls, 0);
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "scope_violation");
+    assert.match(result.failure?.details.join("\n") ?? "", /docs\/roadmap\/projet-lp-infra\.md/);
+    assert.equal(result.validation, null);
+    assert.equal(result.patchExport, undefined);
+    assert.equal(result.commit, null);
+    assert.equal(result.publication, null);
+  });
+
+  it("rechecks governed scope after repair before a second validation", async () => {
+    let validatorCalls = 0;
+    let repairCalls = 0;
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      planLoopCycle: () => ({
+        outcome: "ready" as const,
+        candidate: fixtureCandidate(),
+        plannedSteps: [],
+        snapshot: fixtureSnapshot(fixtureProject(), fixtureCandidate()),
+        authorizedBy: "execution_decision" as const,
+        allowedPaths: ["src/**"],
+      }),
+      maxRepairs: 1,
+      executor: async () => ({ status: "completed", modifiedFiles: ["src/feature.ts"], details: [] }),
+      validator: async () => {
+        validatorCalls += 1;
+        return { status: "failed", failedCommand: "pnpm run typecheck", exitCode: 1, details: [] };
+      },
+      repairer: async () => {
+        repairCalls += 1;
+        return { status: "completed", modifiedFiles: ["docs/outside.md"], details: [] };
+      },
+    });
+
+    assert.equal(validatorCalls, 1);
+    assert.equal(repairCalls, 1);
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "scope_violation");
+    assert.equal(result.validation?.status, "failed");
+    assert.equal(result.validation?.attempts, 1);
+    assert.equal(result.commit, null);
+    assert.equal(result.publication, null);
+  });
+
+  it("prioritizes scope violation when a failed repair modifies outside the authorized scope", async () => {
+    let validatorCalls = 0;
+    let repairCalls = 0;
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      planLoopCycle: () => ({
+        outcome: "ready" as const,
+        candidate: fixtureCandidate(),
+        plannedSteps: [],
+        snapshot: fixtureSnapshot(fixtureProject(), fixtureCandidate()),
+        authorizedBy: "execution_decision" as const,
+        allowedPaths: ["src/**"],
+      }),
+      maxRepairs: 1,
+      executor: async () => ({ status: "completed", modifiedFiles: ["src/feature.ts"], details: [] }),
+      validator: async () => {
+        validatorCalls += 1;
+        return { status: "failed", failedCommand: "pnpm run typecheck", exitCode: 1, details: [] };
+      },
+      repairer: async () => {
+        repairCalls += 1;
+        return {
+          status: "failed",
+          modifiedFiles: ["docs/outside.md"],
+          failure: {
+            code: "repair_rejected",
+            message: "Repair failed after a partial edit.",
+            details: ["Stable repair failure."],
+          },
+        };
+      },
+    });
+
+    assert.equal(validatorCalls, 1);
+    assert.equal(repairCalls, 1);
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "scope_violation");
+    assert.match(result.failure?.details.join("\n") ?? "", /docs\/outside\.md/);
+    assert.equal(result.validation?.attempts, 1);
+    assert.equal(result.validation?.repairAttempts, 1);
+    assert.equal(result.commit, null);
+    assert.equal(result.publication, null);
+  });
+
   it("executes once, validates once and reports modified files without commit", async () => {
     let executorCalls = 0;
     let validatorCalls = 0;

@@ -10,6 +10,7 @@ import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
 import { resolvePolicy } from "../policy/resolver.js";
 import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
 import { createLoopExecutionPlan } from "./execution-plan.js";
+import { findOutOfScopeFiles } from "./file-scope.js";
 import { planLoopCycle, type LoopPlan } from "./planner.js";
 import { canTransition } from "./state-machine.js";
 import {
@@ -139,6 +140,7 @@ export async function runLoopExecute(
   let validation: LoopRunValidation | null = null;
   let agentPolicy: AgentPolicyResolution | null = null;
   let contextPackage: MinimalContextPackage | null = null;
+  let writableFileScope: readonly string[] | null = null;
 
   function transition(
     to: LoopRunStatus,
@@ -184,6 +186,7 @@ export async function runLoopExecute(
       failure,
       agentPolicy,
       contextPackage,
+      writableFileScope,
     });
   }
 
@@ -282,8 +285,10 @@ export async function runLoopExecute(
       candidate: cycle.candidate,
       agentPolicy,
       contextPackage,
+      ...(cycle.allowedPaths === undefined ? {} : { allowedPaths: cycle.allowedPaths }),
     }),
   );
+  writableFileScope = executionPlan.allowedPaths ?? null;
 
   transition("ready", "ready", "completed", [
     `Selected candidate: ${cycle.candidate.text}`,
@@ -311,7 +316,25 @@ export async function runLoopExecute(
     );
   }
 
+  function failForScopeViolation(): LoopRunResult | null {
+    if (writableFileScope === null) return null;
+    const rejected = findOutOfScopeFiles([...modifiedFiles], writableFileScope);
+    if (rejected.length === 0) return null;
+    transition("failed", "failed", "failed", ["Modified files fall outside the authorized writable file scope."]);
+    return finalize(
+      cycle.candidate,
+      Object.freeze({
+        code: "scope_violation",
+        message: "Modified files fall outside the authorized writable file scope.",
+        details: Object.freeze(rejected.map((path) => `Out of scope: ${path}`)),
+      }),
+    );
+  }
+
   addModifiedFiles(modifiedFiles, executionResult.modifiedFiles);
+  const initialScopeFailure = failForScopeViolation();
+  if (initialScopeFailure !== null) return initialScopeFailure;
+
   if (executionResult.status === "failed") {
     transition("failed", "failed", "failed", [executionResult.failure.message]);
     return finalize(cycle.candidate, executionResult.failure);
@@ -448,6 +471,9 @@ export async function runLoopExecute(
     }
 
     addModifiedFiles(modifiedFiles, repairResult.modifiedFiles);
+    const repairScopeFailure = failForScopeViolation();
+    if (repairScopeFailure !== null) return repairScopeFailure;
+
     if (repairResult.status === "failed") {
       transition("failed", "failed", "failed", [repairResult.failure.message]);
       return finalize(cycle.candidate, repairResult.failure);
