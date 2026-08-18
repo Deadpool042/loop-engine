@@ -20,6 +20,7 @@ export type GuidedFlowState = {
   candidateAddressable: boolean;
   planLoading: boolean;
   hasPlan: boolean;
+  hasPlanError: boolean;
   hasExecutionOutcome: boolean;
 };
 
@@ -66,7 +67,7 @@ export function buildGuidedFlowSteps(
         ? "active"
         : workBlocked
           ? "blocked"
-          : workReady && (state.planLoading || state.hasPlan)
+          : workReady && (state.planLoading || state.hasPlan || state.hasPlanError)
             ? "done"
             : "active",
     },
@@ -77,9 +78,11 @@ export function buildGuidedFlowSteps(
         ? "pending"
         : state.hasPlan
           ? "done"
-          : state.planLoading
-            ? "active"
-            : "pending",
+          : state.hasPlanError
+            ? "blocked"
+            : state.planLoading
+              ? "active"
+              : "pending",
     },
     {
       id: "execute",

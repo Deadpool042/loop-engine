@@ -78,6 +78,7 @@ export function App(): React.JSX.Element {
     hasPlan:
       planDetail !== null &&
       isPlanForSelectedProject(planProjectName, selectedProjectName),
+    hasPlanError: planError !== null,
     hasExecutionOutcome: executeResult !== null || executeMessage !== null,
   });
   const focusedStepId = getFocusedGuidedFlowStepId(guidedFlowSteps);
