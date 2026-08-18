@@ -40,15 +40,23 @@ et n'appelle aucun provider.
 Le preload expose seulement les API explicites suivantes :
 
 ```ts
-window.loopDesktop.summary()
-window.loopDesktop.context(projectName)
-window.loopDesktop.review(projectName)
-window.loopDesktop.plan(projectName, candidateId)
-window.loopDesktop.execute({ projectName, candidateId, provider })
+window.loopDesktop.summary();
+window.loopDesktop.context(projectName);
+window.loopDesktop.review(projectName);
+window.loopDesktop.plan(projectName, candidateId);
+window.loopDesktop.execute({ projectName, candidateId, provider, model });
+window.loopDesktop.startExecution({
+  projectName,
+  candidateId,
+  provider,
+  model,
+});
+window.loopDesktop.executionSession(sessionId);
 ```
 
 Elles correspondent uniquement aux canaux `loop:summary`, `loop:context` et
-`loop:review`, `loop:plan`, `loop:execute`. Il n'existe aucun IPC générique de la forme commande +
+`loop:review`, `loop:plan`, `loop:execute`, `loop:execution-start` et
+`loop:execution-session`. Il n'existe aucun IPC générique de la forme commande +
 arguments, et `ipcRenderer` n'est pas exposé au renderer.
 
 Le renderer ne peut jamais fournir le `cwd`. Le process principal résout le
@@ -64,24 +72,46 @@ validation ou exécution provider, sauf l'exécution isolée explicitement confi
 
 Le process principal invoque exclusivement :
 
-| IPC | Commande CLI |
-| --- | --- |
-| `loop:summary` | `pnpm loop summary --json` |
-| `loop:context` | `pnpm loop context <project> --json` |
-| `loop:review` | `pnpm loop review <project> --json` |
-| `loop:plan` | `pnpm loop run <project> --candidate <id> --mode plan --json` |
+| IPC            | Commande CLI                                                                                             |
+| -------------- | -------------------------------------------------------------------------------------------------------- |
+| `loop:summary` | `pnpm loop summary --json`                                                                               |
+| `loop:context` | `pnpm loop context <project> --json`                                                                     |
+| `loop:review`  | `pnpm loop review <project> --json`                                                                      |
+| `loop:plan`    | `pnpm loop run <project> --candidate <id> --mode plan --json`                                            |
 | `loop:execute` | `pnpm loop run <project> --candidate <id> --mode execute ... --export-patch <native destination> --json` |
 
-Le `CliInvoker` se limite au lancement, au délai d'expiration et au parsing
-JSON. Les contrats renderer ne lisent que les champs affichés et rejettent les
-réponses invalides.
+Le `CliInvoker` des lectures reste limité au lancement, au délai d'expiration
+et au parsing JSON. L'exécution longue dispose d'une frontière dédiée : le
+main process lance le CLI avec un canal auxiliaire de transitions structurées.
+Le JSON final reste sur stdout et conserve son contrat existant ; le renderer
+ne reçoit jamais stdout/stderr brut, prompt, secrets, termes interdits ni
+diagnostics internes redacted.
+
+Après confirmation, `startExecution` ouvre une unique session observable. La
+vue affiche le projet, candidat, provider, modèle, effort issu du plan,
+statut, historique court et résultat final / export de patch existants. Les
+seuls événements publics sont `session_started`, `preparing`,
+`execution_started`, `validation_started`, `completed` et `failed`. Ils sont
+émis par les transitions effectives du runner (pas par temporisation), conservés
+dans une fenêtre bornée de 24 événements et consultés par identifiant de
+session. Un second démarrage pendant une session non terminale est refusé
+déterministiquement. La fermeture normale de la fenêtre reste bloquée jusqu'au
+résultat terminal.
+
+Il n'y a ni terminal/shell générique, ni pseudo-terminal, ni commande ou cwd
+contrôlable par React, ni exécution parallèle, queue, commit, push, merge ou
+application du patch. L'annulation n'est pas exposée : le runtime courant ne
+démontre pas encore l'arrêt et le nettoyage bornés du provider et du worktree.
 
 Les lectures conservent leur délai court. `loop:execute` utilise un invoker
 distinct borné à 15 minutes : il couvre au plus 10 minutes de Claude Code,
 les validations, le nettoyage et une marge, sans délai infini ni réglage
 contrôlable par le renderer. Une fermeture normale de la fenêtre est bloquée
-pendant cette invocation ; l'arrêt forcé du processus reste hors garantie de
-cleanup.
+pendant cette invocation. Au timeout, le process CLI reçoit `SIGTERM`, puis
+`SIGKILL` après une grâce bornée si nécessaire. Une seconde grâce bornée attend
+la fermeture : à défaut, la session échoue publiquement sans prétendre que le
+process est arrêté. Cette frontière ne prétend pas nettoyer ni contrôler les
+descendants du provider.
 
 ## Cible et lots futurs
 

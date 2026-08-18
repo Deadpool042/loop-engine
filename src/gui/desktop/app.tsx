@@ -12,6 +12,7 @@ import {
   type PlanDetail,
 } from "./plan-contract.js";
 import type { DesktopExecuteProvider } from "./execute-handler.js";
+import type { DesktopExecutionSession } from "./execution-session.js";
 import {
   buildGuidedFlowSteps,
   getFocusedGuidedFlowStepId,
@@ -41,6 +42,39 @@ function HealthMark({
   );
 }
 
+export function startExecutionSessionPolling(options: {
+  sessionId: string;
+  fetchSession: (sessionId: string) => Promise<DesktopExecutionSession | null>;
+  onSession: (session: DesktopExecutionSession) => void;
+  setIntervalFn?: (callback: () => void, delayMs: number) => number;
+  clearIntervalFn?: (timer: number) => void;
+}): () => void {
+  const setIntervalFn = options.setIntervalFn ?? window.setInterval;
+  const clearIntervalFn = options.clearIntervalFn ?? window.clearInterval;
+  let active = true;
+  let polling = false;
+  const poll = async (): Promise<void> => {
+    if (polling || !active) return;
+    polling = true;
+    try {
+      const current = await options.fetchSession(options.sessionId);
+      if (!active || current === null) return;
+      options.onSession(current);
+      if (current.result !== null) {
+        active = false;
+        clearIntervalFn(timer);
+      }
+    } finally {
+      polling = false;
+    }
+  };
+  const timer = setIntervalFn(() => { void poll(); }, 750);
+  return () => {
+    active = false;
+    clearIntervalFn(timer);
+  };
+}
+
 export function App(): React.JSX.Element {
   const [projects, setProjects] = useState<readonly SummaryProject[]>([]);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(
@@ -64,6 +98,7 @@ export function App(): React.JSX.Element {
   const [executeLoading, setExecuteLoading] = useState(false);
   const [executeMessage, setExecuteMessage] = useState<string | null>(null);
   const [executeResult, setExecuteResult] = useState<Record<string, unknown> | null>(null);
+  const [executionSession, setExecutionSession] = useState<DesktopExecutionSession | null>(null);
   const planRequestId = useRef(0);
   const selectedProject =
     projects.find((project) => project.project.name === selectedProjectName) ??
@@ -211,28 +246,43 @@ export function App(): React.JSX.Element {
     setExecuteLoading(true);
     setExecuteMessage(null);
     setExecuteResult(null);
+    setExecutionSession(null);
     try {
-      const result = await window.loopDesktop.execute({
+      const started = await window.loopDesktop.startExecution({
         projectName: selectedProjectName,
         candidateId: candidate.id,
         provider: executeProvider,
         model: planDetail.profile.model,
       });
-      if (!result.ok) {
-        setExecuteMessage(
-          result.kind === "cancelled" ? "Exécution annulée avant démarrage." : result.raw,
-        );
-      } else if (typeof result.json === "object" && result.json !== null && !Array.isArray(result.json)) {
-        setExecuteResult(result.json as Record<string, unknown>);
-      } else {
-        setExecuteMessage("La réponse execute ne respecte pas le contrat JSON attendu.");
+      if (!started.ok) {
+        setExecuteMessage(started.raw);
+        return;
       }
+      setExecutionSession(started.session);
     } catch {
       setExecuteMessage("Impossible de lancer l’exécution isolée.");
     } finally {
       setExecuteLoading(false);
     }
   }
+
+  useEffect(() => {
+    const session = executionSession;
+    if (session === null || session.result !== null) return;
+    return startExecutionSessionPolling({
+      sessionId: session.id,
+      fetchSession: (sessionId) => window.loopDesktop.executionSession(sessionId),
+      onSession: setExecutionSession,
+    });
+  }, [executionSession?.id]);
+
+  useEffect(() => {
+    if (executionSession?.result !== null && executionSession !== null) {
+      if (!executionSession.result.ok) setExecuteMessage(executionSession.result.raw);
+      else if (typeof executionSession.result.json === "object" && executionSession.result.json !== null && !Array.isArray(executionSession.result.json)) setExecuteResult(executionSession.result.json as Record<string, unknown>);
+      else setExecuteMessage("La réponse execute ne respecte pas le contrat JSON attendu.");
+    }
+  }, [executionSession]);
 
   useEffect(() => {
     if (selectedProjectName === null) {
@@ -745,9 +795,21 @@ export function App(): React.JSX.Element {
                       <p className="mt-3 text-sm">Validations prévues : {contextDetail?.validation.commands.length ?? 0} · maxRepairs : 0</p>
                       <p className="mt-2 text-sm text-loop-muted">Le provider s’exécute dans un worktree Git isolé, mais n’est pas sandboxé au niveau du système d’exploitation.</p>
                       <p className="mt-2 text-sm text-loop-muted">Le dépôt source ne sera pas modifié et le patch ne sera pas appliqué automatiquement.</p>
-                      <Button type="button" size="sm" className="mt-3" disabled={executeLoading} onClick={executePlan}>
+                      <Button type="button" size="sm" className="mt-3" disabled={executeLoading || executionSession?.result === null} onClick={executePlan}>
                         {executeLoading ? "Exécution isolée en cours…" : "Confirmer et choisir la destination du patch"}
                       </Button>
+                      {executionSession && (
+                        <section className="mt-4 rounded-md border border-loop-line bg-neutral-50 p-4" aria-label="Session d’exécution observable">
+                          <p className="m-0 text-sm font-medium">Session observable</p>
+                          <p className="mt-2 text-sm text-loop-muted">Projet : {executionSession.request.projectName} · candidat : {executionSession.request.candidateId}</p>
+                          <p className="mt-1 text-sm text-loop-muted">Provider : {executionSession.request.provider} · modèle : {executionSession.request.model} · effort : {planDetail.profile?.effort ?? "non disponible"}</p>
+                          <p className="mt-3 text-sm font-medium">Statut : {executionSession.result === null ? "en cours" : executionSession.events.at(-1)?.type === "failed" ? "échec" : "terminé"}</p>
+                          <p className="mt-1 text-sm text-loop-muted">Export du patch : {executeResult?.patchExport ? "exporté" : executionSession.result === null ? "en attente de validation" : "non exporté"}</p>
+                          <ol className="mt-2 space-y-1 text-sm text-loop-muted">
+                            {executionSession.events.map((event) => <li key={event.sequence}>{event.sequence}. {{ session_started: "Session démarrée", preparing: "Préparation", execution_started: "Provider / exécution", validation_started: "Validation", completed: "Terminé", failed: "Échec" }[event.type]}</li>)}
+                          </ol>
+                        </section>
+                      )}
                       {executeMessage && <p className="mt-3 text-sm text-loop-muted">{executeMessage}</p>}
                       {executeResult && <div className="mt-3 text-sm"><p>Résultat : {String(executeResult.status ?? "inconnu")}</p><p>Patch exporté : {executeResult.patchExport ? "oui" : "non"}</p><p>Dépôt source non modifié.</p>{typeof executeResult.patchExport === "object" && executeResult.patchExport !== null && <pre className="mt-2 overflow-auto rounded bg-neutral-100 p-3 text-xs">{JSON.stringify(executeResult.patchExport, null, 2)}</pre>}{typeof executeResult.failure === "object" && executeResult.failure !== null && <pre className="mt-2 overflow-auto rounded bg-rose-50 p-3 text-xs text-rose-900">{JSON.stringify(executeResult.failure, null, 2)}</pre>}</div>}
                     </section>

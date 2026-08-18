@@ -1,5 +1,9 @@
 import type { CliInvocationResult } from "../cli-invoker.js";
 import type { DesktopExecuteRequest } from "./execute-handler.js";
+import type {
+  DesktopExecutionSession,
+  DesktopExecutionSessionStart,
+} from "./execution-session.js";
 
 export type LoopDesktopApi = Readonly<{
   summary: () => Promise<CliInvocationResult>;
@@ -7,11 +11,13 @@ export type LoopDesktopApi = Readonly<{
   review: (projectName: string) => Promise<CliInvocationResult>;
   plan: (projectName: string, candidateId: string) => Promise<CliInvocationResult>;
   execute: (request: DesktopExecuteRequest) => Promise<CliInvocationResult>;
+  startExecution: (request: DesktopExecuteRequest) => Promise<DesktopExecutionSessionStart>;
+  executionSession: (sessionId: string) => Promise<DesktopExecutionSession | null>;
 }>;
 
 export function createLoopDesktopApi(
   invoke: (
-    channel: "loop:summary" | "loop:context" | "loop:review" | "loop:plan" | "loop:execute",
+    channel: "loop:summary" | "loop:context" | "loop:review" | "loop:plan" | "loop:execute" | "loop:execution-start" | "loop:execution-session",
     ...args: readonly unknown[]
   ) => Promise<CliInvocationResult>,
 ): LoopDesktopApi {
@@ -30,6 +36,12 @@ export function createLoopDesktopApi(
     },
     execute(request) {
       return invoke("loop:execute", request);
+    },
+    startExecution(request) {
+      return invoke("loop:execution-start", request) as Promise<DesktopExecutionSessionStart>;
+    },
+    executionSession(sessionId) {
+      return invoke("loop:execution-session", sessionId) as unknown as Promise<DesktopExecutionSession | null>;
     },
   });
 }

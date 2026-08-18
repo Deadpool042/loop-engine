@@ -27,6 +27,10 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 - [x] Burn-in 4 — Intégration `runLoopExecute -> validation -> runLoopCommit` dans un vrai dépôt Git temporaire : le faux provider crée un seul fichier, la validation passe, le committer Git réel crée un commit borné contenant exactement ce fichier et laisse le worktree propre (`tests/integration/controlled-commit-burn-in.test.ts`).
 - [x] Burn-in 5 — Exécution réelle de `runLoopExecute` → validation réelle → `runLoopCommit` → commit Git réel sur un dépôt non-fixture (`docs/audits/real-controlled-commit-pilot.md`). Commit borné produit, ne contenant que le fichier validé.
 
+## Lot actif — cockpit d’exécution observable
+
+- [ ] Lot V23.0 — Observable GUI execution session : remplacer l’attente opaque de `loop:execute` par une session d’exécution GUI observable et bornée pour un seul run actif. Afficher au minimum projet, candidat, provider, modèle, effort et progression `préparation -> provider -> validation -> terminé/échec`, avec événements/logs textuels bornés issus du runtime existant et résultat final/patch inchangé. Conserver des IPC explicites et minimaux, `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, la résolution du repository côté main process et l’interdiction de toute commande libre. Aucun shell interactif, aucun terminal générique, aucun commit/push/merge, aucun parallélisme multi-projet, aucun contrôle distant/mobile et aucune nouvelle abstraction sans frontière externe démontrée. Livrer les tests de contrat/IPC/renderer nécessaires et mettre à jour `docs/architecture/gui-cockpit.md` pour décrire uniquement la capacité réellement livrée.
+
 ## Gel architectural
 
 - Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).

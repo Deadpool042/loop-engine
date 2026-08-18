@@ -75,6 +75,7 @@ export type RunLoopRunCommandOptions = Readonly<{
   provider?: LoopProviderId;
   commitMessage?: string;
   exportPatchPath?: string;
+  onProgress?: (event: Readonly<{ status: string }>) => void;
 }>;
 
 function printCommandError(
@@ -159,6 +160,7 @@ export async function runLoopRunCommand(
       ...(options.exportPatchPath === undefined
         ? {}
         : { exportPatchPath: options.exportPatchPath }),
+      ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
       ...executionDependencies,
     });
   } else {

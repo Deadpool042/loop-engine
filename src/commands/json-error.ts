@@ -18,7 +18,8 @@ export type JsonErrorCode =
   | "missing_commit_message"
   | "missing_export_patch_value"
   | "export_patch_execute_only"
-  | "export_patch_requires_provider";
+  | "export_patch_requires_provider"
+  | "progress_events_execute_json_only";
 
 export function printJsonError(code: JsonErrorCode, message: string): void {
   console.log(
