@@ -626,7 +626,7 @@ describe("execution projection contract", () => {
 });
 
 describe("loop-engine burn-in candidate", () => {
-  it("selects V23.1 once V23.0 and both burn-in lots are done", () => {
+  it("has no active candidate once V23.0 and V23.1 are qualified", () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
     const repoRoot = resolve(currentDir, "..", "..");
     const project: ProjectConfig = {
@@ -642,18 +642,21 @@ describe("loop-engine burn-in candidate", () => {
     const burnInCandidates = candidates.filter((candidate) =>
       /Burn-in 1|Burn-in 2/.test(candidate.text),
     );
+    const v23Candidates = candidates.filter((candidate) =>
+      /Lot V23\.[01]/.test(candidate.text),
+    );
 
     assert.ok(
       burnInCandidates.every((candidate) => candidate.status === "done"),
       "expected both burn-in lots to be marked done in the roadmap",
     );
+    assert.equal(v23Candidates.length, 2);
+    assert.ok(
+      v23Candidates.every((candidate) => candidate.status === "done"),
+      "expected V23.0 and V23.1 to be marked done after real burn-in qualification",
+    );
 
     const selected = selectRoadmapCandidate(candidates);
-
-    assert.ok(selected, "expected a fallback candidate once burn-in is done");
-    assert.doesNotMatch(selected!.text, /Burn-in 1|Burn-in 2/);
-    assert.match(selected!.text, /Lot V23\.1 — Recoverable isolated project locks/);
-    assert.equal(selected!.status, "todo");
-    assert.equal(selected!.kind, "safe");
+    assert.equal(selected, null);
   });
 });
