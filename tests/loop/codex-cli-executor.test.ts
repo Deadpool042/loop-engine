@@ -34,6 +34,12 @@ if (mode === "nonzero_after_write") {
   writeFileSync("outside.md", "partial provider change\\n");
   process.exit(9);
 }
+if (mode === "success_with_forbidden_content") {
+  writeFileSync("provider-created.md", "Docker configuration\\n");
+}
+if (mode === "success_with_allowed_content") {
+  writeFileSync("provider-created.md", "Documentation standard\\n");
+}
 process.stdout.write(JSON.stringify({ type: "task.completed" }) + "\\n");
 `,
   );
@@ -171,6 +177,48 @@ describe("createCodexCliLoopExecutor", () => {
       const result = await createCodexCliLoopExecutor({ executable, timeoutMs: 100 })(fakePlan(cwd));
       assert.equal(result.status, "failed");
       assert.equal(result.status === "failed" ? result.failure.code : null, "provider_limit_exceeded");
+    } finally {
+      delete process.env.FAKE_CODEX_MODE;
+      cleanup();
+    }
+  });
+
+  it("fails closed when Codex generates a forbidden governed content term", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    try {
+      process.env.FAKE_CODEX_MODE = "success_with_forbidden_content";
+      const result = await createCodexCliLoopExecutor({ executable, timeoutMs: 5_000 })({
+        ...fakePlan(cwd),
+        brief: {
+          objective: "Write a documentation standard.",
+          deliverables: ["provider-created.md"],
+          outOfScope: ["Infrastructure configuration"],
+          forbiddenContentTerms: ["docker"],
+        },
+      });
+      assert.equal(result.status, "failed");
+      assert.equal(result.status === "failed" ? result.failure.code : null, "content_policy_violation");
+      assert.equal(JSON.stringify(result).includes("docker"), false);
+    } finally {
+      delete process.env.FAKE_CODEX_MODE;
+      cleanup();
+    }
+  });
+
+  it("keeps a Codex execution successful when generated content is compliant", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    try {
+      process.env.FAKE_CODEX_MODE = "success_with_allowed_content";
+      const result = await createCodexCliLoopExecutor({ executable, timeoutMs: 5_000 })({
+        ...fakePlan(cwd),
+        brief: {
+          objective: "Write a documentation standard.",
+          deliverables: ["provider-created.md"],
+          outOfScope: ["Infrastructure configuration"],
+          forbiddenContentTerms: ["docker"],
+        },
+      });
+      assert.equal(result.status, "completed");
     } finally {
       delete process.env.FAKE_CODEX_MODE;
       cleanup();

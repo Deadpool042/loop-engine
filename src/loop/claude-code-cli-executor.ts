@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
 import { basename, resolve } from "node:path";
 
+import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
 import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
+import { readModifiedWorktreeFiles } from "./worktree-status.js";
 
 export type ClaudeCodeCliLoopExecutorOptions = Readonly<{
   executable: string;
@@ -31,8 +33,25 @@ function buildPrompt(plan: LoopExecutionPlan): string {
           ...plan.allowedPaths.map((path) => `- ${path}`),
           "Do not modify files outside this scope.",
         ]),
+    ...(plan.brief === undefined
+      ? ["Do not modify the roadmap or mark the selected candidate complete."]
+      : [
+          "Governed mission brief:",
+          `Objective: ${plan.brief.objective}`,
+          "Required deliverables:",
+          ...plan.brief.deliverables.map((deliverable) => `- ${deliverable}`),
+          "Out of scope:",
+          ...plan.brief.outOfScope.map((item) => `- ${item}`),
+          ...(plan.brief.forbiddenContentTerms === undefined
+            ? []
+            : [
+                "Forbidden content terms (literal, case-insensitive):",
+                ...plan.brief.forbiddenContentTerms.map((term) => `- ${term}`),
+                "The output is rejected if any forbidden content term appears.",
+              ]),
+          "Produce every required deliverable, but only within the writable file scope.",
+        ]),
     "Stay inside the current worktree. Do not commit, push, tag, publish, alter credentials, or expose secrets.",
-    "Do not modify the roadmap or mark the selected candidate complete.",
     "Implement only the target files explicitly named by the selected candidate.",
     "Finish by leaving only the intended source changes in the worktree.",
   ].join("\n");
@@ -112,33 +131,6 @@ function runProcess(
   });
 }
 
-function parsePorcelainFiles(output: string): readonly string[] {
-  const entries = output.split("\0");
-  const files = new Set<string>();
-  for (let index = 0; index < entries.length; index += 1) {
-    const entry = entries[index];
-    if (!entry) continue;
-    const status = entry.slice(0, 2);
-    const path = entry.slice(3);
-    if (path.length > 0) files.add(path);
-    if (status.includes("R") || status.includes("C")) index += 1;
-  }
-  return Object.freeze([...files].sort());
-}
-
-async function readModifiedFiles(
-  cwd: string,
-): Promise<readonly string[] | null> {
-  const result = await runProcess(
-    "git",
-    ["status", "--porcelain=v1", "-z"],
-    cwd,
-    10_000,
-    1_000_000,
-  );
-  return result.exitCode === 0 ? parsePorcelainFiles(result.stdout) : null;
-}
-
 type ClaudeCodeCliJsonOutput = Readonly<{
   is_error?: boolean;
   subtype?: string;
@@ -200,7 +192,7 @@ export function createClaudeCodeCliLoopExecutor(
     }
 
     const cwd = resolve(plan.project.path);
-    const before = await readModifiedFiles(cwd);
+    const before = await readModifiedWorktreeFiles(cwd);
     if (before === null) {
       return failure(
         "worktree_status_failed",
@@ -234,7 +226,7 @@ export function createClaudeCodeCliLoopExecutor(
       maxOutputBytes,
     );
 
-    const modifiedFiles = await readModifiedFiles(cwd);
+    const modifiedFiles = await readModifiedWorktreeFiles(cwd);
 
     if (modifiedFiles === null) {
       return failure(
@@ -291,6 +283,25 @@ export function createClaudeCodeCliLoopExecutor(
       return failure(
         "provider_reported_error",
         "Claude Code reported an error for this execution.",
+        modifiedFiles,
+      );
+    }
+    const contentPolicy = await inspectWorktreeContentPolicy(
+      plan,
+      cwd,
+      modifiedFiles,
+    );
+    if (contentPolicy.outcome === "violation") {
+      return failure(
+        "content_policy_violation",
+        "Generated content violates the governed mission constraints.",
+        modifiedFiles,
+      );
+    }
+    if (contentPolicy.outcome === "uninspectable") {
+      return failure(
+        "content_policy_inspection_failed",
+        "Generated content could not be verified against the governed mission constraints.",
         modifiedFiles,
       );
     }

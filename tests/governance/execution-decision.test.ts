@@ -33,6 +33,90 @@ describe("parseExecutionDecisionFile", () => {
     }
   });
 
+  it("parses a structured brief as descriptive, non-authorizing metadata", () => {
+    const yaml = [
+      "version: 1",
+      "project: fixture",
+      "decision:",
+      "  state: READY",
+      "  candidate:",
+      "    id: C7-L1",
+      "    allowedPaths:",
+      "      - docs/platform/**",
+      "  brief:",
+      "    objective: Define the observability standard.",
+      "    deliverables:",
+      "      - ADR/0006-observability.md",
+      "    outOfScope:",
+      "      - Tool installation",
+      "    forbiddenContentTerms:",
+      "      - Docker",
+      "      - stdout",
+      "source:",
+      `  gitHead: ${SHA}`,
+    ].join("\n");
+
+    const result = parseExecutionDecisionFile(yaml);
+    assert.equal(result.ok, true);
+    if (result.ok) {
+      assert.deepEqual(result.decision.decision.brief, {
+        objective: "Define the observability standard.",
+        deliverables: ["ADR/0006-observability.md"],
+        outOfScope: ["Tool installation"],
+        forbiddenContentTerms: ["Docker", "stdout"],
+      });
+      assert.deepEqual(result.decision.decision.candidate?.allowedPaths, ["docs/platform/**"]);
+    }
+  });
+
+  it("rejects a malformed structured brief", () => {
+    const yaml = [
+      "version: 1",
+      "project: fixture",
+      "decision:",
+      "  state: READY",
+      "  candidate:",
+      "    id: C7-L1",
+      "    allowedPaths:",
+      "      - docs/platform/**",
+      "  brief:",
+      "    objective: Define the observability standard.",
+      "    deliverables: not-an-array",
+      "    outOfScope:",
+      "      - Tool installation",
+      "source:",
+      `  gitHead: ${SHA}`,
+    ].join("\n");
+
+    const result = parseExecutionDecisionFile(yaml);
+    assert.equal(result.ok, false);
+  });
+
+  it("rejects an empty or malformed forbidden-content term list", () => {
+    const yaml = [
+      "version: 1",
+      "project: fixture",
+      "decision:",
+      "  state: READY",
+      "  candidate:",
+      "    id: C7-L1",
+      "    allowedPaths:",
+      "      - docs/platform/**",
+      "  brief:",
+      "    objective: Define the observability standard.",
+      "    deliverables:",
+      "      - ADR/0006-observability.md",
+      "    outOfScope:",
+      "      - Tool installation",
+      "    forbiddenContentTerms: []",
+      "source:",
+      `  gitHead: ${SHA}`,
+    ].join("\n");
+
+    const result = parseExecutionDecisionFile(yaml);
+    assert.equal(result.ok, false);
+  });
+
   it("accepts a well-formed non-READY decision without a candidate", () => {
     const yaml = [
       "version: 1",

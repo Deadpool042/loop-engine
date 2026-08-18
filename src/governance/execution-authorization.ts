@@ -22,6 +22,12 @@ export type ExecutionAuthorizationResult =
       authorized: true;
       candidateId: string;
       allowedPaths: readonly string[];
+      brief?: Readonly<{
+        objective: string;
+        deliverables: readonly string[];
+        outOfScope: readonly string[];
+        forbiddenContentTerms?: readonly string[];
+      }>;
     }>
   | Readonly<{
       governed: true;
@@ -127,6 +133,9 @@ export function resolveExecutionAuthorization(
         authorized: true,
         candidateId,
         allowedPaths: decision.decision.candidate!.allowedPaths!,
+        ...(decision.decision.brief === undefined
+          ? {}
+          : { brief: decision.decision.brief }),
       };
     }
   }

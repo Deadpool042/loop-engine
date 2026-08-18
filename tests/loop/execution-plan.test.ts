@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { createLoopExecutionPlan } from "../../src/loop/execution-plan.js";
+import {
+  createLoopExecutionPlan,
+} from "../../src/loop/execution-plan.js";
 import type { LoopExecutorInput } from "../../src/loop/execution.js";
 
 function admittedInput(): LoopExecutorInput {
@@ -97,6 +99,21 @@ describe("createLoopExecutionPlan", () => {
     assert.equal(Object.isFrozen(plan), true);
     assert.equal(Object.isFrozen(plan.budget), true);
     assert.equal(Object.isFrozen(plan.policy), true);
+  });
+
+  it("carries only explicit forbidden content terms in the immutable plan", () => {
+    const plan = createLoopExecutionPlan({
+      ...admittedInput(),
+      brief: {
+        objective: "Write a neutral standard.",
+        deliverables: ["docs/standard.md"],
+        outOfScope: ["Configuration"],
+        forbiddenContentTerms: ["logrotate", "Docker"],
+      },
+    });
+
+    assert.deepEqual(plan.brief?.forbiddenContentTerms, ["logrotate", "Docker"]);
+    assert.equal(Object.isFrozen(plan.brief?.forbiddenContentTerms), true);
   });
 
   it("rejects a request without an admitted selected policy", () => {

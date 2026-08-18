@@ -90,6 +90,12 @@ switch (mode) {
     process.exit(0);
     break;
   }
+  case "success_with_forbidden_content": {
+    writeFileSync(join(cwd, "provider-created.md"), "Docker configuration\n");
+    write({ subtype: "success", is_error: false, num_turns: 1 });
+    process.exit(0);
+    break;
+  }
   case "success_with_modified_and_file": {
     appendFileSync(join(cwd, "README.md"), "modified\n");
     writeFileSync(join(cwd, "provider-created.txt"), "created\n");

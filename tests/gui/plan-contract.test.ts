@@ -46,11 +46,22 @@ describe("GUI explicit plan contract", () => {
               effort: "low",
             },
           },
+          requirements: {
+            category: "documentation",
+            contextBudget: { maxEstimatedTokens: 5000 },
+          },
+          reasons: ["small bounded documentation lot"],
         },
         contextPackage: {
           files: [{ path: "docs/roadmap/projet-lp-infra.md" }],
           estimatedTokens: 2291,
           truncated: false,
+        },
+        writableFileScope: ["docs/roadmap/projet-lp-infra.md"],
+        brief: {
+          objective: "Documenter la stratégie de rollback.",
+          deliverables: ["Runbook de rollback"],
+          outOfScope: ["Déploiement en production"],
         },
         failure: null,
       }),
@@ -73,11 +84,20 @@ describe("GUI explicit plan contract", () => {
           provider: "anthropic",
           model: "claude-haiku-4-5",
           effort: "low",
+          category: "documentation",
+          reasons: ["small bounded documentation lot"],
+          contextBudgetTokens: 5000,
         },
         context: {
           files: ["docs/roadmap/projet-lp-infra.md"],
           estimatedTokens: 2291,
           truncated: false,
+        },
+        writableFileScope: ["docs/roadmap/projet-lp-infra.md"],
+        brief: {
+          objective: "Documenter la stratégie de rollback.",
+          deliverables: ["Runbook de rollback"],
+          outOfScope: ["Déploiement en production"],
         },
       },
     );
@@ -113,6 +133,8 @@ describe("GUI explicit plan contract", () => {
       ],
       agentPolicy: null,
       contextPackage: null,
+      writableFileScope: null,
+      brief: null,
       failure: null,
     });
 

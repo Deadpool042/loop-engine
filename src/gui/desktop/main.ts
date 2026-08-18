@@ -83,10 +83,10 @@ ipcMain.handle("loop:plan", (_event, projectName, candidateId) =>
 const executeHandler = createExecuteHandler({
   cliInvoker: executeCliInvoker,
   resolveRepositoryPath,
-  async choosePatchDestination() {
+  async choosePatchDestination(defaultPath) {
     const options = {
       title: "Exporter le patch validé",
-      defaultPath: "loop-engine-validated.patch",
+      defaultPath,
       filters: [{ name: "Git patch", extensions: ["patch"] }],
     };
     const result = mainWindow

@@ -10,7 +10,9 @@ import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
 import { resolvePolicy } from "../policy/resolver.js";
 import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
 import { createLoopExecutionPlan } from "./execution-plan.js";
+import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import { findOutOfScopeFiles } from "./file-scope.js";
+import { readModifiedWorktreeFiles } from "./worktree-status.js";
 import { planLoopCycle, type LoopPlan } from "./planner.js";
 import { canTransition } from "./state-machine.js";
 import {
@@ -41,6 +43,8 @@ export type LoopRunExecuteOptions = LoopRunPlanOptions &
     executionProjectPath?: string;
     /** Explicit composition-only destination for a validated isolated patch. */
     exportPatchPath?: string;
+    /** Test-only seam; production always uses the local Git worktree inventory. */
+    readModifiedWorktreeFiles?: typeof readModifiedWorktreeFiles;
   }>;
 
 type ExecuteDependencies = Readonly<{
@@ -62,6 +66,7 @@ type ExecuteDependencies = Readonly<{
   validator: LoopValidator;
   repairer: LoopRepairer | null;
   maxRepairs: number;
+  readModifiedWorktreeFiles: typeof readModifiedWorktreeFiles;
 }>;
 
 function resolveDependencies(
@@ -80,6 +85,8 @@ function resolveDependencies(
     validator: options.validator ?? validateLoopExecution,
     repairer: options.repairer ?? null,
     maxRepairs: options.maxRepairs ?? 0,
+    readModifiedWorktreeFiles:
+      options.readModifiedWorktreeFiles ?? readModifiedWorktreeFiles,
   };
 }
 
@@ -141,6 +148,7 @@ export async function runLoopExecute(
   let agentPolicy: AgentPolicyResolution | null = null;
   let contextPackage: MinimalContextPackage | null = null;
   let writableFileScope: readonly string[] | null = null;
+  let brief: NonNullable<LoopRunResult["brief"]> | null = null;
 
   function transition(
     to: LoopRunStatus,
@@ -187,6 +195,7 @@ export async function runLoopExecute(
       agentPolicy,
       contextPackage,
       writableFileScope,
+      brief,
     });
   }
 
@@ -274,6 +283,14 @@ export async function runLoopExecute(
     );
   }
 
+  brief =
+    cycle.brief === undefined
+      ? null
+      : Object.freeze({
+          objective: cycle.brief.objective,
+          deliverables: Object.freeze([...cycle.brief.deliverables]),
+          outOfScope: Object.freeze([...cycle.brief.outOfScope]),
+        });
   contextPackage = dependencies.buildMinimalContext(
     cycle.snapshot,
     agentPolicy.requirements.contextBudget,
@@ -286,6 +303,7 @@ export async function runLoopExecute(
       agentPolicy,
       contextPackage,
       ...(cycle.allowedPaths === undefined ? {} : { allowedPaths: cycle.allowedPaths }),
+      ...(cycle.brief === undefined ? {} : { brief: cycle.brief }),
     }),
   );
   writableFileScope = executionPlan.allowedPaths ?? null;
@@ -331,7 +349,60 @@ export async function runLoopExecute(
     );
   }
 
-  addModifiedFiles(modifiedFiles, executionResult.modifiedFiles);
+  async function failForContentPolicyViolation(): Promise<LoopRunResult | null> {
+    const inspection = await inspectWorktreeContentPolicy(
+      executionPlan,
+      executionProject.path,
+      [...modifiedFiles],
+    );
+    if (inspection.outcome === "compliant") return null;
+
+    const code =
+      inspection.outcome === "violation"
+        ? "content_policy_violation"
+        : "content_policy_inspection_failed";
+    const message =
+      inspection.outcome === "violation"
+        ? "Generated content violates the governed mission constraints."
+        : "Generated content could not be verified against the governed mission constraints.";
+    transition("failed", "failed", "failed", [message]);
+    return finalize(
+      cycle.candidate,
+      Object.freeze({
+        code,
+        message,
+        details: Object.freeze([
+          "Content-policy diagnostics are redacted.",
+        ]),
+      }),
+    );
+  }
+
+  async function refreshModifiedFilesFromWorktree(): Promise<LoopRunResult | null> {
+    const actualModifiedFiles = await dependencies.readModifiedWorktreeFiles(
+      executionProject.path,
+    );
+    if (actualModifiedFiles !== null) {
+      modifiedFiles.clear();
+      addModifiedFiles(modifiedFiles, actualModifiedFiles);
+      return null;
+    }
+
+    transition("failed", "failed", "failed", [
+      "Unable to determine the provider worktree state.",
+    ]);
+    return finalize(
+      cycle.candidate,
+      internalFailure(
+        "worktree_status_failed",
+        "Unable to determine the provider worktree state.",
+        "Worktree inspection diagnostics are redacted from the public result.",
+      ),
+    );
+  }
+
+  const initialWorktreeFailure = await refreshModifiedFilesFromWorktree();
+  if (initialWorktreeFailure !== null) return initialWorktreeFailure;
   const initialScopeFailure = failForScopeViolation();
   if (initialScopeFailure !== null) return initialScopeFailure;
 
@@ -339,6 +410,9 @@ export async function runLoopExecute(
     transition("failed", "failed", "failed", [executionResult.failure.message]);
     return finalize(cycle.candidate, executionResult.failure);
   }
+
+  const initialContentPolicyFailure = await failForContentPolicyViolation();
+  if (initialContentPolicyFailure !== null) return initialContentPolicyFailure;
 
   transition("validating", "validating", "completed", executionResult.details);
 
@@ -470,7 +544,8 @@ export async function runLoopExecute(
       );
     }
 
-    addModifiedFiles(modifiedFiles, repairResult.modifiedFiles);
+    const repairWorktreeFailure = await refreshModifiedFilesFromWorktree();
+    if (repairWorktreeFailure !== null) return repairWorktreeFailure;
     const repairScopeFailure = failForScopeViolation();
     if (repairScopeFailure !== null) return repairScopeFailure;
 
@@ -478,6 +553,9 @@ export async function runLoopExecute(
       transition("failed", "failed", "failed", [repairResult.failure.message]);
       return finalize(cycle.candidate, repairResult.failure);
     }
+
+    const repairContentPolicyFailure = await failForContentPolicyViolation();
+    if (repairContentPolicyFailure !== null) return repairContentPolicyFailure;
 
     transition("validating", "validating", "completed", repairResult.details);
   }

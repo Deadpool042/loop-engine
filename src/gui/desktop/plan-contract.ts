@@ -15,11 +15,20 @@ export type PlanDetail = Readonly<{
     provider: string;
     model: string;
     effort: string;
+    category: string;
+    reasons: readonly string[];
+    contextBudgetTokens: number;
   }> | null;
   context: Readonly<{
     files: readonly string[];
     estimatedTokens: number;
     truncated: boolean;
+  }> | null;
+  writableFileScope: readonly string[] | null;
+  brief: Readonly<{
+    objective: string;
+    deliverables: readonly string[];
+    outOfScope: readonly string[];
   }> | null;
 }>;
 
@@ -93,11 +102,17 @@ function parseProfile(value: unknown): PlanDetail["profile"] | null | undefined 
   }
 
   const { profile } = value.selection;
+  const requirements = value.requirements;
   if (
     typeof profile.id !== "string" ||
     typeof profile.provider !== "string" ||
     typeof profile.model !== "string" ||
-    typeof profile.effort !== "string"
+    typeof profile.effort !== "string" ||
+    !isRecord(requirements) ||
+    typeof requirements.category !== "string" ||
+    !isStringArray(value.reasons) ||
+    !isRecord(requirements.contextBudget) ||
+    typeof requirements.contextBudget.maxEstimatedTokens !== "number"
   ) {
     return undefined;
   }
@@ -107,6 +122,30 @@ function parseProfile(value: unknown): PlanDetail["profile"] | null | undefined 
     provider: profile.provider,
     model: profile.model,
     effort: profile.effort,
+    category: requirements.category,
+    reasons: Object.freeze([...value.reasons]),
+    contextBudgetTokens: requirements.contextBudget.maxEstimatedTokens,
+  });
+}
+
+function parseBrief(value: unknown): PlanDetail["brief"] | undefined {
+  if (value === null) return null;
+  if (
+    !isRecord(value) ||
+    typeof value.objective !== "string" ||
+    value.objective.trim().length === 0 ||
+    !isStringArray(value.deliverables) ||
+    value.deliverables.length === 0 ||
+    !isStringArray(value.outOfScope) ||
+    value.outOfScope.length === 0
+  ) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    objective: value.objective,
+    deliverables: Object.freeze([...value.deliverables]),
+    outOfScope: Object.freeze([...value.outOfScope]),
   });
 }
 
@@ -159,7 +198,20 @@ export function parsePlanDetail(value: unknown): PlanDetail | null {
   );
   const profile = parseProfile(value.agentPolicy);
   const context = parseContext(value.contextPackage);
-  if (steps.some((step) => step === null) || profile === undefined || context === undefined) {
+  const brief = parseBrief(value.brief);
+  const writableFileScope =
+    value.writableFileScope === null
+      ? null
+      : isStringArray(value.writableFileScope)
+        ? Object.freeze([...value.writableFileScope])
+        : undefined;
+  if (
+    steps.some((step) => step === null) ||
+    profile === undefined ||
+    context === undefined ||
+    brief === undefined ||
+    writableFileScope === undefined
+  ) {
     return null;
   }
 
@@ -181,6 +233,8 @@ export function parsePlanDetail(value: unknown): PlanDetail | null {
     ),
     profile,
     context,
+    writableFileScope,
+    brief,
   });
 }
 

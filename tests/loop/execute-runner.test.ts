@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import type { Config, ProjectConfig } from "../../src/core/config.js";
 import type { RoadmapCandidate } from "../../src/intelligence/roadmap.js";
 import type { ProjectSnapshot } from "../../src/intelligence/snapshot.js";
 import { runLoopExecute } from "../../src/loop/execute-runner.js";
+import { readModifiedWorktreeFiles } from "../../src/loop/worktree-status.js";
 
 function fixtureProject(): ProjectConfig {
   return {
@@ -94,10 +99,144 @@ function deterministicOptions() {
       estimatedTokens: 0,
       truncated: false,
     }),
+    readModifiedWorktreeFiles: async () => [],
   };
 }
 
+async function createGitWorktree(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "loop-execute-runner-"));
+  execFileSync("git", ["init", "-q"], { cwd });
+  return cwd;
+}
+
 describe("runLoopExecute", () => {
+  it("enforces governed content policy before validation even if an injected executor bypasses its own guard", async () => {
+    const cwd = await createGitWorktree();
+    const project = { ...fixtureProject(), path: cwd };
+    const candidate = fixtureCandidate();
+    let validatorCalls = 0;
+
+    try {
+      const result = await runLoopExecute(project.name, {
+        ...deterministicOptions(),
+        loadConfig: () => fixtureConfig(project),
+        planLoopCycle: () => ({
+          outcome: "ready" as const,
+          candidate,
+          plannedSteps: [],
+          snapshot: fixtureSnapshot(project, candidate),
+          brief: {
+            objective: "Write a documentation standard.",
+            deliverables: ["generated.md"],
+            outOfScope: ["Infrastructure configuration"],
+            forbiddenContentTerms: ["docker"],
+          },
+        }),
+        readModifiedWorktreeFiles,
+        executor: async () => {
+          await writeFile(join(cwd, "generated.md"), "Docker configuration\n");
+          return { status: "completed" as const, modifiedFiles: [], details: [] };
+        },
+        validator: async () => {
+          validatorCalls += 1;
+          return { status: "passed" as const, failedCommand: null, exitCode: 0, details: [] };
+        },
+      });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.failure?.code, "content_policy_violation");
+      assert.equal(result.validation, null);
+      assert.equal(validatorCalls, 0);
+      assert.equal(JSON.stringify(result).includes("docker"), false);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("enforces governed scope from the real worktree when an injected executor omits its modified file", async () => {
+    const cwd = await createGitWorktree();
+    const project = { ...fixtureProject(), path: cwd };
+    const candidate = fixtureCandidate();
+    let validatorCalls = 0;
+
+    try {
+      const result = await runLoopExecute(project.name, {
+        ...deterministicOptions(),
+        loadConfig: () => fixtureConfig(project),
+        planLoopCycle: () => ({
+          outcome: "ready" as const,
+          candidate,
+          plannedSteps: [],
+          snapshot: fixtureSnapshot(project, candidate),
+          allowedPaths: ["docs/**"],
+        }),
+        readModifiedWorktreeFiles,
+        executor: async () => {
+          await writeFile(join(cwd, "outside.md"), "outside scope\n");
+          return { status: "completed" as const, modifiedFiles: [], details: [] };
+        },
+        validator: async () => {
+          validatorCalls += 1;
+          return { status: "passed" as const, failedCommand: null, exitCode: 0, details: [] };
+        },
+      });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.failure?.code, "scope_violation");
+      assert.deepEqual(result.modifiedFiles, ["outside.md"]);
+      assert.equal(validatorCalls, 0);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("rechecks real worktree content after repair instead of trusting repairResult.modifiedFiles", async () => {
+    const cwd = await createGitWorktree();
+    const project = { ...fixtureProject(), path: cwd };
+    const candidate = fixtureCandidate();
+    let validatorCalls = 0;
+
+    try {
+      const result = await runLoopExecute(project.name, {
+        ...deterministicOptions(),
+        loadConfig: () => fixtureConfig(project),
+        maxRepairs: 1,
+        planLoopCycle: () => ({
+          outcome: "ready" as const,
+          candidate,
+          plannedSteps: [],
+          snapshot: fixtureSnapshot(project, candidate),
+          brief: {
+            objective: "Write a documentation standard.",
+            deliverables: ["generated.md"],
+            outOfScope: ["Infrastructure configuration"],
+            forbiddenContentTerms: ["docker"],
+          },
+        }),
+        readModifiedWorktreeFiles,
+        executor: async () => {
+          await writeFile(join(cwd, "generated.md"), "Documentation standard\n");
+          return { status: "completed" as const, modifiedFiles: [], details: [] };
+        },
+        validator: async () => {
+          validatorCalls += 1;
+          return { status: "failed" as const, failedCommand: "expected", exitCode: 1, details: [] };
+        },
+        repairer: async () => {
+          await writeFile(join(cwd, "repair.md"), "Docker configuration\n");
+          return { status: "completed" as const, modifiedFiles: [], details: [] };
+        },
+      });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.failure?.code, "content_policy_violation");
+      assert.equal(validatorCalls, 1);
+      assert.deepEqual(result.modifiedFiles, ["generated.md", "repair.md"]);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("blocks a governed scope violation before validation or repair", async () => {
     let executorCalls = 0;
     let validatorCalls = 0;
@@ -113,6 +252,7 @@ describe("runLoopExecute", () => {
         allowedPaths: ["docs/platform/**"],
       }),
       maxRepairs: 1,
+      readModifiedWorktreeFiles: async () => ["docs/platform/README.md", "docs/roadmap/projet-lp-infra.md"],
       executor: async () => {
         executorCalls += 1;
         return {
@@ -146,6 +286,7 @@ describe("runLoopExecute", () => {
   it("rechecks governed scope after repair before a second validation", async () => {
     let validatorCalls = 0;
     let repairCalls = 0;
+    let inventoryCalls = 0;
     const result = await runLoopExecute("fixture-project", {
       ...deterministicOptions(),
       planLoopCycle: () => ({
@@ -157,6 +298,10 @@ describe("runLoopExecute", () => {
         allowedPaths: ["src/**"],
       }),
       maxRepairs: 1,
+      readModifiedWorktreeFiles: async () =>
+        inventoryCalls++ === 0
+          ? ["src/feature.ts"]
+          : ["src/feature.ts", "docs/outside.md"],
       executor: async () => ({ status: "completed", modifiedFiles: ["src/feature.ts"], details: [] }),
       validator: async () => {
         validatorCalls += 1;
@@ -181,6 +326,7 @@ describe("runLoopExecute", () => {
   it("prioritizes scope violation when a failed repair modifies outside the authorized scope", async () => {
     let validatorCalls = 0;
     let repairCalls = 0;
+    let inventoryCalls = 0;
     const result = await runLoopExecute("fixture-project", {
       ...deterministicOptions(),
       planLoopCycle: () => ({
@@ -192,6 +338,10 @@ describe("runLoopExecute", () => {
         allowedPaths: ["src/**"],
       }),
       maxRepairs: 1,
+      readModifiedWorktreeFiles: async () =>
+        inventoryCalls++ === 0
+          ? ["src/feature.ts"]
+          : ["src/feature.ts", "docs/outside.md"],
       executor: async () => ({ status: "completed", modifiedFiles: ["src/feature.ts"], details: [] }),
       validator: async () => {
         validatorCalls += 1;
@@ -228,6 +378,7 @@ describe("runLoopExecute", () => {
 
     const result = await runLoopExecute("fixture-project", {
       ...deterministicOptions(),
+      readModifiedWorktreeFiles: async () => ["src/feature.ts"],
       executor: async () => {
         executorCalls += 1;
         return {
@@ -268,9 +419,14 @@ describe("runLoopExecute", () => {
   it("repairs once and revalidates within the finite budget", async () => {
     let validationCalls = 0;
     let repairCalls = 0;
+    let inventoryCalls = 0;
 
     const result = await runLoopExecute("fixture-project", {
       ...deterministicOptions(),
+      readModifiedWorktreeFiles: async () =>
+        inventoryCalls++ === 0
+          ? ["src/feature.ts"]
+          : ["src/feature.ts", "tests/feature.test.ts"],
       maxRepairs: 1,
       executor: async () => ({
         status: "completed",
@@ -365,8 +521,13 @@ describe("runLoopExecute", () => {
   });
 
   it("counts a repairer-declared failure as an attempted repair", async () => {
+    let inventoryCalls = 0;
     const result = await runLoopExecute("fixture-project", {
       ...deterministicOptions(),
+      readModifiedWorktreeFiles: async () =>
+        inventoryCalls++ === 0
+          ? ["src/feature.ts"]
+          : ["src/feature.ts", "src/partial-repair.ts"],
       maxRepairs: 1,
       executor: async () => ({
         status: "completed",

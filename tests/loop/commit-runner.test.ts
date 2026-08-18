@@ -96,6 +96,7 @@ describe("runLoopCommit", () => {
     const result = await runLoopCommit("fixture-project", {
       ...options(),
       commitMessage: "feat: controlled fixture",
+      readModifiedWorktreeFiles: async () => ["src/a.ts", "tests/a.test.ts"],
       executor: async () => ({
         status: "completed",
         modifiedFiles: ["src/a.ts", "tests/a.test.ts"],
@@ -135,6 +136,7 @@ describe("runLoopCommit", () => {
     const result = await runLoopCommit("fixture-project", {
       ...options(),
       commitMessage: "feat: must not be created",
+      readModifiedWorktreeFiles: async () => ["src/a.ts"],
       executor: async () => ({
         status: "completed",
         modifiedFiles: ["src/a.ts"],

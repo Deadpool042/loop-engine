@@ -52,10 +52,20 @@ function configuredProfile(
     configuration.id === "codex"
       ? { runtime: "codex", provider: "openai" }
       : { runtime: "claude_code", provider: "anthropic" };
-  const defaultProfile = defaultAgentRegistry.profiles.find(
+  const candidates = defaultAgentRegistry.profiles.filter(
     (profile) =>
       profile.runtime === expected.runtime && profile.provider === expected.provider,
   );
+  // A configured model may be an enterprise alias unknown to the local
+  // recommendation catalog. Preserve that supported configuration while using
+  // the provider's conservative baseline capabilities for policy admission.
+  const defaultProfile =
+    (configuration.model === undefined
+      ? candidates[0]
+      : candidates.find((profile) => profile.model === configuration.model) ??
+        candidates.find((profile) => profile.effort === "medium") ??
+        candidates[0]) ??
+    null;
   if (!defaultProfile) {
     throw new Error(`No ${configuration.id} agent profile is registered.`);
   }

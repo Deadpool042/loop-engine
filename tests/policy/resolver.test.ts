@@ -68,6 +68,15 @@ describe("classifyLoopTaskCategory — deterministic keyword deduction", () => {
     );
   });
 
+  it("deduces a documentation standard lot", () => {
+    assert.equal(
+      classifyLoopTaskCategory(
+        candidate({ text: "| H3-L2 | Standard logging (format, niveaux, rétention) | ⬜ À faire |" }),
+      ),
+      "documentation",
+    );
+  });
+
   it("deduces a code lot (no keyword match, default)", () => {
     assert.equal(
       classifyLoopTaskCategory(
@@ -101,6 +110,15 @@ describe("classifyLoopTaskCategory — deterministic keyword deduction", () => {
     assert.equal(
       classifyLoopTaskCategory(
         candidate({ text: "- [ ] Revoir l'architecture du runner" }),
+      ),
+      "architecture",
+    );
+  });
+
+  it("classifies an ADR strategy as architecture, not generic code", () => {
+    assert.equal(
+      classifyLoopTaskCategory(
+        candidate({ text: "| H3-L1 | ADR stratégie d'observabilité | ⬜ À faire |" }),
       ),
       "architecture",
     );
@@ -201,6 +219,14 @@ describe("deriveRequiredPermissions — mode ceiling always wins over category n
     );
     assert.ok(
       !deriveRequiredPermissions("validation", "execute").includes(
+        "write_worktree",
+      ),
+    );
+  });
+
+  it("an architecture lot may write its ADR in execute mode", () => {
+    assert.ok(
+      deriveRequiredPermissions("architecture", "execute").includes(
         "write_worktree",
       ),
     );

@@ -262,6 +262,41 @@ describe("createClaudeCodeCliLoopExecutor", () => {
     }
   });
 
+  it("passes the governed brief and every declared deliverable to Claude Code", async () => {
+    const { cwd, cleanup } = setupCleanWorktree();
+    const capturePath = join(cwd, "claude-arguments.json");
+
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success";
+      process.env.FAKE_CLAUDE_CAPTURE_ARGS = capturePath;
+      const executor = createClaudeCodeCliLoopExecutor({
+        executable: FAKE_CLAUDE,
+        timeoutMs: 5_000,
+      });
+
+      const result = await executor(Object.freeze({
+        ...fakePlan(cwd),
+        allowedPaths: ["ADR/0006-strategie-observabilite.md", "docs/roadmap/projet-lp-infra.md"],
+        brief: {
+          objective: "Define the observability strategy.",
+          deliverables: ["ADR/0006-strategie-observabilite.md", "Update H3-L1 roadmap status."],
+          outOfScope: ["Tool installation"],
+        },
+      }));
+
+      assert.equal(result.status, "completed");
+      const prompt = (JSON.parse(readFileSync(capturePath, "utf8")) as string[]).at(-1) ?? "";
+      assert.match(prompt, /Governed mission brief:/);
+      assert.match(prompt, /Required deliverables:/);
+      assert.match(prompt, /Update H3-L1 roadmap status\./);
+      assert.doesNotMatch(prompt, /Do not modify the roadmap/);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      delete process.env.FAKE_CLAUDE_CAPTURE_ARGS;
+      cleanup();
+    }
+  });
+
   it("passes roadmap protection constraints to Claude Code", async () => {
     const { cwd, cleanup } = setupCleanWorktree();
     const capturePath = join(cwd, "claude-arguments.json");
@@ -296,6 +331,57 @@ describe("createClaudeCodeCliLoopExecutor", () => {
     } finally {
       delete process.env.FAKE_CLAUDE_MODE;
       delete process.env.FAKE_CLAUDE_CAPTURE_ARGS;
+      cleanup();
+    }
+  });
+
+  it("fails closed when Claude Code generates a forbidden governed content term", async () => {
+    const { cwd, cleanup } = setupCleanWorktree();
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success_with_forbidden_content";
+      const result = await createClaudeCodeCliLoopExecutor({
+        executable: FAKE_CLAUDE,
+        timeoutMs: 5_000,
+      })({
+        ...fakePlan(cwd),
+        brief: {
+          objective: "Write a documentation standard.",
+          deliverables: ["provider-created.md"],
+          outOfScope: ["Infrastructure configuration"],
+          forbiddenContentTerms: ["docker"],
+        },
+      });
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "content_policy_violation",
+      );
+      assert.equal(JSON.stringify(result).includes("docker"), false);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      cleanup();
+    }
+  });
+
+  it("keeps a Claude Code execution successful when generated content is compliant", async () => {
+    const { cwd, cleanup } = setupCleanWorktree();
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success_with_file";
+      const result = await createClaudeCodeCliLoopExecutor({
+        executable: FAKE_CLAUDE,
+        timeoutMs: 5_000,
+      })({
+        ...fakePlan(cwd),
+        brief: {
+          objective: "Write a documentation standard.",
+          deliverables: ["provider-created.txt"],
+          outOfScope: ["Infrastructure configuration"],
+          forbiddenContentTerms: ["docker"],
+        },
+      });
+      assert.equal(result.status, "completed");
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
       cleanup();
     }
   });
