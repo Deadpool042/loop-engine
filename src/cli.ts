@@ -249,6 +249,7 @@ else if (command === "review") {
   const candidateId = optionValue("--candidate");
   const commitMessage = optionValue("--commit-message");
   const exportPatchPath = optionValue("--export-patch");
+  const progressEvents = hasOption("--progress-events");
 
   if (hasOption("--candidate") && candidateId === undefined) {
     failOption(json, "missing_candidate_value", "Missing value for --candidate");
@@ -280,6 +281,13 @@ else if (command === "review") {
       json,
       "export_patch_requires_provider",
       "--export-patch requires an explicit provider.",
+    );
+  }
+  if (progressEvents && (mode !== "execute" || !json)) {
+    failOption(
+      json,
+      "progress_events_execute_json_only",
+      "--progress-events requires execute mode with --json.",
     );
   }
 
@@ -338,6 +346,15 @@ else if (command === "review") {
       ...(providerId !== undefined ? { provider: providerId } : {}),
       ...(commitMessage !== undefined ? { commitMessage } : {}),
       ...(exportPatchPath !== undefined ? { exportPatchPath } : {}),
+      ...(progressEvents
+        ? {
+            onProgress(event) {
+              process.stderr.write(
+                `LOOP_EXECUTION_EVENT:${JSON.stringify({ status: event.status })}\n`,
+              );
+            },
+          }
+        : {}),
     },
   );
   if (exitCode !== 0) process.exitCode = exitCode;

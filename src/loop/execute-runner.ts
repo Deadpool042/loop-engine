@@ -45,7 +45,13 @@ export type LoopRunExecuteOptions = LoopRunPlanOptions &
     exportPatchPath?: string;
     /** Test-only seam; production always uses the local Git worktree inventory. */
     readModifiedWorktreeFiles?: typeof readModifiedWorktreeFiles;
+    /** Optional, public-safe observation hook for real runner transitions. */
+    onProgress?: (event: LoopRunExecuteProgressEvent) => void;
   }>;
+
+export type LoopRunExecuteProgressEvent = Readonly<{
+  status: LoopRunStatus;
+}>;
 
 type ExecuteDependencies = Readonly<{
   now: () => string;
@@ -171,6 +177,11 @@ export async function runLoopExecute(
         details: Object.freeze([...details]),
       }),
     );
+    try {
+      options.onProgress?.(Object.freeze({ status: to }));
+    } catch {
+      // Observation is auxiliary and must never alter the governed run.
+    }
   }
 
   function finalize(

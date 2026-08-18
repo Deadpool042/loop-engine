@@ -375,9 +375,11 @@ describe("runLoopExecute", () => {
   it("executes once, validates once and reports modified files without commit", async () => {
     let executorCalls = 0;
     let validatorCalls = 0;
+    const progress: string[] = [];
 
     const result = await runLoopExecute("fixture-project", {
       ...deterministicOptions(),
+      onProgress: (event) => { progress.push(event.status); },
       readModifiedWorktreeFiles: async () => ["src/feature.ts"],
       executor: async () => {
         executorCalls += 1;
@@ -414,6 +416,7 @@ describe("runLoopExecute", () => {
       result.steps.map((step) => step.name),
       ["planning", "ready", "executing", "validating", "completed"],
     );
+    assert.deepEqual(progress, ["planning", "ready", "executing", "validating", "completed"]);
   });
 
   it("repairs once and revalidates within the finite budget", async () => {

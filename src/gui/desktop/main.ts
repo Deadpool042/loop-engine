@@ -7,11 +7,14 @@ import { createContextHandler } from "./context-handler.js";
 import { createPlanHandler } from "./plan-handler.js";
 import { createExecuteHandler, DESKTOP_EXECUTE_CLI_TIMEOUT_MS } from "./execute-handler.js";
 import { createExecutionWindowCloseGuard } from "./execution-window-close-guard.js";
+import {
+  createExecutionSessionManager,
+  createObservableExecuteCliInvoker,
+} from "./execution-session.js";
 import { createReviewHandler } from "./review-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 
 const cliInvoker = createCliInvoker();
-const executeCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_EXECUTE_CLI_TIMEOUT_MS });
 const executionCloseGuard = createExecutionWindowCloseGuard();
 let mainWindow: BrowserWindow | null = null;
 
@@ -80,24 +83,48 @@ ipcMain.handle("loop:plan", (_event, projectName, candidateId) =>
   planHandler(projectName, candidateId),
 );
 
-const executeHandler = createExecuteHandler({
-  cliInvoker: executeCliInvoker,
-  resolveRepositoryPath,
-  async choosePatchDestination(defaultPath) {
-    const options = {
-      title: "Exporter le patch validé",
-      defaultPath,
-      filters: [{ name: "Git patch", extensions: ["patch"] }],
-    };
-    const result = mainWindow
-      ? await dialog.showSaveDialog(mainWindow, options)
-      : await dialog.showSaveDialog(options);
-    return result.canceled || !result.filePath ? null : result.filePath;
+const executionSessions = createExecutionSessionManager({
+  createExecuteHandler(onProgress) {
+    return createExecuteHandler({
+      cliInvoker: createObservableExecuteCliInvoker({
+        timeoutMs: DESKTOP_EXECUTE_CLI_TIMEOUT_MS,
+        onProgress,
+      }),
+      resolveRepositoryPath,
+      async choosePatchDestination(defaultPath) {
+        const options = {
+          title: "Exporter le patch validé",
+          defaultPath,
+          filters: [{ name: "Git patch", extensions: ["patch"] }],
+        };
+        const result = mainWindow
+          ? await dialog.showSaveDialog(mainWindow, options)
+          : await dialog.showSaveDialog(options);
+        return result.canceled || !result.filePath ? null : result.filePath;
+      },
+    });
   },
 });
-ipcMain.handle("loop:execute", (_event, request) =>
-  executionCloseGuard.run(() => executeHandler(request)),
-);
+
+async function startExecutionSession(request: unknown) {
+  const started = await executionSessions.start(request);
+  if (!started.ok) return started;
+  void executionCloseGuard.run(() => executionSessions.waitForCompletion(started.session.id));
+  return started;
+}
+
+ipcMain.handle("loop:execution-start", (_event, request) => startExecutionSession(request));
+ipcMain.handle("loop:execution-session", (_event, sessionId) => executionSessions.get(sessionId));
+ipcMain.handle("loop:execute", async (_event, request) => {
+  const started = await startExecutionSession(request);
+  if (!started.ok) return started;
+  await executionSessions.waitForCompletion(started.session.id);
+  return executionSessions.get(started.session.id)?.result ?? {
+    ok: false as const,
+    kind: "spawn-error" as const,
+    raw: "Execution session result is unavailable.",
+  };
+});
 
 app.whenReady().then(async () => {
   await createMainWindow();

@@ -636,7 +636,7 @@ describe("loop-engine burn-in candidate", () => {
   // contain "lot ". This is real, current reader behavior (verified
   // against src/intelligence/roadmap.ts), not a new production semantic
   // introduced here.
-  it("selects the next deterministic candidate once both burn-in lots are done", () => {
+  it("selects V23.0 once both burn-in lots are done", () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
     const repoRoot = resolve(currentDir, "..", "..");
     const project: ProjectConfig = {
@@ -662,8 +662,8 @@ describe("loop-engine burn-in candidate", () => {
 
     assert.ok(selected, "expected a fallback candidate once burn-in is done");
     assert.doesNotMatch(selected!.text, /Burn-in 1|Burn-in 2/);
-    assert.match(selected!.text, /Aucun nouveau lot V15\+/);
-    assert.equal(selected!.status, "unknown");
+    assert.match(selected!.text, /Lot V23\.0 — Observable GUI execution session/);
+    assert.equal(selected!.status, "todo");
     assert.equal(selected!.kind, "safe");
   });
 });
