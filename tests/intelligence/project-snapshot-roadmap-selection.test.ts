@@ -30,7 +30,7 @@ function setupProject(roadmap: string): {
 }
 
 describe("project snapshot roadmap selection", () => {
-  it("keeps unknown roadmap entries in inventory but never selects them as the next action", () => {
+  it("ignores descriptive roadmap bullets after completed candidates", () => {
     const { project, cleanup } = setupProject(
       [
         "- [x] Burn-in 1 — completed",
@@ -43,8 +43,8 @@ describe("project snapshot roadmap selection", () => {
       const snapshot = buildProjectSnapshot(project);
 
       assert.equal(snapshot.roadmap.stats.done, 2);
-      assert.equal(snapshot.roadmap.stats.unknown, 1);
-      assert.equal(snapshot.roadmap.summary.active, 1);
+      assert.equal(snapshot.roadmap.stats.unknown, 0);
+      assert.equal(snapshot.roadmap.summary.active, 0);
       assert.equal(snapshot.roadmap.summary.selectable, 0);
       assert.equal(snapshot.roadmap.selectedCandidate, null);
     } finally {
@@ -55,7 +55,7 @@ describe("project snapshot roadmap selection", () => {
   it("continues to select explicit todo candidates", () => {
     const { project, cleanup } = setupProject(
       [
-        "- Une phrase de prose contenant le mot lot historique.",
+        "- Statut : le lot historique est clôturé.",
         "- [ ] [P1] Ajouter le prochain burn-in contrôlé",
       ].join("\n"),
     );
@@ -63,7 +63,7 @@ describe("project snapshot roadmap selection", () => {
     try {
       const snapshot = buildProjectSnapshot(project);
 
-      assert.equal(snapshot.roadmap.stats.unknown, 1);
+      assert.equal(snapshot.roadmap.stats.unknown, 0);
       assert.equal(snapshot.roadmap.summary.selectable, 1);
       assert.equal(snapshot.roadmap.selectedCandidate?.status, "todo");
       assert.equal(snapshot.roadmap.selectedCandidate?.priority, "p1");

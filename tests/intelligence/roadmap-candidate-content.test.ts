@@ -140,6 +140,25 @@ describe("roadmap candidate content", () => {
     );
   });
 
+  it("does not parse descriptive roadmap metadata as candidates", () => {
+    withRoadmap(
+      [
+        "- Projet : Loop Engine",
+        "- Statut : clôturé après burn-in.",
+        "- Preuve : docs/audits/real-provider-pilot-burn-in.md",
+        "- [x] Lot explicitement terminé",
+      ].join("\n"),
+      (project, projectPath) => {
+        const candidates = findRoadmapCandidates(project, projectPath);
+        const selected = selectRoadmapCandidate(candidates);
+
+        assert.equal(candidates.length, 1);
+        assert.equal(candidates[0]?.text, "- [x] Lot explicitement terminé");
+        assert.equal(selected, null);
+      },
+    );
+  });
+
   it("keeps explicit non-checkbox candidate formats", () => {
     withRoadmap(
       ["TODO Ajouter la preuve", "Prochain lot : valider le rapport"].join(
