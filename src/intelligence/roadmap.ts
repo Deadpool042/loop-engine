@@ -239,11 +239,7 @@ function isCandidateStart(line: string): boolean {
 }
 
 function isRoadmapInventoryEntry(line: string): boolean {
-  if (isMarkdownHeading(line)) {
-    return false;
-  }
-
-  return isCandidateStart(line) || /^-\s+\S/.test(line);
+  return isCandidateStart(line);
 }
 
 function isIndentedContinuation(line: string): boolean {
