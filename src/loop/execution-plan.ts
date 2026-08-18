@@ -22,6 +22,12 @@ export type CreateLoopExecutionPlanInput = Readonly<{
   agentPolicy: AgentPolicyResolution;
   contextPackage: MinimalContextPackage;
   allowedPaths?: readonly string[];
+  brief?: Readonly<{
+    objective: string;
+    deliverables: readonly string[];
+    outOfScope: readonly string[];
+    forbiddenContentTerms?: readonly string[];
+  }>;
 }>;
 
 export type LoopExecutionPlan = Readonly<{
@@ -31,6 +37,12 @@ export type LoopExecutionPlan = Readonly<{
   candidate: RoadmapCandidate;
   contextPackage: MinimalContextPackage;
   allowedPaths?: readonly string[];
+  brief?: Readonly<{
+    objective: string;
+    deliverables: readonly string[];
+    outOfScope: readonly string[];
+    forbiddenContentTerms?: readonly string[];
+  }>;
   provider: AgentProvider;
   runtime: AgentRuntime;
   profileId: string;
@@ -89,6 +101,22 @@ export function createLoopExecutionPlan(
     ...(input.allowedPaths === undefined
       ? {}
       : { allowedPaths: Object.freeze([...input.allowedPaths]) }),
+    ...(input.brief === undefined
+      ? {}
+      : {
+          brief: Object.freeze({
+            objective: input.brief.objective,
+            deliverables: Object.freeze([...input.brief.deliverables]),
+            outOfScope: Object.freeze([...input.brief.outOfScope]),
+            ...(input.brief.forbiddenContentTerms === undefined
+              ? {}
+              : {
+                  forbiddenContentTerms: Object.freeze([
+                    ...input.brief.forbiddenContentTerms,
+                  ]),
+                }),
+          }),
+        }),
     provider: profile.provider,
     runtime: profile.runtime,
     profileId: profile.id,

@@ -18,6 +18,12 @@ export type LoopPlan =
       // (rather than by heuristic roadmap selection).
       authorizedBy?: "execution_decision";
       allowedPaths?: readonly string[];
+      brief?: Readonly<{
+        objective: string;
+        deliverables: readonly string[];
+        outOfScope: readonly string[];
+        forbiddenContentTerms?: readonly string[];
+      }>;
     }>
   | Readonly<{
       outcome: "blocked";
@@ -190,6 +196,7 @@ export function planLoopCycle(
         ? {
             authorizedBy: "execution_decision" as const,
             allowedPaths: authorization.allowedPaths,
+            ...(authorization.brief === undefined ? {} : { brief: authorization.brief }),
           }
         : {}),
     };

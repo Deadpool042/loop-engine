@@ -254,5 +254,7 @@ export function generateExecutionReport(result: LoopRunResult): LoopRunResult {
     failure: result.failure,
     agentPolicy: result.agentPolicy,
     contextPackage: result.contextPackage,
+    writableFileScope: result.writableFileScope ?? null,
+    brief: result.brief ?? null,
   };
 }

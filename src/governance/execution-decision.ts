@@ -20,6 +20,13 @@ export type ExecutionDecisionFile = Readonly<{
     reason?: string;
     nextAction?: string;
     candidate?: Readonly<{ id: string; allowedPaths?: readonly string[] }>;
+    brief?: Readonly<{
+      objective: string;
+      deliverables: readonly string[];
+      outOfScope: readonly string[];
+      /** Explicit case-insensitive terms that must not appear in generated content. */
+      forbiddenContentTerms?: readonly string[];
+    }>;
   }>;
   source: Readonly<{
     document?: string;
@@ -37,6 +44,10 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyStringArray(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.length > 0 && value.every(isNonEmptyString);
 }
 
 // Fail-closed parser for the authorization-critical V1 fields. Informational
@@ -107,6 +118,41 @@ export function parseExecutionDecisionFile(
     candidate = { id: decisionRaw.candidate.id };
   }
 
+  let brief: ExecutionDecisionFile["decision"]["brief"];
+  if (decisionRaw.brief !== undefined) {
+    if (
+      !isPlainObject(decisionRaw.brief) ||
+      !isNonEmptyString(decisionRaw.brief.objective) ||
+      !isNonEmptyStringArray(decisionRaw.brief.deliverables) ||
+      !isNonEmptyStringArray(decisionRaw.brief.outOfScope)
+    ) {
+      return {
+        ok: false,
+        reason: "Execution decision brief must declare objective, deliverables, and outOfScope.",
+      };
+    }
+    const forbiddenContentTerms = decisionRaw.brief.forbiddenContentTerms;
+    if (
+      forbiddenContentTerms !== undefined &&
+      !isNonEmptyStringArray(forbiddenContentTerms)
+    ) {
+      return {
+        ok: false,
+        reason: "Execution decision brief forbiddenContentTerms, when present, must be a non-empty string array.",
+      };
+    }
+    brief = Object.freeze({
+      objective: decisionRaw.brief.objective,
+      deliverables: Object.freeze([...decisionRaw.brief.deliverables]),
+      outOfScope: Object.freeze([...decisionRaw.brief.outOfScope]),
+      ...(forbiddenContentTerms === undefined
+        ? {}
+        : {
+            forbiddenContentTerms: Object.freeze([...forbiddenContentTerms]),
+          }),
+    });
+  }
+
   if (state === "READY" && candidate === undefined) {
     return {
       ok: false,
@@ -157,6 +203,7 @@ export function parseExecutionDecisionFile(
           ? { nextAction: decisionRaw.nextAction }
           : {}),
         ...(candidate !== undefined ? { candidate } : {}),
+        ...(brief !== undefined ? { brief } : {}),
       },
       source: {
         ...(document !== undefined ? { document } : {}),

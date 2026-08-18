@@ -197,7 +197,17 @@ export function App(): React.JSX.Element {
 
   async function executePlan(): Promise<void> {
     const candidate = planDetail?.candidate;
-    if (selectedProjectName === null || !candidate) return;
+    if (selectedProjectName === null || !candidate || !planDetail?.profile) return;
+    const recommendedProvider =
+      planDetail.profile.provider === "openai"
+        ? "codex"
+        : planDetail.profile.provider === "anthropic"
+          ? "claude_code"
+          : null;
+    if (recommendedProvider === null || executeProvider !== recommendedProvider) {
+      setExecuteMessage("Le provider approuvé ne correspond plus à la recommandation du plan. Préparez à nouveau le lot.");
+      return;
+    }
     setExecuteLoading(true);
     setExecuteMessage(null);
     setExecuteResult(null);
@@ -206,6 +216,7 @@ export function App(): React.JSX.Element {
         projectName: selectedProjectName,
         candidateId: candidate.id,
         provider: executeProvider,
+        model: planDetail.profile.model,
       });
       if (!result.ok) {
         setExecuteMessage(
@@ -603,34 +614,80 @@ export function App(): React.JSX.Element {
                 {planDetail &&
                   isPlanForSelectedProject(planProjectName, selectedProjectName) && (
                   <div className="mt-5 grid gap-6">
-                    <section>
-                      <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
-                        Candidat confirmé
-                      </h4>
-                      <p className="mt-2 font-mono text-sm font-semibold">
+                    <section className="rounded-lg border border-loop-line bg-white p-5">
+                      <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                        Fiche de mission
+                      </p>
+                      <p className="mt-3 font-mono text-sm font-semibold">
                         {planDetail.candidate.id}
                       </p>
-                      <p className="mt-2 text-sm">{planDetail.candidate.text}</p>
-                      <p className="mt-2 text-sm font-medium">
-                        {planDetail.candidate.kind} · {planDetail.candidate.status}
-                      </p>
-                      <p className="mt-2 text-xs text-loop-muted">
-                        Projet : {planDetail.project} · mode : plan
-                      </p>
+                      <h4 className="mt-2 text-lg font-semibold">
+                        {formatCandidateTitle(planDetail.candidate)}
+                      </h4>
+                      <dl className="mt-5 grid gap-5 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                          <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Objectif</dt>
+                          <dd className="mt-2 text-sm">
+                            {planDetail.brief?.objective ?? "Aucun résumé structuré n’est déclaré dans la décision de gouvernance."}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Livrables attendus</dt>
+                          <dd className="mt-2">
+                            {planDetail.brief ? (
+                              <ul className="space-y-1 text-sm text-loop-muted">
+                                {planDetail.brief.deliverables.map((deliverable) => <li key={deliverable}>{deliverable}</li>)}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-loop-muted">Non précisés.</p>
+                            )}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Hors périmètre</dt>
+                          <dd className="mt-2">
+                            {planDetail.brief ? (
+                              <ul className="space-y-1 text-sm text-loop-muted">
+                                {planDetail.brief.outOfScope.map((item) => <li key={item}>{item}</li>)}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-loop-muted">Non précisé.</p>
+                            )}
+                          </dd>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Périmètre d’écriture autorisé</dt>
+                          <dd className="mt-2">
+                            {planDetail.writableFileScope ? (
+                              <ul className="space-y-1 font-mono text-xs text-loop-muted">
+                                {planDetail.writableFileScope.map((path) => <li key={path}>{path}</li>)}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-loop-muted">Aucun périmètre d’écriture gouverné n’est déclaré.</p>
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
                     </section>
                     <section>
                       <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
-                        Politique prévisionnelle
+                        Recommandation IA
                       </h4>
                       {planDetail.profile ? (
-                        <p className="mt-2 text-sm">
-                          {planDetail.profile.id} · {planDetail.profile.provider} ·{" "}
-                          {planDetail.profile.model} · effort {planDetail.profile.effort}
-                        </p>
+                        <>
+                          <p className="mt-2 text-sm font-medium">
+                            {planDetail.profile.provider} · {planDetail.profile.model} · effort {planDetail.profile.effort}
+                          </p>
+                          <p className="mt-2 text-sm text-loop-muted">
+                            Catégorie : {planDetail.profile.category} · budget de contexte : {planDetail.profile.contextBudgetTokens} tokens.
+                          </p>
+                          <ul className="mt-2 space-y-1 text-xs text-loop-muted">
+                            <li>Profil choisi automatiquement selon le type, le périmètre et le budget du lot.</li>
+                            <li>Le plan reste sans appel externe tant que l’exécution n’est pas confirmée.</li>
+                          </ul>
+                        </>
                       ) : (
-                        <p className="mt-2 text-sm text-loop-muted">
-                          Aucun profil prévisionnel sélectionné.
-                        </p>
+                        <p className="mt-2 text-sm text-loop-muted">Aucun profil prévisionnel sélectionné.</p>
                       )}
                     </section>
                     <section>
@@ -653,6 +710,17 @@ export function App(): React.JSX.Element {
                           {planDetail.context.estimatedTokens} tokens estimés
                           {planDetail.context.truncated ? " · tronqué" : ""}
                         </p>
+                        {planDetail.profile && (
+                          <p className="mt-1 text-sm text-loop-muted">
+                            Réserve estimée :{" "}
+                            {Math.max(
+                              0,
+                              planDetail.profile.contextBudgetTokens -
+                                planDetail.context.estimatedTokens,
+                            )}{" "}
+                            tokens. Chaque exécution démarre dans une session isolée, sans réutiliser l’historique brut.
+                          </p>
+                        )}
                         <ul className="mt-2 space-y-1 font-mono text-xs text-loop-muted">
                           {planDetail.context.files.map((path) => (
                             <li key={path}>{path}</li>
@@ -668,13 +736,12 @@ export function App(): React.JSX.Element {
                         Exécution isolée confirmée
                       </h4>
                       <p className="mt-2 text-sm">Projet : {planDetail.project} · candidat : {planDetail.candidate.id}</p>
-                      <label className="mt-3 block text-sm" htmlFor="execute-provider">
-                        Provider approuvé
-                      </label>
-                      <select id="execute-provider" className="mt-1 rounded border border-loop-line bg-white p-2 text-sm" value={executeProvider} disabled={executeLoading} onChange={(event) => setExecuteProvider(event.target.value as DesktopExecuteProvider)}>
-                        <option value="claude_code">Claude Code</option>
-                        <option value="codex">Codex</option>
-                      </select>
+                      <p className="mt-3 text-sm">Exécution avec la recommandation du plan</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {planDetail.profile
+                          ? `${executeProvider === "codex" ? "Codex" : "Claude Code"} · ${planDetail.profile.model} · effort ${planDetail.profile.effort}`
+                          : "Aucun profil recommandé."}
+                      </p>
                       <p className="mt-3 text-sm">Validations prévues : {contextDetail?.validation.commands.length ?? 0} · maxRepairs : 0</p>
                       <p className="mt-2 text-sm text-loop-muted">Le provider s’exécute dans un worktree Git isolé, mais n’est pas sandboxé au niveau du système d’exploitation.</p>
                       <p className="mt-2 text-sm text-loop-muted">Le dépôt source ne sera pas modifié et le patch ne sera pas appliqué automatiquement.</p>

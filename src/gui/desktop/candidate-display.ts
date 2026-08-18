@@ -1,6 +1,7 @@
 import type { ContextDetail } from "./context-contract.js";
 
-type Candidate = NonNullable<ContextDetail["roadmap"]["selectedCandidate"]>;
+type Candidate = Readonly<{ id?: string; text: string }>;
+type CandidateState = NonNullable<ContextDetail["roadmap"]["selectedCandidate"]>;
 
 const statusLabels: Readonly<Record<string, string>> = Object.freeze({
   todo: "À faire",
@@ -24,7 +25,7 @@ export function formatCandidateTitle(candidate: Candidate): string {
   return cells[1] || text;
 }
 
-export function formatCandidateState(candidate: Candidate): string {
+export function formatCandidateState(candidate: CandidateState): string {
   const admissibility =
     candidate.admissibility?.state === "admissible"
       ? "Admissible"

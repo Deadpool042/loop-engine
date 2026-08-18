@@ -141,6 +141,7 @@ describe("explicit roadmap candidate binding", () => {
       const execution = await runLoopExecute(project.name, {
         loadConfig: () => config,
         candidateId: "H1-L4",
+        readModifiedWorktreeFiles: async () => [],
         executor: async (executionPlan) => {
           executedCandidateId = executionPlan.candidate.id;
           return {

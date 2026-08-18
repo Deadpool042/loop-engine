@@ -514,6 +514,7 @@ describe("project-owned execution decision governance", () => {
       let executedCandidateId: string | undefined;
       const execution = await runLoopExecute(project.name, {
         loadConfig: () => config,
+        readModifiedWorktreeFiles: async () => [],
         executor: async (executionPlan) => {
           executedCandidateId = executionPlan.candidate.id;
           return { status: "completed", modifiedFiles: [], details: [] };

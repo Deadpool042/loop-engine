@@ -96,6 +96,8 @@ export function runLoopPlan(
     failure: LoopRunFailure | null,
     agentPolicy: AgentPolicyResolution | null = null,
     contextPackage: MinimalContextPackage | null = null,
+    writableFileScope: readonly string[] | null = null,
+    brief: LoopRunResult["brief"] = null,
   ): LoopRunResult {
     return {
       schemaVersion: 1,
@@ -114,6 +116,8 @@ export function runLoopPlan(
       failure,
       agentPolicy,
       contextPackage,
+      writableFileScope,
+      brief,
     };
   }
 
@@ -188,5 +192,18 @@ export function runLoopPlan(
     agentPolicy.requirements.contextBudget,
   );
 
-  return finalize(cycle.candidate, null, agentPolicy, contextPackage);
+  return finalize(
+    cycle.candidate,
+    null,
+    agentPolicy,
+    contextPackage,
+    cycle.allowedPaths ?? null,
+    cycle.brief === undefined
+      ? null
+      : {
+          objective: cycle.brief.objective,
+          deliverables: cycle.brief.deliverables,
+          outOfScope: cycle.brief.outOfScope,
+        },
+  );
 }

@@ -44,7 +44,25 @@ describe("LoopProviderRegistry", () => {
       id: profile.id,
       model: profile.model,
       effort: profile.effort,
-    })), [{ id: "configured.codex", model: "gpt-5.6-terra", effort: "medium" }]);
+    })), [{ id: "configured.codex", model: "gpt-5.6-luna", effort: "low" }]);
+  });
+
+  it("binds a configured Codex model to its registered capability profile", () => {
+    const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
+      id: "codex",
+      executable: "/usr/local/bin/codex",
+      model: "gpt-5.6-sol",
+    });
+
+    assert.deepEqual(assembly.agentRegistry.profiles.map((profile) => ({
+      model: profile.model,
+      effort: profile.effort,
+      capabilities: profile.capabilities,
+    })), [{
+      model: "gpt-5.6-sol",
+      effort: "high",
+      capabilities: ["code_edit", "shell_exec", "test_execution", "multi_file_refactor", "long_context"],
+    }]);
   });
 
   it("rejects duplicate provider registrations deterministically", () => {

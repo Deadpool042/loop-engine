@@ -233,6 +233,50 @@ describe("isolated provider execution", () => {
     }
   });
 
+  it("blocks patch export when generated content violates the governed policy", async () => {
+    const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
+    const project = await createRepository(root, "source");
+    const patchPath = join(root, "content-policy-violation.patch");
+    const app = application([project], root);
+    let validatorCalls = 0;
+
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success_with_forbidden_content";
+      const result = await app.runLoopExecute(project.name, {
+        ...optionsFor([project]),
+        exportPatchPath: patchPath,
+        planLoopCycle: (executionProject) => ({
+          outcome: "ready" as const,
+          candidate: candidate(),
+          plannedSteps: ["Execute", "Validate"],
+          snapshot: snapshot(executionProject),
+          brief: {
+            objective: "Write a documentation standard.",
+            deliverables: ["provider-created.md"],
+            outOfScope: ["Infrastructure configuration"],
+            forbiddenContentTerms: ["docker"],
+          },
+        }),
+        validator: async () => {
+          validatorCalls += 1;
+          return { status: "passed" as const, failedCommand: null, exitCode: 0, details: [] };
+        },
+      });
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.failure?.code, "content_policy_violation");
+      assert.equal(result.validation, null);
+      assert.equal(result.patchExport, undefined);
+      assert.equal(validatorCalls, 0);
+      await assert.rejects(readFile(patchPath, "utf8"));
+      await assertCleanSource(project, "provider-created.md");
+      await assertNoOrphans(root);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("cleans the worktree and releases the lock after validation fails", async () => {
     const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
     const project = await createRepository(root, "source");

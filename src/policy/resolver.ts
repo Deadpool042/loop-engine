@@ -45,10 +45,23 @@ import type {
 // docs/roadmap/...), not the file the lot would touch; matching against it
 // would mis-classify nearly every candidate of every project as
 // "documentation" just because the roadmap itself lives under docs/.
-const DOCUMENTATION_KEYWORDS = ["documentation", "readme", "guide"];
+const DOCUMENTATION_KEYWORDS = [
+  "documentation",
+  "readme",
+  "guide",
+  "standard",
+  "logging",
+];
 const TEST_KEYWORDS = ["test", "tests", "coverage"];
 const VALIDATION_KEYWORDS = ["validation", "valider", "audit"];
-const ARCHITECTURE_KEYWORDS = ["architecture", "conception", "design"];
+const ARCHITECTURE_KEYWORDS = [
+  "architecture",
+  "conception",
+  "design",
+  "adr",
+  "stratégie",
+  "strategie",
+];
 const REVIEW_KEYWORDS = ["revue", "review"];
 
 export function classifyLoopTaskCategory(
@@ -90,7 +103,7 @@ const CATEGORY_CAPABILITIES: Readonly<
   code: ["code_edit", "shell_exec", "test_execution"],
   tests: ["code_edit", "test_execution"],
   validation: ["shell_exec", "test_execution"],
-  architecture: ["long_context"],
+  architecture: ["code_edit", "long_context"],
   review: [],
   none: [],
 };
@@ -104,7 +117,7 @@ const CATEGORY_NEEDS_WRITE: Readonly<Record<LoopTaskCategory, boolean>> = {
   code: true,
   tests: true,
   validation: false,
-  architecture: false,
+  architecture: true,
   review: false,
   none: false,
 };

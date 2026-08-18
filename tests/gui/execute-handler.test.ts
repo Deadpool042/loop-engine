@@ -5,12 +5,19 @@ import { createCliInvoker } from "../../src/gui/cli-invoker.js";
 import {
   APPROVED_DESKTOP_EXECUTE_PROVIDERS,
   createExecuteHandler,
+  defaultPatchFilename,
 } from "../../src/gui/desktop/execute-handler.js";
 
 describe("GUI execute handler", () => {
+  it("derives a stable, safe patch filename from project and candidate", () => {
+    assert.equal(defaultPatchFilename("lp-infra", "H3-L2"), "lp-infra-H3-L2.patch");
+    assert.equal(defaultPatchFilename("../LP Infra", "H3 / L2"), "LP-Infra-H3-L2.patch");
+  });
+
   it("accepts only the renderer project, candidate and approved provider, then retains the trusted cwd", async () => {
     const calls: Array<readonly string[]> = [];
     const cwdValues: string[] = [];
+    let patchDefault = "";
     const handler = createExecuteHandler({
       cliInvoker: createCliInvoker({
         timeoutMs: 900_000,
@@ -21,7 +28,10 @@ describe("GUI execute handler", () => {
         },
       }),
       resolveRepositoryPath: () => "/trusted/loop-engine",
-      choosePatchDestination: async () => "/chosen/validated.patch",
+      choosePatchDestination: async (defaultPath) => {
+        patchDefault = defaultPath;
+        return "/chosen/validated.patch";
+      },
       destinationExists: () => false,
       parentDirectoryExists: () => true,
     });
@@ -30,9 +40,11 @@ describe("GUI execute handler", () => {
       projectName: "lp-infra",
       candidateId: "H1-L4",
       provider: "claude_code",
+      model: "claude-sonnet-5",
     });
 
     assert.equal(result.ok, true);
+    assert.equal(patchDefault, "lp-infra-H1-L4.patch");
     assert.deepEqual(cwdValues, ["/trusted/loop-engine"]);
     assert.deepEqual(calls, [
       [
@@ -48,6 +60,8 @@ describe("GUI execute handler", () => {
         "claude_code",
         "--provider-executable",
         "claude",
+        "--provider-model",
+        "claude-sonnet-5",
         "--provider-timeout-ms",
         "600000",
         "--export-patch",
@@ -82,11 +96,11 @@ describe("GUI execute handler", () => {
     });
 
     assert.deepEqual(
-      await cancelled({ projectName: "lp-infra", candidateId: "H1-L4", provider: "codex" }),
+      await cancelled({ projectName: "lp-infra", candidateId: "H1-L4", provider: "codex", model: "gpt-5.6-terra" }),
       { ok: false, kind: "cancelled", raw: "Patch destination selection was cancelled." },
     );
     assert.deepEqual(
-      await existing({ projectName: "lp-infra", candidateId: "H1-L4", provider: "codex" }),
+      await existing({ projectName: "lp-infra", candidateId: "H1-L4", provider: "codex", model: "gpt-5.6-terra" }),
       { ok: false, kind: "spawn-error", raw: "Patch destination already exists." },
     );
     assert.equal(calls, 0);
@@ -109,6 +123,7 @@ describe("GUI execute handler", () => {
       projectName: "lp-infra",
       candidateId: "H1-L4",
       provider: "not-a-provider" as never,
+      model: "untrusted-model",
     });
 
     assert.equal(result.ok, false);
