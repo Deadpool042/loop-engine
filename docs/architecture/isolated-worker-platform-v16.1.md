@@ -38,9 +38,11 @@ This order guarantees that no workspace is allocated for a rejected attempt and 
 
 ### Local project lock manager
 
-`createLocalProjectLockManager` uses atomic directory creation under an injected lock root. A project identifier is encoded as a filesystem-safe segment. An existing directory means the project is already locked.
+`createLocalProjectLockManager` prepares a private candidate directory under an injected lock root, writes its bounded `owner.json` completely, then atomically renames that complete directory to the canonical project path. A project identifier is encoded as a filesystem-safe segment. A canonical lock created by this adapter is therefore never visible without its owner metadata, while an interrupted unpublished candidate remains outside the canonical path and is cleaned when the current acquisition can do so.
 
-The adapter is single-host and process-independent for acquisition because the filesystem operation is atomic. Durable stale-lock recovery is intentionally deferred to V16.4.
+The adapter is local to one host. An existing lock is recovered only when its metadata is valid, names the requested project and current hostname, and its PID is demonstrated absent locally (`ESRCH`). A live PID, PID inspection ambiguity (including permission denial), a different host, missing/corrupt/unsupported metadata, or any inconsistent value remains `project_locked`; age never authorizes recovery. A dead generation is atomically moved to a deterministic, non-empty quarantine path derived from its `lockId`; that quarantine remains as a generation barrier, so another recoverer that observed the old generation cannot rename or remove a replacement generation. Retries are bounded, and the next complete candidate is published atomically only while the canonical path is absent. Release is idempotent and removes a lock only if its current unique owner identity matches the handle, so an old handle cannot remove a replacement lock.
+
+The adapter cannot clean up descendants left behind by a crashed provider. GUI-driven multi-project parallelism is not introduced by this local per-project exclusion.
 
 ### Local workspace manager
 
@@ -78,5 +80,4 @@ separate human Git action.
 
 - lease heartbeat and renewal: V16.2;
 - active cancellation and process termination: V16.3;
-- stale lock and crash recovery: V16.4;
 - idempotent resume and duplicate suppression: V16.5.
