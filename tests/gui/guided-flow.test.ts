@@ -15,6 +15,7 @@ test("starts on project selection when no project is selected", () => {
       candidateAddressable: false,
       planLoading: false,
       hasPlan: false,
+      hasPlanError: false,
       hasExecutionOutcome: false,
     }).map((step) => [step.id, step.status]),
     [
@@ -35,6 +36,7 @@ test("keeps work active while an addressable candidate awaits confirmation", () 
     candidateAddressable: true,
     planLoading: false,
     hasPlan: false,
+    hasPlanError: false,
     hasExecutionOutcome: false,
   });
 
@@ -51,11 +53,29 @@ test("focuses preparation while the confirmed work is being prepared", () => {
     candidateAddressable: true,
     planLoading: true,
     hasPlan: false,
+    hasPlanError: false,
     hasExecutionOutcome: false,
   });
 
   assert.equal(steps.find((step) => step.id === "work")?.status, "done");
   assert.equal(steps.find((step) => step.id === "prepare")?.status, "active");
+  assert.equal(getFocusedGuidedFlowStepId(steps), "prepare");
+});
+
+test("keeps preparation focused and blocked when plan preparation fails", () => {
+  const steps = buildGuidedFlowSteps({
+    hasProject: true,
+    contextLoading: false,
+    hasCandidate: true,
+    candidateAddressable: true,
+    planLoading: false,
+    hasPlan: false,
+    hasPlanError: true,
+    hasExecutionOutcome: false,
+  });
+
+  assert.equal(steps.find((step) => step.id === "work")?.status, "done");
+  assert.equal(steps.find((step) => step.id === "prepare")?.status, "blocked");
   assert.equal(getFocusedGuidedFlowStepId(steps), "prepare");
 });
 
@@ -67,6 +87,7 @@ test("advances from a prepared plan to execution and result", () => {
     candidateAddressable: true,
     planLoading: false,
     hasPlan: true,
+    hasPlanError: false,
     hasExecutionOutcome: false,
   });
   assert.equal(execute.find((step) => step.id === "execute")?.status, "active");
@@ -78,6 +99,7 @@ test("advances from a prepared plan to execution and result", () => {
     candidateAddressable: true,
     planLoading: false,
     hasPlan: true,
+    hasPlanError: false,
     hasExecutionOutcome: true,
   });
   assert.equal(result.find((step) => step.id === "result")?.status, "active");
@@ -92,6 +114,7 @@ test("marks work as blocked when the candidate cannot be addressed", () => {
     candidateAddressable: false,
     planLoading: false,
     hasPlan: false,
+    hasPlanError: false,
     hasExecutionOutcome: false,
   });
 
