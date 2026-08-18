@@ -626,17 +626,7 @@ describe("execution projection contract", () => {
 });
 
 describe("loop-engine burn-in candidate", () => {
-  // Burn-in 1 and Burn-in 2 are both marked [x] done in
-  // docs/roadmap/loop-engine.md, so neither is selectable anymore
-  // (selectRoadmapCandidate filters out status "done"). The reader is a
-  // conservative keyword matcher (CANDIDATE_PATTERNS includes the bare
-  // substring "lot "), so with no open task left in "Lot actif", selection
-  // deterministically falls through to the next matching line in document
-  // order — a prose bullet under "Gel architectural" that happens to
-  // contain "lot ". This is real, current reader behavior (verified
-  // against src/intelligence/roadmap.ts), not a new production semantic
-  // introduced here.
-  it("selects V23.0 once both burn-in lots are done", () => {
+  it("selects V23.1 once V23.0 and both burn-in lots are done", () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
     const repoRoot = resolve(currentDir, "..", "..");
     const project: ProjectConfig = {
@@ -662,7 +652,7 @@ describe("loop-engine burn-in candidate", () => {
 
     assert.ok(selected, "expected a fallback candidate once burn-in is done");
     assert.doesNotMatch(selected!.text, /Burn-in 1|Burn-in 2/);
-    assert.match(selected!.text, /Lot V23\.0 — Observable GUI execution session/);
+    assert.match(selected!.text, /Lot V23\.1 — Recoverable isolated project locks/);
     assert.equal(selected!.status, "todo");
     assert.equal(selected!.kind, "safe");
   });
