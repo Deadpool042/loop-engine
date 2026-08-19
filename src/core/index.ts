@@ -100,6 +100,11 @@ export * from "./boundary.js";
 export * from "./transports.js";
 export * from "./reports.js";
 export * from "./types.js";
+export {
+  type ObjectiveReason,
+  type ObjectiveStatus,
+  MAX_OBJECTIVE_SOURCE_BYTES,
+} from "../intelligence/objective.js";
 export { loadConfig, type Config, type ProjectConfig } from "./config.js";
 export { findProject, getRequiredProjectName } from "./project.js";
 export { isAuditProfile } from "../audit/profiles.js";

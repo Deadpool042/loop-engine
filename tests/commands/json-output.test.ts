@@ -45,6 +45,53 @@ describe("json outputs", () => {
     assert.ok(json.docs);
   });
 
+  it("roadmap objective --json exposes the V1 canonical objective contract", () => {
+    const json = runJson(
+      "pnpm exec tsx src/cli.ts roadmap objective loop-engine --json",
+    ) as {
+      schemaVersion?: unknown;
+      project?: { name?: unknown };
+      planning?: { mode?: unknown };
+      objective?: {
+        source?: unknown;
+        available?: unknown;
+        eligibleForRoadmapProposal?: unknown;
+        content?: unknown;
+      };
+    };
+
+    assert.equal(json.schemaVersion, 1);
+    assert.equal(json.project?.name, "loop-engine");
+    assert.equal(json.planning?.mode, "roadmap");
+    assert.equal(
+      json.objective?.source,
+      "docs/architecture/final-objective.md",
+    );
+    assert.equal(json.objective?.available, true);
+    assert.equal(json.objective?.eligibleForRoadmapProposal, true);
+    assert.equal(typeof json.objective?.content, "string");
+  });
+
+  it("roadmap objective --json reports maintenance as deliberately ineligible", () => {
+    const json = runJson(
+      "pnpm exec tsx src/cli.ts roadmap objective n8n --json",
+    ) as {
+      schemaVersion?: unknown;
+      planning?: { mode?: unknown };
+      objective?: {
+        available?: unknown;
+        eligibleForRoadmapProposal?: unknown;
+        reason?: unknown;
+      };
+    };
+
+    assert.equal(json.schemaVersion, 1);
+    assert.equal(json.planning?.mode, "maintenance");
+    assert.equal(json.objective?.available, false);
+    assert.equal(json.objective?.eligibleForRoadmapProposal, false);
+    assert.equal(json.objective?.reason, "planning_mode_maintenance");
+  });
+
   it("next --json exposes schemaVersion and selected candidate field", () => {
     const json = runJson(
       "pnpm exec tsx src/cli.ts next loop-engine --json",

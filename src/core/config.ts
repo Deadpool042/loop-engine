@@ -15,6 +15,8 @@ export type ProjectConfig = {
   execution_decision?: string;
   planning?: {
     mode: "roadmap" | "maintenance" | "deferred" | "external";
+    /** One project-relative canonical objective document. */
+    objective_source?: string;
   };
 };
 
