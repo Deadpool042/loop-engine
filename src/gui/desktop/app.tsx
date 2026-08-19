@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "./components/ui/button.js";
 import { formatCandidateState, formatCandidateTitle } from "./candidate-display.js";
 import { parseContextDetail, type ContextDetail } from "./context-contract.js";
+import {
+  formatGitStatus,
+  getPlanningDisplay,
+} from "./planning-display.js";
 import { parseReviewDetail, type ReviewDetail } from "./review-contract.js";
 import {
   formatPlanSteps,
@@ -104,6 +108,8 @@ export function App(): React.JSX.Element {
     projects.find((project) => project.project.name === selectedProjectName) ??
     null;
   const selectedCandidate = contextDetail?.roadmap.selectedCandidate ?? null;
+  const planningDisplay =
+    contextDetail === null ? null : getPlanningDisplay(contextDetail);
   const guidedFlowSteps = buildGuidedFlowSteps({
     hasProject: selectedProject !== null,
     contextLoading,
@@ -503,7 +509,11 @@ export function App(): React.JSX.Element {
                     État Git
                   </dt>
                   <dd className="mt-2 text-sm font-medium">
-                    {selectedProject.git.clean ? "Propre" : "Modifié"}
+                    {contextDetail?.git
+                      ? formatGitStatus(contextDetail.git.statusText)
+                      : selectedProject.git.clean
+                        ? "Propre"
+                        : "Modifié"}
                   </dd>
                 </div>
                 <div>
@@ -514,6 +524,16 @@ export function App(): React.JSX.Element {
                     {selectedProject.git.branch}
                   </dd>
                 </div>
+                {planningDisplay?.modeLabel && (
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                      Planification
+                    </dt>
+                    <dd className="mt-2 text-sm font-medium">
+                      {planningDisplay.modeLabel}
+                    </dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
                     Santé
@@ -533,7 +553,9 @@ export function App(): React.JSX.Element {
               </dl>
               {focusedStepId === "work" && (
               <section className="mt-8 border-t border-loop-line pt-6">
-                <h3 className="m-0 text-base font-semibold">Travail recommandé</h3>
+                <h3 className="m-0 text-base font-semibold">
+                  {planningDisplay?.heading ?? "Travail recommandé"}
+                </h3>
                 {contextLoading && (
                   <p className="mt-3 text-sm text-loop-muted">
                     Chargement du contexte…
@@ -573,8 +595,22 @@ export function App(): React.JSX.Element {
                         )}
                       </section>
                     )}
-                    {!contextDetail.roadmap.selectedCandidate && (
-                      <p className="text-sm text-loop-muted">Aucun prochain travail recommandé par la roadmap.</p>
+                    {!contextDetail.roadmap.selectedCandidate && planningDisplay && (
+                      <section className="rounded-lg border border-loop-line bg-white p-5">
+                        <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                          {planningDisplay.heading}
+                        </p>
+                        <p className="mt-3 text-sm text-loop-muted">
+                          {planningDisplay.description}
+                        </p>
+                        {planningDisplay.blockedGates.length > 0 && (
+                          <ul className="mt-3 space-y-1 font-mono text-xs text-loop-muted">
+                            {planningDisplay.blockedGates.map((gate) => (
+                              <li key={gate}>{gate}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </section>
                     )}
                     <details className="rounded-md border border-loop-line bg-neutral-50 p-4">
                       <summary className="cursor-pointer text-sm font-medium">Détails techniques</summary>
@@ -599,9 +635,10 @@ export function App(): React.JSX.Element {
                         Roadmap
                       </h4>
                       <p className="mt-2 text-sm">
-                        {contextDetail.roadmap.available
-                          ? "Roadmap configurée."
-                          : "Aucune roadmap configurée."}
+                        {planningDisplay?.roadmapDetail ??
+                          (contextDetail.roadmap.available
+                            ? "Roadmap configurée."
+                            : "Aucune roadmap configurée.")}
                       </p>
                       {contextDetail.roadmap.paths.map((path) => (
                         <p

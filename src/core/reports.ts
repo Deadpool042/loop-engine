@@ -63,6 +63,7 @@ export function generateProjectContextReport(project: ProjectConfig) {
     schemaVersion: 1 as const,
     project: snapshot.project,
     git: snapshot.git,
+    planning: snapshot.planning,
     docs: snapshot.docs,
     roadmap: {
       available: snapshot.roadmap.available,
