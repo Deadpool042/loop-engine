@@ -16,6 +16,10 @@ import { docExists } from "./docs.js";
 import { isGitRepository } from "./git.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import {
+  buildRoadmapProposalContext,
+  projectRoadmapProposalCandidate,
+} from "../intelligence/proposal-context.js";
+import {
   changedPathsFromGitDiff,
   createDocumentationImpactReport,
   mergeChangedPaths,
@@ -69,6 +73,54 @@ export function generateProjectObjectiveReport(project: ProjectConfig) {
     },
     objective: snapshot.objective,
   };
+}
+
+export function generateRoadmapProposalContextReport(project: ProjectConfig) {
+  const snapshot = generateProjectReport(project);
+  const report = {
+    schemaVersion: 1 as const,
+    project: {
+      name: snapshot.project.name,
+      type: snapshot.project.type,
+    },
+    planning: {
+      mode: snapshot.planning.mode,
+    },
+    objective: snapshot.objective,
+  };
+
+  if (!snapshot.objective.eligibleForRoadmapProposal) {
+    return Object.freeze({
+      ...report,
+      context: null,
+    });
+  }
+
+  const proposalContext = buildRoadmapProposalContext(snapshot);
+  return Object.freeze({
+    ...report,
+    roadmap: {
+      configuredPaths: snapshot.roadmap.paths,
+      stats: snapshot.roadmap.stats,
+      summary: snapshot.roadmap.summary,
+      selectedCandidate:
+        snapshot.roadmap.selectedCandidate === null
+          ? null
+          : projectRoadmapProposalCandidate(snapshot.roadmap.selectedCandidate),
+      candidates: proposalContext.candidates,
+      phaseGates: proposalContext.phaseGates,
+    },
+    projectState: {
+      git: {
+        branch: snapshot.git.branch,
+        clean: snapshot.git.clean,
+        requiresGit: snapshot.git.requiresGit,
+      },
+      validation: snapshot.validation,
+      health: snapshot.health,
+    },
+    context: "available" as const,
+  });
 }
 
 export function generateProjectContextReport(project: ProjectConfig) {

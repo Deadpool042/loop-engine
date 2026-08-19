@@ -101,6 +101,13 @@ export * from "./transports.js";
 export * from "./reports.js";
 export * from "./types.js";
 export {
+  buildRoadmapProposalContext,
+  projectRoadmapProposalCandidate,
+  MAX_PROPOSAL_CONTEXT_CANDIDATES,
+  MAX_PROPOSAL_CONTEXT_PHASE_GATES,
+  MAX_PROPOSAL_CONTEXT_CANDIDATE_TEXT_CHARACTERS,
+} from "../intelligence/proposal-context.js";
+export {
   type ObjectiveReason,
   type ObjectiveStatus,
   MAX_OBJECTIVE_SOURCE_BYTES,

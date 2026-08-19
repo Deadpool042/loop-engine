@@ -39,6 +39,10 @@ import {
   printProjectObjectiveJson,
 } from "./commands/objective.js";
 import {
+  printRoadmapProposalContext,
+  printRoadmapProposalContextJson,
+} from "./commands/proposal-context.js";
+import {
   printAuditReport,
   printAuditReportJson,
   printAuditRuleManifest,
@@ -158,9 +162,14 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   process.argv.includes("--json")
     ? printProjectObjectiveJson(application, project)
     : printProjectObjective(application, project);
+} else if (command === "roadmap" && process.argv[3] === "proposal-context") {
+  const project = resolveProjectOrExit("roadmap proposal-context", 4);
+  process.argv.includes("--json")
+    ? printRoadmapProposalContextJson(application, project)
+    : printRoadmapProposalContext(application, project);
 } else if (command === "roadmap") {
   terminal.error(
-    "Usage: pnpm loop roadmap status|objective <project> [--json]",
+    "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json]",
   );
   process.exit(1);
 } else if (command === "audit") {
@@ -387,7 +396,7 @@ else if (command === "review") {
   if (exitCode !== 0) process.exitCode = exitCode;
 } else {
   terminal.error(
-    "Usage: pnpm loop help|summary|status|doctor|roadmap status|objective <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>",
+    "Usage: pnpm loop help|summary|status|doctor|roadmap status|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>",
   );
   process.exit(1);
 }
