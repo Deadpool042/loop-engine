@@ -235,7 +235,7 @@ export function createAnthropicApiProvider(
               system: input.systemPrompt,
               messages: [{ role: "user", content: input.contextJson }],
               max_tokens: maxOutputTokens,
-              thinking: { type: "disabled" },
+              tool_choice: { type: "none" },
             }),
             signal: controller.signal,
           }),

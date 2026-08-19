@@ -68,13 +68,14 @@ describe("Anthropic API text-only provider", () => {
       "messages",
       "model",
       "system",
-      "thinking",
+      "tool_choice",
     ]);
     assert.equal("tools" in body, false);
     assert.equal("mcp_servers" in body, false);
     assert.equal("attachments" in body, false);
     assert.deepEqual(body.messages, [{ role: "user", content: validInput.contextJson }]);
-    assert.deepEqual(body.thinking, { type: "disabled" });
+    assert.deepEqual(body.tool_choice, { type: "none" });
+    assert.equal("thinking" in body, false);
   });
 
   it("keeps an adversarial context as inert user text without granting tools", async () => {
