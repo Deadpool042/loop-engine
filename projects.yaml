@@ -55,6 +55,9 @@ projects:
   - name: loop-engine
     path: .
     type: node-cli
+    planning:
+      mode: roadmap
+      objective_source: docs/architecture/final-objective.md
     required_docs:
       - README.md
       - docs/architecture/project-intelligence.md

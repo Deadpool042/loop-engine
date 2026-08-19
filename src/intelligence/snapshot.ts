@@ -44,6 +44,24 @@ export type ProjectSnapshot = Readonly<{
       | "no_admissible_candidate";
   }>;
 
+  objective: Readonly<{
+    source: string | null;
+    available: boolean;
+    eligibleForRoadmapProposal: boolean;
+    reason?:
+      | "planning_mode_maintenance"
+      | "planning_mode_deferred"
+      | "planning_mode_external"
+      | "planning_mode_not_roadmap"
+      | "objective_source_not_configured"
+      | "objective_source_outside_project_root"
+      | "objective_source_missing"
+      | "objective_source_not_file"
+      | "objective_source_unreadable"
+      | "objective_source_too_large";
+    content?: string;
+  }>;
+
   roadmap: Readonly<{
     available: boolean;
     paths: readonly string[];

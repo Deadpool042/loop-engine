@@ -35,6 +35,10 @@ import {
   printRoadmapStatusJson,
 } from "./commands/roadmap.js";
 import {
+  printProjectObjective,
+  printProjectObjectiveJson,
+} from "./commands/objective.js";
+import {
   printAuditReport,
   printAuditReportJson,
   printAuditRuleManifest,
@@ -149,8 +153,15 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   process.argv.includes("--json")
     ? printRoadmapStatusJson(application, project)
     : printRoadmapStatus(application, project);
+} else if (command === "roadmap" && process.argv[3] === "objective") {
+  const project = resolveProjectOrExit("roadmap objective", 4);
+  process.argv.includes("--json")
+    ? printProjectObjectiveJson(application, project)
+    : printProjectObjective(application, project);
 } else if (command === "roadmap") {
-  terminal.error("Usage: pnpm loop roadmap status <project> [--json]");
+  terminal.error(
+    "Usage: pnpm loop roadmap status|objective <project> [--json]",
+  );
   process.exit(1);
 } else if (command === "audit") {
   if (process.argv.includes("--manifest")) {
@@ -376,7 +387,7 @@ else if (command === "review") {
   if (exitCode !== 0) process.exitCode = exitCode;
 } else {
   terminal.error(
-    "Usage: pnpm loop help|summary|status|doctor|roadmap status <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>",
+    "Usage: pnpm loop help|summary|status|doctor|roadmap status|objective <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>",
   );
   process.exit(1);
 }

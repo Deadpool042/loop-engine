@@ -8,6 +8,7 @@ import {
   generateNextProjectActionReport,
   generateProjectContextReport,
   generateProjectHandoffReport,
+  generateProjectObjectiveReport,
   generateProjectPromptReport,
   generateProjectReport,
   generateRoadmapPlanningStatusReport,
@@ -85,6 +86,7 @@ export type LoopApplicationAssembly = Readonly<{
   generateNextProjectActionReport: typeof generateNextProjectActionReport;
   generateProjectContextReport: typeof generateProjectContextReport;
   generateProjectHandoffReport: typeof generateProjectHandoffReport;
+  generateProjectObjectiveReport: typeof generateProjectObjectiveReport;
   generateProjectPromptReport: typeof generateProjectPromptReport;
   generateProjectReport: typeof generateProjectReport;
   generateRoadmapPlanningStatusReport: typeof generateRoadmapPlanningStatusReport;
@@ -204,6 +206,7 @@ export function createLoopApplicationAssembly(
     generateNextProjectActionReport,
     generateProjectContextReport,
     generateProjectHandoffReport,
+    generateProjectObjectiveReport,
     generateProjectPromptReport,
     generateProjectReport,
     generateRoadmapPlanningStatusReport,

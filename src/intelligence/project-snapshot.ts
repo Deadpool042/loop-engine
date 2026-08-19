@@ -9,6 +9,7 @@ import {
   getLastCommit,
 } from "../core/git.js";
 import { analyzeRoadmaps, selectRoadmapCandidate } from "./roadmap.js";
+import { buildObjectiveStatus } from "./objective.js";
 import { buildPlanningStatus } from "./planning.js";
 import { type ProjectSnapshot } from "./snapshot.js";
 
@@ -85,6 +86,12 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
     selectedCandidate: selectedRoadmapCandidate,
   });
 
+  const objective = buildObjectiveStatus({
+    project,
+    projectPath,
+    mode: planning.mode,
+  });
+
   const health: ProjectSnapshot["health"] =
     missingDocs.length === 0 ? "good" : "warning";
 
@@ -114,6 +121,7 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
     },
 
     planning,
+    objective,
 
     roadmap: {
       available: roadmapAvailable,
