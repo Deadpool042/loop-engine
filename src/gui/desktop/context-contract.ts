@@ -1,4 +1,19 @@
 export type ContextDetail = Readonly<{
+  git?: Readonly<{
+    statusText: string;
+  }>;
+  planning?: Readonly<{
+    mode: "roadmap" | "maintenance" | "deferred" | "external" | null;
+    roadmapConfigured: boolean;
+    recommendation:
+      | "roadmap_configured"
+      | "connect_discovered_roadmap"
+      | "no_roadmap_present"
+      | "maintenance_no_work"
+      | "deferred_no_work"
+      | "external_planning_source"
+      | "no_admissible_candidate";
+  }>;
   docs: Readonly<{
     required: readonly string[];
     missing: readonly string[];
@@ -11,6 +26,16 @@ export type ContextDetail = Readonly<{
       state: "open" | "closed";
       blockedBy?: string;
     }>[];
+    stats?: Readonly<{
+      total: number;
+      todo: number;
+      inProgress: number;
+      done: number;
+      unknown: number;
+      safe: number;
+      warning: number;
+      blocked: number;
+    }>;
     selectedCandidate: Readonly<{
       id?: string;
       phaseId?: string;
@@ -66,13 +91,56 @@ function isSelectedCandidate(
   );
 }
 
-function isPhaseGate(value: unknown): value is ContextDetail["roadmap"]["phaseGates"][number] {
+function isPhaseGate(
+  value: unknown,
+): value is ContextDetail["roadmap"]["phaseGates"][number] {
   return (
     isRecord(value) &&
     typeof value.phaseId === "string" &&
     (value.state === "open" || value.state === "closed") &&
     (value.blockedBy === undefined || typeof value.blockedBy === "string")
   );
+}
+
+function isRoadmapStats(
+  value: unknown,
+): value is NonNullable<ContextDetail["roadmap"]["stats"]> {
+  if (!isRecord(value)) return false;
+  return [
+    "total",
+    "todo",
+    "inProgress",
+    "done",
+    "unknown",
+    "safe",
+    "warning",
+    "blocked",
+  ].every((key) => typeof value[key] === "number");
+}
+
+function isPlanning(
+  value: unknown,
+): value is NonNullable<ContextDetail["planning"]> {
+  if (!isRecord(value)) return false;
+  return (
+    (value.mode === "roadmap" ||
+      value.mode === "maintenance" ||
+      value.mode === "deferred" ||
+      value.mode === "external" ||
+      value.mode === null) &&
+    typeof value.roadmapConfigured === "boolean" &&
+    (value.recommendation === "roadmap_configured" ||
+      value.recommendation === "connect_discovered_roadmap" ||
+      value.recommendation === "no_roadmap_present" ||
+      value.recommendation === "maintenance_no_work" ||
+      value.recommendation === "deferred_no_work" ||
+      value.recommendation === "external_planning_source" ||
+      value.recommendation === "no_admissible_candidate")
+  );
+}
+
+function isGit(value: unknown): value is NonNullable<ContextDetail["git"]> {
+  return isRecord(value) && typeof value.statusText === "string";
 }
 
 export function parseContextDetail(value: unknown): ContextDetail | null {
@@ -92,8 +160,11 @@ export function parseContextDetail(value: unknown): ContextDetail | null {
     !isStringArray(value.roadmap.paths) ||
     !Array.isArray(value.roadmap.phaseGates) ||
     !value.roadmap.phaseGates.every(isPhaseGate) ||
+    (value.roadmap.stats !== undefined && !isRoadmapStats(value.roadmap.stats)) ||
     (value.roadmap.selectedCandidate !== null &&
       !isSelectedCandidate(value.roadmap.selectedCandidate)) ||
+    (value.planning !== undefined && !isPlanning(value.planning)) ||
+    (value.git !== undefined && !isGit(value.git)) ||
     typeof value.validation.configured !== "boolean" ||
     !isStringArray(value.validation.commands)
   ) {
@@ -101,6 +172,18 @@ export function parseContextDetail(value: unknown): ContextDetail | null {
   }
 
   return Object.freeze({
+    ...(value.git === undefined
+      ? {}
+      : { git: Object.freeze({ statusText: value.git.statusText }) }),
+    ...(value.planning === undefined
+      ? {}
+      : {
+          planning: Object.freeze({
+            mode: value.planning.mode,
+            roadmapConfigured: value.planning.roadmapConfigured,
+            recommendation: value.planning.recommendation,
+          }),
+        }),
     docs: Object.freeze({
       required: Object.freeze([...value.docs.required]),
       missing: Object.freeze([...value.docs.missing]),
@@ -117,6 +200,20 @@ export function parseContextDetail(value: unknown): ContextDetail | null {
           }),
         ),
       ),
+      ...(value.roadmap.stats === undefined
+        ? {}
+        : {
+            stats: Object.freeze({
+              total: value.roadmap.stats.total,
+              todo: value.roadmap.stats.todo,
+              inProgress: value.roadmap.stats.inProgress,
+              done: value.roadmap.stats.done,
+              unknown: value.roadmap.stats.unknown,
+              safe: value.roadmap.stats.safe,
+              warning: value.roadmap.stats.warning,
+              blocked: value.roadmap.stats.blocked,
+            }),
+          }),
       selectedCandidate:
         value.roadmap.selectedCandidate === null
           ? null
