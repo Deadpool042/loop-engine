@@ -101,10 +101,16 @@ export * from "./transports.js";
 export * from "./reports.js";
 export * from "./types.js";
 export {
+  boundProposalContextString,
   buildRoadmapProposalContext,
   projectRoadmapProposalCandidate,
+  projectRoadmapProposalPhaseGate,
+  projectRoadmapProposalStringCollection,
   MAX_PROPOSAL_CONTEXT_CANDIDATES,
   MAX_PROPOSAL_CONTEXT_PHASE_GATES,
+  MAX_PROPOSAL_CONTEXT_CONFIGURED_PATHS,
+  MAX_PROPOSAL_CONTEXT_VALIDATION_COMMANDS,
+  MAX_PROPOSAL_CONTEXT_STRING_CHARACTERS,
   MAX_PROPOSAL_CONTEXT_CANDIDATE_TEXT_CHARACTERS,
 } from "../intelligence/proposal-context.js";
 export {

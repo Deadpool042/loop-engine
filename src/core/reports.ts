@@ -16,8 +16,12 @@ import { docExists } from "./docs.js";
 import { isGitRepository } from "./git.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import {
+  boundProposalContextString,
   buildRoadmapProposalContext,
+  MAX_PROPOSAL_CONTEXT_CONFIGURED_PATHS,
+  MAX_PROPOSAL_CONTEXT_VALIDATION_COMMANDS,
   projectRoadmapProposalCandidate,
+  projectRoadmapProposalStringCollection,
 } from "../intelligence/proposal-context.js";
 import {
   changedPathsFromGitDiff,
@@ -77,16 +81,30 @@ export function generateProjectObjectiveReport(project: ProjectConfig) {
 
 export function generateRoadmapProposalContextReport(project: ProjectConfig) {
   const snapshot = generateProjectReport(project);
+  const projectName = boundProposalContextString(snapshot.project.name);
+  const projectType = boundProposalContextString(snapshot.project.type);
+  const objectiveSource =
+    snapshot.objective.source === null
+      ? null
+      : boundProposalContextString(snapshot.objective.source);
   const report = {
     schemaVersion: 1 as const,
     project: {
-      name: snapshot.project.name,
-      type: snapshot.project.type,
+      name: projectName.value,
+      nameTruncated: projectName.truncated,
+      type: projectType.value,
+      typeTruncated: projectType.truncated,
     },
     planning: {
       mode: snapshot.planning.mode,
     },
-    objective: snapshot.objective,
+    objective: {
+      ...snapshot.objective,
+      source: objectiveSource?.value ?? null,
+      ...(objectiveSource === null
+        ? {}
+        : { sourceTruncated: objectiveSource.truncated }),
+    },
   };
 
   if (!snapshot.objective.eligibleForRoadmapProposal) {
@@ -97,10 +115,22 @@ export function generateRoadmapProposalContextReport(project: ProjectConfig) {
   }
 
   const proposalContext = buildRoadmapProposalContext(snapshot);
+  const configuredPaths = projectRoadmapProposalStringCollection(
+    snapshot.roadmap.paths,
+    MAX_PROPOSAL_CONTEXT_CONFIGURED_PATHS,
+  );
+  const validationCommands = projectRoadmapProposalStringCollection(
+    snapshot.validation.commands,
+    MAX_PROPOSAL_CONTEXT_VALIDATION_COMMANDS,
+  );
+  const gitBranch = boundProposalContextString(snapshot.git.branch);
+
   return Object.freeze({
     ...report,
     roadmap: {
-      configuredPaths: snapshot.roadmap.paths,
+      configuredPaths: configuredPaths.items,
+      configuredPathsTotal: configuredPaths.total,
+      configuredPathsTruncated: configuredPaths.truncated,
       stats: snapshot.roadmap.stats,
       summary: snapshot.roadmap.summary,
       selectedCandidate:
@@ -112,11 +142,17 @@ export function generateRoadmapProposalContextReport(project: ProjectConfig) {
     },
     projectState: {
       git: {
-        branch: snapshot.git.branch,
+        branch: gitBranch.value,
+        branchTruncated: gitBranch.truncated,
         clean: snapshot.git.clean,
         requiresGit: snapshot.git.requiresGit,
       },
-      validation: snapshot.validation,
+      validation: {
+        commands: validationCommands.items,
+        commandsTotal: validationCommands.total,
+        commandsTruncated: validationCommands.truncated,
+        configured: snapshot.validation.configured,
+      },
       health: snapshot.health,
     },
     context: "available" as const,
