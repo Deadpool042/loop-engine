@@ -101,6 +101,14 @@ export * from "./transports.js";
 export * from "./reports.js";
 export * from "./types.js";
 export {
+  generateRoadmapProposalFromContext,
+  ROADMAP_PROPOSAL_SCHEMA_VERSION,
+  ROADMAP_PROPOSAL_OUTPUT_SCHEMA,
+  ROADMAP_PROPOSAL_SYSTEM_PROMPT,
+  MAX_ROADMAP_PROPOSAL_BYTES,
+  type RoadmapProposalReport,
+} from "../intelligence/roadmap-proposal.js";
+export {
   boundProposalContextString,
   buildRoadmapProposalContext,
   projectRoadmapProposalCandidate,

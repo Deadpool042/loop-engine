@@ -43,6 +43,10 @@ import {
   printRoadmapProposalContextJson,
 } from "./commands/proposal-context.js";
 import {
+  printRoadmapProposal,
+  printRoadmapProposalJson,
+} from "./commands/roadmap-propose.js";
+import {
   printAuditReport,
   printAuditReportJson,
   printAuditRuleManifest,
@@ -167,9 +171,25 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   process.argv.includes("--json")
     ? printRoadmapProposalContextJson(application, project)
     : printRoadmapProposalContext(application, project);
+} else if (command === "roadmap" && process.argv[3] === "propose") {
+  const json = process.argv.includes("--json");
+  const project = resolveProjectOrExit("roadmap propose", 4);
+  const provider = optionValue("--provider");
+  const model = optionValue("--provider-model");
+  const timeoutValue = optionValue("--provider-timeout-ms");
+  if (provider !== "anthropic_api") failOption(json, "unsupported_provider", "--provider anthropic_api is required.");
+  if (!model) failOption(json, "missing_provider_model", "--provider-model is required.");
+  if (hasOption("--provider-timeout-ms") && timeoutValue === undefined)
+    failOption(json, "invalid_provider_timeout", "Missing value for --provider-timeout-ms");
+  const timeoutMs = timeoutValue === undefined ? 60_000 : Number(timeoutValue);
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 120_000)
+    failOption(json, "invalid_provider_timeout", "Invalid --provider-timeout-ms value.");
+  json
+    ? await printRoadmapProposalJson(application, project, { model, timeoutMs })
+    : await printRoadmapProposal(application, project, { model, timeoutMs });
 } else if (command === "roadmap") {
   terminal.error(
-    "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json]",
+    "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json] | roadmap propose <project> --provider anthropic_api --provider-model <model> [--provider-timeout-ms <ms>] [--json]",
   );
   process.exit(1);
 } else if (command === "audit") {

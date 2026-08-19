@@ -13,6 +13,7 @@ export type JsonErrorCode =
   | "invalid_provider_timeout"
   | "unsupported_provider"
   | "missing_provider_executable"
+  | "missing_provider_model"
   | "invalid_provider_executable"
   | "agent_policy_rejected"
   | "missing_commit_message"

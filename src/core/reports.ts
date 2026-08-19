@@ -15,6 +15,8 @@ import type { Config, ProjectConfig } from "./config.js";
 import { docExists } from "./docs.js";
 import { isGitRepository } from "./git.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
+import { generateRoadmapProposalFromContext } from "../intelligence/roadmap-proposal.js";
+import type { TextOnlyProvider } from "../text-only-provider/index.js";
 import {
   boundProposalContextString,
   buildRoadmapProposalContext,
@@ -157,6 +159,23 @@ export function generateRoadmapProposalContextReport(project: ProjectConfig) {
     },
     context: "available" as const,
   });
+}
+
+export type RoadmapProposalContextReport = ReturnType<
+  typeof generateRoadmapProposalContextReport
+>;
+
+export async function generateRoadmapProposalReport(
+  project: ProjectConfig,
+  input: Readonly<{
+    provider: TextOnlyProvider;
+    providerAvailable: boolean;
+    model: string;
+    timeoutMs: number;
+  }>,
+) {
+  const context = generateRoadmapProposalContextReport(project);
+  return generateRoadmapProposalFromContext(context, input);
 }
 
 export function generateProjectContextReport(project: ProjectConfig) {
