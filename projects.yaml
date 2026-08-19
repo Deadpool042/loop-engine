@@ -1,4 +1,17 @@
 projects:
+  - name: development-workspace
+    path: ../development-workspace
+    type: development-workspace
+    required_docs:
+      - AGENTS.md
+      - README.md
+      - roadmap/workflow-roadmap.md
+    validation: []
+    planning:
+      mode: roadmap
+    roadmap:
+      - roadmap/workflow-roadmap.md
+
   - name: creatyss
     path: ../CREATYSS
     type: next-prisma
@@ -36,6 +49,8 @@ projects:
     required_docs:
       - README.md
     validation: []
+    planning:
+      mode: maintenance
 
   - name: loop-engine
     path: .
