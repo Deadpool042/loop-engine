@@ -92,6 +92,72 @@ describe("json outputs", () => {
     assert.equal(json.objective?.reason, "planning_mode_maintenance");
   });
 
+  it("roadmap proposal-context --json exposes bounded V1 canonical planning data", () => {
+    const json = runJson(
+      "pnpm exec tsx src/cli.ts roadmap proposal-context loop-engine --json",
+    ) as {
+      schemaVersion?: unknown;
+      project?: { name?: unknown; type?: unknown };
+      planning?: { mode?: unknown };
+      objective?: {
+        source?: unknown;
+        content?: unknown;
+        eligibleForRoadmapProposal?: unknown;
+      };
+      context?: unknown;
+      roadmap?: {
+        configuredPaths?: unknown;
+        stats?: { todo?: unknown };
+        candidates?: { items?: unknown; total?: unknown; truncated?: unknown };
+        phaseGates?: { items?: unknown; total?: unknown; truncated?: unknown };
+      };
+      projectState?: { git?: unknown; validation?: unknown; health?: unknown };
+    };
+
+    assert.equal(json.schemaVersion, 1);
+    assert.equal(json.project?.name, "loop-engine");
+    assert.equal(json.planning?.mode, "roadmap");
+    assert.equal(json.objective?.source, "docs/architecture/final-objective.md");
+    assert.equal(typeof json.objective?.content, "string");
+    assert.equal(json.objective?.eligibleForRoadmapProposal, true);
+    assert.equal(json.context, "available");
+    assert.ok(Array.isArray(json.roadmap?.configuredPaths));
+    assert.equal(typeof json.roadmap?.stats?.todo, "number");
+    assert.ok(Array.isArray(json.roadmap?.candidates?.items));
+    assert.equal(typeof json.roadmap?.candidates?.total, "number");
+    assert.equal(typeof json.roadmap?.candidates?.truncated, "boolean");
+    assert.ok(Array.isArray(json.roadmap?.phaseGates?.items));
+    assert.equal(typeof json.roadmap?.phaseGates?.total, "number");
+    assert.equal(typeof json.roadmap?.phaseGates?.truncated, "boolean");
+    assert.ok(json.projectState?.git);
+    assert.ok(json.projectState?.validation);
+    assert.ok(json.projectState?.health);
+  });
+
+  it("roadmap proposal-context --json refuses maintenance deliberately", () => {
+    const json = runJson(
+      "pnpm exec tsx src/cli.ts roadmap proposal-context n8n --json",
+    ) as {
+      schemaVersion?: unknown;
+      planning?: { mode?: unknown };
+      objective?: {
+        available?: unknown;
+        eligibleForRoadmapProposal?: unknown;
+        reason?: unknown;
+      };
+      context?: unknown;
+      roadmap?: unknown;
+    };
+
+    assert.equal(json.schemaVersion, 1);
+    assert.equal(json.planning?.mode, "maintenance");
+    assert.equal(json.objective?.available, false);
+    assert.equal(json.objective?.eligibleForRoadmapProposal, false);
+    assert.equal(json.objective?.reason, "planning_mode_maintenance");
+    assert.equal(json.context, null);
+    assert.equal("roadmap" in json, false);
+  });
+
   it("next --json exposes schemaVersion and selected candidate field", () => {
     const json = runJson(
       "pnpm exec tsx src/cli.ts next loop-engine --json",
