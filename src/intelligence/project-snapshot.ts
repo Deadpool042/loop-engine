@@ -9,6 +9,7 @@ import {
   getLastCommit,
 } from "../core/git.js";
 import { analyzeRoadmaps, selectRoadmapCandidate } from "./roadmap.js";
+import { buildPlanningStatus } from "./planning.js";
 import { type ProjectSnapshot } from "./snapshot.js";
 
 export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
@@ -78,6 +79,12 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
     hasBlocked: roadmapStats.blocked > 0,
   };
 
+  const planning = buildPlanningStatus({
+    project,
+    projectPath,
+    selectedCandidate: selectedRoadmapCandidate,
+  });
+
   const health: ProjectSnapshot["health"] =
     missingDocs.length === 0 ? "good" : "warning";
 
@@ -105,6 +112,8 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
       commands: project.validation,
       configured: project.validation.length > 0,
     },
+
+    planning,
 
     roadmap: {
       available: roadmapAvailable,

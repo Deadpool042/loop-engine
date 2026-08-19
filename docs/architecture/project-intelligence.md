@@ -26,6 +26,7 @@ Champs prévus :
 - git : branch, clean
 - docs : required, missing
 - validation : commands, configured
+- planning : mode déclaré ou non déclaré, roadmaps configurées/détectées, recommandation déterministe
 - roadmap : available, lastLot, nextLot
 - health : good, warning, error
 
@@ -39,6 +40,16 @@ Champs prévus :
 - architecture extensible
 
 ---
+
+## Planning state
+
+La sémantique de planning appartient à Loop Engine et complète, sans la remplacer, l'analyse des candidats.
+
+Un projet peut déclarer `planning.mode` : `roadmap`, `maintenance`, `deferred` ou `external`. Sans déclaration, une configuration `roadmap` existante conserve le mode effectif `roadmap`; l'absence des deux reste explicitement non déclarée, sans intention inférée.
+
+La commande `loop roadmap status <project>` inspecte uniquement le root du projet déjà déclaré. Elle relève les fichiers présents à quatre emplacements conventionnels fixes et distingue explicitement les chemins configurés des chemins conventionnels supplémentaires détectés. Elle ne parcourt pas récursivement les Markdown, ne lit aucun contenu pour qualifier un fichier, ne crée rien et ne modifie jamais l'admissibilité d'un candidat.
+
+Une recommandation de planning est structurelle et déterministe. Elle prime donc sur l'absence ou la présence d'un candidat : maintenance, deferred, external et roadmap découverte mais non raccordée ne déclenchent aucun travail.
 
 ## Roadmap candidates
 

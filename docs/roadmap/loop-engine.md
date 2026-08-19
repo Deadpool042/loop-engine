@@ -32,6 +32,11 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 - [x] Lot V23.0 — Observable GUI execution session : session unique observable validée en burn-in réel LP-INFRA H3-L2, avec progression `préparation -> provider -> validation -> terminé/échec`, garde-fous de scope effectifs, résultat final inchangé et export de patch sans modification du dépôt source.
 - [x] Lot V23.1 — Recoverable isolated project locks : verrous locaux par projet publiés atomiquement avec metadata propriétaire, récupération uniquement lorsque le PID local est démontré mort, état ambigu fail-closed, quarantaine générationnelle anti-race et release protégée par identité de lock. Burn-in réel validé le 2026-08-18 sur `lp-infra` : un lock canonique valide avec PID réellement mort a été récupéré automatiquement, déplacé en quarantaine, remplacé puis relâché ; l’exécution s’est ensuite bloquée sur `sha_stale` avant tout appel provider. Aucun parallélisme multi-projet, aucune queue, aucun terminal, aucun contrôle distant/mobile ajouté.
 
+## Lot V24 — Planning state & deterministic roadmap discovery
+
+- [x] V24.0 — état de planning explicite (`roadmap`, `maintenance`, `deferred`, `external`) et découverte bornée des seuls emplacements conventionnels dans le root d'un projet déjà déclaré. Aucune lecture de contenu, aucun scan global ou récursif et aucune création de travail.
+- [x] V24.1 — `loop roadmap status <project> [--json]` : rapport déterministe, read-only, distinguant roadmap configurée, roadmap détectée non raccordée, absence réelle, maintenance, report et source externe. Le parser, `next`, l'admissibilité et le runner restent inchangés.
+
 ## Gel architectural
 
 - Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).

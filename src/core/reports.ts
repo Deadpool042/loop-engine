@@ -46,6 +46,17 @@ export function generateWorkspaceSummaryReport(config: Config) {
   };
 }
 
+export function generateRoadmapPlanningStatusReport(project: ProjectConfig) {
+  const snapshot = generateProjectReport(project);
+  return {
+    schemaVersion: 1 as const,
+    project: {
+      name: snapshot.project.name,
+    },
+    planning: snapshot.planning,
+  };
+}
+
 export function generateProjectContextReport(project: ProjectConfig) {
   const snapshot = generateProjectReport(project);
   return {
