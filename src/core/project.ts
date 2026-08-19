@@ -12,8 +12,9 @@ export function findProject(
 export function getRequiredProjectName(
   args: string[],
   command: string,
+  argumentIndex = 3,
 ): string {
-  const projectName = args[3];
+  const projectName = args[argumentIndex];
 
   if (!projectName) {
     throw new Error(`Usage: pnpm loop ${command} <project>`);

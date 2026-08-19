@@ -13,6 +13,9 @@ export type ProjectConfig = {
   // Opt-in, project-relative path to an explicit, SHA-bound execution
   // authorization file (see src/governance/execution-decision.ts).
   execution_decision?: string;
+  planning?: {
+    mode: "roadmap" | "maintenance" | "deferred" | "external";
+  };
 };
 
 export type Config = {

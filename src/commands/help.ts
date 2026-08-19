@@ -33,6 +33,12 @@ export function printHelp(): void {
   terminal.info(
     "pnpm loop next <project> --json    — prochaine action en JSON",
   );
+  terminal.info(
+    "pnpm loop roadmap status <project> — état de planning déterministe",
+  );
+  terminal.info(
+    "pnpm loop roadmap status <project> --json — état de planning en JSON",
+  );
   terminal.info("pnpm loop prompt <project>         — prompt court à copier");
   terminal.info(
     "pnpm loop prompt <project> --json  — contexte de prompt en JSON",

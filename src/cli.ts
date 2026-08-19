@@ -31,6 +31,10 @@ import {
 import { printStatus } from "./commands/status.js";
 import { printDoctor } from "./commands/doctor.js";
 import {
+  printRoadmapStatus,
+  printRoadmapStatusJson,
+} from "./commands/roadmap.js";
+import {
   printAuditReport,
   printAuditReportJson,
   printAuditRuleManifest,
@@ -48,9 +52,12 @@ import { printJsonError } from "./commands/json-error.js";
 
 const application = createLoopApplicationAssembly();
 
-function resolveProjectOrExit(commandName: string) {
+function resolveProjectOrExit(commandName: string, argumentIndex = 3) {
   const config = application.loadConfig();
-  if (!process.argv[3] || process.argv[3].startsWith("--")) {
+  if (
+    !process.argv[argumentIndex] ||
+    process.argv[argumentIndex].startsWith("--")
+  ) {
     if (process.argv.includes("--json"))
       printJsonError(
         "missing_project",
@@ -62,6 +69,7 @@ function resolveProjectOrExit(commandName: string) {
   const projectName = application.getRequiredProjectName(
     process.argv,
     commandName,
+    argumentIndex,
   );
   const project = application.findProject(config, projectName);
   if (!project) {
@@ -136,7 +144,15 @@ else if (command === "rag-search") {
   });
 } else if (command === "doctor")
   printDoctor(application, application.loadConfig());
-else if (command === "audit") {
+else if (command === "roadmap" && process.argv[3] === "status") {
+  const project = resolveProjectOrExit("roadmap status", 4);
+  process.argv.includes("--json")
+    ? printRoadmapStatusJson(application, project)
+    : printRoadmapStatus(application, project);
+} else if (command === "roadmap") {
+  terminal.error("Usage: pnpm loop roadmap status <project> [--json]");
+  process.exit(1);
+} else if (command === "audit") {
   if (process.argv.includes("--manifest")) {
     if (process.argv.includes("--strict")) {
       terminal.error("--strict cannot be used with --manifest");
@@ -360,7 +376,7 @@ else if (command === "review") {
   if (exitCode !== 0) process.exitCode = exitCode;
 } else {
   terminal.error(
-    "Usage: pnpm loop help|summary|status|doctor|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>",
+    "Usage: pnpm loop help|summary|status|doctor|roadmap status <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>",
   );
   process.exit(1);
 }

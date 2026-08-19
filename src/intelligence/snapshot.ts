@@ -28,6 +28,22 @@ export type ProjectSnapshot = Readonly<{
     configured: boolean;
   }>;
 
+  planning: Readonly<{
+    mode: "roadmap" | "maintenance" | "deferred" | "external" | null;
+    roadmapConfigured: boolean;
+    configuredPaths: readonly string[];
+    discoveredPaths: readonly string[];
+    voluntaryNoWork: boolean;
+    recommendation:
+      | "roadmap_configured"
+      | "connect_discovered_roadmap"
+      | "no_roadmap_present"
+      | "maintenance_no_work"
+      | "deferred_no_work"
+      | "external_planning_source"
+      | "no_admissible_candidate";
+  }>;
+
   roadmap: Readonly<{
     available: boolean;
     paths: readonly string[];
