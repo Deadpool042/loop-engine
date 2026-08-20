@@ -14,7 +14,18 @@ export type RoadmapProposalAssessment = Readonly<{
 
 export type RoadmapProposal =
   | Readonly<{ status: "no_proposal"; reason: string }>
-  | Readonly<{ status: "proposed"; summary: string; lots: readonly RoadmapProposalLot[] }>;
+  | Readonly<{
+      status: "proposed";
+      summary: string;
+      lots: readonly RoadmapProposalLot[];
+    }>;
+
+export type RoadmapProposalProfile = "economy" | "balanced" | "deep";
+export type AnthropicEffort = "low" | "medium" | "high" | "xhigh" | "max";
+export type RoadmapProposalUsage = Readonly<{
+  inputTokens: number;
+  outputTokens: number;
+}>;
 
 export type RoadmapProposalReport = Readonly<{
   schemaVersion: 1;
@@ -22,7 +33,17 @@ export type RoadmapProposalReport = Readonly<{
   result:
     | Readonly<{ status: "unavailable"; reason: string }>
     | Readonly<{ status: "failed"; reason: string }>
-    | Readonly<{ status: "completed"; provider: string; model: string; durationMs: number }>;
+    | Readonly<{
+        status: "completed";
+        provider: string;
+        model: string;
+        effort: AnthropicEffort | null;
+        durationMs: number;
+        usage?: RoadmapProposalUsage;
+        actualCalculatedCostUsd?: number;
+        pricingEffectiveDate?: string;
+      }>;
+  profile?: RoadmapProposalProfile;
   assessment?: RoadmapProposalAssessment;
   proposal?: RoadmapProposal;
 }>;
@@ -32,7 +53,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
 }
 
 function isCostRisk(value: unknown): value is "low" | "medium" | "high" {
@@ -51,7 +74,9 @@ function isLot(value: unknown): value is RoadmapProposalLot {
   );
 }
 
-function parseAssessment(value: unknown): RoadmapProposalAssessment | undefined {
+function parseAssessment(
+  value: unknown,
+): RoadmapProposalAssessment | undefined {
   if (value === undefined) return undefined;
   if (
     !isRecord(value) ||
@@ -72,7 +97,10 @@ function parseProposal(value: unknown): RoadmapProposal | undefined {
 
   if (value.status === "no_proposal") {
     if (typeof value.reason !== "string") return undefined;
-    return Object.freeze({ status: "no_proposal" as const, reason: value.reason });
+    return Object.freeze({
+      status: "no_proposal" as const,
+      reason: value.reason,
+    });
   }
 
   if (value.status === "proposed") {
@@ -104,7 +132,42 @@ function parseProposal(value: unknown): RoadmapProposal | undefined {
   return undefined;
 }
 
-function parseResult(value: unknown): RoadmapProposalReport["result"] | undefined {
+const ANTHROPIC_EFFORT_VALUES: readonly AnthropicEffort[] = [
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+];
+
+function isEffort(value: unknown): value is AnthropicEffort {
+  return (
+    typeof value === "string" &&
+    (ANTHROPIC_EFFORT_VALUES as readonly string[]).includes(value)
+  );
+}
+
+function isProfile(value: unknown): value is RoadmapProposalProfile {
+  return value === "economy" || value === "balanced" || value === "deep";
+}
+
+function parseUsage(value: unknown): RoadmapProposalUsage | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.inputTokens !== "number" ||
+    typeof value.outputTokens !== "number"
+  ) {
+    return undefined;
+  }
+  return Object.freeze({
+    inputTokens: value.inputTokens,
+    outputTokens: value.outputTokens,
+  });
+}
+
+function parseResult(
+  value: unknown,
+): RoadmapProposalReport["result"] | undefined {
   if (!isRecord(value)) return undefined;
   if (value.status === "unavailable" || value.status === "failed") {
     if (typeof value.reason !== "string") return undefined;
@@ -114,23 +177,38 @@ function parseResult(value: unknown): RoadmapProposalReport["result"] | undefine
     if (
       typeof value.provider !== "string" ||
       typeof value.model !== "string" ||
-      typeof value.durationMs !== "number"
+      typeof value.durationMs !== "number" ||
+      (value.effort !== null &&
+        value.effort !== undefined &&
+        !isEffort(value.effort))
     ) {
       return undefined;
     }
+    const usage = parseUsage(value.usage);
     return Object.freeze({
       status: "completed" as const,
       provider: value.provider,
       model: value.model,
+      effort: isEffort(value.effort) ? value.effort : null,
       durationMs: value.durationMs,
+      ...(usage === undefined ? {} : { usage }),
+      ...(typeof value.actualCalculatedCostUsd === "number"
+        ? { actualCalculatedCostUsd: value.actualCalculatedCostUsd }
+        : {}),
+      ...(typeof value.pricingEffectiveDate === "string"
+        ? { pricingEffectiveDate: value.pricingEffectiveDate }
+        : {}),
     });
   }
   return undefined;
 }
 
-export function parseRoadmapProposalReport(value: unknown): RoadmapProposalReport | null {
+export function parseRoadmapProposalReport(
+  value: unknown,
+): RoadmapProposalReport | null {
   if (!isRecord(value) || value.schemaVersion !== 1) return null;
-  if (!isRecord(value.project) || typeof value.project.name !== "string") return null;
+  if (!isRecord(value.project) || typeof value.project.name !== "string")
+    return null;
 
   const result = parseResult(value.result);
   if (result === undefined) return null;
@@ -145,6 +223,7 @@ export function parseRoadmapProposalReport(value: unknown): RoadmapProposalRepor
     schemaVersion: 1 as const,
     project: Object.freeze({ name: value.project.name }),
     result,
+    ...(isProfile(value.profile) ? { profile: value.profile } : {}),
     ...(assessment === undefined ? {} : { assessment }),
     ...(proposal === undefined ? {} : { proposal }),
   });

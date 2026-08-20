@@ -1,11 +1,14 @@
 import type { CliInvocationResult, CliInvoker } from "../cli-invoker.js";
 import type { ProviderKeychainReader } from "../keychain-reader.js";
 
-export const DESKTOP_ROADMAP_PROPOSAL_MODEL = "claude-sonnet-5";
 export const DESKTOP_ROADMAP_PROPOSAL_TIMEOUT_MS = 60_000;
 
 function failure(raw: string): CliInvocationResult {
-  return Object.freeze({ ok: false as const, kind: "spawn-error" as const, raw });
+  return Object.freeze({
+    ok: false as const,
+    kind: "spawn-error" as const,
+    raw,
+  });
 }
 
 export function createRoadmapProposalHandler(options: {
@@ -25,9 +28,13 @@ export function createRoadmapProposalHandler(options: {
 
     const credential = await options.keychainReader.read();
     if (!credential.ok) {
-      return failure("Identifiant Anthropic indisponible dans le trousseau macOS.");
+      return failure(
+        "Identifiant Anthropic indisponible dans le trousseau macOS.",
+      );
     }
 
+    // No --provider-model: the CLI auto-selects model/effort via the cost-aware
+    // routing policy from the deterministic proposal context (roadmap-proposal-routing.ts).
     return options.cliInvoker.invoke(
       "roadmap",
       [
@@ -35,8 +42,6 @@ export function createRoadmapProposalHandler(options: {
         projectName,
         "--provider",
         "anthropic_api",
-        "--provider-model",
-        DESKTOP_ROADMAP_PROPOSAL_MODEL,
         "--provider-timeout-ms",
         String(DESKTOP_ROADMAP_PROPOSAL_TIMEOUT_MS),
       ],

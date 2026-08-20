@@ -9,16 +9,35 @@ export type LoopDesktopApi = Readonly<{
   summary: () => Promise<CliInvocationResult>;
   context: (projectName: string) => Promise<CliInvocationResult>;
   review: (projectName: string) => Promise<CliInvocationResult>;
-  plan: (projectName: string, candidateId: string) => Promise<CliInvocationResult>;
+  plan: (
+    projectName: string,
+    candidateId: string,
+  ) => Promise<CliInvocationResult>;
   execute: (request: DesktopExecuteRequest) => Promise<CliInvocationResult>;
-  startExecution: (request: DesktopExecuteRequest) => Promise<DesktopExecutionSessionStart>;
-  executionSession: (sessionId: string) => Promise<DesktopExecutionSession | null>;
+  startExecution: (
+    request: DesktopExecuteRequest,
+  ) => Promise<DesktopExecutionSessionStart>;
+  executionSession: (
+    sessionId: string,
+  ) => Promise<DesktopExecutionSession | null>;
   roadmapProposal: (projectName: string) => Promise<CliInvocationResult>;
+  roadmapProposalEstimate: (
+    projectName: string,
+  ) => Promise<CliInvocationResult>;
 }>;
 
 export function createLoopDesktopApi(
   invoke: (
-    channel: "loop:summary" | "loop:context" | "loop:review" | "loop:plan" | "loop:execute" | "loop:execution-start" | "loop:execution-session" | "loop:roadmap-proposal",
+    channel:
+      | "loop:summary"
+      | "loop:context"
+      | "loop:review"
+      | "loop:plan"
+      | "loop:execute"
+      | "loop:execution-start"
+      | "loop:execution-session"
+      | "loop:roadmap-proposal"
+      | "loop:roadmap-proposal-estimate",
     ...args: readonly unknown[]
   ) => Promise<CliInvocationResult>,
 ): LoopDesktopApi {
@@ -39,13 +58,22 @@ export function createLoopDesktopApi(
       return invoke("loop:execute", request);
     },
     startExecution(request) {
-      return invoke("loop:execution-start", request) as Promise<DesktopExecutionSessionStart>;
+      return invoke(
+        "loop:execution-start",
+        request,
+      ) as Promise<DesktopExecutionSessionStart>;
     },
     executionSession(sessionId) {
-      return invoke("loop:execution-session", sessionId) as unknown as Promise<DesktopExecutionSession | null>;
+      return invoke(
+        "loop:execution-session",
+        sessionId,
+      ) as unknown as Promise<DesktopExecutionSession | null>;
     },
     roadmapProposal(projectName) {
       return invoke("loop:roadmap-proposal", projectName);
+    },
+    roadmapProposalEstimate(projectName) {
+      return invoke("loop:roadmap-proposal-estimate", projectName);
     },
   });
 }
