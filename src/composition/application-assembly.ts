@@ -13,6 +13,7 @@ import {
   generateProjectReport,
   generateRoadmapPlanningStatusReport,
   generateRoadmapProposalContextReport,
+  generateRoadmapProposalEstimateReport,
   generateRoadmapProposalReport,
   generateProjectValidationReport,
   generateRagIndex,
@@ -38,6 +39,7 @@ import type { AgentRegistry } from "../agents/registry.js";
 import {
   createAnthropicApiProvider,
   hasAnthropicApiCredential,
+  type AnthropicEffort,
   type TextOnlyProvider,
 } from "../text-only-provider/index.js";
 import { createLoopProviderFailoverAssembly } from "./provider-failover-assembly.js";
@@ -102,8 +104,13 @@ export type LoopApplicationAssembly = Readonly<{
   generateRoadmapProposalContextReport: typeof generateRoadmapProposalContextReport;
   generateRoadmapProposalReport: (
     project: LoopApplicationProject,
-    input: Readonly<{ model: string; timeoutMs: number }>,
+    input: Readonly<{
+      model?: string;
+      effort?: AnthropicEffort;
+      timeoutMs: number;
+    }>,
   ) => ReturnType<typeof generateRoadmapProposalReport>;
+  generateRoadmapProposalEstimateReport: typeof generateRoadmapProposalEstimateReport;
   generateProjectValidationReport: typeof generateProjectValidationReport;
   generateRagIndex: typeof generateRagIndex;
   generateRagSearchReport: typeof generateRagSearchReport;
@@ -211,9 +218,11 @@ export function createLoopApplicationAssembly(
           ...(options.isolatedProviderExecution ?? {}),
         });
 
-  const textOnlyProvider = options.textOnlyProvider ?? createAnthropicApiProvider();
+  const textOnlyProvider =
+    options.textOnlyProvider ?? createAnthropicApiProvider();
   const textOnlyProviderCredentialAvailable =
-    options.textOnlyProviderCredentialAvailable ?? (() => hasAnthropicApiCredential());
+    options.textOnlyProviderCredentialAvailable ??
+    (() => hasAnthropicApiCredential());
 
   return Object.freeze({
     findProject,
@@ -229,6 +238,7 @@ export function createLoopApplicationAssembly(
     generateProjectReport,
     generateRoadmapPlanningStatusReport,
     generateRoadmapProposalContextReport,
+    generateRoadmapProposalEstimateReport,
     generateRoadmapProposalReport: (project, input) =>
       generateRoadmapProposalReport(project, {
         provider: textOnlyProvider,

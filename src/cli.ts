@@ -47,6 +47,11 @@ import {
   printRoadmapProposalJson,
 } from "./commands/roadmap-propose.js";
 import {
+  printRoadmapProposalEstimate,
+  printRoadmapProposalEstimateJson,
+} from "./commands/roadmap-propose-estimate.js";
+import { ANTHROPIC_EFFORT_VALUES } from "./text-only-provider/index.js";
+import {
   printAuditReport,
   printAuditReportJson,
   printAuditRuleManifest,
@@ -171,25 +176,73 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   process.argv.includes("--json")
     ? printRoadmapProposalContextJson(application, project)
     : printRoadmapProposalContext(application, project);
+} else if (command === "roadmap" && process.argv[3] === "propose-estimate") {
+  const project = resolveProjectOrExit("roadmap propose-estimate", 4);
+  process.argv.includes("--json")
+    ? printRoadmapProposalEstimateJson(application, project)
+    : printRoadmapProposalEstimate(application, project);
 } else if (command === "roadmap" && process.argv[3] === "propose") {
   const json = process.argv.includes("--json");
   const project = resolveProjectOrExit("roadmap propose", 4);
   const provider = optionValue("--provider");
   const model = optionValue("--provider-model");
+  const effort = optionValue("--provider-effort");
   const timeoutValue = optionValue("--provider-timeout-ms");
-  if (provider !== "anthropic_api") failOption(json, "unsupported_provider", "--provider anthropic_api is required.");
-  if (!model) failOption(json, "missing_provider_model", "--provider-model is required.");
+  if (provider !== "anthropic_api")
+    failOption(
+      json,
+      "unsupported_provider",
+      "--provider anthropic_api is required.",
+    );
   if (hasOption("--provider-timeout-ms") && timeoutValue === undefined)
-    failOption(json, "invalid_provider_timeout", "Missing value for --provider-timeout-ms");
+    failOption(
+      json,
+      "invalid_provider_timeout",
+      "Missing value for --provider-timeout-ms",
+    );
   const timeoutMs = timeoutValue === undefined ? 60_000 : Number(timeoutValue);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 120_000)
-    failOption(json, "invalid_provider_timeout", "Invalid --provider-timeout-ms value.");
+    failOption(
+      json,
+      "invalid_provider_timeout",
+      "Invalid --provider-timeout-ms value.",
+    );
+  // --provider-model is optional: when omitted, the model and effort are chosen
+  // deterministically by the cost-aware routing policy (no --provider-effort allowed then).
+  if (hasOption("--provider-effort") && effort === undefined)
+    failOption(
+      json,
+      "invalid_provider_effort",
+      "Missing value for --provider-effort",
+    );
+  if (effort !== undefined && !model)
+    failOption(
+      json,
+      "provider_effort_requires_provider_model",
+      "--provider-effort requires an explicit --provider-model.",
+    );
+  if (
+    effort !== undefined &&
+    !(ANTHROPIC_EFFORT_VALUES as readonly string[]).includes(effort)
+  )
+    failOption(
+      json,
+      "invalid_provider_effort",
+      "Invalid --provider-effort value.",
+    );
+  const input = {
+    ...(model ? { model } : {}),
+    ...(effort
+      ? { effort: effort as (typeof ANTHROPIC_EFFORT_VALUES)[number] }
+      : {}),
+    timeoutMs,
+  };
   json
-    ? await printRoadmapProposalJson(application, project, { model, timeoutMs })
-    : await printRoadmapProposal(application, project, { model, timeoutMs });
+    ? await printRoadmapProposalJson(application, project, input)
+    : await printRoadmapProposal(application, project, input);
 } else if (command === "roadmap") {
   terminal.error(
-    "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json] | roadmap propose <project> --provider anthropic_api --provider-model <model> [--provider-timeout-ms <ms>] [--json]",
+    "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json] | roadmap propose-estimate <project> [--json] | roadmap propose <project> --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>] [--json]",
   );
   process.exit(1);
 } else if (command === "audit") {
@@ -308,7 +361,11 @@ else if (command === "review") {
   const progressEvents = hasOption("--progress-events");
 
   if (hasOption("--candidate") && candidateId === undefined) {
-    failOption(json, "missing_candidate_value", "Missing value for --candidate");
+    failOption(
+      json,
+      "missing_candidate_value",
+      "Missing value for --candidate",
+    );
   }
   if (candidateId !== undefined && mode !== "plan" && mode !== "execute") {
     failOption(
