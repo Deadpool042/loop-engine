@@ -20,7 +20,9 @@ export type JsonErrorCode =
   | "missing_export_patch_value"
   | "export_patch_execute_only"
   | "export_patch_requires_provider"
-  | "progress_events_execute_json_only";
+  | "progress_events_execute_json_only"
+  | "invalid_provider_effort"
+  | "provider_effort_requires_provider_model";
 
 export function printJsonError(code: JsonErrorCode, message: string): void {
   console.log(

@@ -1,22 +1,388 @@
-import { MAX_TEXT_ONLY_CONTEXT_BYTES, MAX_TEXT_ONLY_MODEL_CHARACTERS, MAX_TEXT_ONLY_OUTPUT_BYTES, MAX_TEXT_ONLY_OUTPUT_TOKENS, MAX_TEXT_ONLY_SYSTEM_PROMPT_BYTES, MAX_TEXT_ONLY_TIMEOUT_MS, MIN_TEXT_ONLY_TIMEOUT_MS, type TextOnlyProvider, type TextOnlyProviderFailure, type TextOnlyProviderFailureCode, type TextOnlyProviderInput, type TextOnlyProviderResult, type TextOnlyProviderUsage } from "./types.js";
-const ANTHROPIC_MESSAGES_URL="https://api.anthropic.com/v1/messages"; const ANTHROPIC_VERSION="2023-06-01";
-export type TextOnlyHttpRequest=Readonly<{url:string;method:"POST";headers:Readonly<Record<string,string>>;body:string;signal:AbortSignal}>;
-export type TextOnlyHttpTransport=(request:TextOnlyHttpRequest)=>Promise<Response>;
-export type AnthropicApiProviderOptions=Readonly<{environment?:Readonly<Record<string,string|undefined>>;transport?:TextOnlyHttpTransport;maxOutputTokens?:number;now?:()=>number}>;
-type AnthropicMessageResponse=Readonly<{content?:unknown;usage?:Readonly<{input_tokens?:unknown;output_tokens?:unknown}>}>;
-function defaultTransport(request:TextOnlyHttpRequest):Promise<Response>{return fetch(request.url,{method:request.method,headers:request.headers,body:request.body,signal:request.signal});}
-function byteLength(value:string):number{return Buffer.byteLength(value,"utf8");}
-function validString(value:string,max:number):boolean{return value.trim().length>0&&byteLength(value)<=max;}
-function validModel(value:string):boolean{return value.trim().length>0&&value.length<=MAX_TEXT_ONLY_MODEL_CHARACTERS;}
-function validTimeout(value:number):boolean{return Number.isInteger(value)&&value>=MIN_TEXT_ONLY_TIMEOUT_MS&&value<=MAX_TEXT_ONLY_TIMEOUT_MS;}
-function validOutputTokenLimit(value:number):boolean{return Number.isInteger(value)&&value>0&&value<=MAX_TEXT_ONLY_OUTPUT_TOKENS;}
-function validOutputSchema(value:TextOnlyProviderInput["outputSchema"]):boolean{return value===undefined||(typeof value==="object"&&value!==null&&typeof value.schema==="object"&&value.schema!==null);}
-function sanitizeAnthropicSchemaValue(value:unknown):unknown{if(Array.isArray(value))return value.map(sanitizeAnthropicSchemaValue);if(typeof value!=="object"||value===null)return value;const result:Record<string,unknown>={};for(const [key,item] of Object.entries(value)){if(key==="maxLength"||key==="maxItems")continue;result[key]=sanitizeAnthropicSchemaValue(item);}return result;}
-function toAnthropicOutputSchema(schema:Readonly<Record<string,unknown>>):Readonly<Record<string,unknown>>{return sanitizeAnthropicSchemaValue(schema) as Readonly<Record<string,unknown>>;}
-export function hasAnthropicApiCredential(environment:Readonly<Record<string,string|undefined>>=process.env):boolean{return Boolean(environment.ANTHROPIC_API_KEY?.trim());}
-function failure(model:string|null,code:TextOnlyProviderFailureCode,message:string,durationMs:number,truncated=false):TextOnlyProviderFailure{return Object.freeze({status:"failed",provider:"anthropic_api",model,code,message,durationMs,truncated});}
-async function readBoundedResponseBody(response:Response):Promise<{body:string;exceeded:boolean}>{if(response.body===null)return{body:"",exceeded:false};const reader=response.body.getReader();const chunks:Uint8Array[]=[];let totalBytes=0;try{while(true){const next=await reader.read();if(next.done)break;totalBytes+=next.value.byteLength;if(totalBytes>MAX_TEXT_ONLY_OUTPUT_BYTES){await reader.cancel();return{body:"",exceeded:true};}chunks.push(next.value);}}finally{reader.releaseLock();}const bytes=new Uint8Array(totalBytes);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}return{body:new TextDecoder().decode(bytes),exceeded:false};}
-function parseUsage(value:unknown):TextOnlyProviderUsage|undefined{if(typeof value!=="object"||value===null||!Number.isInteger((value as AnthropicMessageResponse["usage"])?.input_tokens)||!Number.isInteger((value as AnthropicMessageResponse["usage"])?.output_tokens))return undefined;return Object.freeze({inputTokens:(value as {input_tokens:number}).input_tokens,outputTokens:(value as {output_tokens:number}).output_tokens});}
-function parseTextOutput(body:string):{output:string;usage?:TextOnlyProviderUsage}|null{try{const parsed=JSON.parse(body)as AnthropicMessageResponse;if(!Array.isArray(parsed.content))return null;const texts=parsed.content.flatMap(block=>typeof block==="object"&&block!==null&&(block as {type?:unknown}).type==="text"&&typeof(block as{text?:unknown}).text==="string"?[(block as{text:string}).text]:[]);if(texts.length===0)return null;const output=texts.join("");if(byteLength(output)>MAX_TEXT_ONLY_OUTPUT_BYTES)return null;const usage=parseUsage(parsed.usage);return usage===undefined?{output}:{output,usage};}catch{return null;}}
+import {
+  ANTHROPIC_EFFORT_VALUES,
+  MAX_TEXT_ONLY_CONTEXT_BYTES,
+  MAX_TEXT_ONLY_MODEL_CHARACTERS,
+  MAX_TEXT_ONLY_OUTPUT_BYTES,
+  MAX_TEXT_ONLY_OUTPUT_TOKENS,
+  MAX_TEXT_ONLY_SYSTEM_PROMPT_BYTES,
+  MAX_TEXT_ONLY_TIMEOUT_MS,
+  MIN_TEXT_ONLY_TIMEOUT_MS,
+  type TextOnlyProvider,
+  type TextOnlyProviderFailure,
+  type TextOnlyProviderFailureCode,
+  type TextOnlyProviderInput,
+  type TextOnlyProviderResult,
+  type TextOnlyProviderUsage,
+} from "./types.js";
+const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_VERSION = "2023-06-01";
+export type TextOnlyHttpRequest = Readonly<{
+  url: string;
+  method: "POST";
+  headers: Readonly<Record<string, string>>;
+  body: string;
+  signal: AbortSignal;
+}>;
+export type TextOnlyHttpTransport = (
+  request: TextOnlyHttpRequest,
+) => Promise<Response>;
+export type AnthropicApiProviderOptions = Readonly<{
+  environment?: Readonly<Record<string, string | undefined>>;
+  transport?: TextOnlyHttpTransport;
+  maxOutputTokens?: number;
+  now?: () => number;
+}>;
+type AnthropicMessageResponse = Readonly<{
+  content?: unknown;
+  usage?: Readonly<{ input_tokens?: unknown; output_tokens?: unknown }>;
+  stop_reason?: unknown;
+}>;
+function defaultTransport(request: TextOnlyHttpRequest): Promise<Response> {
+  return fetch(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: request.body,
+    signal: request.signal,
+  });
+}
+function byteLength(value: string): number {
+  return Buffer.byteLength(value, "utf8");
+}
+function validString(value: string, max: number): boolean {
+  return value.trim().length > 0 && byteLength(value) <= max;
+}
+function validModel(value: string): boolean {
+  return (
+    value.trim().length > 0 && value.length <= MAX_TEXT_ONLY_MODEL_CHARACTERS
+  );
+}
+function validTimeout(value: number): boolean {
+  return (
+    Number.isInteger(value) &&
+    value >= MIN_TEXT_ONLY_TIMEOUT_MS &&
+    value <= MAX_TEXT_ONLY_TIMEOUT_MS
+  );
+}
+function validOutputTokenLimit(value: number): boolean {
+  return (
+    Number.isInteger(value) && value > 0 && value <= MAX_TEXT_ONLY_OUTPUT_TOKENS
+  );
+}
+function validEffort(value: TextOnlyProviderInput["effort"]): boolean {
+  return (
+    value === undefined ||
+    (ANTHROPIC_EFFORT_VALUES as readonly string[]).includes(value)
+  );
+}
+function validOutputSchema(
+  value: TextOnlyProviderInput["outputSchema"],
+): boolean {
+  return (
+    value === undefined ||
+    (typeof value === "object" &&
+      value !== null &&
+      typeof value.schema === "object" &&
+      value.schema !== null)
+  );
+}
+function sanitizeAnthropicSchemaValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeAnthropicSchemaValue);
+  if (typeof value !== "object" || value === null) return value;
+  const result: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (key === "maxLength" || key === "maxItems") continue;
+    result[key] = sanitizeAnthropicSchemaValue(item);
+  }
+  return result;
+}
+/**
+ * Pure transform from a business JSON Schema to what is actually transmitted
+ * to the Anthropic Messages API as `output_config.format.schema` (strips
+ * keywords Structured Outputs does not support, e.g. maxLength/maxItems).
+ * Exported so the pre-call token estimate can size the real transmitted
+ * schema instead of duplicating this sanitization logic.
+ */
+export function toAnthropicOutputSchema(
+  schema: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  return sanitizeAnthropicSchemaValue(schema) as Readonly<
+    Record<string, unknown>
+  >;
+}
+export function hasAnthropicApiCredential(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return Boolean(environment.ANTHROPIC_API_KEY?.trim());
+}
+function failure(
+  model: string | null,
+  code: TextOnlyProviderFailureCode,
+  message: string,
+  durationMs: number,
+  truncated = false,
+): TextOnlyProviderFailure {
+  return Object.freeze({
+    status: "failed",
+    provider: "anthropic_api",
+    model,
+    code,
+    message,
+    durationMs,
+    truncated,
+  });
+}
+async function readBoundedResponseBody(
+  response: Response,
+): Promise<{ body: string; exceeded: boolean }> {
+  if (response.body === null) return { body: "", exceeded: false };
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      totalBytes += next.value.byteLength;
+      if (totalBytes > MAX_TEXT_ONLY_OUTPUT_BYTES) {
+        await reader.cancel();
+        return { body: "", exceeded: true };
+      }
+      chunks.push(next.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { body: new TextDecoder().decode(bytes), exceeded: false };
+}
+function parseUsage(value: unknown): TextOnlyProviderUsage | undefined {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !Number.isInteger(
+      (value as AnthropicMessageResponse["usage"])?.input_tokens,
+    ) ||
+    !Number.isInteger(
+      (value as AnthropicMessageResponse["usage"])?.output_tokens,
+    )
+  )
+    return undefined;
+  return Object.freeze({
+    inputTokens: (value as { input_tokens: number }).input_tokens,
+    outputTokens: (value as { output_tokens: number }).output_tokens,
+  });
+}
+function parseStopReason(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as AnthropicMessageResponse;
+    return typeof parsed.stop_reason === "string" ? parsed.stop_reason : null;
+  } catch {
+    return null;
+  }
+}
+function parseTextOutput(
+  body: string,
+): { output: string; usage?: TextOnlyProviderUsage } | null {
+  try {
+    const parsed = JSON.parse(body) as AnthropicMessageResponse;
+    if (!Array.isArray(parsed.content)) return null;
+    const texts = parsed.content.flatMap((block) =>
+      typeof block === "object" &&
+      block !== null &&
+      (block as { type?: unknown }).type === "text" &&
+      typeof (block as { text?: unknown }).text === "string"
+        ? [(block as { text: string }).text]
+        : [],
+    );
+    if (texts.length === 0) return null;
+    const output = texts.join("");
+    if (byteLength(output) > MAX_TEXT_ONLY_OUTPUT_BYTES) return null;
+    const usage = parseUsage(parsed.usage);
+    return usage === undefined ? { output } : { output, usage };
+  } catch {
+    return null;
+  }
+}
 /** Direct Anthropic Messages API adapter with no tools or project capabilities. */
-export function createAnthropicApiProvider(options:AnthropicApiProviderOptions={}):TextOnlyProvider{const environment=options.environment??process.env;const transport=options.transport??defaultTransport;const maxOutputTokens=options.maxOutputTokens??MAX_TEXT_ONLY_OUTPUT_TOKENS;const now=options.now??Date.now;if(!validOutputTokenLimit(maxOutputTokens))throw new TypeError("Anthropic API output token limit is invalid.");return Object.freeze({async invoke(input:TextOnlyProviderInput):Promise<TextOnlyProviderResult>{const startedAt=now();const model=validModel(input.model)?input.model.trim():null;if(!validString(input.systemPrompt,MAX_TEXT_ONLY_SYSTEM_PROMPT_BYTES))return failure(model,"invalid_system_prompt","System prompt is invalid.",now()-startedAt);if(!validString(input.contextJson,MAX_TEXT_ONLY_CONTEXT_BYTES))return failure(model,"invalid_context_json","Context JSON is invalid.",now()-startedAt);if(model===null)return failure(null,"invalid_model","Model is invalid.",now()-startedAt);if(!validTimeout(input.timeoutMs))return failure(model,"invalid_timeout","Timeout is invalid.",now()-startedAt);if(!validOutputSchema(input.outputSchema))return failure(model,"provider_response_invalid","Output schema is invalid.",now()-startedAt);const apiKey=environment.ANTHROPIC_API_KEY?.trim();if(!apiKey)return failure(model,"credential_unavailable","Anthropic API credential is unavailable.",now()-startedAt);const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),input.timeoutMs);try{const body={model,system:input.systemPrompt,messages:[{role:"user",content:input.contextJson}],max_tokens:maxOutputTokens,tool_choice:{type:"none" as const},...(input.outputSchema===undefined?{}:{output_config:{format:{type:"json_schema" as const,schema:toAnthropicOutputSchema(input.outputSchema.schema)}}})};const response=await transport(Object.freeze({url:ANTHROPIC_MESSAGES_URL,method:"POST",headers:Object.freeze({"content-type":"application/json","x-api-key":apiKey,"anthropic-version":ANTHROPIC_VERSION}),body:JSON.stringify(body),signal:controller.signal}));const raw=await readBoundedResponseBody(response);if(raw.exceeded)return failure(model,"output_limit_exceeded","Anthropic API response exceeded the output limit.",now()-startedAt,true);if(!response.ok){const code=response.status===401||response.status===403?"provider_authentication_failed":"provider_request_failed";return failure(model,code,code==="provider_authentication_failed"?"Anthropic API authentication failed.":"Anthropic API request failed.",now()-startedAt);}const parsed=parseTextOutput(raw.body);if(parsed===null)return failure(model,"provider_response_invalid","Anthropic API response was invalid.",now()-startedAt);return Object.freeze({status:"completed",provider:"anthropic_api",model,output:parsed.output,durationMs:now()-startedAt,truncated:false,...(parsed.usage===undefined?{}:{usage:parsed.usage})});}catch{return failure(model,controller.signal.aborted?"provider_timeout":"provider_unavailable",controller.signal.aborted?"Anthropic API request timed out.":"Anthropic API request could not be completed.",now()-startedAt);}finally{clearTimeout(timeout);}}});}
+export function createAnthropicApiProvider(
+  options: AnthropicApiProviderOptions = {},
+): TextOnlyProvider {
+  const environment = options.environment ?? process.env;
+  const transport = options.transport ?? defaultTransport;
+  const maxOutputTokens =
+    options.maxOutputTokens ?? MAX_TEXT_ONLY_OUTPUT_TOKENS;
+  const now = options.now ?? Date.now;
+  if (!validOutputTokenLimit(maxOutputTokens))
+    throw new TypeError("Anthropic API output token limit is invalid.");
+  return Object.freeze({
+    async invoke(
+      input: TextOnlyProviderInput,
+    ): Promise<TextOnlyProviderResult> {
+      const startedAt = now();
+      const model = validModel(input.model) ? input.model.trim() : null;
+      if (!validString(input.systemPrompt, MAX_TEXT_ONLY_SYSTEM_PROMPT_BYTES))
+        return failure(
+          model,
+          "invalid_system_prompt",
+          "System prompt is invalid.",
+          now() - startedAt,
+        );
+      if (!validString(input.contextJson, MAX_TEXT_ONLY_CONTEXT_BYTES))
+        return failure(
+          model,
+          "invalid_context_json",
+          "Context JSON is invalid.",
+          now() - startedAt,
+        );
+      if (model === null)
+        return failure(
+          null,
+          "invalid_model",
+          "Model is invalid.",
+          now() - startedAt,
+        );
+      if (!validTimeout(input.timeoutMs))
+        return failure(
+          model,
+          "invalid_timeout",
+          "Timeout is invalid.",
+          now() - startedAt,
+        );
+      if (!validOutputSchema(input.outputSchema))
+        return failure(
+          model,
+          "provider_response_invalid",
+          "Output schema is invalid.",
+          now() - startedAt,
+        );
+      if (!validEffort(input.effort))
+        return failure(
+          model,
+          "invalid_effort",
+          "Effort is invalid.",
+          now() - startedAt,
+        );
+      const apiKey = environment.ANTHROPIC_API_KEY?.trim();
+      if (!apiKey)
+        return failure(
+          model,
+          "credential_unavailable",
+          "Anthropic API credential is unavailable.",
+          now() - startedAt,
+        );
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
+      try {
+        const outputConfig = {
+          ...(input.outputSchema === undefined
+            ? {}
+            : {
+                format: {
+                  type: "json_schema" as const,
+                  schema: toAnthropicOutputSchema(input.outputSchema.schema),
+                },
+              }),
+          ...(input.effort === undefined ? {} : { effort: input.effort }),
+        };
+        const body = {
+          model,
+          system: input.systemPrompt,
+          messages: [{ role: "user", content: input.contextJson }],
+          max_tokens: maxOutputTokens,
+          tool_choice: { type: "none" as const },
+          ...(Object.keys(outputConfig).length === 0
+            ? {}
+            : { output_config: outputConfig }),
+        };
+        const response = await transport(
+          Object.freeze({
+            url: ANTHROPIC_MESSAGES_URL,
+            method: "POST",
+            headers: Object.freeze({
+              "content-type": "application/json",
+              "x-api-key": apiKey,
+              "anthropic-version": ANTHROPIC_VERSION,
+            }),
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          }),
+        );
+        const raw = await readBoundedResponseBody(response);
+        if (raw.exceeded)
+          return failure(
+            model,
+            "output_limit_exceeded",
+            "Anthropic API response exceeded the output limit.",
+            now() - startedAt,
+            true,
+          );
+        if (!response.ok) {
+          const code =
+            response.status === 401 || response.status === 403
+              ? "provider_authentication_failed"
+              : "provider_request_failed";
+          return failure(
+            model,
+            code,
+            code === "provider_authentication_failed"
+              ? "Anthropic API authentication failed."
+              : "Anthropic API request failed.",
+            now() - startedAt,
+          );
+        }
+        const stopReason = parseStopReason(raw.body);
+        if (stopReason === "refusal")
+          return failure(
+            model,
+            "provider_refused",
+            "Anthropic API refused the request.",
+            now() - startedAt,
+          );
+        if (stopReason === "max_tokens")
+          return failure(
+            model,
+            "provider_output_truncated",
+            "Anthropic API response was truncated by the output token limit.",
+            now() - startedAt,
+            true,
+          );
+        const parsed = parseTextOutput(raw.body);
+        if (parsed === null)
+          return failure(
+            model,
+            "provider_response_invalid",
+            "Anthropic API response was invalid.",
+            now() - startedAt,
+          );
+        return Object.freeze({
+          status: "completed",
+          provider: "anthropic_api",
+          model,
+          output: parsed.output,
+          durationMs: now() - startedAt,
+          truncated: false,
+          ...(parsed.usage === undefined ? {} : { usage: parsed.usage }),
+          ...(input.effort === undefined ? {} : { effort: input.effort }),
+        });
+      } catch {
+        return failure(
+          model,
+          controller.signal.aborted
+            ? "provider_timeout"
+            : "provider_unavailable",
+          controller.signal.aborted
+            ? "Anthropic API request timed out."
+            : "Anthropic API request could not be completed.",
+          now() - startedAt,
+        );
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
+  });
+}

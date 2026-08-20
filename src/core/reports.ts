@@ -15,8 +15,25 @@ import type { Config, ProjectConfig } from "./config.js";
 import { docExists } from "./docs.js";
 import { isGitRepository } from "./git.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
-import { generateRoadmapProposalFromContext } from "../intelligence/roadmap-proposal.js";
-import type { TextOnlyProvider } from "../text-only-provider/index.js";
+import {
+  generateRoadmapProposalFromContext,
+  ROADMAP_PROPOSAL_ESTIMATED_OUTPUT_TOKENS,
+  ROADMAP_PROPOSAL_ESTIMATED_STRUCTURED_OUTPUT_OVERHEAD_TOKENS,
+  ROADMAP_PROPOSAL_OUTPUT_SCHEMA,
+  ROADMAP_PROPOSAL_SYSTEM_PROMPT,
+} from "../intelligence/roadmap-proposal.js";
+import { selectRoadmapProposalProfile } from "../intelligence/roadmap-proposal-routing.js";
+import {
+  buildCompactRoadmapProposalContext,
+  estimateTokenCount,
+} from "../intelligence/roadmap-proposal-context-compaction.js";
+import {
+  calculateCostUsd,
+  resolveAnthropicPricing,
+  toAnthropicOutputSchema,
+  type AnthropicEffort,
+  type TextOnlyProvider,
+} from "../text-only-provider/index.js";
 import {
   boundProposalContextString,
   buildRoadmapProposalContext,
@@ -170,12 +187,105 @@ export async function generateRoadmapProposalReport(
   input: Readonly<{
     provider: TextOnlyProvider;
     providerAvailable: boolean;
-    model: string;
+    /** Explicit override for manual/debug CLI use. Omit to auto-route (the GUI's only path). */
+    model?: string;
+    effort?: AnthropicEffort;
     timeoutMs: number;
   }>,
 ) {
   const context = generateRoadmapProposalContextReport(project);
-  return generateRoadmapProposalFromContext(context, input);
+  const autoRouted = input.model === undefined;
+  const routingDecision = autoRouted
+    ? selectRoadmapProposalProfile(context)
+    : null;
+  const model = input.model ?? routingDecision!.model;
+  const effort = autoRouted
+    ? (routingDecision!.effort ?? undefined)
+    : input.effort;
+
+  const base = await generateRoadmapProposalFromContext(context, {
+    provider: input.provider,
+    providerAvailable: input.providerAvailable,
+    model,
+    timeoutMs: input.timeoutMs,
+    ...(effort === undefined ? {} : { effort }),
+  });
+
+  const withProfile = autoRouted
+    ? { ...base, profile: routingDecision!.profile }
+    : base;
+
+  if (withProfile.result.status === "unavailable") return withProfile;
+  const { usage, model: resultModel } = withProfile.result;
+  if (usage === undefined || resultModel === undefined) return withProfile;
+
+  const pricing = resolveAnthropicPricing(resultModel);
+  const actualCalculatedCostUsd =
+    pricing === null
+      ? undefined
+      : calculateCostUsd(usage.inputTokens, usage.outputTokens, pricing);
+
+  return {
+    ...withProfile,
+    result: {
+      ...withProfile.result,
+      ...(actualCalculatedCostUsd === undefined
+        ? {}
+        : {
+            actualCalculatedCostUsd,
+            pricingEffectiveDate: pricing!.effectiveFrom,
+          }),
+    },
+  };
+}
+
+export function generateRoadmapProposalEstimateReport(project: ProjectConfig) {
+  const context = generateRoadmapProposalContextReport(project);
+  if (context.context !== "available") {
+    return {
+      schemaVersion: 1 as const,
+      project: { name: context.project.name },
+      estimate: {
+        status: "unavailable" as const,
+        reason: context.objective.reason ?? "proposal_context_unavailable",
+      },
+    };
+  }
+
+  const routingDecision = selectRoadmapProposalProfile(context);
+  const compact = buildCompactRoadmapProposalContext(context);
+  const contextJson = compact === null ? "" : JSON.stringify(compact);
+  const transmittedSchemaJson = JSON.stringify(
+    toAnthropicOutputSchema(ROADMAP_PROPOSAL_OUTPUT_SCHEMA),
+  );
+  const estimatedInputTokens =
+    estimateTokenCount(ROADMAP_PROPOSAL_SYSTEM_PROMPT) +
+    estimateTokenCount(contextJson) +
+    estimateTokenCount(transmittedSchemaJson) +
+    ROADMAP_PROPOSAL_ESTIMATED_STRUCTURED_OUTPUT_OVERHEAD_TOKENS;
+  const estimatedOutputTokens = ROADMAP_PROPOSAL_ESTIMATED_OUTPUT_TOKENS;
+  const pricing = resolveAnthropicPricing(routingDecision.model);
+  const estimatedCostUsd =
+    pricing === null
+      ? undefined
+      : calculateCostUsd(estimatedInputTokens, estimatedOutputTokens, pricing);
+
+  return {
+    schemaVersion: 1 as const,
+    project: { name: context.project.name },
+    estimate: {
+      status: "available" as const,
+      profile: routingDecision.profile,
+      model: routingDecision.model,
+      effort: routingDecision.effort,
+      reason: routingDecision.reason,
+      estimatedInputTokens,
+      estimatedOutputTokens,
+      ...(estimatedCostUsd === undefined
+        ? {}
+        : { estimatedCostUsd, pricingEffectiveDate: pricing!.effectiveFrom }),
+    },
+  };
 }
 
 export function generateProjectContextReport(project: ProjectConfig) {

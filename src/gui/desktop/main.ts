@@ -6,7 +6,10 @@ import { createProviderKeychainReader } from "../keychain-reader.js";
 import { resolveLoopEngineRepositoryPath } from "../repo-path-resolver.js";
 import { createContextHandler } from "./context-handler.js";
 import { createPlanHandler } from "./plan-handler.js";
-import { createExecuteHandler, DESKTOP_EXECUTE_CLI_TIMEOUT_MS } from "./execute-handler.js";
+import {
+  createExecuteHandler,
+  DESKTOP_EXECUTE_CLI_TIMEOUT_MS,
+} from "./execute-handler.js";
 import { createExecutionWindowCloseGuard } from "./execution-window-close-guard.js";
 import {
   createExecutionSessionManager,
@@ -16,6 +19,7 @@ import {
   createRoadmapProposalHandler,
   DESKTOP_ROADMAP_PROPOSAL_TIMEOUT_MS,
 } from "./roadmap-proposal-handler.js";
+import { createRoadmapProposalEstimateHandler } from "./roadmap-proposal-estimate-handler.js";
 import { createReviewHandler } from "./review-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 
@@ -117,7 +121,9 @@ const executionSessions = createExecutionSessionManager({
 async function startExecutionSession(request: unknown) {
   const started = await executionSessions.start(request);
   if (!started.ok) return started;
-  void executionCloseGuard.run(() => executionSessions.waitForCompletion(started.session.id));
+  void executionCloseGuard.run(() =>
+    executionSessions.waitForCompletion(started.session.id),
+  );
   return started;
 }
 
@@ -130,17 +136,31 @@ ipcMain.handle("loop:roadmap-proposal", (_event, projectName) =>
   roadmapProposalHandler(projectName),
 );
 
-ipcMain.handle("loop:execution-start", (_event, request) => startExecutionSession(request));
-ipcMain.handle("loop:execution-session", (_event, sessionId) => executionSessions.get(sessionId));
+const roadmapProposalEstimateHandler = createRoadmapProposalEstimateHandler({
+  cliInvoker,
+  resolveRepositoryPath,
+});
+ipcMain.handle("loop:roadmap-proposal-estimate", (_event, projectName) =>
+  roadmapProposalEstimateHandler(projectName),
+);
+
+ipcMain.handle("loop:execution-start", (_event, request) =>
+  startExecutionSession(request),
+);
+ipcMain.handle("loop:execution-session", (_event, sessionId) =>
+  executionSessions.get(sessionId),
+);
 ipcMain.handle("loop:execute", async (_event, request) => {
   const started = await startExecutionSession(request);
   if (!started.ok) return started;
   await executionSessions.waitForCompletion(started.session.id);
-  return executionSessions.get(started.session.id)?.result ?? {
-    ok: false as const,
-    kind: "spawn-error" as const,
-    raw: "Execution session result is unavailable.",
-  };
+  return (
+    executionSessions.get(started.session.id)?.result ?? {
+      ok: false as const,
+      kind: "spawn-error" as const,
+      raw: "Execution session result is unavailable.",
+    }
+  );
 });
 
 app.whenReady().then(async () => {

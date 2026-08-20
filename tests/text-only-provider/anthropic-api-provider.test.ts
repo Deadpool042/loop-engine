@@ -73,7 +73,9 @@ describe("Anthropic API text-only provider", () => {
     assert.equal("tools" in body, false);
     assert.equal("mcp_servers" in body, false);
     assert.equal("attachments" in body, false);
-    assert.deepEqual(body.messages, [{ role: "user", content: validInput.contextJson }]);
+    assert.deepEqual(body.messages, [
+      { role: "user", content: validInput.contextJson },
+    ]);
     assert.deepEqual(body.tool_choice, { type: "none" });
     assert.equal("thinking" in body, false);
   });
@@ -82,21 +84,33 @@ describe("Anthropic API text-only provider", () => {
     let request: TextOnlyHttpRequest | null = null;
     const provider = providerWith(async (received) => {
       request = received;
-      return new Response(JSON.stringify({ content: [{ type: "text", text: "{}" }] }));
+      return new Response(
+        JSON.stringify({ content: [{ type: "text", text: "{}" }] }),
+      );
     });
-    await provider.invoke({ ...validInput, outputSchema: { schema: { type: "object", additionalProperties: false } } });
+    await provider.invoke({
+      ...validInput,
+      outputSchema: { schema: { type: "object", additionalProperties: false } },
+    });
     assert.ok(request);
     const body = JSON.parse(request.body) as Record<string, unknown>;
     assert.equal("tools" in body, false);
     assert.deepEqual(body.tool_choice, { type: "none" });
-    assert.deepEqual(body.output_config, { format: { type: "json_schema", schema: { type: "object", additionalProperties: false } } });
+    assert.deepEqual(body.output_config, {
+      format: {
+        type: "json_schema",
+        schema: { type: "object", additionalProperties: false },
+      },
+    });
   });
 
   it("removes Anthropic-unsupported length constraints from the transmitted schema", async () => {
     let request: TextOnlyHttpRequest | null = null;
     const provider = providerWith(async (received) => {
       request = received;
-      return new Response(JSON.stringify({ content: [{ type: "text", text: "{}" }] }));
+      return new Response(
+        JSON.stringify({ content: [{ type: "text", text: "{}" }] }),
+      );
     });
 
     await provider.invoke({
@@ -139,12 +153,183 @@ describe("Anthropic API text-only provider", () => {
     });
   });
 
+  it("preserves anyOf/required/additionalProperties/const discriminants while stripping length constraints", async () => {
+    let request: TextOnlyHttpRequest | null = null;
+    const provider = providerWith(async (received) => {
+      request = received;
+      return new Response(
+        JSON.stringify({ content: [{ type: "text", text: "{}" }] }),
+      );
+    });
+
+    await provider.invoke({
+      ...validInput,
+      outputSchema: {
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["status"],
+          properties: {
+            status: {
+              anyOf: [
+                {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["status", "reason"],
+                  properties: {
+                    status: { type: "string", const: "no_proposal" },
+                    reason: { type: "string", maxLength: 500 },
+                  },
+                },
+                {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["status", "summary", "lots"],
+                  properties: {
+                    status: { type: "string", const: "proposed" },
+                    summary: { type: "string", maxLength: 500 },
+                    lots: { type: "array", maxItems: 3, items: { type: "string" } },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    assert.ok(request);
+    const body = JSON.parse(request.body) as Record<string, unknown>;
+    const schema = (
+      (body.output_config as Record<string, unknown>).format as Record<
+        string,
+        unknown
+      >
+    ).schema as Record<string, unknown>;
+    const anyOf = (schema.properties as Record<string, unknown>).status as Record<
+      string,
+      unknown
+    >;
+    assert.equal(Array.isArray(anyOf.anyOf), true);
+    const branches = anyOf.anyOf as Record<string, unknown>[];
+    assert.deepEqual(branches[0]?.required, ["status", "reason"]);
+    assert.equal(branches[0]?.additionalProperties, false);
+    assert.equal(
+      (
+        (branches[0]?.properties as Record<string, unknown>).status as Record<
+          string,
+          unknown
+        >
+      ).const,
+      "no_proposal",
+    );
+    assert.equal(
+      (
+        (branches[0]?.properties as Record<string, unknown>).reason as Record<
+          string,
+          unknown
+        >
+      ).maxLength,
+      undefined,
+    );
+    assert.deepEqual(branches[1]?.required, ["status", "summary", "lots"]);
+    assert.equal(
+      (
+        (branches[1]?.properties as Record<string, unknown>).status as Record<
+          string,
+          unknown
+        >
+      ).const,
+      "proposed",
+    );
+    assert.equal(
+      (
+        (branches[1]?.properties as Record<string, unknown>).lots as Record<
+          string,
+          unknown
+        >
+      ).maxItems,
+      undefined,
+    );
+  });
+
+  it("converts stop_reason=refusal to a redacted failure without retaining raw output", async () => {
+    let calls = 0;
+    const provider = providerWith(async () => {
+      calls += 1;
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "some sensitive model text" }],
+          stop_reason: "refusal",
+        }),
+        { status: 200 },
+      );
+    });
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(calls, 1);
+    assert.equal(result.status, "failed");
+    if (result.status === "failed") {
+      assert.equal(result.code, "provider_refused");
+      assert.doesNotMatch(
+        JSON.stringify(result),
+        /sensitive model text/,
+      );
+    }
+  });
+
+  it("converts stop_reason=max_tokens to a redacted truncated failure without retaining raw output", async () => {
+    let calls = 0;
+    const provider = providerWith(async () => {
+      calls += 1;
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "partial sensitive output" }],
+          stop_reason: "max_tokens",
+        }),
+        { status: 200 },
+      );
+    });
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(calls, 1);
+    assert.equal(result.status, "failed");
+    if (result.status === "failed") {
+      assert.equal(result.code, "provider_output_truncated");
+      assert.equal(result.truncated, true);
+      assert.doesNotMatch(
+        JSON.stringify(result),
+        /partial sensitive output/,
+      );
+    }
+  });
+
+  it("does not treat a normal end_turn completion as refused or truncated", async () => {
+    const provider = providerWith(async () => {
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "ok" }],
+          stop_reason: "end_turn",
+        }),
+        { status: 200 },
+      );
+    });
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(result.status, "completed");
+  });
+
   it("keeps an adversarial context as inert user text without granting tools", async () => {
     let request: TextOnlyHttpRequest | null = null;
     const provider = providerWith(async (received) => {
       request = received;
       return new Response(
-        JSON.stringify({ content: [{ type: "text", text: "I only received text." }] }),
+        JSON.stringify({
+          content: [{ type: "text", text: "I only received text." }],
+        }),
       );
     });
     const contextJson =
@@ -174,7 +359,10 @@ describe("Anthropic API text-only provider", () => {
       ...validInput,
       systemPrompt: "x".repeat(MAX_TEXT_ONLY_SYSTEM_PROMPT_BYTES + 1),
     });
-    const invalidTimeout = await provider.invoke({ ...validInput, timeoutMs: 999 });
+    const invalidTimeout = await provider.invoke({
+      ...validInput,
+      timeoutMs: 999,
+    });
 
     assert.equal(tooLargeContext.status, "failed");
     assert.equal(tooLargePrompt.status, "failed");
@@ -184,20 +372,20 @@ describe("Anthropic API text-only provider", () => {
 
   it("does not call HTTP when the environment credential is absent", async () => {
     let calls = 0;
-    const provider = providerWith(
-      async () => {
-        calls += 1;
-        return new Response();
-      },
-      {},
-    );
+    const provider = providerWith(async () => {
+      calls += 1;
+      return new Response();
+    }, {});
 
     const result = await provider.invoke(validInput);
 
     assert.equal(result.status, "failed");
     if (result.status === "failed") {
       assert.equal(result.code, "credential_unavailable");
-      assert.doesNotMatch(JSON.stringify(result), /test-secret|ANTHROPIC_API_KEY/);
+      assert.doesNotMatch(
+        JSON.stringify(result),
+        /test-secret|ANTHROPIC_API_KEY/,
+      );
     }
     assert.equal(calls, 0);
   });
@@ -258,15 +446,83 @@ describe("Anthropic API text-only provider", () => {
     }
   });
 
+  it("forwards a supported effort value in output_config and echoes it back", async () => {
+    const requests: TextOnlyHttpRequest[] = [];
+    const provider = providerWith(async (request) => {
+      requests.push(request);
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "ok" }],
+          usage: { input_tokens: 5, output_tokens: 2 },
+        }),
+        { status: 200 },
+      );
+    });
+
+    const result = await provider.invoke({ ...validInput, effort: "low" });
+
+    assert.equal(result.status, "completed");
+    if (result.status === "completed") {
+      assert.equal(result.effort, "low");
+    }
+    const body = JSON.parse(requests[0]?.body ?? "{}");
+    assert.equal(body.output_config.effort, "low");
+  });
+
+  it("omits output_config.effort entirely when no effort is given", async () => {
+    const requests: TextOnlyHttpRequest[] = [];
+    const provider = providerWith(async (request) => {
+      requests.push(request);
+      return new Response(
+        JSON.stringify({ content: [{ type: "text", text: "ok" }] }),
+        { status: 200 },
+      );
+    });
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(result.status, "completed");
+    if (result.status === "completed") {
+      assert.equal(result.effort, undefined);
+    }
+    const body = JSON.parse(requests[0]?.body ?? "{}");
+    assert.equal(body.output_config, undefined);
+  });
+
+  it("rejects an invalid effort value before calling the transport", async () => {
+    let calls = 0;
+    const provider = providerWith(async () => {
+      calls += 1;
+      throw new Error("must not be called");
+    });
+
+    const result = await provider.invoke({
+      ...validInput,
+      effort: "extreme" as never,
+    });
+
+    assert.equal(calls, 0);
+    assert.equal(result.status, "failed");
+    if (result.status === "failed") {
+      assert.equal(result.code, "invalid_effort");
+    }
+  });
+
   it("keeps the public port free of project and execution capabilities", () => {
     const source = readFileSync("src/text-only-provider/types.ts", "utf8");
-    assert.doesNotMatch(source, /\b(projectPath|cwd|worktree|LoopExecutionPlan)\s*:/);
+    assert.doesNotMatch(
+      source,
+      /\b(projectPath|cwd|worktree|LoopExecutionPlan)\s*:/,
+    );
 
     const providerSource = readFileSync(
       "src/text-only-provider/anthropic-api-provider.ts",
       "utf8",
     );
-    assert.doesNotMatch(providerSource, /child_process|\bspawn\s*\(|node:fs|node:child_process/);
+    assert.doesNotMatch(
+      providerSource,
+      /child_process|\bspawn\s*\(|node:fs|node:child_process/,
+    );
     assert.doesNotMatch(providerSource, /\btools\s*:/);
   });
 });

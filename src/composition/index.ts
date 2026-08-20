@@ -1,3 +1,5 @@
+export { type AnthropicEffort } from "../text-only-provider/index.js";
+
 export {
   createLoopApplicationAssembly,
   type LoopApplicationAssembly,

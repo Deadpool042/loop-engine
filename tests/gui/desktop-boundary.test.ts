@@ -24,23 +24,52 @@ describe("GUI desktop execution boundary", () => {
     assert.equal(api.startExecution.length, 1);
     assert.equal(api.executionSession.length, 1);
     assert.equal(api.roadmapProposal.length, 1);
+    assert.equal(api.roadmapProposalEstimate.length, 1);
     await api.summary();
     await api.context("loop-engine");
     await api.review("loop-engine");
     await api.plan("lp-infra", "H1-L4");
-    await api.execute({ projectName: "lp-infra", candidateId: "H1-L4", provider: "codex", model: "gpt-5.6-terra" });
-    await api.startExecution({ projectName: "lp-infra", candidateId: "H1-L4", provider: "codex", model: "gpt-5.6-terra" });
+    await api.execute({
+      projectName: "lp-infra",
+      candidateId: "H1-L4",
+      provider: "codex",
+      model: "gpt-5.6-terra",
+    });
+    await api.startExecution({
+      projectName: "lp-infra",
+      candidateId: "H1-L4",
+      provider: "codex",
+      model: "gpt-5.6-terra",
+    });
     await api.executionSession("session-1");
     await api.roadmapProposal("loop-engine");
+    await api.roadmapProposalEstimate("loop-engine");
     assert.deepEqual(calls, [
       ["loop:summary"],
       ["loop:context", "loop-engine"],
       ["loop:review", "loop-engine"],
       ["loop:plan", "lp-infra", "H1-L4"],
-      ["loop:execute", { projectName: "lp-infra", candidateId: "H1-L4", provider: "codex", model: "gpt-5.6-terra" }],
-      ["loop:execution-start", { projectName: "lp-infra", candidateId: "H1-L4", provider: "codex", model: "gpt-5.6-terra" }],
+      [
+        "loop:execute",
+        {
+          projectName: "lp-infra",
+          candidateId: "H1-L4",
+          provider: "codex",
+          model: "gpt-5.6-terra",
+        },
+      ],
+      [
+        "loop:execution-start",
+        {
+          projectName: "lp-infra",
+          candidateId: "H1-L4",
+          provider: "codex",
+          model: "gpt-5.6-terra",
+        },
+      ],
       ["loop:execution-session", "session-1"],
       ["loop:roadmap-proposal", "loop-engine"],
+      ["loop:roadmap-proposal-estimate", "loop-engine"],
     ]);
   });
 
@@ -100,11 +129,21 @@ describe("GUI desktop execution boundary", () => {
       mainSource,
       /ipcMain\.handle\("loop:plan", \(_event, projectName, candidateId\) =>\s*planHandler\(projectName, candidateId\),\s*\)/s,
     );
-    assert.match(mainSource, /ipcMain\.handle\("loop:execution-start", \(_event, request\) => startExecutionSession\(request\)\)/s);
-    assert.match(mainSource, /ipcMain\.handle\("loop:execution-session", \(_event, sessionId\) => executionSessions\.get\(sessionId\)\)/s);
+    assert.match(
+      mainSource,
+      /ipcMain\.handle\("loop:execution-start", \(_event, request\) =>\s*startExecutionSession\(request\),?\s*\)/s,
+    );
+    assert.match(
+      mainSource,
+      /ipcMain\.handle\("loop:execution-session", \(_event, sessionId\) =>\s*executionSessions\.get\(sessionId\),?\s*\)/s,
+    );
     assert.match(
       mainSource,
       /ipcMain\.handle\("loop:roadmap-proposal", \(_event, projectName\) =>\s*roadmapProposalHandler\(projectName\),\s*\)/s,
+    );
+    assert.match(
+      mainSource,
+      /ipcMain\.handle\("loop:roadmap-proposal-estimate", \(_event, projectName\) =>\s*roadmapProposalEstimateHandler\(projectName\),\s*\)/s,
     );
     assert.doesNotMatch(mainSource, /ipcMain\.handle\("loop:command"/);
   });
@@ -116,7 +155,10 @@ describe("GUI desktop execution boundary", () => {
     );
 
     assert.match(mainSource, /createRoadmapProposalHandler\(\{/);
-    assert.match(mainSource, /keychainReader: createProviderKeychainReader\(\)/);
+    assert.match(
+      mainSource,
+      /keychainReader: createProviderKeychainReader\(\)/,
+    );
   });
 
   it("passes the renderer project name to review while retaining the trusted cwd", async () => {
