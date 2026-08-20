@@ -32,7 +32,19 @@ export type RoadmapProposalReport = Readonly<{
   project: Readonly<{ name: string }>;
   result:
     | Readonly<{ status: "unavailable"; reason: string }>
-    | Readonly<{ status: "failed"; reason: string }>
+    | Readonly<{
+        status: "failed";
+        reason: string;
+        /** Only present when a provider call completed but failed local business validation. */
+        validationFailureCode?: string;
+        provider?: string;
+        model?: string;
+        effort?: AnthropicEffort | null;
+        durationMs?: number;
+        usage?: RoadmapProposalUsage;
+        actualCalculatedCostUsd?: number;
+        pricingEffectiveDate?: string;
+      }>
     | Readonly<{
         status: "completed";
         provider: string;
@@ -42,6 +54,7 @@ export type RoadmapProposalReport = Readonly<{
         usage?: RoadmapProposalUsage;
         actualCalculatedCostUsd?: number;
         pricingEffectiveDate?: string;
+        normalizationWarnings?: readonly string[];
       }>;
   profile?: RoadmapProposalProfile;
   assessment?: RoadmapProposalAssessment;
@@ -169,9 +182,37 @@ function parseResult(
   value: unknown,
 ): RoadmapProposalReport["result"] | undefined {
   if (!isRecord(value)) return undefined;
-  if (value.status === "unavailable" || value.status === "failed") {
+  if (value.status === "unavailable") {
     if (typeof value.reason !== "string") return undefined;
-    return Object.freeze({ status: value.status, reason: value.reason });
+    return Object.freeze({ status: "unavailable" as const, reason: value.reason });
+  }
+  if (value.status === "failed") {
+    if (typeof value.reason !== "string") return undefined;
+    const usage = parseUsage(value.usage);
+    return Object.freeze({
+      status: "failed" as const,
+      reason: value.reason,
+      ...(typeof value.validationFailureCode === "string"
+        ? { validationFailureCode: value.validationFailureCode }
+        : {}),
+      ...(typeof value.provider === "string" ? { provider: value.provider } : {}),
+      ...(typeof value.model === "string" ? { model: value.model } : {}),
+      ...(value.effort === null
+        ? { effort: null }
+        : isEffort(value.effort)
+          ? { effort: value.effort }
+          : {}),
+      ...(typeof value.durationMs === "number"
+        ? { durationMs: value.durationMs }
+        : {}),
+      ...(usage === undefined ? {} : { usage }),
+      ...(typeof value.actualCalculatedCostUsd === "number"
+        ? { actualCalculatedCostUsd: value.actualCalculatedCostUsd }
+        : {}),
+      ...(typeof value.pricingEffectiveDate === "string"
+        ? { pricingEffectiveDate: value.pricingEffectiveDate }
+        : {}),
+    });
   }
   if (value.status === "completed") {
     if (
@@ -185,6 +226,9 @@ function parseResult(
       return undefined;
     }
     const usage = parseUsage(value.usage);
+    const normalizationWarnings = isStringArray(value.normalizationWarnings)
+      ? Object.freeze([...value.normalizationWarnings])
+      : undefined;
     return Object.freeze({
       status: "completed" as const,
       provider: value.provider,
@@ -198,6 +242,9 @@ function parseResult(
       ...(typeof value.pricingEffectiveDate === "string"
         ? { pricingEffectiveDate: value.pricingEffectiveDate }
         : {}),
+      ...(normalizationWarnings === undefined
+        ? {}
+        : { normalizationWarnings }),
     });
   }
   return undefined;

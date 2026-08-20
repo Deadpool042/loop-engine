@@ -18,6 +18,8 @@ export const TEXT_ONLY_PROVIDER_FAILURE_CODES = [
   "provider_authentication_failed",
   "provider_response_invalid",
   "output_limit_exceeded",
+  "provider_refused",
+  "provider_output_truncated",
 ] as const;
 export type TextOnlyProviderFailureCode =
   (typeof TEXT_ONLY_PROVIDER_FAILURE_CODES)[number];

@@ -18,6 +18,8 @@ import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import {
   generateRoadmapProposalFromContext,
   ROADMAP_PROPOSAL_ESTIMATED_OUTPUT_TOKENS,
+  ROADMAP_PROPOSAL_ESTIMATED_STRUCTURED_OUTPUT_OVERHEAD_TOKENS,
+  ROADMAP_PROPOSAL_OUTPUT_SCHEMA,
   ROADMAP_PROPOSAL_SYSTEM_PROMPT,
 } from "../intelligence/roadmap-proposal.js";
 import { selectRoadmapProposalProfile } from "../intelligence/roadmap-proposal-routing.js";
@@ -28,6 +30,7 @@ import {
 import {
   calculateCostUsd,
   resolveAnthropicPricing,
+  toAnthropicOutputSchema,
   type AnthropicEffort,
   type TextOnlyProvider,
 } from "../text-only-provider/index.js";
@@ -212,17 +215,15 @@ export async function generateRoadmapProposalReport(
     ? { ...base, profile: routingDecision!.profile }
     : base;
 
-  if (withProfile.result.status !== "completed") return withProfile;
+  if (withProfile.result.status === "unavailable") return withProfile;
+  const { usage, model: resultModel } = withProfile.result;
+  if (usage === undefined || resultModel === undefined) return withProfile;
 
-  const pricing = resolveAnthropicPricing(withProfile.result.model);
+  const pricing = resolveAnthropicPricing(resultModel);
   const actualCalculatedCostUsd =
-    withProfile.result.usage === undefined || pricing === null
+    pricing === null
       ? undefined
-      : calculateCostUsd(
-          withProfile.result.usage.inputTokens,
-          withProfile.result.usage.outputTokens,
-          pricing,
-        );
+      : calculateCostUsd(usage.inputTokens, usage.outputTokens, pricing);
 
   return {
     ...withProfile,
@@ -254,9 +255,14 @@ export function generateRoadmapProposalEstimateReport(project: ProjectConfig) {
   const routingDecision = selectRoadmapProposalProfile(context);
   const compact = buildCompactRoadmapProposalContext(context);
   const contextJson = compact === null ? "" : JSON.stringify(compact);
+  const transmittedSchemaJson = JSON.stringify(
+    toAnthropicOutputSchema(ROADMAP_PROPOSAL_OUTPUT_SCHEMA),
+  );
   const estimatedInputTokens =
     estimateTokenCount(ROADMAP_PROPOSAL_SYSTEM_PROMPT) +
-    estimateTokenCount(contextJson);
+    estimateTokenCount(contextJson) +
+    estimateTokenCount(transmittedSchemaJson) +
+    ROADMAP_PROPOSAL_ESTIMATED_STRUCTURED_OUTPUT_OVERHEAD_TOKENS;
   const estimatedOutputTokens = ROADMAP_PROPOSAL_ESTIMATED_OUTPUT_TOKENS;
   const pricing = resolveAnthropicPricing(routingDecision.model);
   const estimatedCostUsd =

@@ -173,4 +173,102 @@ describe("GUI roadmap proposal contract", () => {
       assert.fail("expected a completed result");
     }
   });
+
+  it("round-trips telemetry on a failed result whose provider call completed but local validation failed", () => {
+    const report = parseRoadmapProposalReport({
+      schemaVersion: 1,
+      project: { name: "loop-engine" },
+      result: {
+        status: "failed",
+        reason: "invalid_proposal_response",
+        validationFailureCode: "empty_reason",
+        provider: "anthropic_api",
+        model: "claude-haiku-4-5",
+        effort: null,
+        durationMs: 850,
+        usage: { inputTokens: 1160, outputTokens: 40 },
+        actualCalculatedCostUsd: 0.00136,
+        pricingEffectiveDate: "1970-01-01",
+      },
+    });
+
+    assert.notEqual(report, null);
+    if (report?.result.status === "failed") {
+      assert.equal(report.result.reason, "invalid_proposal_response");
+      assert.equal(report.result.validationFailureCode, "empty_reason");
+      assert.equal(report.result.model, "claude-haiku-4-5");
+      assert.deepEqual(report.result.usage, {
+        inputTokens: 1160,
+        outputTokens: 40,
+      });
+      assert.equal(report.result.actualCalculatedCostUsd, 0.00136);
+    } else {
+      assert.fail("expected a failed result");
+    }
+  });
+
+  it("still parses a bare failed result without telemetry (provider-level failure)", () => {
+    const report = parseRoadmapProposalReport({
+      schemaVersion: 1,
+      project: { name: "loop-engine" },
+      result: { status: "failed", reason: "provider_error" },
+    });
+
+    assert.notEqual(report, null);
+    if (report?.result.status === "failed") {
+      assert.equal(report.result.reason, "provider_error");
+      assert.equal(report.result.model, undefined);
+      assert.equal(report.result.usage, undefined);
+    } else {
+      assert.fail("expected a failed result");
+    }
+  });
+
+  it("27. accepts a completed result carrying normalizationWarnings", () => {
+    const report = parseRoadmapProposalReport({
+      schemaVersion: 1,
+      project: { name: "loop-engine" },
+      result: {
+        status: "completed",
+        provider: "anthropic_api",
+        model: "claude-haiku-4-5",
+        effort: null,
+        durationMs: 500,
+        usage: { inputTokens: 2058, outputTokens: 329 },
+        normalizationWarnings: ["reason_truncated"],
+      },
+      proposal: { status: "no_proposal", reason: "Bounded reason." },
+    });
+
+    assert.notEqual(report, null);
+    if (report?.result.status === "completed") {
+      assert.deepEqual(report.result.normalizationWarnings, [
+        "reason_truncated",
+      ]);
+    } else {
+      assert.fail("expected a completed result");
+    }
+  });
+
+  it("degrades cleanly when normalizationWarnings is absent from a completed result", () => {
+    const report = parseRoadmapProposalReport({
+      schemaVersion: 1,
+      project: { name: "loop-engine" },
+      result: {
+        status: "completed",
+        provider: "anthropic_api",
+        model: "claude-haiku-4-5",
+        effort: null,
+        durationMs: 500,
+      },
+      proposal: { status: "no_proposal", reason: "Reason." },
+    });
+
+    assert.notEqual(report, null);
+    if (report?.result.status === "completed") {
+      assert.equal(report.result.normalizationWarnings, undefined);
+    } else {
+      assert.fail("expected a completed result");
+    }
+  });
 });

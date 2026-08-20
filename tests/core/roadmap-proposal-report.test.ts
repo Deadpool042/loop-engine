@@ -9,7 +9,15 @@ import {
   generateRoadmapProposalEstimateReport,
   generateRoadmapProposalReport,
 } from "../../src/core/reports.js";
-import type { TextOnlyProvider } from "../../src/text-only-provider/index.js";
+import {
+  ROADMAP_PROPOSAL_OUTPUT_SCHEMA,
+  ROADMAP_PROPOSAL_SYSTEM_PROMPT,
+} from "../../src/intelligence/roadmap-proposal.js";
+import {
+  toAnthropicOutputSchema,
+  type TextOnlyProvider,
+} from "../../src/text-only-provider/index.js";
+import { estimateTokenCount } from "../../src/intelligence/roadmap-proposal-context-compaction.js";
 
 function setupProject(files: Readonly<Record<string, string>>): {
   path: string;
@@ -55,8 +63,6 @@ function fakeProvider(
         provider: "anthropic_api",
         model,
         output: JSON.stringify({
-          schemaVersion: 1,
-          project: { name: "example" },
           assessment: { observedGaps: [], assumptions: [] },
           proposal: { status: "no_proposal", reason: "No observable gap." },
         }),
@@ -131,6 +137,53 @@ test("respects an explicit --provider-model override and does not attach a profi
   }
 });
 
+test("computes the actual calculated cost even when the provider completes but local business validation fails", async () => {
+  const fixture = setupProject({
+    "objective.md": "Objective.",
+    "roadmap.md": "- [x] Done lot",
+  });
+  try {
+    const badProvider: TextOnlyProvider = {
+      async invoke(input) {
+        return {
+          status: "completed",
+          provider: "anthropic_api",
+          model: "claude-haiku-4-5",
+          output: JSON.stringify({
+            assessment: { observedGaps: [], assumptions: [] },
+            proposal: { status: "no_proposal" },
+          }),
+          durationMs: 7,
+          truncated: false,
+          usage: { inputTokens: 1200, outputTokens: 40 },
+          ...(input.effort === undefined ? {} : { effort: input.effort }),
+        };
+      },
+    };
+    const report = await generateRoadmapProposalReport(project(fixture.path), {
+      provider: badProvider,
+      providerAvailable: true,
+      timeoutMs: 60_000,
+    });
+
+    assert.equal(report.result.status, "failed");
+    if (report.result.status === "failed") {
+      assert.equal(report.result.reason, "invalid_proposal_response");
+      assert.equal(report.result.validationFailureCode, "empty_reason");
+      assert.equal(report.result.model, "claude-haiku-4-5");
+      assert.deepEqual(report.result.usage, {
+        inputTokens: 1200,
+        outputTokens: 40,
+      });
+      const cost = (report.result as { actualCalculatedCostUsd?: number })
+        .actualCalculatedCostUsd;
+      assert.equal(cost, (1200 * 1.0) / 1_000_000 + (40 * 5.0) / 1_000_000);
+    }
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("the pre-click estimate never touches the provider and reports the same routing profile", async () => {
   const fixture = setupProject({
     "objective.md": "Objective.",
@@ -150,6 +203,108 @@ test("the pre-click estimate never touches the provider and reports the same rou
       assert.ok(estimate.estimate.estimatedOutputTokens > 0);
     }
     assert.equal(providerCalls, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("28/29. estimatedInputTokens includes the real, sanitized Structured Outputs schema — no duplicated sanitization logic", () => {
+  const fixture = setupProject({
+    "objective.md": "Objective.",
+    "roadmap.md": "- [x] Done lot",
+  });
+  try {
+    const estimate = generateRoadmapProposalEstimateReport(project(fixture.path));
+    assert.equal(estimate.estimate.status, "available");
+    if (estimate.estimate.status !== "available") return;
+
+    const schemaJson = JSON.stringify(
+      toAnthropicOutputSchema(ROADMAP_PROPOSAL_OUTPUT_SCHEMA),
+    );
+    const promptOnly = estimateTokenCount(ROADMAP_PROPOSAL_SYSTEM_PROMPT);
+    const promptPlusSchema =
+      promptOnly + estimateTokenCount(schemaJson);
+    // The schema (via the exact provider transform, not a re-implementation)
+    // must materially raise the estimate beyond prompt + context alone.
+    assert.ok(estimate.estimate.estimatedInputTokens >= promptPlusSchema);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("30. the estimate for the real loop-engine repository (the burn-in's own project) is within 15% of the observed 2058-token burn-in", () => {
+  // Mirrors the `loop-engine` entry in projects.yaml (path: .) — the exact
+  // project the real Haiku burn-in ran against, not a synthetic fixture.
+  const loopEngineProject: ProjectConfig = {
+    name: "loop-engine",
+    path: process.cwd(),
+    type: "node-cli",
+    required_docs: [
+      "README.md",
+      "docs/architecture/project-intelligence.md",
+    ],
+    validation: ["pnpm run validate"],
+    requires_git: false,
+    planning: {
+      mode: "roadmap",
+      objective_source: "docs/architecture/final-objective.md",
+    },
+    roadmap: ["docs/roadmap/loop-engine.md"],
+  };
+  const estimate = generateRoadmapProposalEstimateReport(loopEngineProject);
+  assert.equal(estimate.estimate.status, "available");
+  if (estimate.estimate.status !== "available") return;
+  const REAL_OBSERVED_INPUT_TOKENS = 2058;
+  const deviation =
+    Math.abs(estimate.estimate.estimatedInputTokens - REAL_OBSERVED_INPUT_TOKENS) /
+    REAL_OBSERVED_INPUT_TOKENS;
+  assert.ok(
+    deviation <= 0.15,
+    `estimatedInputTokens=${estimate.estimate.estimatedInputTokens} deviates ${(deviation * 100).toFixed(1)}% from the real 2058-token burn-in`,
+  );
+});
+
+test("31. estimatedCostUsd uses the corrected estimatedInputTokens, not the old under-count", () => {
+  const fixture = setupProject({
+    "objective.md": "Objective.",
+    "roadmap.md": "- [x] Done lot",
+  });
+  try {
+    const estimate = generateRoadmapProposalEstimateReport(project(fixture.path));
+    assert.equal(estimate.estimate.status, "available");
+    if (estimate.estimate.status !== "available") return;
+    assert.ok("estimatedCostUsd" in estimate.estimate);
+    const cost = (estimate.estimate as { estimatedCostUsd?: number }).estimatedCostUsd;
+    assert.ok(cost !== undefined && cost > 0);
+    // claude-haiku-4-5 pricing fixture: $1.00/M input, $5.00/M output.
+    const expected =
+      (estimate.estimate.estimatedInputTokens * 1.0) / 1_000_000 +
+      (estimate.estimate.estimatedOutputTokens * 5.0) / 1_000_000;
+    assert.ok(cost !== undefined && Math.abs(cost - expected) < 1e-9);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("32. the estimate never touches the network", () => {
+  const fixture = setupProject({
+    "objective.md": "Objective.",
+    "roadmap.md": "- [x] Done lot",
+  });
+  try {
+    const originalFetch = globalThis.fetch;
+    let called = false;
+    // @ts-expect-error test-only stub
+    globalThis.fetch = async () => {
+      called = true;
+      throw new Error("must not be called");
+    };
+    try {
+      generateRoadmapProposalEstimateReport(project(fixture.path));
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    assert.equal(called, false);
   } finally {
     fixture.cleanup();
   }

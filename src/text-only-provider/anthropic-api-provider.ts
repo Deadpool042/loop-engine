@@ -35,6 +35,7 @@ export type AnthropicApiProviderOptions = Readonly<{
 type AnthropicMessageResponse = Readonly<{
   content?: unknown;
   usage?: Readonly<{ input_tokens?: unknown; output_tokens?: unknown }>;
+  stop_reason?: unknown;
 }>;
 function defaultTransport(request: TextOnlyHttpRequest): Promise<Response> {
   return fetch(request.url, {
@@ -94,7 +95,14 @@ function sanitizeAnthropicSchemaValue(value: unknown): unknown {
   }
   return result;
 }
-function toAnthropicOutputSchema(
+/**
+ * Pure transform from a business JSON Schema to what is actually transmitted
+ * to the Anthropic Messages API as `output_config.format.schema` (strips
+ * keywords Structured Outputs does not support, e.g. maxLength/maxItems).
+ * Exported so the pre-call token estimate can size the real transmitted
+ * schema instead of duplicating this sanitization logic.
+ */
+export function toAnthropicOutputSchema(
   schema: Readonly<Record<string, unknown>>,
 ): Readonly<Record<string, unknown>> {
   return sanitizeAnthropicSchemaValue(schema) as Readonly<
@@ -168,6 +176,14 @@ function parseUsage(value: unknown): TextOnlyProviderUsage | undefined {
     inputTokens: (value as { input_tokens: number }).input_tokens,
     outputTokens: (value as { output_tokens: number }).output_tokens,
   });
+}
+function parseStopReason(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as AnthropicMessageResponse;
+    return typeof parsed.stop_reason === "string" ? parsed.stop_reason : null;
+  } catch {
+    return null;
+  }
 }
 function parseTextOutput(
   body: string,
@@ -319,6 +335,22 @@ export function createAnthropicApiProvider(
             now() - startedAt,
           );
         }
+        const stopReason = parseStopReason(raw.body);
+        if (stopReason === "refusal")
+          return failure(
+            model,
+            "provider_refused",
+            "Anthropic API refused the request.",
+            now() - startedAt,
+          );
+        if (stopReason === "max_tokens")
+          return failure(
+            model,
+            "provider_output_truncated",
+            "Anthropic API response was truncated by the output token limit.",
+            now() - startedAt,
+            true,
+          );
         const parsed = parseTextOutput(raw.body);
         if (parsed === null)
           return failure(

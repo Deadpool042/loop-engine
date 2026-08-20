@@ -153,6 +153,175 @@ describe("Anthropic API text-only provider", () => {
     });
   });
 
+  it("preserves anyOf/required/additionalProperties/const discriminants while stripping length constraints", async () => {
+    let request: TextOnlyHttpRequest | null = null;
+    const provider = providerWith(async (received) => {
+      request = received;
+      return new Response(
+        JSON.stringify({ content: [{ type: "text", text: "{}" }] }),
+      );
+    });
+
+    await provider.invoke({
+      ...validInput,
+      outputSchema: {
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["status"],
+          properties: {
+            status: {
+              anyOf: [
+                {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["status", "reason"],
+                  properties: {
+                    status: { type: "string", const: "no_proposal" },
+                    reason: { type: "string", maxLength: 500 },
+                  },
+                },
+                {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["status", "summary", "lots"],
+                  properties: {
+                    status: { type: "string", const: "proposed" },
+                    summary: { type: "string", maxLength: 500 },
+                    lots: { type: "array", maxItems: 3, items: { type: "string" } },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    assert.ok(request);
+    const body = JSON.parse(request.body) as Record<string, unknown>;
+    const schema = (
+      (body.output_config as Record<string, unknown>).format as Record<
+        string,
+        unknown
+      >
+    ).schema as Record<string, unknown>;
+    const anyOf = (schema.properties as Record<string, unknown>).status as Record<
+      string,
+      unknown
+    >;
+    assert.equal(Array.isArray(anyOf.anyOf), true);
+    const branches = anyOf.anyOf as Record<string, unknown>[];
+    assert.deepEqual(branches[0]?.required, ["status", "reason"]);
+    assert.equal(branches[0]?.additionalProperties, false);
+    assert.equal(
+      (
+        (branches[0]?.properties as Record<string, unknown>).status as Record<
+          string,
+          unknown
+        >
+      ).const,
+      "no_proposal",
+    );
+    assert.equal(
+      (
+        (branches[0]?.properties as Record<string, unknown>).reason as Record<
+          string,
+          unknown
+        >
+      ).maxLength,
+      undefined,
+    );
+    assert.deepEqual(branches[1]?.required, ["status", "summary", "lots"]);
+    assert.equal(
+      (
+        (branches[1]?.properties as Record<string, unknown>).status as Record<
+          string,
+          unknown
+        >
+      ).const,
+      "proposed",
+    );
+    assert.equal(
+      (
+        (branches[1]?.properties as Record<string, unknown>).lots as Record<
+          string,
+          unknown
+        >
+      ).maxItems,
+      undefined,
+    );
+  });
+
+  it("converts stop_reason=refusal to a redacted failure without retaining raw output", async () => {
+    let calls = 0;
+    const provider = providerWith(async () => {
+      calls += 1;
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "some sensitive model text" }],
+          stop_reason: "refusal",
+        }),
+        { status: 200 },
+      );
+    });
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(calls, 1);
+    assert.equal(result.status, "failed");
+    if (result.status === "failed") {
+      assert.equal(result.code, "provider_refused");
+      assert.doesNotMatch(
+        JSON.stringify(result),
+        /sensitive model text/,
+      );
+    }
+  });
+
+  it("converts stop_reason=max_tokens to a redacted truncated failure without retaining raw output", async () => {
+    let calls = 0;
+    const provider = providerWith(async () => {
+      calls += 1;
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "partial sensitive output" }],
+          stop_reason: "max_tokens",
+        }),
+        { status: 200 },
+      );
+    });
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(calls, 1);
+    assert.equal(result.status, "failed");
+    if (result.status === "failed") {
+      assert.equal(result.code, "provider_output_truncated");
+      assert.equal(result.truncated, true);
+      assert.doesNotMatch(
+        JSON.stringify(result),
+        /partial sensitive output/,
+      );
+    }
+  });
+
+  it("does not treat a normal end_turn completion as refused or truncated", async () => {
+    const provider = providerWith(async () => {
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "ok" }],
+          stop_reason: "end_turn",
+        }),
+        { status: 200 },
+      );
+    });
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(result.status, "completed");
+  });
+
   it("keeps an adversarial context as inert user text without granting tools", async () => {
     let request: TextOnlyHttpRequest | null = null;
     const provider = providerWith(async (received) => {

@@ -965,9 +965,31 @@ export function App(): React.JSX.Element {
                                       {proposalReport.result.status !==
                                         "completed" && (
                                         <p className="m-0 text-sm text-rose-700">
-                                          {proposalReport.result.reason}
+                                          {proposalReport.result.status ===
+                                          "failed"
+                                            ? "Analyse invalide"
+                                            : proposalReport.result.reason}
                                         </p>
                                       )}
+                                      {proposalReport.result.status ===
+                                        "failed" &&
+                                        proposalReport.result.model && (
+                                          <p className="m-0 text-xs text-loop-muted">
+                                            {proposalReport.result.model}
+                                            {proposalReport.result.effort
+                                              ? ` · effort ${proposalReport.result.effort}`
+                                              : ""}
+                                            {proposalReport.result.usage &&
+                                              ` · ${proposalReport.result.usage.inputTokens} tokens entrée / ${proposalReport.result.usage.outputTokens} tokens sortie`}
+                                            {proposalReport.result
+                                              .durationMs !== undefined &&
+                                              ` · ${proposalReport.result.durationMs} ms`}
+                                            {proposalReport.result
+                                              .actualCalculatedCostUsd !==
+                                              undefined &&
+                                              ` · coût réel calculé $${proposalReport.result.actualCalculatedCostUsd.toFixed(4)}`}
+                                          </p>
+                                        )}
                                       {proposalReport.result.status ===
                                         "completed" && (
                                         <p className="m-0 text-xs text-loop-muted">
@@ -984,6 +1006,20 @@ export function App(): React.JSX.Element {
                                             ` · coût réel calculé $${proposalReport.result.actualCalculatedCostUsd.toFixed(4)}`}
                                         </p>
                                       )}
+                                      {proposalReport.result.status ===
+                                        "completed" &&
+                                        proposalReport.result
+                                          .normalizationWarnings &&
+                                        proposalReport.result
+                                          .normalizationWarnings.length >
+                                          0 && (
+                                          <p className="m-0 text-xs text-amber-700">
+                                            Réponse normalisée :{" "}
+                                            {proposalReport.result.normalizationWarnings.join(
+                                              ", ",
+                                            )}
+                                          </p>
+                                        )}
                                       {proposalReport.result.status ===
                                         "completed" &&
                                         proposalReport.proposal?.status ===
