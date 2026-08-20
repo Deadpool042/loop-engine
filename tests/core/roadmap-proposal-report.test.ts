@@ -201,6 +201,25 @@ test("the pre-click estimate never touches the provider and reports the same rou
       assert.equal(estimate.estimate.effort, null);
       assert.ok(estimate.estimate.estimatedInputTokens > 0);
       assert.ok(estimate.estimate.estimatedOutputTokens > 0);
+      assert.deepEqual(
+        estimate.estimate.options.map(({ profile, model, effort }) => ({
+          profile,
+          model,
+          effort,
+        })),
+        [
+          { profile: "economy", model: "claude-haiku-4-5", effort: null },
+          { profile: "balanced", model: "claude-sonnet-5", effort: "low" },
+          { profile: "deep", model: "claude-sonnet-5", effort: "medium" },
+        ],
+      );
+      const economy = estimate.estimate.options[0]!;
+      const balanced = estimate.estimate.options[1]!;
+      const deep = estimate.estimate.options[2]!;
+      assert.ok(economy.estimatedCostUsd !== undefined);
+      assert.ok(balanced.estimatedCostUsd !== undefined);
+      assert.equal(balanced.estimatedCostUsd, deep.estimatedCostUsd);
+      assert.ok(balanced.estimatedCostUsd! > economy.estimatedCostUsd!);
     }
     assert.equal(providerCalls, 0);
   } finally {

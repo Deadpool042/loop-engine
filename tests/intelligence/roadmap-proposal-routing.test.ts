@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { selectRoadmapProposalProfile } from "../../src/intelligence/roadmap-proposal-routing.js";
+import {
+  resolveRoadmapProposalProfile,
+  selectRoadmapProposalProfile,
+} from "../../src/intelligence/roadmap-proposal-routing.js";
 
 function context(
   stats: Readonly<{
@@ -129,4 +132,25 @@ test("is a pure, synchronous, provider-free function", () => {
   const first = selectRoadmapProposalProfile(input);
   const second = selectRoadmapProposalProfile(input);
   assert.deepEqual(first, second);
+});
+
+test("resolves each closed operator profile to its canonical model/effort pair", () => {
+  assert.deepEqual(resolveRoadmapProposalProfile("economy"), {
+    profile: "economy",
+    model: "claude-haiku-4-5",
+    effort: null,
+    reason: "operator_override",
+  });
+  assert.deepEqual(resolveRoadmapProposalProfile("balanced"), {
+    profile: "balanced",
+    model: "claude-sonnet-5",
+    effort: "low",
+    reason: "operator_override",
+  });
+  assert.deepEqual(resolveRoadmapProposalProfile("deep"), {
+    profile: "deep",
+    model: "claude-sonnet-5",
+    effort: "medium",
+    reason: "operator_override",
+  });
 });

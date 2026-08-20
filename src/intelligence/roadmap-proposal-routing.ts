@@ -49,6 +49,13 @@ function routing(
   });
 }
 
+/** Resolves one operator-selectable profile to its fixed model/effort pair. */
+export function resolveRoadmapProposalProfile(
+  profile: RoadmapProposalProfile,
+): RoadmapProposalRouting {
+  return routing(profile, "operator_override");
+}
+
 /**
  * Deterministic, provider-free profile selection. Never calls the provider and
  * never inspects anything beyond the already-bounded proposal context report.

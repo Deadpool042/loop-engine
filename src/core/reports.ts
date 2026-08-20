@@ -22,7 +22,11 @@ import {
   ROADMAP_PROPOSAL_OUTPUT_SCHEMA,
   ROADMAP_PROPOSAL_SYSTEM_PROMPT,
 } from "../intelligence/roadmap-proposal.js";
-import { selectRoadmapProposalProfile } from "../intelligence/roadmap-proposal-routing.js";
+import {
+  ROADMAP_PROPOSAL_PROFILES,
+  resolveRoadmapProposalProfile,
+  selectRoadmapProposalProfile,
+} from "../intelligence/roadmap-proposal-routing.js";
 import {
   buildCompactRoadmapProposalContext,
   estimateTokenCount,
@@ -187,7 +191,7 @@ export async function generateRoadmapProposalReport(
   input: Readonly<{
     provider: TextOnlyProvider;
     providerAvailable: boolean;
-    /** Explicit override for manual/debug CLI use. Omit to auto-route (the GUI's only path). */
+    /** Explicit model for bounded/manual callers. Omit to auto-route from proposal context. */
     model?: string;
     effort?: AnthropicEffort;
     timeoutMs: number;
@@ -264,26 +268,36 @@ export function generateRoadmapProposalEstimateReport(project: ProjectConfig) {
     estimateTokenCount(transmittedSchemaJson) +
     ROADMAP_PROPOSAL_ESTIMATED_STRUCTURED_OUTPUT_OVERHEAD_TOKENS;
   const estimatedOutputTokens = ROADMAP_PROPOSAL_ESTIMATED_OUTPUT_TOKENS;
-  const pricing = resolveAnthropicPricing(routingDecision.model);
-  const estimatedCostUsd =
-    pricing === null
-      ? undefined
-      : calculateCostUsd(estimatedInputTokens, estimatedOutputTokens, pricing);
+  const options = ROADMAP_PROPOSAL_PROFILES.map((profile) => {
+    const resolved = resolveRoadmapProposalProfile(profile);
+    const pricing = resolveAnthropicPricing(resolved.model);
+    const estimatedCostUsd =
+      pricing === null
+        ? undefined
+        : calculateCostUsd(estimatedInputTokens, estimatedOutputTokens, pricing);
+    return Object.freeze({
+      profile,
+      model: resolved.model,
+      effort: resolved.effort,
+      estimatedInputTokens,
+      estimatedOutputTokens,
+      ...(estimatedCostUsd === undefined
+        ? {}
+        : { estimatedCostUsd, pricingEffectiveDate: pricing!.effectiveFrom }),
+    });
+  });
+  const recommended = options.find(
+    (option) => option.profile === routingDecision.profile,
+  )!;
 
   return {
     schemaVersion: 1 as const,
     project: { name: context.project.name },
     estimate: {
       status: "available" as const,
-      profile: routingDecision.profile,
-      model: routingDecision.model,
-      effort: routingDecision.effort,
+      ...recommended,
       reason: routingDecision.reason,
-      estimatedInputTokens,
-      estimatedOutputTokens,
-      ...(estimatedCostUsd === undefined
-        ? {}
-        : { estimatedCostUsd, pricingEffectiveDate: pricing!.effectiveFrom }),
+      options,
     },
   };
 }

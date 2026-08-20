@@ -1,5 +1,6 @@
 import type { CliInvocationResult } from "../cli-invoker.js";
 import type { DesktopExecuteRequest } from "./execute-handler.js";
+import type { RoadmapProposalProfileOverride } from "./roadmap-proposal-contract.js";
 import type {
   DesktopExecutionSession,
   DesktopExecutionSessionStart,
@@ -20,7 +21,10 @@ export type LoopDesktopApi = Readonly<{
   executionSession: (
     sessionId: string,
   ) => Promise<DesktopExecutionSession | null>;
-  roadmapProposal: (projectName: string) => Promise<CliInvocationResult>;
+  roadmapProposal: (
+    projectName: string,
+    profileOverride: RoadmapProposalProfileOverride,
+  ) => Promise<CliInvocationResult>;
   roadmapProposalEstimate: (
     projectName: string,
   ) => Promise<CliInvocationResult>;
@@ -69,8 +73,8 @@ export function createLoopDesktopApi(
         sessionId,
       ) as unknown as Promise<DesktopExecutionSession | null>;
     },
-    roadmapProposal(projectName) {
-      return invoke("loop:roadmap-proposal", projectName);
+    roadmapProposal(projectName, profileOverride) {
+      return invoke("loop:roadmap-proposal", projectName, profileOverride);
     },
     roadmapProposalEstimate(projectName) {
       return invoke("loop:roadmap-proposal-estimate", projectName);
