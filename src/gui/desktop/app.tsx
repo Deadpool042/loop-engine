@@ -25,6 +25,11 @@ import {
   parseSummaryResponse,
   type SummaryProject,
 } from "./summary-contract.js";
+import {
+  parseRoadmapProposalReport,
+  type RoadmapProposalReport,
+} from "./roadmap-proposal-contract.js";
+import type { CliInvocationResult } from "../cli-invoker.js";
 
 const healthTone = {
   good: "bg-emerald-500",
@@ -79,6 +84,59 @@ export function startExecutionSessionPolling(options: {
   };
 }
 
+export type RoadmapProposalOutcome =
+  | Readonly<{ ok: true; report: RoadmapProposalReport }>
+  | Readonly<{ ok: false; message: string }>;
+
+export function shouldDisplayRoadmapProposalResult(
+  resultProjectName: string,
+  currentSelectedProjectName: string | null,
+): boolean {
+  return resultProjectName === currentSelectedProjectName;
+}
+
+export function createRoadmapProposalRunner(options: {
+  invoke: (projectName: string) => Promise<CliInvocationResult>;
+  onStart: (projectName: string) => void;
+  onResult: (projectName: string, result: RoadmapProposalOutcome) => void;
+}): { start: (projectName: string) => Promise<void>; isActive: () => boolean } {
+  let active = false;
+
+  return Object.freeze({
+    isActive() {
+      return active;
+    },
+    async start(projectName: string): Promise<void> {
+      if (active) return;
+      active = true;
+      options.onStart(projectName);
+
+      try {
+        const result = await options.invoke(projectName);
+        if (!result.ok) {
+          options.onResult(projectName, { ok: false, message: result.raw });
+          return;
+        }
+
+        const report = parseRoadmapProposalReport(result.json);
+        if (report === null) {
+          options.onResult(projectName, {
+            ok: false,
+            message: "La réponse roadmap propose ne respecte pas le contrat JSON attendu.",
+          });
+          return;
+        }
+
+        options.onResult(projectName, { ok: true, report });
+      } catch {
+        options.onResult(projectName, { ok: false, message: "Impossible d’analyser la suite." });
+      } finally {
+        active = false;
+      }
+    },
+  });
+}
+
 export function App(): React.JSX.Element {
   const [projects, setProjects] = useState<readonly SummaryProject[]>([]);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(
@@ -103,6 +161,10 @@ export function App(): React.JSX.Element {
   const [executeMessage, setExecuteMessage] = useState<string | null>(null);
   const [executeResult, setExecuteResult] = useState<Record<string, unknown> | null>(null);
   const [executionSession, setExecutionSession] = useState<DesktopExecutionSession | null>(null);
+  const [proposalLoading, setProposalLoading] = useState(false);
+  const [proposalReport, setProposalReport] = useState<RoadmapProposalReport | null>(null);
+  const [proposalProjectName, setProposalProjectName] = useState<string | null>(null);
+  const [proposalError, setProposalError] = useState<string | null>(null);
   const planRequestId = useRef(0);
   const selectedProject =
     projects.find((project) => project.project.name === selectedProjectName) ??
@@ -169,12 +231,42 @@ export function App(): React.JSX.Element {
     };
   }, [selectedProjectName]);
 
+  const selectedProjectNameRef = useRef<string | null>(selectedProjectName);
+  selectedProjectNameRef.current = selectedProjectName;
+
+  const proposalRunner = useRef(
+    createRoadmapProposalRunner({
+      invoke: (projectName) => window.loopDesktop.roadmapProposal(projectName),
+      onStart(projectName) {
+        if (!shouldDisplayRoadmapProposalResult(projectName, selectedProjectNameRef.current)) return;
+        setProposalReport(null);
+        setProposalProjectName(null);
+        setProposalError(null);
+        setProposalLoading(true);
+      },
+      onResult(projectName, result) {
+        setProposalLoading(false);
+        if (!shouldDisplayRoadmapProposalResult(projectName, selectedProjectNameRef.current)) return;
+        if (result.ok) {
+          setProposalReport(result.report);
+          setProposalProjectName(projectName);
+        } else {
+          setProposalError(result.message);
+        }
+      },
+    }),
+  ).current;
+
   useEffect(() => {
     planRequestId.current += 1;
     setPlanDetail(null);
     setPlanProjectName(null);
     setPlanError(null);
     setPlanLoading(false);
+    setProposalReport(null);
+    setProposalProjectName(null);
+    setProposalError(null);
+    setProposalLoading(proposalRunner.isActive());
   }, [selectedProjectName]);
 
   function selectProject(projectName: string): void {
@@ -183,7 +275,16 @@ export function App(): React.JSX.Element {
     setPlanProjectName(null);
     setPlanError(null);
     setPlanLoading(false);
+    setProposalReport(null);
+    setProposalProjectName(null);
+    setProposalError(null);
+    setProposalLoading(proposalRunner.isActive());
     setSelectedProjectName(projectName);
+  }
+
+  function analyzeRoadmapContinuation(): void {
+    if (selectedProjectName === null) return;
+    void proposalRunner.start(selectedProjectName);
   }
 
   async function preparePlan(): Promise<void> {
@@ -609,6 +710,85 @@ export function App(): React.JSX.Element {
                               <li key={gate}>{gate}</li>
                             ))}
                           </ul>
+                        )}
+                        {planningDisplay.showRoadmapProposalAction && (
+                          <div className="mt-5">
+                            <Button
+                              type="button"
+                              disabled={proposalLoading}
+                              onClick={analyzeRoadmapContinuation}
+                            >
+                              {proposalLoading ? "Analyse en cours…" : "Analyser la suite"}
+                            </Button>
+                            {proposalError && (
+                              <pre className="mt-3 overflow-auto whitespace-pre-wrap break-words rounded-md border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900">
+                                {proposalError}
+                              </pre>
+                            )}
+                            {proposalReport &&
+                              proposalProjectName === selectedProjectName && (
+                                <div className="mt-4 rounded-lg border border-loop-line bg-white p-5">
+                                  {proposalReport.result.status !== "completed" && (
+                                    <p className="m-0 text-sm text-rose-700">
+                                      {proposalReport.result.reason}
+                                    </p>
+                                  )}
+                                  {proposalReport.result.status === "completed" &&
+                                    proposalReport.proposal?.status === "no_proposal" && (
+                                      <>
+                                        <p className="m-0 text-sm font-semibold">
+                                          Aucun nouveau travail justifié
+                                        </p>
+                                        <p className="mt-2 text-sm text-loop-muted">
+                                          {proposalReport.proposal.reason}
+                                        </p>
+                                      </>
+                                    )}
+                                  {proposalReport.result.status === "completed" &&
+                                    proposalReport.proposal?.status === "proposed" && (
+                                      <>
+                                        {proposalReport.assessment && proposalReport.assessment.observedGaps.length > 0 && (
+                                          <section>
+                                            <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                                              Écarts observés
+                                            </p>
+                                            <ul className="mt-2 space-y-1 text-sm">
+                                              {proposalReport.assessment.observedGaps.map((gap) => (
+                                                <li key={gap}>{gap}</li>
+                                              ))}
+                                            </ul>
+                                          </section>
+                                        )}
+                                        <section className="mt-4">
+                                          <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                                            Lots proposés
+                                          </p>
+                                          <ol className="mt-2 space-y-2 text-sm">
+                                            {proposalReport.proposal.lots.map((lot, index) => (
+                                              <li key={`${index}:${lot.title}`}>
+                                                <span className="font-semibold">{index + 1}. {lot.title}</span>
+                                                <span className="text-loop-muted"> — {lot.objective}</span>
+                                              </li>
+                                            ))}
+                                          </ol>
+                                        </section>
+                                        {proposalReport.assessment && proposalReport.assessment.assumptions.length > 0 && (
+                                          <section className="mt-4">
+                                            <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                                              Hypothèses
+                                            </p>
+                                            <ul className="mt-2 space-y-1 text-sm text-loop-muted">
+                                              {proposalReport.assessment.assumptions.map((assumption) => (
+                                                <li key={assumption}>{assumption}</li>
+                                              ))}
+                                            </ul>
+                                          </section>
+                                        )}
+                                      </>
+                                    )}
+                                </div>
+                              )}
+                          </div>
                         )}
                       </section>
                     )}

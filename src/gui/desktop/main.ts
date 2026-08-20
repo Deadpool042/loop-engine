@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { join } from "node:path";
 import { createCliInvoker } from "../cli-invoker.js";
 import { createGuiConfigStore } from "../config-store.js";
+import { createProviderKeychainReader } from "../keychain-reader.js";
 import { resolveLoopEngineRepositoryPath } from "../repo-path-resolver.js";
 import { createContextHandler } from "./context-handler.js";
 import { createPlanHandler } from "./plan-handler.js";
@@ -11,10 +12,17 @@ import {
   createExecutionSessionManager,
   createObservableExecuteCliInvoker,
 } from "./execution-session.js";
+import {
+  createRoadmapProposalHandler,
+  DESKTOP_ROADMAP_PROPOSAL_TIMEOUT_MS,
+} from "./roadmap-proposal-handler.js";
 import { createReviewHandler } from "./review-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 
 const cliInvoker = createCliInvoker();
+const roadmapProposalCliInvoker = createCliInvoker({
+  timeoutMs: DESKTOP_ROADMAP_PROPOSAL_TIMEOUT_MS + 5_000,
+});
 const executionCloseGuard = createExecutionWindowCloseGuard();
 let mainWindow: BrowserWindow | null = null;
 
@@ -112,6 +120,15 @@ async function startExecutionSession(request: unknown) {
   void executionCloseGuard.run(() => executionSessions.waitForCompletion(started.session.id));
   return started;
 }
+
+const roadmapProposalHandler = createRoadmapProposalHandler({
+  cliInvoker: roadmapProposalCliInvoker,
+  resolveRepositoryPath,
+  keychainReader: createProviderKeychainReader(),
+});
+ipcMain.handle("loop:roadmap-proposal", (_event, projectName) =>
+  roadmapProposalHandler(projectName),
+);
 
 ipcMain.handle("loop:execution-start", (_event, request) => startExecutionSession(request));
 ipcMain.handle("loop:execution-session", (_event, sessionId) => executionSessions.get(sessionId));

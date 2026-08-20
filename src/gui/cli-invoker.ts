@@ -25,6 +25,7 @@ type ExecuteCli = (
   args: readonly string[],
   cwd: string,
   timeoutMs: number,
+  env?: Readonly<Record<string, string>>,
 ) => Promise<ExecuteResult>;
 
 function executeCliProcess(
@@ -32,6 +33,7 @@ function executeCliProcess(
   args: readonly string[],
   cwd: string,
   timeoutMs: number,
+  env?: Readonly<Record<string, string>>,
 ): Promise<ExecuteResult> {
   return new Promise((resolve, reject) => {
     execFile(
@@ -42,6 +44,7 @@ function executeCliProcess(
         encoding: "utf8",
         timeout: timeoutMs,
         maxBuffer: 20 * 1024 * 1024,
+        ...(env === undefined ? {} : { env: { ...process.env, ...env } }),
       },
       (error, stdout, stderr) => {
         if (!error) {
@@ -76,11 +79,32 @@ function executeCliProcess(
   });
 }
 
+const REDACTED_PLACEHOLDER = "[redacted]";
+
+function redactSecrets(
+  raw: string,
+  env: Readonly<Record<string, string>> | undefined,
+): string {
+  if (env === undefined) {
+    return raw;
+  }
+
+  let redacted = raw;
+  for (const value of Object.values(env)) {
+    if (value.length === 0) {
+      continue;
+    }
+    redacted = redacted.split(value).join(REDACTED_PLACEHOLDER);
+  }
+  return redacted;
+}
+
 export type CliInvoker = Readonly<{
   invoke: (
     command: string,
     args: readonly string[],
     cwd: string,
+    env?: Readonly<Record<string, string>>,
   ) => Promise<CliInvocationResult>;
 }>;
 
@@ -98,11 +122,11 @@ export function createCliInvoker(options: {
   }
 
   return Object.freeze({
-    async invoke(command, args, cwd) {
+    async invoke(command, args, cwd, env) {
       const invocationArgs = ["--silent", "loop", command, ...args, "--json"];
 
       try {
-        const result = await execute(executable, invocationArgs, cwd, timeoutMs);
+        const result = await execute(executable, invocationArgs, cwd, timeoutMs, env);
         try {
           return Object.freeze({
             ok: true as const,
@@ -113,14 +137,20 @@ export function createCliInvoker(options: {
           return Object.freeze({
             ok: false as const,
             kind: "spawn-error" as const,
-            raw: result.stderr || result.stdout || "CLI returned invalid JSON.",
+            raw: redactSecrets(
+              result.stderr || result.stdout || "CLI returned invalid JSON.",
+              env,
+            ),
           });
         }
       } catch (error) {
         return Object.freeze({
           ok: false as const,
           kind: "spawn-error" as const,
-          raw: error instanceof Error ? error.message : "CLI invocation failed.",
+          raw: redactSecrets(
+            error instanceof Error ? error.message : "CLI invocation failed.",
+            env,
+          ),
         });
       }
     },
