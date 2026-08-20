@@ -28,6 +28,8 @@ export type LoopDesktopApi = Readonly<{
   roadmapProposalEstimate: (
     projectName: string,
   ) => Promise<CliInvocationResult>;
+  gateReassessment: (projectName: string, profileOverride: RoadmapProposalProfileOverride) => Promise<CliInvocationResult>;
+  gateReassessmentEstimate: (projectName: string) => Promise<CliInvocationResult>;
 }>;
 
 export function createLoopDesktopApi(
@@ -41,7 +43,9 @@ export function createLoopDesktopApi(
       | "loop:execution-start"
       | "loop:execution-session"
       | "loop:roadmap-proposal"
-      | "loop:roadmap-proposal-estimate",
+      | "loop:roadmap-proposal-estimate"
+      | "loop:gate-reassessment"
+      | "loop:gate-reassessment-estimate",
     ...args: readonly unknown[]
   ) => Promise<CliInvocationResult>,
 ): LoopDesktopApi {
@@ -79,5 +83,7 @@ export function createLoopDesktopApi(
     roadmapProposalEstimate(projectName) {
       return invoke("loop:roadmap-proposal-estimate", projectName);
     },
+    gateReassessment(projectName, profileOverride) { return invoke("loop:gate-reassessment", projectName, profileOverride); },
+    gateReassessmentEstimate(projectName) { return invoke("loop:gate-reassessment-estimate", projectName); },
   });
 }

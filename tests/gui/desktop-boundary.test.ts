@@ -25,6 +25,8 @@ describe("GUI desktop execution boundary", () => {
     assert.equal(api.executionSession.length, 1);
     assert.equal(api.roadmapProposal.length, 2);
     assert.equal(api.roadmapProposalEstimate.length, 1);
+    assert.equal(api.gateReassessment.length, 2);
+    assert.equal(api.gateReassessmentEstimate.length, 1);
     await api.summary();
     await api.context("loop-engine");
     await api.review("loop-engine");
@@ -44,6 +46,8 @@ describe("GUI desktop execution boundary", () => {
     await api.executionSession("session-1");
     await api.roadmapProposal("loop-engine", "auto");
     await api.roadmapProposalEstimate("loop-engine");
+    await api.gateReassessment("lp-infra", "auto");
+    await api.gateReassessmentEstimate("lp-infra");
     assert.deepEqual(calls, [
       ["loop:summary"],
       ["loop:context", "loop-engine"],
@@ -70,6 +74,8 @@ describe("GUI desktop execution boundary", () => {
       ["loop:execution-session", "session-1"],
       ["loop:roadmap-proposal", "loop-engine", "auto"],
       ["loop:roadmap-proposal-estimate", "loop-engine"],
+      ["loop:gate-reassessment", "lp-infra", "auto"],
+      ["loop:gate-reassessment-estimate", "lp-infra"],
     ]);
   });
 

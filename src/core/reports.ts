@@ -23,6 +23,14 @@ import {
   ROADMAP_PROPOSAL_SYSTEM_PROMPT,
 } from "../intelligence/roadmap-proposal.js";
 import {
+  buildGateReassessmentContext,
+  GATE_REASSESSMENT_ESTIMATED_OUTPUT_TOKENS,
+  GATE_REASSESSMENT_ESTIMATED_STRUCTURED_OUTPUT_OVERHEAD_TOKENS,
+  GATE_REASSESSMENT_OUTPUT_SCHEMA,
+  GATE_REASSESSMENT_SYSTEM_PROMPT,
+  generateGateReassessmentFromContext,
+} from "../intelligence/gate-reassessment.js";
+import {
   ROADMAP_PROPOSAL_PROFILES,
   resolveRoadmapProposalProfile,
   selectRoadmapProposalProfile,
@@ -102,7 +110,10 @@ export function generateProjectObjectiveReport(project: ProjectConfig) {
   };
 }
 
-export function generateRoadmapProposalContextReport(project: ProjectConfig) {
+export function generateRoadmapProposalContextReport(
+  project: ProjectConfig,
+  options: Readonly<{ allowIneligibleObjective?: boolean }> = {},
+) {
   const snapshot = generateProjectReport(project);
   const projectName = boundProposalContextString(snapshot.project.name);
   const projectType = boundProposalContextString(snapshot.project.type);
@@ -130,7 +141,7 @@ export function generateRoadmapProposalContextReport(project: ProjectConfig) {
     },
   };
 
-  if (!snapshot.objective.eligibleForRoadmapProposal) {
+  if (!snapshot.objective.eligibleForRoadmapProposal && !options.allowIneligibleObjective) {
     return Object.freeze({
       ...report,
       context: null,
@@ -300,6 +311,35 @@ export function generateRoadmapProposalEstimateReport(project: ProjectConfig) {
       options,
     },
   };
+}
+
+export async function generateGateReassessmentReport(
+  project: ProjectConfig,
+  input: Readonly<{ provider: TextOnlyProvider; providerAvailable: boolean; model?: string; effort?: AnthropicEffort; timeoutMs: number }>,
+) {
+  const context = generateRoadmapProposalContextReport(project, { allowIneligibleObjective: true });
+  const auto = input.model === undefined;
+  const routing = auto ? selectRoadmapProposalProfile(context) : null;
+  const base = await generateGateReassessmentFromContext(context, {
+    ...input,
+    model: input.model ?? routing!.model,
+    ...(auto && routing!.effort !== null ? { effort: routing!.effort } : {}),
+  });
+  const report = auto ? { ...base, profile: routing!.profile } : base;
+  if (report.result.status === "unavailable" || report.result.usage === undefined || report.result.model === undefined) return report;
+  const pricing = resolveAnthropicPricing(report.result.model);
+  return pricing === null ? report : { ...report, result: { ...report.result, actualCalculatedCostUsd: calculateCostUsd(report.result.usage.inputTokens, report.result.usage.outputTokens, pricing), pricingEffectiveDate: pricing.effectiveFrom } };
+}
+
+export function generateGateReassessmentEstimateReport(project: ProjectConfig) {
+  const context = generateRoadmapProposalContextReport(project, { allowIneligibleObjective: true });
+  const json = buildGateReassessmentContext(context);
+  if (json === null) return { schemaVersion: 1 as const, project: { name: context.project.name }, estimate: { status: "unavailable" as const, reason: "gate_reassessment_context_unavailable" } };
+  const routing = selectRoadmapProposalProfile(context);
+  const input = estimateTokenCount(GATE_REASSESSMENT_SYSTEM_PROMPT) + estimateTokenCount(json) + estimateTokenCount(JSON.stringify(toAnthropicOutputSchema(GATE_REASSESSMENT_OUTPUT_SCHEMA))) + GATE_REASSESSMENT_ESTIMATED_STRUCTURED_OUTPUT_OVERHEAD_TOKENS;
+  const options = ROADMAP_PROPOSAL_PROFILES.map((profile) => { const resolved = resolveRoadmapProposalProfile(profile); const pricing = resolveAnthropicPricing(resolved.model); return Object.freeze({ profile, model: resolved.model, effort: resolved.effort, estimatedInputTokens: input, estimatedOutputTokens: GATE_REASSESSMENT_ESTIMATED_OUTPUT_TOKENS, ...(pricing === null ? {} : { estimatedCostUsd: calculateCostUsd(input, GATE_REASSESSMENT_ESTIMATED_OUTPUT_TOKENS, pricing), pricingEffectiveDate: pricing.effectiveFrom }) }); });
+  const recommended = options.find((option) => option.profile === routing.profile)!;
+  return { schemaVersion: 1 as const, project: { name: context.project.name }, estimate: { status: "available" as const, ...recommended, reason: routing.reason, options } };
 }
 
 export function generateProjectContextReport(project: ProjectConfig) {

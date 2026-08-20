@@ -7,6 +7,7 @@ export type PlanningDisplay = Readonly<{
   roadmapDetail?: string;
   blockedGates: readonly string[];
   showRoadmapProposalAction: boolean;
+  showGateReassessmentAction: boolean;
 }>;
 
 function formatPlanningMode(
@@ -45,6 +46,7 @@ export function getPlanningDisplay(detail: ContextDetail): PlanningDisplay {
       description: "",
       blockedGates: Object.freeze([]),
       showRoadmapProposalAction: false,
+      showGateReassessmentAction: false,
     });
   }
 
@@ -56,6 +58,7 @@ export function getPlanningDisplay(detail: ContextDetail): PlanningDisplay {
       roadmapDetail: "Aucune roadmap requise.",
       blockedGates: Object.freeze([]),
       showRoadmapProposalAction: false,
+      showGateReassessmentAction: false,
     });
   }
 
@@ -73,6 +76,7 @@ export function getPlanningDisplay(detail: ContextDetail): PlanningDisplay {
       description: "Les prochaines phases sont actuellement bloquées.",
       blockedGates: Object.freeze(blockedGates),
       showRoadmapProposalAction: false,
+      showGateReassessmentAction: true,
     });
   }
 
@@ -87,6 +91,7 @@ export function getPlanningDisplay(detail: ContextDetail): PlanningDisplay {
       description: "Aucun travail restant.",
       blockedGates: Object.freeze([]),
       showRoadmapProposalAction: true,
+      showGateReassessmentAction: false,
     });
   }
 
@@ -96,5 +101,6 @@ export function getPlanningDisplay(detail: ContextDetail): PlanningDisplay {
     description: "La roadmap est à jour et aucun candidat n’est admissible.",
     blockedGates: Object.freeze([]),
     showRoadmapProposalAction: false,
+    showGateReassessmentAction: false,
   });
 }

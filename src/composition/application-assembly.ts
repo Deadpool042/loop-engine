@@ -15,6 +15,8 @@ import {
   generateRoadmapProposalContextReport,
   generateRoadmapProposalEstimateReport,
   generateRoadmapProposalReport,
+  generateGateReassessmentEstimateReport,
+  generateGateReassessmentReport,
   generateProjectValidationReport,
   generateRagIndex,
   generateRagSearchReport,
@@ -111,6 +113,11 @@ export type LoopApplicationAssembly = Readonly<{
     }>,
   ) => ReturnType<typeof generateRoadmapProposalReport>;
   generateRoadmapProposalEstimateReport: typeof generateRoadmapProposalEstimateReport;
+  generateGateReassessmentEstimateReport: typeof generateGateReassessmentEstimateReport;
+  generateGateReassessmentReport: (
+    project: LoopApplicationProject,
+    input: Readonly<{ model?: string; effort?: AnthropicEffort; timeoutMs: number }>,
+  ) => ReturnType<typeof generateGateReassessmentReport>;
   generateProjectValidationReport: typeof generateProjectValidationReport;
   generateRagIndex: typeof generateRagIndex;
   generateRagSearchReport: typeof generateRagSearchReport;
@@ -239,8 +246,15 @@ export function createLoopApplicationAssembly(
     generateRoadmapPlanningStatusReport,
     generateRoadmapProposalContextReport,
     generateRoadmapProposalEstimateReport,
+    generateGateReassessmentEstimateReport,
     generateRoadmapProposalReport: (project, input) =>
       generateRoadmapProposalReport(project, {
+        provider: textOnlyProvider,
+        providerAvailable: textOnlyProviderCredentialAvailable(),
+        ...input,
+      }),
+    generateGateReassessmentReport: (project, input) =>
+      generateGateReassessmentReport(project, {
         provider: textOnlyProvider,
         providerAvailable: textOnlyProviderCredentialAvailable(),
         ...input,
