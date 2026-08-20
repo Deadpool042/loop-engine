@@ -55,6 +55,7 @@ describe("GUI planning display", () => {
         roadmapDetail: "Aucune roadmap requise.",
         blockedGates: [],
         showRoadmapProposalAction: false,
+        showGateReassessmentAction: false,
       },
     );
   });
@@ -80,6 +81,7 @@ describe("GUI planning display", () => {
         description: "Aucun travail restant.",
         blockedGates: [],
         showRoadmapProposalAction: true,
+        showGateReassessmentAction: false,
       },
     );
   });
@@ -102,6 +104,7 @@ describe("GUI planning display", () => {
         description: "La roadmap est à jour et aucun candidat n’est admissible.",
         blockedGates: [],
         showRoadmapProposalAction: false,
+        showGateReassessmentAction: false,
       },
     );
   });
@@ -134,6 +137,7 @@ describe("GUI planning display", () => {
           "H5 · h4-and-adr-iac",
         ],
         showRoadmapProposalAction: false,
+        showGateReassessmentAction: true,
       },
     );
   });

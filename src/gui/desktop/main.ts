@@ -20,6 +20,8 @@ import {
   DESKTOP_ROADMAP_PROPOSAL_TIMEOUT_MS,
 } from "./roadmap-proposal-handler.js";
 import { createRoadmapProposalEstimateHandler } from "./roadmap-proposal-estimate-handler.js";
+import { createGateReassessmentHandler, DESKTOP_GATE_REASSESSMENT_TIMEOUT_MS } from "./gate-reassessment-handler.js";
+import { createGateReassessmentEstimateHandler } from "./gate-reassessment-estimate-handler.js";
 import { createReviewHandler } from "./review-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 
@@ -27,6 +29,7 @@ const cliInvoker = createCliInvoker();
 const roadmapProposalCliInvoker = createCliInvoker({
   timeoutMs: DESKTOP_ROADMAP_PROPOSAL_TIMEOUT_MS + 5_000,
 });
+const gateReassessmentCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_GATE_REASSESSMENT_TIMEOUT_MS + 5_000 });
 const executionCloseGuard = createExecutionWindowCloseGuard();
 let mainWindow: BrowserWindow | null = null;
 
@@ -145,6 +148,10 @@ const roadmapProposalEstimateHandler = createRoadmapProposalEstimateHandler({
 ipcMain.handle("loop:roadmap-proposal-estimate", (_event, projectName) =>
   roadmapProposalEstimateHandler(projectName),
 );
+const gateReassessmentHandler = createGateReassessmentHandler({ cliInvoker: gateReassessmentCliInvoker, resolveRepositoryPath, keychainReader: createProviderKeychainReader() });
+ipcMain.handle("loop:gate-reassessment", (_event, projectName, profileOverride) => gateReassessmentHandler(projectName, profileOverride));
+const gateReassessmentEstimateHandler = createGateReassessmentEstimateHandler({ cliInvoker, resolveRepositoryPath });
+ipcMain.handle("loop:gate-reassessment-estimate", (_event, projectName) => gateReassessmentEstimateHandler(projectName));
 
 ipcMain.handle("loop:execution-start", (_event, request) =>
   startExecutionSession(request),

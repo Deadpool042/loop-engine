@@ -50,6 +50,7 @@ import {
   printRoadmapProposalEstimate,
   printRoadmapProposalEstimateJson,
 } from "./commands/roadmap-propose-estimate.js";
+import { printGateReassessment, printGateReassessmentEstimateJson, printGateReassessmentJson } from "./commands/gate-reassess.js";
 import { ANTHROPIC_EFFORT_VALUES } from "./text-only-provider/index.js";
 import {
   printAuditReport,
@@ -240,6 +241,16 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   json
     ? await printRoadmapProposalJson(application, project, input)
     : await printRoadmapProposal(application, project, input);
+} else if (command === "roadmap" && process.argv[3] === "reassess-gates-estimate") {
+  const project = resolveProjectOrExit("roadmap reassess-gates-estimate", 4);
+  printGateReassessmentEstimateJson(application, project);
+} else if (command === "roadmap" && process.argv[3] === "reassess-gates") {
+  const json = process.argv.includes("--json"); const project = resolveProjectOrExit("roadmap reassess-gates", 4);
+  const provider = optionValue("--provider"); const model = optionValue("--provider-model"); const effort = optionValue("--provider-effort"); const timeoutMs = Number(optionValue("--provider-timeout-ms") ?? "60000");
+  if (provider !== "anthropic_api") failOption(json, "unsupported_provider", "--provider anthropic_api is required.");
+  if (effort !== undefined && (!model || !(ANTHROPIC_EFFORT_VALUES as readonly string[]).includes(effort))) failOption(json, "invalid_provider_effort", "Invalid --provider-effort value.");
+  const input = { ...(model ? { model } : {}), ...(effort ? { effort: effort as (typeof ANTHROPIC_EFFORT_VALUES)[number] } : {}), timeoutMs };
+  json ? await printGateReassessmentJson(application, project, input) : await printGateReassessment(application, project, input);
 } else if (command === "roadmap") {
   terminal.error(
     "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json] | roadmap propose-estimate <project> [--json] | roadmap propose <project> --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>] [--json]",

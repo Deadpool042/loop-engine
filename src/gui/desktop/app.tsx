@@ -36,6 +36,7 @@ import {
   type RoadmapProposalEstimateReport,
 } from "./roadmap-proposal-estimate-contract.js";
 import type { CliInvocationResult } from "../cli-invoker.js";
+import { parseGateReassessmentReport, type GateReassessmentReport } from "./gate-reassessment-contract.js";
 
 const ROADMAP_PROPOSAL_PROFILE_LABELS: Readonly<Record<string, string>> = {
   economy: "Économique",
@@ -268,6 +269,9 @@ export function App(): React.JSX.Element {
   const [proposalEstimateError, setProposalEstimateError] = useState<
     string | null
   >(null);
+  const [gateReassessmentReport, setGateReassessmentReport] = useState<GateReassessmentReport | null>(null);
+  const [gateReassessmentProjectName, setGateReassessmentProjectName] = useState<string | null>(null);
+  const [gateReassessmentLoading, setGateReassessmentLoading] = useState(false);
   const planRequestId = useRef(0);
   const selectedProject =
     projects.find((project) => project.project.name === selectedProjectName) ??
@@ -449,6 +453,17 @@ export function App(): React.JSX.Element {
     proposalEstimateError,
   ]);
 
+  useEffect(() => {
+    if (selectedProjectName === null || !planningDisplay?.showGateReassessmentAction) return;
+    if (proposalEstimateProjectName === selectedProjectName || proposalEstimateError !== null) return;
+    const projectName = selectedProjectName;
+    void window.loopDesktop.gateReassessmentEstimate(projectName).then((result) => {
+      if (!result.ok || !shouldDisplayRoadmapProposalResult(projectName, selectedProjectNameRef.current)) return;
+      const report = parseRoadmapProposalEstimateReport(result.json);
+      if (report !== null) { setProposalEstimateReport(report); setProposalEstimateProjectName(projectName); }
+    });
+  }, [selectedProjectName, planningDisplay?.showGateReassessmentAction, proposalEstimateProjectName, proposalEstimateError]);
+
   function selectProject(projectName: string): void {
     planRequestId.current += 1;
     setPlanDetail(null);
@@ -465,6 +480,14 @@ export function App(): React.JSX.Element {
   function analyzeRoadmapContinuation(): void {
     if (selectedProjectName === null) return;
     void proposalRunner.start(selectedProjectName, proposalProfileSelection);
+  }
+  function reassessGates(): void {
+    if (selectedProjectName === null || gateReassessmentLoading) return;
+    const projectName = selectedProjectName; setGateReassessmentLoading(true); setGateReassessmentReport(null); setGateReassessmentProjectName(null);
+    void window.loopDesktop.gateReassessment(projectName, proposalProfileSelection).then((result) => {
+      if (!shouldDisplayRoadmapProposalResult(projectName, selectedProjectNameRef.current) || !result.ok) return;
+      const report = parseGateReassessmentReport(result.json); if (report !== null) { setGateReassessmentReport(report); setGateReassessmentProjectName(projectName); }
+    }).finally(() => setGateReassessmentLoading(false));
   }
 
   function selectProposalProfile(value: string): void {
@@ -1164,6 +1187,15 @@ export function App(): React.JSX.Element {
                                         )}
                                     </div>
                                   )}
+                              </div>
+                            )}
+                            {planningDisplay.showGateReassessmentAction && (
+                              <div className="mt-5">
+                                {availableProposalEstimate && selectedProposalEstimate && <div className="mb-4 grid gap-2 text-xs text-loop-muted"><label className="grid max-w-xs gap-1"><span>Profil utilisé</span><select value={proposalProfileSelection} onChange={(event) => selectProposalProfile(event.currentTarget.value)} className="rounded-md border border-loop-line bg-white px-3 py-2 text-sm font-medium text-loop-ink"><option value="auto">Automatique</option><option value="economy">Économique</option><option value="balanced">Équilibré</option><option value="deep">Approfondi</option></select></label><span>Profil recommandé : <b>{ROADMAP_PROPOSAL_PROFILE_LABELS[availableProposalEstimate.profile]}</b></span><span>Modèle : {selectedProposalEstimate.model}</span><span>Effort : {selectedProposalEstimate.effort ?? "—"}</span><span>Entrée estimée : ~{selectedProposalEstimate.estimatedInputTokens} tokens</span><span>Sortie estimée : ~{selectedProposalEstimate.estimatedOutputTokens} tokens</span>{selectedProposalEstimate.estimatedCostUsd !== undefined && <span>Coût estimé : ~${selectedProposalEstimate.estimatedCostUsd.toFixed(4)}</span>}</div>}
+                                <Button type="button" disabled={gateReassessmentLoading} onClick={reassessGates}>{gateReassessmentLoading ? "Réévaluation…" : "Réévaluer les conditions"}</Button>
+                                {gateReassessmentReport && gateReassessmentProjectName === selectedProjectName && gateReassessmentReport.result.status === "completed" && gateReassessmentReport.assessment && (
+                                  <div className="mt-4 rounded-lg border border-loop-line bg-white p-5 text-sm"><p className="m-0 font-semibold">{gateReassessmentReport.assessment.status === "no_new_signal" ? "Aucun signal nouveau" : "Revue manuelle recommandée"}</p><p className="mt-2 text-loop-muted">{gateReassessmentReport.assessment.reason}</p><p className="mt-2 text-xs text-loop-muted">{gateReassessmentReport.result.provider} · {gateReassessmentReport.result.model} · effort {gateReassessmentReport.result.effort ?? "—"} · {gateReassessmentReport.result.durationMs} ms{gateReassessmentReport.result.usage && ` · ${gateReassessmentReport.result.usage.inputTokens} entrée / ${gateReassessmentReport.result.usage.outputTokens} sortie`}{gateReassessmentReport.result.actualCalculatedCostUsd !== undefined && ` · coût réel calculé $${gateReassessmentReport.result.actualCalculatedCostUsd.toFixed(4)}`}</p>{gateReassessmentReport.assessment.status === "review_recommended" && <ul className="mt-2 space-y-2 text-loop-muted">{gateReassessmentReport.assessment.gates.map((gate) => <li key={`${gate.phase}:${gate.blockedBy}`}>{gate.phase} · {gate.blockedBy} — {gate.observedSignal}<br />{gate.recommendation}</li>)}</ul>}</div>
+                                )}
                               </div>
                             )}
                           </section>
