@@ -13,6 +13,7 @@ import {
   generateProjectReport,
   generateRoadmapPlanningStatusReport,
   generateRoadmapProposalContextReport,
+  generateRoadmapProposalReport,
   generateProjectValidationReport,
   generateRagIndex,
   generateRagSearchReport,
@@ -34,6 +35,11 @@ import {
   type LoopExecutor,
 } from "../core/index.js";
 import type { AgentRegistry } from "../agents/registry.js";
+import {
+  createAnthropicApiProvider,
+  hasAnthropicApiCredential,
+  type TextOnlyProvider,
+} from "../text-only-provider/index.js";
 import { createLoopProviderFailoverAssembly } from "./provider-failover-assembly.js";
 import {
   createIsolatedProviderRunExecute,
@@ -66,6 +72,8 @@ export type LoopApplicationAssemblyOptions = Readonly<{
   providerRegistry?: LoopProviderRegistry;
   providerAssemblies?: readonly LoopProviderAssembly[];
   maxProviderAttempts?: number;
+  textOnlyProvider?: TextOnlyProvider;
+  textOnlyProviderCredentialAvailable?: () => boolean;
   /** @deprecated Prefer provider: { id: "codex", ... }. */
   codexProvider?: LoopApplicationCodexProviderOptions;
   /** @deprecated Prefer provider: { id: "claude_code", ... }. */
@@ -92,6 +100,10 @@ export type LoopApplicationAssembly = Readonly<{
   generateProjectReport: typeof generateProjectReport;
   generateRoadmapPlanningStatusReport: typeof generateRoadmapPlanningStatusReport;
   generateRoadmapProposalContextReport: typeof generateRoadmapProposalContextReport;
+  generateRoadmapProposalReport: (
+    project: LoopApplicationProject,
+    input: Readonly<{ model: string; timeoutMs: number }>,
+  ) => ReturnType<typeof generateRoadmapProposalReport>;
   generateProjectValidationReport: typeof generateProjectValidationReport;
   generateRagIndex: typeof generateRagIndex;
   generateRagSearchReport: typeof generateRagSearchReport;
@@ -199,6 +211,10 @@ export function createLoopApplicationAssembly(
           ...(options.isolatedProviderExecution ?? {}),
         });
 
+  const textOnlyProvider = options.textOnlyProvider ?? createAnthropicApiProvider();
+  const textOnlyProviderCredentialAvailable =
+    options.textOnlyProviderCredentialAvailable ?? (() => hasAnthropicApiCredential());
+
   return Object.freeze({
     findProject,
     generateAuditReport,
@@ -213,6 +229,12 @@ export function createLoopApplicationAssembly(
     generateProjectReport,
     generateRoadmapPlanningStatusReport,
     generateRoadmapProposalContextReport,
+    generateRoadmapProposalReport: (project, input) =>
+      generateRoadmapProposalReport(project, {
+        provider: textOnlyProvider,
+        providerAvailable: textOnlyProviderCredentialAvailable(),
+        ...input,
+      }),
     generateProjectValidationReport,
     generateRagIndex,
     generateRagSearchReport,

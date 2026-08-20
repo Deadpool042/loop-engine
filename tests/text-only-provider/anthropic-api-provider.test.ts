@@ -78,6 +78,67 @@ describe("Anthropic API text-only provider", () => {
     assert.equal("thinking" in body, false);
   });
 
+  it("adds a schema only as constrained output, never as a tool", async () => {
+    let request: TextOnlyHttpRequest | null = null;
+    const provider = providerWith(async (received) => {
+      request = received;
+      return new Response(JSON.stringify({ content: [{ type: "text", text: "{}" }] }));
+    });
+    await provider.invoke({ ...validInput, outputSchema: { schema: { type: "object", additionalProperties: false } } });
+    assert.ok(request);
+    const body = JSON.parse(request.body) as Record<string, unknown>;
+    assert.equal("tools" in body, false);
+    assert.deepEqual(body.tool_choice, { type: "none" });
+    assert.deepEqual(body.output_config, { format: { type: "json_schema", schema: { type: "object", additionalProperties: false } } });
+  });
+
+  it("removes Anthropic-unsupported length constraints from the transmitted schema", async () => {
+    let request: TextOnlyHttpRequest | null = null;
+    const provider = providerWith(async (received) => {
+      request = received;
+      return new Response(JSON.stringify({ content: [{ type: "text", text: "{}" }] }));
+    });
+
+    await provider.invoke({
+      ...validInput,
+      outputSchema: {
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name", "items"],
+          properties: {
+            name: { type: "string", maxLength: 160 },
+            items: {
+              type: "array",
+              maxItems: 3,
+              items: { type: "string", maxLength: 500 },
+            },
+          },
+        },
+      },
+    });
+
+    assert.ok(request);
+    const body = JSON.parse(request.body) as Record<string, unknown>;
+    assert.deepEqual(body.output_config, {
+      format: {
+        type: "json_schema",
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name", "items"],
+          properties: {
+            name: { type: "string" },
+            items: {
+              type: "array",
+              items: { type: "string" },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it("keeps an adversarial context as inert user text without granting tools", async () => {
     let request: TextOnlyHttpRequest | null = null;
     const provider = providerWith(async (received) => {
