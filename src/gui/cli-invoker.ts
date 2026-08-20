@@ -79,6 +79,26 @@ function executeCliProcess(
   });
 }
 
+const REDACTED_PLACEHOLDER = "[redacted]";
+
+function redactSecrets(
+  raw: string,
+  env: Readonly<Record<string, string>> | undefined,
+): string {
+  if (env === undefined) {
+    return raw;
+  }
+
+  let redacted = raw;
+  for (const value of Object.values(env)) {
+    if (value.length === 0) {
+      continue;
+    }
+    redacted = redacted.split(value).join(REDACTED_PLACEHOLDER);
+  }
+  return redacted;
+}
+
 export type CliInvoker = Readonly<{
   invoke: (
     command: string,
@@ -117,14 +137,20 @@ export function createCliInvoker(options: {
           return Object.freeze({
             ok: false as const,
             kind: "spawn-error" as const,
-            raw: result.stderr || result.stdout || "CLI returned invalid JSON.",
+            raw: redactSecrets(
+              result.stderr || result.stdout || "CLI returned invalid JSON.",
+              env,
+            ),
           });
         }
       } catch (error) {
         return Object.freeze({
           ok: false as const,
           kind: "spawn-error" as const,
-          raw: error instanceof Error ? error.message : "CLI invocation failed.",
+          raw: redactSecrets(
+            error instanceof Error ? error.message : "CLI invocation failed.",
+            env,
+          ),
         });
       }
     },

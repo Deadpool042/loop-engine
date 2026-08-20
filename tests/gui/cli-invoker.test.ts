@@ -88,4 +88,71 @@ describe("GUI CliInvoker", () => {
       raw: "CLI invocation timed out.",
     });
   });
+
+  it("redacts an injected secret leaked in stderr on invalid JSON", async () => {
+    const invoker = createCliInvoker({
+      execute: async () => ({
+        stdout: "not-json",
+        stderr: "boom: sk-test-FAKE-SECRET-VALUE leaked",
+        exitCode: 2,
+      }),
+    });
+
+    const result = await invoker.invoke("roadmap", ["propose", "loop-engine"], "/repo", {
+      ANTHROPIC_API_KEY: "sk-test-FAKE-SECRET-VALUE",
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.doesNotMatch(result.raw, /sk-test-FAKE-SECRET-VALUE/);
+    assert.match(result.raw, /\[redacted\]/);
+  });
+
+  it("redacts an injected secret leaked in stdout on invalid JSON", async () => {
+    const invoker = createCliInvoker({
+      execute: async () => ({
+        stdout: "not-json but contains sk-test-FAKE-SECRET-VALUE here",
+        stderr: "",
+        exitCode: 2,
+      }),
+    });
+
+    const result = await invoker.invoke("roadmap", ["propose", "loop-engine"], "/repo", {
+      ANTHROPIC_API_KEY: "sk-test-FAKE-SECRET-VALUE",
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.doesNotMatch(result.raw, /sk-test-FAKE-SECRET-VALUE/);
+    assert.match(result.raw, /\[redacted\]/);
+  });
+
+  it("redacts an injected secret leaked in a spawn Error.message", async () => {
+    const invoker = createCliInvoker({
+      execute: async () => {
+        throw new Error("spawn failed with key sk-test-FAKE-SECRET-VALUE");
+      },
+    });
+
+    const result = await invoker.invoke("roadmap", ["propose", "loop-engine"], "/repo", {
+      ANTHROPIC_API_KEY: "sk-test-FAKE-SECRET-VALUE",
+    });
+
+    assert.equal(result.ok, false);
+    if (result.ok) return;
+    assert.doesNotMatch(result.raw, /sk-test-FAKE-SECRET-VALUE/);
+    assert.match(result.raw, /\[redacted\]/);
+  });
+
+  it("keeps legacy raw error behavior for invocations without a secret env", async () => {
+    const invoker = createCliInvoker({
+      execute: async () => ({ stdout: "not-json", stderr: "raw stderr", exitCode: 2 }),
+    });
+
+    assert.deepEqual(await invoker.invoke("summary", [], "/repo"), {
+      ok: false,
+      kind: "spawn-error",
+      raw: "raw stderr",
+    });
+  });
 });
