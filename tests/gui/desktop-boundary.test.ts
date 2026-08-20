@@ -23,6 +23,7 @@ describe("GUI desktop execution boundary", () => {
     assert.equal(api.execute.length, 1);
     assert.equal(api.startExecution.length, 1);
     assert.equal(api.executionSession.length, 1);
+    assert.equal(api.roadmapProposal.length, 1);
     await api.summary();
     await api.context("loop-engine");
     await api.review("loop-engine");
@@ -30,6 +31,7 @@ describe("GUI desktop execution boundary", () => {
     await api.execute({ projectName: "lp-infra", candidateId: "H1-L4", provider: "codex", model: "gpt-5.6-terra" });
     await api.startExecution({ projectName: "lp-infra", candidateId: "H1-L4", provider: "codex", model: "gpt-5.6-terra" });
     await api.executionSession("session-1");
+    await api.roadmapProposal("loop-engine");
     assert.deepEqual(calls, [
       ["loop:summary"],
       ["loop:context", "loop-engine"],
@@ -38,7 +40,19 @@ describe("GUI desktop execution boundary", () => {
       ["loop:execute", { projectName: "lp-infra", candidateId: "H1-L4", provider: "codex", model: "gpt-5.6-terra" }],
       ["loop:execution-start", { projectName: "lp-infra", candidateId: "H1-L4", provider: "codex", model: "gpt-5.6-terra" }],
       ["loop:execution-session", "session-1"],
+      ["loop:roadmap-proposal", "loop-engine"],
     ]);
+  });
+
+  it("only accepts a project name for roadmapProposal, never provider/model/timeout/credential", async () => {
+    const calls: Array<readonly unknown[]> = [];
+    const api = createLoopDesktopApi(async (channel, ...args) => {
+      calls.push([channel, ...args]);
+      return { ok: false, kind: "spawn-error", raw: "unavailable" };
+    });
+
+    await api.roadmapProposal("loop-engine");
+    assert.deepEqual(calls, [["loop:roadmap-proposal", "loop-engine"]]);
   });
 
   it("returns the summary invocation result through the renderer bridge", async () => {
@@ -88,7 +102,21 @@ describe("GUI desktop execution boundary", () => {
     );
     assert.match(mainSource, /ipcMain\.handle\("loop:execution-start", \(_event, request\) => startExecutionSession\(request\)\)/s);
     assert.match(mainSource, /ipcMain\.handle\("loop:execution-session", \(_event, sessionId\) => executionSessions\.get\(sessionId\)\)/s);
+    assert.match(
+      mainSource,
+      /ipcMain\.handle\("loop:roadmap-proposal", \(_event, projectName\) =>\s*roadmapProposalHandler\(projectName\),\s*\)/s,
+    );
     assert.doesNotMatch(mainSource, /ipcMain\.handle\("loop:command"/);
+  });
+
+  it("does not let the main process wire provider, model, or timeout from an untrusted source for the proposal handler", () => {
+    const mainSource = readFileSync(
+      new URL("../../src/gui/desktop/main.ts", import.meta.url),
+      "utf8",
+    );
+
+    assert.match(mainSource, /createRoadmapProposalHandler\(\{/);
+    assert.match(mainSource, /keychainReader: createProviderKeychainReader\(\)/);
   });
 
   it("passes the renderer project name to review while retaining the trusted cwd", async () => {

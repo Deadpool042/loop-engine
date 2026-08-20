@@ -25,6 +25,7 @@ type ExecuteCli = (
   args: readonly string[],
   cwd: string,
   timeoutMs: number,
+  env?: Readonly<Record<string, string>>,
 ) => Promise<ExecuteResult>;
 
 function executeCliProcess(
@@ -32,6 +33,7 @@ function executeCliProcess(
   args: readonly string[],
   cwd: string,
   timeoutMs: number,
+  env?: Readonly<Record<string, string>>,
 ): Promise<ExecuteResult> {
   return new Promise((resolve, reject) => {
     execFile(
@@ -42,6 +44,7 @@ function executeCliProcess(
         encoding: "utf8",
         timeout: timeoutMs,
         maxBuffer: 20 * 1024 * 1024,
+        ...(env === undefined ? {} : { env: { ...process.env, ...env } }),
       },
       (error, stdout, stderr) => {
         if (!error) {
@@ -81,6 +84,7 @@ export type CliInvoker = Readonly<{
     command: string,
     args: readonly string[],
     cwd: string,
+    env?: Readonly<Record<string, string>>,
   ) => Promise<CliInvocationResult>;
 }>;
 
@@ -98,11 +102,11 @@ export function createCliInvoker(options: {
   }
 
   return Object.freeze({
-    async invoke(command, args, cwd) {
+    async invoke(command, args, cwd, env) {
       const invocationArgs = ["--silent", "loop", command, ...args, "--json"];
 
       try {
-        const result = await execute(executable, invocationArgs, cwd, timeoutMs);
+        const result = await execute(executable, invocationArgs, cwd, timeoutMs, env);
         try {
           return Object.freeze({
             ok: true as const,

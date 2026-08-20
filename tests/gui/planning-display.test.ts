@@ -54,6 +54,7 @@ describe("GUI planning display", () => {
         description: "Aucun travail planifié actuellement.",
         roadmapDetail: "Aucune roadmap requise.",
         blockedGates: [],
+        showRoadmapProposalAction: false,
       },
     );
   });
@@ -78,6 +79,7 @@ describe("GUI planning display", () => {
         heading: "Roadmap terminée",
         description: "Aucun travail restant.",
         blockedGates: [],
+        showRoadmapProposalAction: true,
       },
     );
   });
@@ -99,6 +101,7 @@ describe("GUI planning display", () => {
         heading: "Aucun travail à lancer",
         description: "La roadmap est à jour et aucun candidat n’est admissible.",
         blockedGates: [],
+        showRoadmapProposalAction: false,
       },
     );
   });
@@ -130,7 +133,27 @@ describe("GUI planning display", () => {
           "H4 · retours-terrain-2027",
           "H5 · h4-and-adr-iac",
         ],
+        showRoadmapProposalAction: false,
       },
+    );
+  });
+
+  it("hides the roadmap proposal action outside roadmap mode even with todo: 0", () => {
+    assert.equal(
+      getPlanningDisplay(
+        context({
+          planning: {
+            mode: "deferred",
+            roadmapConfigured: true,
+            recommendation: "no_admissible_candidate",
+          },
+          roadmap: {
+            ...context().roadmap,
+            stats: { ...context().roadmap.stats!, todo: 0 },
+          },
+        }),
+      ).showRoadmapProposalAction,
+      false,
     );
   });
 

@@ -13,11 +13,12 @@ export type LoopDesktopApi = Readonly<{
   execute: (request: DesktopExecuteRequest) => Promise<CliInvocationResult>;
   startExecution: (request: DesktopExecuteRequest) => Promise<DesktopExecutionSessionStart>;
   executionSession: (sessionId: string) => Promise<DesktopExecutionSession | null>;
+  roadmapProposal: (projectName: string) => Promise<CliInvocationResult>;
 }>;
 
 export function createLoopDesktopApi(
   invoke: (
-    channel: "loop:summary" | "loop:context" | "loop:review" | "loop:plan" | "loop:execute" | "loop:execution-start" | "loop:execution-session",
+    channel: "loop:summary" | "loop:context" | "loop:review" | "loop:plan" | "loop:execute" | "loop:execution-start" | "loop:execution-session" | "loop:roadmap-proposal",
     ...args: readonly unknown[]
   ) => Promise<CliInvocationResult>,
 ): LoopDesktopApi {
@@ -42,6 +43,9 @@ export function createLoopDesktopApi(
     },
     executionSession(sessionId) {
       return invoke("loop:execution-session", sessionId) as unknown as Promise<DesktopExecutionSession | null>;
+    },
+    roadmapProposal(projectName) {
+      return invoke("loop:roadmap-proposal", projectName);
     },
   });
 }

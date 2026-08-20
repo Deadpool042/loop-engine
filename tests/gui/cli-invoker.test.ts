@@ -60,6 +60,20 @@ describe("GUI CliInvoker", () => {
     });
   });
 
+  it("forwards an explicit env override to the executor without requiring it by default", async () => {
+    const invoker = createCliInvoker({
+      execute: async (_executable, _args, _cwd, _timeoutMs, env) => {
+        assert.deepEqual(env, { ANTHROPIC_API_KEY: "secret-value" });
+        return { stdout: "{}", stderr: "", exitCode: 0 };
+      },
+    });
+
+    const result = await invoker.invoke("roadmap", ["propose", "loop-engine"], "/repo", {
+      ANTHROPIC_API_KEY: "secret-value",
+    });
+    assert.equal(result.ok, true);
+  });
+
   it("returns spawn-error for spawn failures and timeouts", async () => {
     const invoker = createCliInvoker({
       timeoutMs: 50,
