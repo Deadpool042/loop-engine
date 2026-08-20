@@ -1,0 +1,9 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { createExecutionDecisionDraft } from "../../src/governance/execution-decision-draft.js";
+
+const local = { project: "lp-infra", projectPath: "/tmp/lp-infra", candidateId: "H4-L1", sourceDocument: "roadmap.md", gitHead: "a".repeat(40), executionDecisionPath: ".governance/execution-decision.yaml" };
+const valid = { objective: "Draft ADR", deliverables: ["ADR"], outOfScope: ["No execution"], allowedPaths: ["ADR/0007.md"] };
+test("creates a locally-bound draft without accepting provider authority", () => { const result = createExecutionDecisionDraft(local, valid); assert.equal(result.ok, true); if (result.ok) assert.deepEqual(result.draft.allowedPaths, ["ADR/0007.md"]); });
+for (const [name, proposal] of [["rejects another candidate", { ...valid, candidateId: "H4-L2" }], ["rejects invalid scope", { ...valid, allowedPaths: ["../x"] }], ["rejects git scope", { ...valid, allowedPaths: [".git/config"] }], ["rejects recursive git scope", { ...valid, allowedPaths: [".git/**"] }], ["rejects decision file scope", { ...valid, allowedPaths: [".governance/execution-decision.yaml"] }], ["rejects recursive decision parent scope", { ...valid, allowedPaths: [".governance/**"] }]] as const) test(name, () => assert.equal(createExecutionDecisionDraft(local, proposal).ok, false));
+for (const [name, localBinding] of [["rejects invalid local SHA", { ...local, gitHead: "not-a-sha" }], ["rejects empty local project", { ...local, project: "" }], ["rejects absolute local decision path", { ...local, executionDecisionPath: "/decision.yml" }]] as const) test(name, () => assert.equal(createExecutionDecisionDraft(localBinding, valid).ok, false));

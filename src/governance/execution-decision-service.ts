@@ -1,0 +1,19 @@
+import { prepareStoredExecutionDecisionDraft, serializeReadyExecutionDecision, type ExecutionDecisionDraftStore } from "./execution-decision-approval.js";
+import type { ExecutionDecisionDraft } from "./execution-decision-draft.js";
+
+export type ExecutionDecisionCurrent = Readonly<{ project: string; projectPath: string; candidateId: string; gitHead: string; sourceDocument: string; executionDecisionPath: string }>;
+export type ExecutionDecisionProviderProposal = Readonly<{ objective: unknown; deliverables: unknown; outOfScope: unknown; allowedPaths: unknown; forbiddenContentTerms?: unknown }>;
+export type ExecutionDecisionServicePorts = Readonly<{
+  current: (projectName: string) => Promise<ExecutionDecisionCurrent | null>;
+  propose: (current: ExecutionDecisionCurrent) => Promise<ExecutionDecisionProviderProposal>;
+  publishTransaction: (current: ExecutionDecisionCurrent, contents: string) => Promise<Readonly<{ ok: true; commit: () => boolean; recover: () => boolean }> | Readonly<{ ok: false }>>;
+  validate: (current: ExecutionDecisionCurrent, draft: ExecutionDecisionDraft) => Promise<boolean>;
+}>;
+const failure = (code: string) => ({ ok: false as const, code });
+export function isRenewableExecutionDecisionCode(code: unknown): boolean { return code === "decision_missing" || code === "sha_stale" || code === "decision_revalidation_required" || code === "candidate_authorization_mismatch"; }
+export function createExecutionDecisionService(ports: ExecutionDecisionServicePorts, store: ExecutionDecisionDraftStore) {
+  return Object.freeze({
+    async prepare(projectName: unknown) { if (typeof projectName !== "string") return failure("decision_draft_invalid"); const current = await ports.current(projectName); if (!current) return failure("decision_draft_stale"); const proposal = await ports.propose(current); const result = prepareStoredExecutionDecisionDraft({ ...current }, proposal, store); if (!result.ok) return result; return { ok: true as const, draftId: result.draftId, candidateId: result.draft.candidateId, objective: result.draft.objective, deliverables: result.draft.deliverables, outOfScope: result.draft.outOfScope, allowedPaths: result.draft.allowedPaths, gitHead: result.draft.gitHead, sourceDocument: result.draft.sourceDocument }; },
+    async approve(draftId: unknown) { const stored = store.get(draftId); if (!stored || typeof draftId !== "string") return failure("decision_draft_missing"); const current = await ports.current(stored.draft.project); if (!current || current.project !== stored.draft.project || current.projectPath !== stored.projectPath || current.candidateId !== stored.draft.candidateId || current.gitHead !== stored.draft.gitHead || current.executionDecisionPath !== stored.executionDecisionPath) return failure("decision_draft_stale"); const publication = await ports.publishTransaction(current, serializeReadyExecutionDecision(stored.draft)); if (!publication.ok) return failure("decision_draft_write_failed"); if (!(await ports.validate(current, stored.draft))) return publication.recover() ? failure("decision_draft_post_write_invalid") : failure("decision_draft_recovery_failed"); if (!publication.commit()) return failure("decision_draft_recovery_failed"); store.consume(draftId); return { ok: true as const }; },
+  });
+}
