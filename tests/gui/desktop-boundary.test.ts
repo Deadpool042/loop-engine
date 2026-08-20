@@ -23,7 +23,7 @@ describe("GUI desktop execution boundary", () => {
     assert.equal(api.execute.length, 1);
     assert.equal(api.startExecution.length, 1);
     assert.equal(api.executionSession.length, 1);
-    assert.equal(api.roadmapProposal.length, 1);
+    assert.equal(api.roadmapProposal.length, 2);
     assert.equal(api.roadmapProposalEstimate.length, 1);
     await api.summary();
     await api.context("loop-engine");
@@ -42,7 +42,7 @@ describe("GUI desktop execution boundary", () => {
       model: "gpt-5.6-terra",
     });
     await api.executionSession("session-1");
-    await api.roadmapProposal("loop-engine");
+    await api.roadmapProposal("loop-engine", "auto");
     await api.roadmapProposalEstimate("loop-engine");
     assert.deepEqual(calls, [
       ["loop:summary"],
@@ -68,20 +68,20 @@ describe("GUI desktop execution boundary", () => {
         },
       ],
       ["loop:execution-session", "session-1"],
-      ["loop:roadmap-proposal", "loop-engine"],
+      ["loop:roadmap-proposal", "loop-engine", "auto"],
       ["loop:roadmap-proposal-estimate", "loop-engine"],
     ]);
   });
 
-  it("only accepts a project name for roadmapProposal, never provider/model/timeout/credential", async () => {
+  it("only accepts project name plus a closed profile selection for roadmapProposal, never provider/model/timeout/credential", async () => {
     const calls: Array<readonly unknown[]> = [];
     const api = createLoopDesktopApi(async (channel, ...args) => {
       calls.push([channel, ...args]);
       return { ok: false, kind: "spawn-error", raw: "unavailable" };
     });
 
-    await api.roadmapProposal("loop-engine");
-    assert.deepEqual(calls, [["loop:roadmap-proposal", "loop-engine"]]);
+    await api.roadmapProposal("loop-engine", "auto");
+    assert.deepEqual(calls, [["loop:roadmap-proposal", "loop-engine", "auto"]]);
   });
 
   it("returns the summary invocation result through the renderer bridge", async () => {
@@ -139,7 +139,7 @@ describe("GUI desktop execution boundary", () => {
     );
     assert.match(
       mainSource,
-      /ipcMain\.handle\("loop:roadmap-proposal", \(_event, projectName\) =>\s*roadmapProposalHandler\(projectName\),\s*\)/s,
+      /ipcMain\.handle\(\s*"loop:roadmap-proposal",\s*\(_event, projectName, profileOverride\) =>\s*roadmapProposalHandler\(projectName, profileOverride\),\s*\)/s,
     );
     assert.match(
       mainSource,

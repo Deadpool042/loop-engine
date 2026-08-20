@@ -21,6 +21,7 @@ export type RoadmapProposal =
     }>;
 
 export type RoadmapProposalProfile = "economy" | "balanced" | "deep";
+export type RoadmapProposalProfileOverride = "auto" | RoadmapProposalProfile;
 export type AnthropicEffort = "low" | "medium" | "high" | "xhigh" | "max";
 export type RoadmapProposalUsage = Readonly<{
   inputTokens: number;

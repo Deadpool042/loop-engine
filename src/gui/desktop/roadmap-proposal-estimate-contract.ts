@@ -2,6 +2,17 @@ import type {
   RoadmapProposalProfile,
   AnthropicEffort,
 } from "./roadmap-proposal-contract.js";
+import { resolveRoadmapProposalProfile } from "../../intelligence/roadmap-proposal-routing.js";
+
+export type RoadmapProposalEstimateOption = Readonly<{
+  profile: RoadmapProposalProfile;
+  model: string;
+  effort: AnthropicEffort | null;
+  estimatedInputTokens: number;
+  estimatedOutputTokens: number;
+  estimatedCostUsd?: number;
+  pricingEffectiveDate?: string;
+}>;
 
 export type RoadmapProposalEstimateReport = Readonly<{
   schemaVersion: 1;
@@ -18,6 +29,7 @@ export type RoadmapProposalEstimateReport = Readonly<{
         estimatedOutputTokens: number;
         estimatedCostUsd?: number;
         pricingEffectiveDate?: string;
+        options: readonly RoadmapProposalEstimateOption[];
       }>;
 }>;
 
@@ -42,6 +54,38 @@ function isEffort(value: unknown): value is AnthropicEffort {
 
 function isProfile(value: unknown): value is RoadmapProposalProfile {
   return value === "economy" || value === "balanced" || value === "deep";
+}
+
+function parseOption(value: unknown): RoadmapProposalEstimateOption | null {
+  if (
+    !isRecord(value) ||
+    !isProfile(value.profile) ||
+    typeof value.model !== "string" ||
+    (value.effort !== null && !isEffort(value.effort)) ||
+    typeof value.estimatedInputTokens !== "number" ||
+    typeof value.estimatedOutputTokens !== "number"
+  ) {
+    return null;
+  }
+
+  const canonical = resolveRoadmapProposalProfile(value.profile);
+  if (value.model !== canonical.model || value.effort !== canonical.effort) {
+    return null;
+  }
+
+  return Object.freeze({
+    profile: value.profile,
+    model: value.model,
+    effort: value.effort,
+    estimatedInputTokens: value.estimatedInputTokens,
+    estimatedOutputTokens: value.estimatedOutputTokens,
+    ...(typeof value.estimatedCostUsd === "number"
+      ? { estimatedCostUsd: value.estimatedCostUsd }
+      : {}),
+    ...(typeof value.pricingEffectiveDate === "string"
+      ? { pricingEffectiveDate: value.pricingEffectiveDate }
+      : {}),
+  });
 }
 
 export function parseRoadmapProposalEstimateReport(
@@ -72,7 +116,18 @@ export function parseRoadmapProposalEstimateReport(
     (estimate.effort !== null && !isEffort(estimate.effort)) ||
     typeof estimate.reason !== "string" ||
     typeof estimate.estimatedInputTokens !== "number" ||
-    typeof estimate.estimatedOutputTokens !== "number"
+    typeof estimate.estimatedOutputTokens !== "number" ||
+    !Array.isArray(estimate.options)
+  ) {
+    return null;
+  }
+
+  const options = estimate.options.map(parseOption);
+  if (
+    options.some((option) => option === null) ||
+    options.length !== 3 ||
+    new Set(options.map((option) => option!.profile)).size !== 3 ||
+    !options.some((option) => option!.profile === estimate.profile)
   ) {
     return null;
   }
@@ -94,6 +149,7 @@ export function parseRoadmapProposalEstimateReport(
       ...(typeof estimate.pricingEffectiveDate === "string"
         ? { pricingEffectiveDate: estimate.pricingEffectiveDate }
         : {}),
+      options: Object.freeze(options as RoadmapProposalEstimateOption[]),
     }),
   });
 }

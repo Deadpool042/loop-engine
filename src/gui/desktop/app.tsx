@@ -27,10 +27,12 @@ import {
 } from "./summary-contract.js";
 import {
   parseRoadmapProposalReport,
+  type RoadmapProposalProfileOverride,
   type RoadmapProposalReport,
 } from "./roadmap-proposal-contract.js";
 import {
   parseRoadmapProposalEstimateReport,
+  type RoadmapProposalEstimateOption,
   type RoadmapProposalEstimateReport,
 } from "./roadmap-proposal-estimate-contract.js";
 import type { CliInvocationResult } from "../cli-invoker.js";
@@ -107,24 +109,51 @@ export function shouldDisplayRoadmapProposalResult(
   return resultProjectName === currentSelectedProjectName;
 }
 
+type AvailableRoadmapProposalEstimate = Extract<
+  RoadmapProposalEstimateReport["estimate"],
+  { status: "available" }
+>;
+
+/** Selects a precomputed local option only; it never invokes IPC. */
+export function selectRoadmapProposalEstimate(
+  estimate: AvailableRoadmapProposalEstimate,
+  profileOverride: RoadmapProposalProfileOverride,
+): RoadmapProposalEstimateOption | null {
+  const profile =
+    profileOverride === "auto" ? estimate.profile : profileOverride;
+  return estimate.options.find((option) => option.profile === profile) ?? null;
+}
+
 export function createRoadmapProposalRunner(options: {
-  invoke: (projectName: string) => Promise<CliInvocationResult>;
+  invoke: (
+    projectName: string,
+    profileOverride: RoadmapProposalProfileOverride,
+  ) => Promise<CliInvocationResult>;
   onStart: (projectName: string) => void;
   onResult: (projectName: string, result: RoadmapProposalOutcome) => void;
-}): { start: (projectName: string) => Promise<void>; isActive: () => boolean } {
+}): {
+  start: (
+    projectName: string,
+    profileOverride: RoadmapProposalProfileOverride,
+  ) => Promise<void>;
+  isActive: () => boolean;
+} {
   let active = false;
 
   return Object.freeze({
     isActive() {
       return active;
     },
-    async start(projectName: string): Promise<void> {
+    async start(
+      projectName: string,
+      profileOverride: RoadmapProposalProfileOverride,
+    ): Promise<void> {
       if (active) return;
       active = true;
       options.onStart(projectName);
 
       try {
-        const result = await options.invoke(projectName);
+        const result = await options.invoke(projectName, profileOverride);
         if (!result.ok) {
           options.onResult(projectName, { ok: false, message: result.raw });
           return;
@@ -224,6 +253,8 @@ export function App(): React.JSX.Element {
   const [executionSession, setExecutionSession] =
     useState<DesktopExecutionSession | null>(null);
   const [proposalLoading, setProposalLoading] = useState(false);
+  const [proposalProfileSelection, setProposalProfileSelection] =
+    useState<RoadmapProposalProfileOverride>("auto");
   const [proposalReport, setProposalReport] =
     useState<RoadmapProposalReport | null>(null);
   const [proposalProjectName, setProposalProjectName] = useState<string | null>(
@@ -244,6 +275,19 @@ export function App(): React.JSX.Element {
   const selectedCandidate = contextDetail?.roadmap.selectedCandidate ?? null;
   const planningDisplay =
     contextDetail === null ? null : getPlanningDisplay(contextDetail);
+  const availableProposalEstimate =
+    proposalEstimateReport !== null &&
+    proposalEstimateProjectName === selectedProjectName &&
+    proposalEstimateReport.estimate.status === "available"
+      ? proposalEstimateReport.estimate
+      : null;
+  const selectedProposalEstimate =
+    availableProposalEstimate === null
+      ? null
+      : selectRoadmapProposalEstimate(
+          availableProposalEstimate,
+          proposalProfileSelection,
+        );
   const guidedFlowSteps = buildGuidedFlowSteps({
     hasProject: selectedProject !== null,
     contextLoading,
@@ -308,7 +352,8 @@ export function App(): React.JSX.Element {
 
   const proposalRunner = useRef(
     createRoadmapProposalRunner({
-      invoke: (projectName) => window.loopDesktop.roadmapProposal(projectName),
+      invoke: (projectName, profileOverride) =>
+        window.loopDesktop.roadmapProposal(projectName, profileOverride),
       onStart(projectName) {
         if (
           !shouldDisplayRoadmapProposalResult(
@@ -385,6 +430,7 @@ export function App(): React.JSX.Element {
     setProposalProjectName(null);
     setProposalError(null);
     setProposalLoading(proposalRunner.isActive());
+    setProposalProfileSelection("auto");
     setProposalEstimateReport(null);
     setProposalEstimateProjectName(null);
     setProposalEstimateError(null);
@@ -418,7 +464,18 @@ export function App(): React.JSX.Element {
 
   function analyzeRoadmapContinuation(): void {
     if (selectedProjectName === null) return;
-    void proposalRunner.start(selectedProjectName);
+    void proposalRunner.start(selectedProjectName, proposalProfileSelection);
+  }
+
+  function selectProposalProfile(value: string): void {
+    if (
+      value === "auto" ||
+      value === "economy" ||
+      value === "balanced" ||
+      value === "deep"
+    ) {
+      setProposalProfileSelection(value);
+    }
   }
 
   async function preparePlan(): Promise<void> {
@@ -890,59 +947,70 @@ export function App(): React.JSX.Element {
                             )}
                             {planningDisplay.showRoadmapProposalAction && (
                               <div className="mt-5">
-                                {proposalEstimateReport &&
-                                  proposalEstimateProjectName ===
-                                    selectedProjectName &&
-                                  proposalEstimateReport.estimate.status ===
-                                    "available" && (
-                                    <dl className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-loop-muted">
-                                      <dt>Profil recommandé</dt>
-                                      <dd className="text-right font-medium text-loop-ink">
-                                        {ROADMAP_PROPOSAL_PROFILE_LABELS[
-                                          proposalEstimateReport.estimate
-                                            .profile
-                                        ] ??
-                                          proposalEstimateReport.estimate
-                                            .profile}
-                                      </dd>
-                                      <dt>Modèle</dt>
-                                      <dd className="text-right font-medium text-loop-ink">
-                                        {proposalEstimateReport.estimate.model}
-                                        {proposalEstimateReport.estimate.effort
-                                          ? ` (effort ${proposalEstimateReport.estimate.effort})`
-                                          : ""}
-                                      </dd>
-                                      <dt>Contexte estimé</dt>
-                                      <dd className="text-right font-medium text-loop-ink">
-                                        ~
-                                        {
-                                          proposalEstimateReport.estimate
-                                            .estimatedInputTokens
-                                        }{" "}
-                                        tokens
-                                      </dd>
-                                      <dt>Sortie max</dt>
-                                      <dd className="text-right font-medium text-loop-ink">
-                                        ~
-                                        {
-                                          proposalEstimateReport.estimate
-                                            .estimatedOutputTokens
-                                        }{" "}
-                                        tokens
-                                      </dd>
-                                      {"estimatedCostUsd" in
-                                        proposalEstimateReport.estimate && (
-                                        <>
-                                          <dt>Coût estimé</dt>
-                                          <dd className="text-right font-medium text-loop-ink">
-                                            ~$
-                                            {proposalEstimateReport.estimate.estimatedCostUsd?.toFixed(
-                                              4,
-                                            )}
-                                          </dd>
-                                        </>
-                                      )}
-                                    </dl>
+                                {availableProposalEstimate &&
+                                  selectedProposalEstimate && (
+                                    <div className="mb-4 grid gap-3">
+                                      <label className="grid max-w-xs gap-1 text-xs text-loop-muted">
+                                        <span>Profil utilisé</span>
+                                        <select
+                                          value={proposalProfileSelection}
+                                          disabled={proposalLoading}
+                                          onChange={(event) =>
+                                            selectProposalProfile(
+                                              event.currentTarget.value,
+                                            )
+                                          }
+                                          className="rounded-md border border-loop-line bg-white px-3 py-2 text-sm font-medium text-loop-ink"
+                                        >
+                                          <option value="auto">Automatique</option>
+                                          <option value="economy">Économique</option>
+                                          <option value="balanced">Équilibré</option>
+                                          <option value="deep">Approfondi</option>
+                                        </select>
+                                      </label>
+                                      <div className="flex items-center justify-between gap-3 text-xs text-loop-muted">
+                                        <span>
+                                          Profil recommandé :{" "}
+                                          <span className="font-medium text-loop-ink">
+                                            {ROADMAP_PROPOSAL_PROFILE_LABELS[
+                                              availableProposalEstimate.profile
+                                            ] ?? availableProposalEstimate.profile}
+                                          </span>
+                                        </span>
+                                      </div>
+                                      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-loop-muted">
+                                        <dt>Modèle</dt>
+                                        <dd className="text-right font-medium text-loop-ink">
+                                          {selectedProposalEstimate.model}
+                                        </dd>
+                                        <dt>Effort</dt>
+                                        <dd className="text-right font-medium text-loop-ink">
+                                          {selectedProposalEstimate.effort ?? "—"}
+                                        </dd>
+                                        <dt>Entrée estimée</dt>
+                                        <dd className="text-right font-medium text-loop-ink">
+                                          ~{selectedProposalEstimate.estimatedInputTokens}{" "}
+                                          tokens
+                                        </dd>
+                                        <dt>Sortie estimée</dt>
+                                        <dd className="text-right font-medium text-loop-ink">
+                                          ~{selectedProposalEstimate.estimatedOutputTokens}{" "}
+                                          tokens
+                                        </dd>
+                                        {selectedProposalEstimate.estimatedCostUsd !==
+                                          undefined && (
+                                          <>
+                                            <dt>Coût estimé</dt>
+                                            <dd className="text-right font-medium text-loop-ink">
+                                              ~$
+                                              {selectedProposalEstimate.estimatedCostUsd.toFixed(
+                                                4,
+                                              )}
+                                            </dd>
+                                          </>
+                                        )}
+                                      </dl>
+                                    </div>
                                   )}
                                 <Button
                                   type="button"
@@ -976,9 +1044,7 @@ export function App(): React.JSX.Element {
                                         proposalReport.result.model && (
                                           <p className="m-0 text-xs text-loop-muted">
                                             {proposalReport.result.model}
-                                            {proposalReport.result.effort
-                                              ? ` · effort ${proposalReport.result.effort}`
-                                              : ""}
+                                            {` · effort ${proposalReport.result.effort ?? "—"}`}
                                             {proposalReport.result.usage &&
                                               ` · ${proposalReport.result.usage.inputTokens} tokens entrée / ${proposalReport.result.usage.outputTokens} tokens sortie`}
                                             {proposalReport.result

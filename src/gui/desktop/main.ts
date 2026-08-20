@@ -132,8 +132,10 @@ const roadmapProposalHandler = createRoadmapProposalHandler({
   resolveRepositoryPath,
   keychainReader: createProviderKeychainReader(),
 });
-ipcMain.handle("loop:roadmap-proposal", (_event, projectName) =>
-  roadmapProposalHandler(projectName),
+ipcMain.handle(
+  "loop:roadmap-proposal",
+  (_event, projectName, profileOverride) =>
+    roadmapProposalHandler(projectName, profileOverride),
 );
 
 const roadmapProposalEstimateHandler = createRoadmapProposalEstimateHandler({
