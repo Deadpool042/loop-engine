@@ -106,6 +106,24 @@ test("advances from a prepared plan to execution and result", () => {
   assert.equal(result.find((step) => step.id === "execute")?.status, "done");
 });
 
+test("keeps preparation focused while an execution-decision draft is pending, even after the plan error clears", () => {
+  const steps = buildGuidedFlowSteps({
+    hasProject: true,
+    contextLoading: false,
+    hasCandidate: true,
+    candidateAddressable: true,
+    planLoading: false,
+    hasPlan: false,
+    hasPlanError: false,
+    hasExecutionOutcome: false,
+    hasExecutionDecisionInProgress: true,
+  });
+
+  assert.equal(steps.find((step) => step.id === "work")?.status, "done");
+  assert.equal(steps.find((step) => step.id === "prepare")?.status, "blocked");
+  assert.equal(getFocusedGuidedFlowStepId(steps), "prepare");
+});
+
 test("marks work as blocked when the candidate cannot be addressed", () => {
   const steps = buildGuidedFlowSteps({
     hasProject: true,

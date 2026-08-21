@@ -22,6 +22,8 @@ export type GuidedFlowState = {
   hasPlan: boolean;
   hasPlanError: boolean;
   hasExecutionOutcome: boolean;
+  /** True while an execution-decision renewal or draft is awaiting the user's action, even after a plan error has been resolved. */
+  hasExecutionDecisionInProgress?: boolean;
 };
 
 const labels: Record<GuidedFlowStepId, string> = {
@@ -57,6 +59,7 @@ export function buildGuidedFlowSteps(
 
   const workReady = state.hasCandidate && state.candidateAddressable;
   const workBlocked = state.hasCandidate && !state.candidateAddressable;
+  const decisionInProgress = state.hasExecutionDecisionInProgress ?? false;
 
   return [
     { id: "project", label: labels.project, status: "done" },
@@ -67,18 +70,18 @@ export function buildGuidedFlowSteps(
         ? "active"
         : workBlocked
           ? "blocked"
-          : workReady && (state.planLoading || state.hasPlan || state.hasPlanError)
+          : workReady && (state.planLoading || state.hasPlan || state.hasPlanError || decisionInProgress)
             ? "done"
             : "active",
     },
     {
       id: "prepare",
       label: labels.prepare,
-      status: !workReady
+      status: !workReady && !decisionInProgress
         ? "pending"
         : state.hasPlan
           ? "done"
-          : state.hasPlanError
+          : state.hasPlanError || decisionInProgress
             ? "blocked"
             : state.planLoading
               ? "active"
