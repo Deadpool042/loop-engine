@@ -9,6 +9,13 @@ export class ExecutionDecisionPreparationStageFailure extends Error {
   ) { super(code); this.name = "ExecutionDecisionPreparationStageFailure"; }
 }
 
+export class ExecutionDecisionApprovalStageFailure extends Error {
+  constructor(
+    readonly stage: "current" | "publish" | "validate" | "recover" | "commit",
+    readonly code: "execution_decision_approval_current_failed" | "execution_decision_approval_publish_failed" | "execution_decision_approval_validate_failed" | "execution_decision_approval_recover_failed" | "execution_decision_approval_commit_failed",
+  ) { super(code); this.name = "ExecutionDecisionApprovalStageFailure"; }
+}
+
 export type DraftValidationIssue =
   | "provider_fields_invalid"
   | "allowed_paths_invalid"
