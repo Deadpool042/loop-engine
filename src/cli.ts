@@ -67,6 +67,7 @@ import {
 } from "./composition/index.js";
 import { terminal } from "./ui/terminal.js";
 import { printJsonError } from "./commands/json-error.js";
+import { printExecutionDecisionProposalJson } from "./commands/execution-decision-propose.js";
 
 const application = createLoopApplicationAssembly();
 
@@ -251,6 +252,23 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   if (effort !== undefined && (!model || !(ANTHROPIC_EFFORT_VALUES as readonly string[]).includes(effort))) failOption(json, "invalid_provider_effort", "Invalid --provider-effort value.");
   const input = { ...(model ? { model } : {}), ...(effort ? { effort: effort as (typeof ANTHROPIC_EFFORT_VALUES)[number] } : {}), timeoutMs };
   json ? await printGateReassessmentJson(application, project, input) : await printGateReassessment(application, project, input);
+} else if (command === "execution-decision" && process.argv[3] === "propose") {
+  const json = process.argv.includes("--json");
+  const project = resolveProjectOrExit("execution-decision propose", 4);
+  const candidateId = optionValue("--candidate");
+  const sourceDocument = optionValue("--source-document");
+  const gitHead = optionValue("--git-head");
+  const provider = optionValue("--provider");
+  const model = optionValue("--provider-model");
+  const effort = optionValue("--provider-effort");
+  const timeoutValue = optionValue("--provider-timeout-ms");
+  if (!candidateId || !sourceDocument || !gitHead) failOption(json, "missing_candidate_value", "--candidate, --source-document, and --git-head are required.");
+  if (provider !== "anthropic_api") failOption(json, "unsupported_provider", "--provider anthropic_api is required.");
+  if (model !== "claude-sonnet-5") failOption(json, "missing_provider_model", "--provider-model claude-sonnet-5 is required.");
+  if (effort !== "low") failOption(json, "invalid_provider_effort", "--provider-effort low is required.");
+  if (timeoutValue !== "60000") failOption(json, "invalid_provider_timeout", "--provider-timeout-ms 60000 is required.");
+  if (json) await printExecutionDecisionProposalJson(application, { project: project.name, candidateId, sourceDocument, gitHead, provider, model, effort, timeoutMs: 60_000 });
+  else terminal.info("Execution-decision propose requires --json.");
 } else if (command === "roadmap") {
   terminal.error(
     "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json] | roadmap propose-estimate <project> [--json] | roadmap propose <project> --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>] [--json]",

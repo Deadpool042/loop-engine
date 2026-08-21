@@ -25,14 +25,16 @@ import { createGateReassessmentEstimateHandler } from "./gate-reassessment-estim
 import { createReviewHandler } from "./review-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 import { createDesktopExecutionDecisionController } from "./execution-decision-controller.js";
+import { DESKTOP_EXECUTION_DECISION_TIMEOUT_MS } from "./execution-decision-cli-proposer.js";
 
 const cliInvoker = createCliInvoker();
 const roadmapProposalCliInvoker = createCliInvoker({
   timeoutMs: DESKTOP_ROADMAP_PROPOSAL_TIMEOUT_MS + 5_000,
 });
 const gateReassessmentCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_GATE_REASSESSMENT_TIMEOUT_MS + 5_000 });
+const executionDecisionCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_EXECUTION_DECISION_TIMEOUT_MS + 7_000 });
 const executionCloseGuard = createExecutionWindowCloseGuard();
-const executionDecisionController = createDesktopExecutionDecisionController({ keychainReader: createProviderKeychainReader() });
+const executionDecisionController = createDesktopExecutionDecisionController({ keychainReader: createProviderKeychainReader(), cliInvoker: executionDecisionCliInvoker, resolveRepositoryPath });
 let mainWindow: BrowserWindow | null = null;
 
 function resolveRepositoryPath(): string | null {

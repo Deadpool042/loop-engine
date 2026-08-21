@@ -1,8 +1,9 @@
-import { createAnthropicApiProvider } from "../../text-only-provider/index.js";
-import { createExecutionDecisionProposalProvider, ExecutionDecisionProviderFailure } from "../../governance/execution-decision-provider.js";
+import { ExecutionDecisionProviderFailure } from "../../governance/execution-decision-provider.js";
 import { createProductionExecutionDecisionService } from "../../governance/execution-decision-production.js";
 import type { ProviderKeychainReader } from "../keychain-reader.js";
 import type { DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
+import { createCliExecutionDecisionProposer } from "./execution-decision-cli-proposer.js";
+import type { CliInvoker } from "../cli-invoker.js";
 
 const messages: Readonly<Record<string, string>> = {
   decision_draft_invalid: "Le brouillon de décision est invalide.", decision_draft_missing: "Ce brouillon n’est plus disponible.",
@@ -12,17 +13,12 @@ const messages: Readonly<Record<string, string>> = {
 };
 const failed = (code: string, message?: string, provider?: Extract<DesktopExecutionDecisionResult, { ok: false }> ["provider"]): DesktopExecutionDecisionResult => ({ ok: false, code, message: message ?? messages[code] ?? "La préparation de la décision est indisponible.", ...(provider === undefined ? {} : { provider }) });
 
-export function createDesktopExecutionDecisionController(options: Readonly<{ keychainReader: ProviderKeychainReader; createProvider?: (environment: Readonly<Record<string, string>>) => ReturnType<typeof createAnthropicApiProvider> }>) {
-  const createProvider = options.createProvider ?? ((environment) => createAnthropicApiProvider({ environment }));
-  const service = createProductionExecutionDecisionService(async (current) => {
-    const credential = await options.keychainReader.read();
-    if (!credential.ok) throw new Error("keychain_unavailable");
-    return createExecutionDecisionProposalProvider(createProvider({ ANTHROPIC_API_KEY: credential.apiKey }))(current);
-  });
+export function createDesktopExecutionDecisionController(options: Readonly<{ keychainReader: ProviderKeychainReader; cliInvoker: CliInvoker; resolveRepositoryPath: () => string | null }>) {
+  const service = createProductionExecutionDecisionService(createCliExecutionDecisionProposer(options));
   return Object.freeze({
     async prepare(projectName: unknown): Promise<DesktopExecutionDecisionResult> {
       try { const result = await service.prepare(projectName); if (!result.ok) return failed(result.code); return result; }
-      catch (error) { if (error instanceof ExecutionDecisionProviderFailure) { const failure = error.failure; return failed(failure.code, undefined, { ...(failure.model === null ? {} : { model: failure.model }), durationMs: failure.durationMs, ...(failure.httpStatus === undefined ? {} : { httpStatus: failure.httpStatus }), failureCode: failure.code }); } return failed(error instanceof Error && error.message === "keychain_unavailable" ? "keychain_unavailable" : "provider_unavailable", error instanceof Error && error.message === "keychain_unavailable" ? "Identifiant Anthropic indisponible dans le trousseau macOS." : undefined); }
+      catch (error) { if (error instanceof ExecutionDecisionProviderFailure) { const failure = error.failure; return failed(failure.code, undefined, { ...(failure.model === null ? {} : { model: failure.model }), durationMs: failure.durationMs, ...(failure.httpStatus === undefined ? {} : { httpStatus: failure.httpStatus }), failureCode: failure.code }); } return failed(error instanceof Error && error.message === "keychain_unavailable" ? "keychain_unavailable" : error instanceof Error && error.message === "decision_draft_stale" ? "decision_draft_stale" : "provider_unavailable", error instanceof Error && error.message === "keychain_unavailable" ? "Identifiant Anthropic indisponible dans le trousseau macOS." : undefined); }
     },
     async approve(draftId: unknown): Promise<DesktopExecutionDecisionResult> {
       try { const result = await service.approve(draftId); return result.ok ? { ok: true } : failed(result.code); }

@@ -60,6 +60,7 @@ import {
   type LoopProviderId,
   type LoopProviderRegistry,
 } from "./provider-registry.js";
+import { runExecutionDecisionProposal, type ExecutionDecisionProposeInput } from "./execution-decision-proposal.js";
 
 export type LoopApplicationCodexProviderOptions = Omit<
   CodexProviderConfiguration,
@@ -139,6 +140,7 @@ export type LoopApplicationAssembly = Readonly<{
   runLoopCommit: typeof runLoopCommit;
   runLoopExecute: typeof runLoopExecuteWithProviderFailoverEvidence;
   runLoopPlan: typeof runLoopPlan;
+  runExecutionDecisionProposal: (input: ExecutionDecisionProposeInput) => ReturnType<typeof runExecutionDecisionProposal>;
 }>;
 
 export type LoopApplicationConfig = ReturnType<
@@ -286,5 +288,6 @@ export function createLoopApplicationAssembly(
     runLoopExecute:
       isolatedRunExecute ?? runLoopExecuteWithProviderFailoverEvidence,
     runLoopPlan,
+    runExecutionDecisionProposal,
   });
 }
