@@ -26,8 +26,20 @@ test("execution-decision CLI returns bounded provider telemetry and proposal wit
 test("execution-decision CLI rejects directory provider scopes without widening them", async () => {
   for (const allowedPaths of [["docs/adr/"], ["docs/roadmap/"]]) {
     const report = await runExecutionDecisionProposal(input, { current: () => current, propose: async () => ({ status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 1, proposal: { objective: "ADR", deliverables: ["ADR"], outOfScope: ["execute"], allowedPaths } }) });
-    assert.deepEqual(report, { schemaVersion: 1, project: "lp-infra", result: { status: "failed", code: "decision_draft_invalid", model: "claude-sonnet-5", durationMs: 1 } });
+    assert.deepEqual(report, { schemaVersion: 1, project: "lp-infra", result: { status: "failed", code: "decision_draft_invalid", model: "claude-sonnet-5", durationMs: 1, draftValidationIssue: "allowed_paths_invalid" } });
   }
+});
+
+test("execution-decision CLI preserves invalid-draft telemetry without exposing the rejected proposal", async () => {
+  const report = await runExecutionDecisionProposal(input, { current: () => current, propose: async () => ({ status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 6041, usage: { inputTokens: 671, outputTokens: 369 }, proposal: { objective: "ADR architecture cockpit", deliverables: ["ADR"], outOfScope: ["implementation"], allowedPaths: ["docs/roadmap/projet-lp-infra.md", "docs/adr/", "docs/roadmap/"], forbiddenContentTerms: [] } }) });
+  assert.deepEqual(report, { schemaVersion: 1, project: "lp-infra", result: { status: "failed", code: "decision_draft_invalid", model: "claude-sonnet-5", durationMs: 6041, usage: { inputTokens: 671, outputTokens: 369 }, actualCalculatedCostUsd: 0.005032, draftValidationIssue: "allowed_paths_invalid" } });
+  assert.equal("proposal" in report, false);
+});
+
+test("execution-decision CLI accepts exact LP-INFRA-like paths while omitting empty forbidden terms", async () => {
+  const report = await runExecutionDecisionProposal(input, { current: () => current, propose: async () => ({ status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 1, proposal: { objective: "ADR architecture cockpit", deliverables: ["ADR"], outOfScope: ["implementation"], allowedPaths: ["ADR/0007-architecture-cockpit.md", "docs/roadmap/projet-lp-infra.md"] } }) });
+  assert.equal(report.result.status, "completed");
+  if (report.result.status === "completed") assert.equal("forbiddenContentTerms" in report.proposal, false);
 });
 
 test("execution-decision CLI accepts exact files and terminal recursive scopes only", async () => {

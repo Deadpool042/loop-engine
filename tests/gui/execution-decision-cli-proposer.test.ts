@@ -23,6 +23,11 @@ test("desktop execution-decision proposer accepts the real completed JSON shape 
   const proposal = await propose(current); assert.deepEqual(proposal.allowedPaths, ["docs/roadmap/projet-lp-infra.md", "docs/adr/", "docs/roadmap/"]);
   const draft = createExecutionDecisionDraft(current, proposal); assert.equal(draft.ok, false); if (!draft.ok) assert.equal(draft.code, "decision_draft_invalid");
 });
+test("desktop execution-decision proposer forwards bounded invalid-draft telemetry without a proposal", async () => {
+  const json = { schemaVersion: 1, project: "lp-infra", result: { status: "failed", code: "decision_draft_invalid", model: "claude-sonnet-5", durationMs: 6041, usage: { inputTokens: 671, outputTokens: 369 }, actualCalculatedCostUsd: 0.005032, draftValidationIssue: "allowed_paths_invalid" } };
+  const propose = createCliExecutionDecisionProposer({ resolveRepositoryPath: () => "/loop", keychainReader: { read: async () => ({ ok: true, apiKey: "sk-secret" }) }, cliInvoker: { invoke: async () => ({ ok: true, exitCode: 0, json }) } });
+  await assert.rejects(() => propose(current), (error: unknown) => error instanceof Error && error.name === "ExecutionDecisionDraftValidationFailure" && !("proposal" in error));
+});
 test("desktop execution-decision proposer distinguishes malformed JSON, spawn failure, and timeout", async () => {
   const cases: readonly [unknown, "cli_response_invalid" | "cli_spawn_failed" | "cli_timeout"][] = [[{ schemaVersion: 1, project: "lp-infra", result: { status: "completed" } }, "cli_response_invalid"], [{ ok: false, kind: "spawn-error", raw: "sk-secret" }, "cli_spawn_failed"], [{ ok: false, kind: "timeout", raw: "sk-secret" }, "cli_timeout"]];
   for (const [value, code] of cases) {

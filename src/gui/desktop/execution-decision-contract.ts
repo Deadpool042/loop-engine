@@ -6,7 +6,7 @@ export type DesktopExecutionDecisionDraft = Readonly<{
 export type DesktopExecutionDecisionResult =
   | Readonly<{ ok: true } & DesktopExecutionDecisionDraft>
   | Readonly<{ ok: true }>
-  | Readonly<{ ok: false; code: string; message: string; provider?: Readonly<{ model?: string; durationMs?: number; httpStatus?: number; failureCode?: string }> }>;
+  | Readonly<{ ok: false; code: string; message: string; provider?: Readonly<{ model?: string; durationMs?: number; usage?: Readonly<{ inputTokens: number; outputTokens: number }>; actualCalculatedCostUsd?: number; pricingEffectiveDate?: string; draftValidationIssue?: "provider_fields_invalid" | "allowed_paths_invalid" | "protected_path" | "forbidden_terms_invalid"; httpStatus?: number; failureCode?: string }> }>;
 
 export const EXECUTION_DECISION_PREPARE_CHANNEL = "loop:execution-decision-prepare" as const;
 export const EXECUTION_DECISION_APPROVE_CHANNEL = "loop:execution-decision-approve" as const;

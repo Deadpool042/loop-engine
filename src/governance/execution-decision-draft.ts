@@ -1,4 +1,5 @@
 import { isPathAllowed, parseAllowedPaths } from "../loop/file-scope.js";
+import type { DraftValidationIssue } from "./execution-decision-errors.js";
 
 export type ExecutionDecisionDraft = Readonly<{
   project: string;
@@ -30,18 +31,19 @@ const strings = (value: unknown): readonly string[] | null => Array.isArray(valu
 export function createExecutionDecisionDraft(
   local: Readonly<{ project: string; candidateId: string; sourceDocument: string; gitHead: string; executionDecisionPath: string }>,
   provider: ProviderDraft,
-): Readonly<{ ok: true; draft: ExecutionDecisionDraft }> | Readonly<{ ok: false; code: "decision_draft_invalid"; reason: string }> {
-  if (!isText(local.project) || !isText(local.candidateId) || !isText(local.sourceDocument) || !SHA.test(local.gitHead)) return { ok: false, code: "decision_draft_invalid", reason: "Local draft binding is invalid." };
+): Readonly<{ ok: true; draft: ExecutionDecisionDraft }> | Readonly<{ ok: false; code: "decision_draft_invalid"; draftValidationIssue: DraftValidationIssue; reason: string }> {
+  const invalid = (draftValidationIssue: DraftValidationIssue, reason: string) => ({ ok: false as const, code: "decision_draft_invalid" as const, draftValidationIssue, reason });
+  if (!isText(local.project) || !isText(local.candidateId) || !isText(local.sourceDocument) || !SHA.test(local.gitHead)) return invalid("provider_fields_invalid", "Local draft binding is invalid.");
   const decisionPath = parseAllowedPaths([local.executionDecisionPath]);
-  if (!decisionPath.ok) return { ok: false, code: "decision_draft_invalid", reason: "Configured execution decision path is invalid." };
-  if (provider.candidateId !== undefined && provider.candidateId !== local.candidateId) return { ok: false, code: "decision_draft_invalid", reason: "Provider candidate does not match the selected candidate." };
+  if (!decisionPath.ok) return invalid("protected_path", "Configured execution decision path is invalid.");
+  if (provider.candidateId !== undefined && provider.candidateId !== local.candidateId) return invalid("provider_fields_invalid", "Provider candidate does not match the selected candidate.");
   const deliverables = strings(provider.deliverables); const outOfScope = strings(provider.outOfScope);
-  if (!isText(provider.objective) || deliverables === null || outOfScope === null) return { ok: false, code: "decision_draft_invalid", reason: "Provider draft fields are invalid or unbounded." };
+  if (!isText(provider.objective) || deliverables === null || outOfScope === null) return invalid("provider_fields_invalid", "Provider draft fields are invalid or unbounded.");
   const scope = parseAllowedPaths(provider.allowedPaths);
-  if (!scope.ok) return { ok: false, code: "decision_draft_invalid", reason: scope.reason };
-  if (isPathAllowed(".git", scope.allowedPaths) || isPathAllowed(".git/config", scope.allowedPaths) || isPathAllowed(local.executionDecisionPath, scope.allowedPaths)) return { ok: false, code: "decision_draft_invalid", reason: "Provider draft contains a protected path." };
+  if (!scope.ok) return invalid("allowed_paths_invalid", scope.reason);
+  if (scope.allowedPaths.some((path) => path === ".git" || path.startsWith(".git/") || path === ".governance" || path.startsWith(".governance/")) || isPathAllowed(local.executionDecisionPath, scope.allowedPaths)) return invalid("protected_path", "Provider draft contains a protected path.");
   const forbiddenContentTerms = provider.forbiddenContentTerms === undefined ? undefined : strings(provider.forbiddenContentTerms);
-  if (provider.forbiddenContentTerms !== undefined && forbiddenContentTerms === null) return { ok: false, code: "decision_draft_invalid", reason: "Provider forbidden content terms are invalid or unbounded." };
+  if (provider.forbiddenContentTerms !== undefined && forbiddenContentTerms === null) return invalid("forbidden_terms_invalid", "Provider forbidden content terms are invalid or unbounded.");
   const optionalTerms = forbiddenContentTerms === null || forbiddenContentTerms === undefined ? {} : { forbiddenContentTerms };
   return { ok: true, draft: Object.freeze({ project: local.project, candidateId: local.candidateId, sourceDocument: local.sourceDocument, gitHead: local.gitHead, objective: provider.objective, deliverables, outOfScope, allowedPaths: scope.allowedPaths, ...optionalTerms }) };
 }
