@@ -27,6 +27,8 @@ import { createSummaryHandler } from "./summary-handler.js";
 import { createDesktopExecutionDecisionController } from "./execution-decision-controller.js";
 import { DESKTOP_EXECUTION_DECISION_TIMEOUT_MS } from "./execution-decision-cli-proposer.js";
 
+export const DESKTOP_MAIN_PROCESS_BUILD_IDENTIFIER = process.env.GIT_COMMIT ?? "development";
+
 const cliInvoker = createCliInvoker();
 const roadmapProposalCliInvoker = createCliInvoker({
   timeoutMs: DESKTOP_ROADMAP_PROPOSAL_TIMEOUT_MS + 5_000,
@@ -35,6 +37,7 @@ const gateReassessmentCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_GATE_RE
 const executionDecisionCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_EXECUTION_DECISION_TIMEOUT_MS + 7_000 });
 const executionCloseGuard = createExecutionWindowCloseGuard();
 const executionDecisionController = createDesktopExecutionDecisionController({ keychainReader: createProviderKeychainReader(), cliInvoker: executionDecisionCliInvoker, resolveRepositoryPath });
+if (process.env.NODE_ENV !== "production") console.info(`Loop Engine main process: ${DESKTOP_MAIN_PROCESS_BUILD_IDENTIFIER}`);
 let mainWindow: BrowserWindow | null = null;
 
 function resolveRepositoryPath(): string | null {

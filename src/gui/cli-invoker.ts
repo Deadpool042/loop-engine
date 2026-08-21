@@ -8,7 +8,7 @@ export type CliInvocationSuccess = Readonly<{
 
 export type CliInvocationFailure = Readonly<{
   ok: false;
-  kind: "spawn-error" | "cancelled";
+  kind: "spawn-error" | "cancelled" | "timeout";
   raw: string;
 }>;
 
@@ -144,13 +144,11 @@ export function createCliInvoker(options: {
           });
         }
       } catch (error) {
+        const raw = redactSecrets(error instanceof Error ? error.message : "CLI invocation failed.", env);
         return Object.freeze({
           ok: false as const,
-          kind: "spawn-error" as const,
-          raw: redactSecrets(
-            error instanceof Error ? error.message : "CLI invocation failed.",
-            env,
-          ),
+          kind: raw === "CLI invocation timed out." ? "timeout" as const : "spawn-error" as const,
+          raw,
         });
       }
     },

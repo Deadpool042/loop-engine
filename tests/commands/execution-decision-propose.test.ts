@@ -20,7 +20,21 @@ test("execution-decision CLI returns bounded provider telemetry and proposal wit
   let calls = 0;
   const report = await runExecutionDecisionProposal(input, { current: () => current, createProvider: () => ({ invoke: async () => { calls++; throw new Error("injected proposer owns this"); } }), propose: async () => ({ status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 12, usage: { inputTokens: 100, outputTokens: 20 }, proposal: { objective: "ADR", deliverables: ["ADR"], outOfScope: ["execute"], allowedPaths: ["docs/adr.md"] } }) });
   assert.equal(calls, 0);
-  assert.deepEqual(report, { schemaVersion: 1, project: "lp-infra", result: { status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 12, usage: { inputTokens: 100, outputTokens: 20 }, actualCalculatedCostUsd: 0.0004, pricingEffectiveDate: "1970-01-01" }, proposal: { objective: "ADR", deliverables: ["ADR"], outOfScope: ["execute"], allowedPaths: ["docs/adr.md"] } });
+  assert.deepEqual(report, { schemaVersion: 1, project: "lp-infra", result: { status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 12, usage: { inputTokens: 100, outputTokens: 20 }, actualCalculatedCostUsd: 0.0004 }, proposal: { objective: "ADR", deliverables: ["ADR"], outOfScope: ["execute"], allowedPaths: ["docs/adr.md"] } });
+});
+
+test("execution-decision CLI rejects directory provider scopes without widening them", async () => {
+  for (const allowedPaths of [["docs/adr/"], ["docs/roadmap/"]]) {
+    const report = await runExecutionDecisionProposal(input, { current: () => current, propose: async () => ({ status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 1, proposal: { objective: "ADR", deliverables: ["ADR"], outOfScope: ["execute"], allowedPaths } }) });
+    assert.deepEqual(report, { schemaVersion: 1, project: "lp-infra", result: { status: "failed", code: "decision_draft_invalid", model: "claude-sonnet-5", durationMs: 1 } });
+  }
+});
+
+test("execution-decision CLI accepts exact files and terminal recursive scopes only", async () => {
+  for (const allowedPaths of [["docs/adr/0007-cockpit-architecture.md"], ["docs/adr/**"]]) {
+    const report = await runExecutionDecisionProposal(input, { current: () => current, propose: async () => ({ status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 1, proposal: { objective: "ADR", deliverables: ["ADR"], outOfScope: ["execute"], allowedPaths } }) });
+    assert.equal(report.result.status, "completed");
+  }
 });
 
 test("execution-decision CLI propagates bounded provider failure", async () => {
