@@ -48,8 +48,8 @@ const RENEWABLE_DECISION_MESSAGES: Readonly<Record<string, string>> = {
 export function executionDecisionRenewalMessage(code: unknown): string | null {
   return typeof code === "string" ? RENEWABLE_DECISION_MESSAGES[code] ?? null : null;
 }
-export function clearResolvedShaStalePlanError(error: string | null, renewalCode: string | null): string | null {
-  return renewalCode === "sha_stale" && error?.startsWith("sha_stale:") ? null : error;
+export function clearResolvedShaStalePlanError(error: string | null): string | null {
+  return error?.startsWith("sha_stale:") ? null : error;
 }
 
 const ROADMAP_PROPOSAL_PROFILE_LABELS: Readonly<Record<string, string>> = {
@@ -604,7 +604,7 @@ export function App(): React.JSX.Element {
       if (requestId !== decisionRequestId.current || selectedProjectNameRef.current !== projectName || (selectedCandidate?.id ?? null) !== candidateId) return;
       if (!result.ok || !("draftId" in result)) { setDecisionError(!result.ok ? result.message : "Le brouillon est invalide."); if (!result.ok) setDecisionProviderDetails(result.provider); return; }
       const { ok: _ok, ...draft } = result;
-      setPlanError((error) => clearResolvedShaStalePlanError(error, decisionRenewalCode));
+      setPlanError((error) => clearResolvedShaStalePlanError(error));
       setDecisionDraft(draft);
     } catch { if (requestId === decisionRequestId.current) setDecisionError("Impossible de préparer la décision."); }
     finally { if (requestId === decisionRequestId.current) setDecisionPrepareLoading(false); }

@@ -10,4 +10,4 @@ test("only renewable execution governance failures expose the decision renewal U
   assert.equal(executionDecisionRenewalMessage("decision_no_actionable_work"), null);
   assert.equal(executionDecisionRenewalMessage("unknown"), null);
 });
-test("a successful renewed draft clears only the technical sha_stale banner", () => { assert.equal(clearResolvedShaStalePlanError("sha_stale: Le projet a changé", "sha_stale"), null); assert.equal(clearResolvedShaStalePlanError("provider_timeout: indisponible", "sha_stale"), "provider_timeout: indisponible"); assert.equal(clearResolvedShaStalePlanError("sha_stale: Le projet a changé", "decision_missing"), "sha_stale: Le projet a changé"); });
+test("a successful renewed draft clears only the technical sha_stale banner", () => { assert.equal(clearResolvedShaStalePlanError("sha_stale: Le projet a changé"), null); assert.equal(clearResolvedShaStalePlanError("provider_timeout: indisponible"), "provider_timeout: indisponible"); assert.equal(clearResolvedShaStalePlanError(null), null); });
