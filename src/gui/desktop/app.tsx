@@ -37,7 +37,7 @@ import {
 } from "./roadmap-proposal-estimate-contract.js";
 import type { CliInvocationResult } from "../cli-invoker.js";
 import { parseGateReassessmentReport, type GateReassessmentReport } from "./gate-reassessment-contract.js";
-import type { DesktopExecutionDecisionDraft } from "./execution-decision-contract.js";
+import type { DesktopExecutionDecisionDraft, DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
 
 const RENEWABLE_DECISION_MESSAGES: Readonly<Record<string, string>> = {
   decision_missing: "Aucune décision d’exécution valide n’est disponible pour ce travail.",
@@ -259,6 +259,7 @@ export function App(): React.JSX.Element {
   const [decisionPrepareLoading, setDecisionPrepareLoading] = useState(false);
   const [decisionApproveLoading, setDecisionApproveLoading] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionProviderDetails, setDecisionProviderDetails] = useState<Extract<DesktopExecutionDecisionResult, { ok: false }>["provider"]>();
   const [executeProvider, setExecuteProvider] =
     useState<DesktopExecuteProvider>("claude_code");
   const [executeLoading, setExecuteLoading] = useState(false);
@@ -453,6 +454,7 @@ export function App(): React.JSX.Element {
     setDecisionPrepareLoading(false);
     setDecisionApproveLoading(false);
     setDecisionError(null);
+    setDecisionProviderDetails(undefined);
     setProposalReport(null);
     setProposalProjectName(null);
     setProposalError(null);
@@ -503,6 +505,7 @@ export function App(): React.JSX.Element {
     setDecisionPrepareLoading(false);
     setDecisionApproveLoading(false);
     setDecisionError(null);
+    setDecisionProviderDetails(undefined);
     setSelectedProjectName(projectName);
   }
 
@@ -592,11 +595,11 @@ export function App(): React.JSX.Element {
     const candidateId = selectedCandidate?.id ?? null;
     const requestId = decisionRequestId.current + 1;
     decisionRequestId.current = requestId;
-    setDecisionPrepareLoading(true); setDecisionError(null); setDecisionDraft(null);
+    setDecisionPrepareLoading(true); setDecisionError(null); setDecisionProviderDetails(undefined); setDecisionDraft(null);
     try {
       const result = await window.loopDesktop.prepareExecutionDecision(projectName);
       if (requestId !== decisionRequestId.current || selectedProjectNameRef.current !== projectName || (selectedCandidate?.id ?? null) !== candidateId) return;
-      if (!result.ok || !("draftId" in result)) { setDecisionError(!result.ok ? result.message : "Le brouillon est invalide."); return; }
+      if (!result.ok || !("draftId" in result)) { setDecisionError(!result.ok ? result.message : "Le brouillon est invalide."); if (!result.ok) setDecisionProviderDetails(result.provider); return; }
       const { ok: _ok, ...draft } = result;
       setDecisionDraft(draft);
     } catch { if (requestId === decisionRequestId.current) setDecisionError("Impossible de préparer la décision."); }
@@ -1380,6 +1383,7 @@ export function App(): React.JSX.Element {
                       <h4 className="m-0 text-base font-semibold text-amber-950">Décision d’exécution à renouveler</h4>
                       <p className="mt-2 text-sm text-amber-900">{executionDecisionRenewalMessage(decisionRenewalCode)}</p>
                       {decisionError && <p className="mt-3 text-sm text-rose-700">{decisionError}</p>}
+                      {decisionProviderDetails && <p className="mt-2 text-xs text-loop-muted">Code : {decisionProviderDetails.failureCode ?? "—"}{decisionProviderDetails.httpStatus !== undefined && ` · HTTP : ${decisionProviderDetails.httpStatus}`}{decisionProviderDetails.model && ` · Modèle : ${decisionProviderDetails.model}`}{decisionProviderDetails.durationMs !== undefined && ` · Durée : ${decisionProviderDetails.durationMs} ms`}</p>}
                       {decisionDraft === null ? (
                         <Button type="button" className="mt-4" disabled={decisionPrepareLoading || decisionApproveLoading} onClick={prepareExecutionDecision}>
                           {decisionPrepareLoading ? "Préparation du brouillon…" : "Préparer une nouvelle décision"}

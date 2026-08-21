@@ -37,6 +37,7 @@ type AnthropicMessageResponse = Readonly<{
   usage?: Readonly<{ input_tokens?: unknown; output_tokens?: unknown }>;
   stop_reason?: unknown;
 }>;
+type AnthropicErrorEnvelope = Readonly<{ type?: unknown; error?: Readonly<{ type?: unknown; message?: unknown }>; request_id?: unknown }>;
 function defaultTransport(request: TextOnlyHttpRequest): Promise<Response> {
   return fetch(request.url, {
     method: request.method,
@@ -120,6 +121,7 @@ function failure(
   message: string,
   durationMs: number,
   truncated = false,
+  diagnostics: Readonly<{ httpStatus?: number; providerErrorType?: string; requestId?: string; diagnosticMessage?: string }> = {},
 ): TextOnlyProviderFailure {
   return Object.freeze({
     status: "failed",
@@ -129,8 +131,14 @@ function failure(
     message,
     durationMs,
     truncated,
+    ...diagnostics,
   });
 }
+function boundedString(value: unknown, max = 512): string | undefined { return typeof value === "string" && value.length > 0 && Buffer.byteLength(value, "utf8") <= max ? value : undefined; }
+function parseAnthropicError(body: string): Readonly<{ providerErrorType?: string; requestId?: string; diagnosticMessage?: string }> {
+  try { const parsed = JSON.parse(body) as AnthropicErrorEnvelope; if (parsed.type !== "error") return {}; return Object.freeze({ ...(boundedString(parsed.error?.type, 96) === undefined ? {} : { providerErrorType: boundedString(parsed.error?.type, 96)! }), ...(boundedString(parsed.request_id, 256) === undefined ? {} : { requestId: boundedString(parsed.request_id, 256)! }), ...(boundedString(parsed.error?.message) === undefined ? {} : { diagnosticMessage: boundedString(parsed.error?.message)! }) }); } catch { return {}; }
+}
+function httpFailureCode(status: number): TextOnlyProviderFailureCode { if (status === 400) return "provider_request_failed"; if (status === 401) return "provider_authentication_failed"; if (status === 402) return "provider_billing_failed"; if (status === 403) return "provider_permission_denied"; if (status === 404) return "provider_not_found"; if (status === 413) return "provider_request_too_large"; if (status === 429) return "provider_rate_limited"; if ([500,502,503,504,529].includes(status)) return "provider_server_error"; return "provider_request_failed"; }
 async function readBoundedResponseBody(
   response: Response,
 ): Promise<{ body: string; exceeded: boolean }> {
@@ -322,17 +330,14 @@ export function createAnthropicApiProvider(
             true,
           );
         if (!response.ok) {
-          const code =
-            response.status === 401 || response.status === 403
-              ? "provider_authentication_failed"
-              : "provider_request_failed";
+          const code = httpFailureCode(response.status);
           return failure(
             model,
             code,
-            code === "provider_authentication_failed"
-              ? "Anthropic API authentication failed."
-              : "Anthropic API request failed.",
+            "Anthropic API request failed.",
             now() - startedAt,
+            false,
+            { httpStatus: response.status, ...parseAnthropicError(raw.body) },
           );
         }
         const stopReason = parseStopReason(raw.body);

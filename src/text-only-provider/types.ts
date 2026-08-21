@@ -16,6 +16,12 @@ export const TEXT_ONLY_PROVIDER_FAILURE_CODES = [
   "provider_unavailable",
   "provider_request_failed",
   "provider_authentication_failed",
+  "provider_billing_failed",
+  "provider_permission_denied",
+  "provider_not_found",
+  "provider_request_too_large",
+  "provider_rate_limited",
+  "provider_server_error",
   "provider_response_invalid",
   "output_limit_exceeded",
   "provider_refused",
@@ -66,6 +72,11 @@ export type TextOnlyProviderFailure = Readonly<{
   message: string;
   durationMs: number;
   truncated: boolean;
+  httpStatus?: number;
+  providerErrorType?: string;
+  requestId?: string;
+  /** Bounded and private to main-process diagnostics; never project it to IPC. */
+  diagnosticMessage?: string;
 }>;
 export type TextOnlyProviderResult =
   TextOnlyProviderSuccess | TextOnlyProviderFailure;
