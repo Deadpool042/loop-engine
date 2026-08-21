@@ -16,4 +16,4 @@ if [ "$soft_limit" -lt "$target_limit" ]; then
   fi
 fi
 
-exec pnpm exec electron-forge start "$@"
+exec ./node_modules/.bin/electron-forge start "$@"
