@@ -84,7 +84,7 @@ describe("GUI CliInvoker", () => {
 
     assert.deepEqual(await invoker.invoke("summary", [], "/repo"), {
       ok: false,
-      kind: "spawn-error",
+      kind: "timeout",
       raw: "CLI invocation timed out.",
     });
   });

@@ -5,6 +5,7 @@ import type {
   DesktopExecutionSession,
   DesktopExecutionSessionStart,
 } from "./execution-session.js";
+import type { DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
 
 export type LoopDesktopApi = Readonly<{
   summary: () => Promise<CliInvocationResult>;
@@ -30,6 +31,8 @@ export type LoopDesktopApi = Readonly<{
   ) => Promise<CliInvocationResult>;
   gateReassessment: (projectName: string, profileOverride: RoadmapProposalProfileOverride) => Promise<CliInvocationResult>;
   gateReassessmentEstimate: (projectName: string) => Promise<CliInvocationResult>;
+  prepareExecutionDecision: (projectName: string) => Promise<DesktopExecutionDecisionResult>;
+  approveExecutionDecision: (draftId: string) => Promise<DesktopExecutionDecisionResult>;
 }>;
 
 export function createLoopDesktopApi(
@@ -45,7 +48,9 @@ export function createLoopDesktopApi(
       | "loop:roadmap-proposal"
       | "loop:roadmap-proposal-estimate"
       | "loop:gate-reassessment"
-      | "loop:gate-reassessment-estimate",
+      | "loop:gate-reassessment-estimate"
+      | "loop:execution-decision-prepare"
+      | "loop:execution-decision-approve",
     ...args: readonly unknown[]
   ) => Promise<CliInvocationResult>,
 ): LoopDesktopApi {
@@ -85,5 +90,7 @@ export function createLoopDesktopApi(
     },
     gateReassessment(projectName, profileOverride) { return invoke("loop:gate-reassessment", projectName, profileOverride); },
     gateReassessmentEstimate(projectName) { return invoke("loop:gate-reassessment-estimate", projectName); },
+    prepareExecutionDecision(projectName) { return invoke("loop:execution-decision-prepare", projectName) as unknown as Promise<DesktopExecutionDecisionResult>; },
+    approveExecutionDecision(draftId) { return invoke("loop:execution-decision-approve", draftId) as unknown as Promise<DesktopExecutionDecisionResult>; },
   });
 }

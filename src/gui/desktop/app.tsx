@@ -37,6 +37,20 @@ import {
 } from "./roadmap-proposal-estimate-contract.js";
 import type { CliInvocationResult } from "../cli-invoker.js";
 import { parseGateReassessmentReport, type GateReassessmentReport } from "./gate-reassessment-contract.js";
+import type { DesktopExecutionDecisionDraft, DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
+
+const RENEWABLE_DECISION_MESSAGES: Readonly<Record<string, string>> = {
+  decision_missing: "Aucune décision d’exécution valide n’est disponible pour ce travail.",
+  sha_stale: "Le projet a changé depuis la dernière autorisation.",
+  decision_revalidation_required: "Cette décision doit être revue avant toute exécution.",
+  candidate_authorization_mismatch: "Le candidat ne correspond plus à la décision autorisée.",
+};
+export function executionDecisionRenewalMessage(code: unknown): string | null {
+  return typeof code === "string" ? RENEWABLE_DECISION_MESSAGES[code] ?? null : null;
+}
+export function clearResolvedShaStalePlanError(error: string | null): string | null {
+  return error?.startsWith("sha_stale:") ? null : error;
+}
 
 const ROADMAP_PROPOSAL_PROFILE_LABELS: Readonly<Record<string, string>> = {
   economy: "Économique",
@@ -243,6 +257,12 @@ export function App(): React.JSX.Element {
   const [planProjectName, setPlanProjectName] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
+  const [decisionRenewalCode, setDecisionRenewalCode] = useState<string | null>(null);
+  const [decisionDraft, setDecisionDraft] = useState<DesktopExecutionDecisionDraft | null>(null);
+  const [decisionPrepareLoading, setDecisionPrepareLoading] = useState(false);
+  const [decisionApproveLoading, setDecisionApproveLoading] = useState(false);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionProviderDetails, setDecisionProviderDetails] = useState<Extract<DesktopExecutionDecisionResult, { ok: false }>["provider"]>();
   const [executeProvider, setExecuteProvider] =
     useState<DesktopExecuteProvider>("claude_code");
   const [executeLoading, setExecuteLoading] = useState(false);
@@ -273,6 +293,7 @@ export function App(): React.JSX.Element {
   const [gateReassessmentProjectName, setGateReassessmentProjectName] = useState<string | null>(null);
   const [gateReassessmentLoading, setGateReassessmentLoading] = useState(false);
   const planRequestId = useRef(0);
+  const decisionRequestId = useRef(0);
   const selectedProject =
     projects.find((project) => project.project.name === selectedProjectName) ??
     null;
@@ -430,6 +451,13 @@ export function App(): React.JSX.Element {
     setPlanProjectName(null);
     setPlanError(null);
     setPlanLoading(false);
+    decisionRequestId.current += 1;
+    setDecisionRenewalCode(null);
+    setDecisionDraft(null);
+    setDecisionPrepareLoading(false);
+    setDecisionApproveLoading(false);
+    setDecisionError(null);
+    setDecisionProviderDetails(undefined);
     setProposalReport(null);
     setProposalProjectName(null);
     setProposalError(null);
@@ -474,6 +502,13 @@ export function App(): React.JSX.Element {
     setProposalProjectName(null);
     setProposalError(null);
     setProposalLoading(proposalRunner.isActive());
+    decisionRequestId.current += 1;
+    setDecisionRenewalCode(null);
+    setDecisionDraft(null);
+    setDecisionPrepareLoading(false);
+    setDecisionApproveLoading(false);
+    setDecisionError(null);
+    setDecisionProviderDetails(undefined);
     setSelectedProjectName(projectName);
   }
 
@@ -513,6 +548,7 @@ export function App(): React.JSX.Element {
     setPlanDetail(null);
     setPlanProjectName(null);
     setPlanError(null);
+    setDecisionRenewalCode(null);
     setPlanLoading(true);
 
     try {
@@ -526,6 +562,7 @@ export function App(): React.JSX.Element {
       const failure = parsePlanFailure(result.json);
       if (failure) {
         setPlanError(`${failure.code}: ${failure.message}`);
+        setDecisionRenewalCode(executionDecisionRenewalMessage(failure.code) ? failure.code : null);
         return;
       }
 
@@ -553,6 +590,52 @@ export function App(): React.JSX.Element {
     } finally {
       if (requestId === planRequestId.current) setPlanLoading(false);
     }
+  }
+
+  async function prepareExecutionDecision(): Promise<void> {
+    if (selectedProjectName === null || decisionPrepareLoading) return;
+    const projectName = selectedProjectName;
+    const candidateId = selectedCandidate?.id ?? null;
+    const requestId = decisionRequestId.current + 1;
+    decisionRequestId.current = requestId;
+    setDecisionPrepareLoading(true); setDecisionError(null); setDecisionProviderDetails(undefined); setDecisionDraft(null);
+    try {
+      const result = await window.loopDesktop.prepareExecutionDecision(projectName);
+      if (requestId !== decisionRequestId.current || selectedProjectNameRef.current !== projectName || (selectedCandidate?.id ?? null) !== candidateId) return;
+      if (!result.ok || !("draftId" in result)) { setDecisionError(!result.ok ? result.message : "Le brouillon est invalide."); if (!result.ok) setDecisionProviderDetails(result.provider); return; }
+      const { ok: _ok, ...draft } = result;
+      setPlanError((error) => clearResolvedShaStalePlanError(error));
+      setDecisionDraft(draft);
+    } catch { if (requestId === decisionRequestId.current) setDecisionError("Impossible de préparer la décision."); }
+    finally { if (requestId === decisionRequestId.current) setDecisionPrepareLoading(false); }
+  }
+
+  async function refreshApprovedProjectContext(projectName: string, candidateId: string | null): Promise<boolean> {
+    try {
+      const result = await window.loopDesktop.context(projectName);
+      if (!result.ok) return false;
+      const detail = parseContextDetail(result.json);
+      if (detail === null || detail.roadmap.selectedCandidate?.id !== candidateId) return false;
+      setContextDetail(detail);
+      return true;
+    } catch { return false; }
+  }
+
+  async function approveExecutionDecision(): Promise<void> {
+    if (decisionDraft === null || decisionApproveLoading) return;
+    const projectName = selectedProjectName; const candidateId = selectedCandidate?.id ?? null; const draftId = decisionDraft.draftId;
+    const requestId = decisionRequestId.current + 1; decisionRequestId.current = requestId;
+    setDecisionApproveLoading(true); setDecisionError(null);
+    try {
+      const result = await window.loopDesktop.approveExecutionDecision(draftId);
+      if (requestId !== decisionRequestId.current || selectedProjectNameRef.current !== projectName || (selectedCandidate?.id ?? null) !== candidateId) return;
+      if (!result.ok) { setDecisionError(result.message); if (result.code === "decision_draft_stale") setDecisionDraft(null); return; }
+      setDecisionDraft(null); setDecisionRenewalCode(null);
+      if (!(await refreshApprovedProjectContext(projectName!, candidateId))) { setDecisionError("Le contexte a changé. Préparez une nouvelle décision."); return; }
+      if (requestId !== decisionRequestId.current || selectedProjectNameRef.current !== projectName) return;
+      await preparePlan();
+    } catch { if (requestId === decisionRequestId.current) setDecisionError("Impossible d’approuver la décision."); }
+    finally { if (requestId === decisionRequestId.current) setDecisionApproveLoading(false); }
   }
 
   async function executePlan(): Promise<void> {
@@ -1298,6 +1381,26 @@ export function App(): React.JSX.Element {
                     <pre className="mt-3 overflow-auto whitespace-pre-wrap break-words rounded-md border border-rose-200 bg-rose-50 p-4 text-xs text-rose-900">
                       {planError}
                     </pre>
+                  )}
+                  {decisionRenewalCode && (
+                    <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-5">
+                      <h4 className="m-0 text-base font-semibold text-amber-950">Décision d’exécution à renouveler</h4>
+                      <p className="mt-2 text-sm text-amber-900">{executionDecisionRenewalMessage(decisionRenewalCode)}</p>
+                      {decisionError && <p className="mt-3 text-sm text-rose-700">{decisionError}</p>}
+                      {decisionProviderDetails && <p className="mt-2 text-xs text-loop-muted">Code : {decisionProviderDetails.failureCode ?? "—"}{decisionProviderDetails.httpStatus !== undefined && ` · HTTP : ${decisionProviderDetails.httpStatus}`}{decisionProviderDetails.model && ` · Modèle : ${decisionProviderDetails.model}`}{decisionProviderDetails.durationMs !== undefined && ` · Durée : ${decisionProviderDetails.durationMs} ms`}</p>}
+                      {decisionDraft === null ? (
+                        <Button type="button" className="mt-4" disabled={decisionPrepareLoading || decisionApproveLoading} onClick={prepareExecutionDecision}>
+                          {decisionPrepareLoading ? "Préparation du brouillon…" : "Préparer une nouvelle décision"}
+                        </Button>
+                      ) : (
+                        <div className="mt-4 rounded-md border border-amber-200 bg-white p-4">
+                          <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-amber-900">Brouillon de décision</p>
+                          <dl className="mt-3 grid gap-3 text-sm"><div><dt className="font-medium">Candidat</dt><dd>{decisionDraft.candidateId}</dd></div><div><dt className="font-medium">Objectif</dt><dd>{decisionDraft.objective}</dd></div><div><dt className="font-medium">Livrables</dt><dd>{decisionDraft.deliverables.join(" · ")}</dd></div><div><dt className="font-medium">Hors périmètre</dt><dd>{decisionDraft.outOfScope.join(" · ")}</dd></div><div><dt className="font-medium">Fichiers autorisés</dt><dd className="font-mono text-xs">{decisionDraft.allowedPaths.join("\n")}</dd></div><div><dt className="font-medium">HEAD cible</dt><dd className="font-mono text-xs">{decisionDraft.gitHead}</dd></div></dl>
+                          <p className="mt-4 text-sm font-medium text-amber-900">Ce brouillon n’autorise encore aucune exécution.</p>
+                          <Button type="button" className="mt-4" disabled={decisionApproveLoading || decisionPrepareLoading} onClick={approveExecutionDecision}>{decisionApproveLoading ? "Approbation…" : "Approuver cette décision"}</Button>
+                        </div>
+                      )}
+                    </section>
                   )}
                   {planDetail &&
                     isPlanForSelectedProject(

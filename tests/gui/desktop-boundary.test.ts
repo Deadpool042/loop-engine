@@ -27,6 +27,8 @@ describe("GUI desktop execution boundary", () => {
     assert.equal(api.roadmapProposalEstimate.length, 1);
     assert.equal(api.gateReassessment.length, 2);
     assert.equal(api.gateReassessmentEstimate.length, 1);
+    assert.equal(api.prepareExecutionDecision.length, 1);
+    assert.equal(api.approveExecutionDecision.length, 1);
     await api.summary();
     await api.context("loop-engine");
     await api.review("loop-engine");
@@ -48,6 +50,8 @@ describe("GUI desktop execution boundary", () => {
     await api.roadmapProposalEstimate("loop-engine");
     await api.gateReassessment("lp-infra", "auto");
     await api.gateReassessmentEstimate("lp-infra");
+    await api.prepareExecutionDecision("lp-infra");
+    await api.approveExecutionDecision("draft-1");
     assert.deepEqual(calls, [
       ["loop:summary"],
       ["loop:context", "loop-engine"],
@@ -76,6 +80,8 @@ describe("GUI desktop execution boundary", () => {
       ["loop:roadmap-proposal-estimate", "loop-engine"],
       ["loop:gate-reassessment", "lp-infra", "auto"],
       ["loop:gate-reassessment-estimate", "lp-infra"],
+      ["loop:execution-decision-prepare", "lp-infra"],
+      ["loop:execution-decision-approve", "draft-1"],
     ]);
   });
 
@@ -115,6 +121,8 @@ describe("GUI desktop execution boundary", () => {
       mainSource,
       /declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string/,
     );
+    assert.match(mainSource, /ipcMain\.handle\("loop:execution-decision-prepare", \(_event, projectName\) => executionDecisionController\.prepare\(projectName\)\);/);
+    assert.match(mainSource, /ipcMain\.handle\("loop:execution-decision-approve", \(_event, draftId\) => executionDecisionController\.approve\(draftId\)\);/);
   });
 
   it("forwards the renderer project-name argument past Electron's IPC event", () => {

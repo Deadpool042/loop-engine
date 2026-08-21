@@ -24,13 +24,22 @@ import { createGateReassessmentHandler, DESKTOP_GATE_REASSESSMENT_TIMEOUT_MS } f
 import { createGateReassessmentEstimateHandler } from "./gate-reassessment-estimate-handler.js";
 import { createReviewHandler } from "./review-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
+import { createDesktopExecutionDecisionController } from "./execution-decision-controller.js";
+import { DESKTOP_EXECUTION_DECISION_TIMEOUT_MS } from "./execution-decision-cli-proposer.js";
+import { DESKTOP_EXECUTION_DECISION_CURRENT_TIMEOUT_MS } from "./execution-decision-cli-current.js";
+
+export const DESKTOP_MAIN_PROCESS_BUILD_IDENTIFIER = process.env.GIT_COMMIT ?? "development";
 
 const cliInvoker = createCliInvoker();
 const roadmapProposalCliInvoker = createCliInvoker({
   timeoutMs: DESKTOP_ROADMAP_PROPOSAL_TIMEOUT_MS + 5_000,
 });
 const gateReassessmentCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_GATE_REASSESSMENT_TIMEOUT_MS + 5_000 });
+const executionDecisionCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_EXECUTION_DECISION_TIMEOUT_MS + 7_000 });
+const executionDecisionCurrentCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_EXECUTION_DECISION_CURRENT_TIMEOUT_MS });
 const executionCloseGuard = createExecutionWindowCloseGuard();
+const executionDecisionController = createDesktopExecutionDecisionController({ keychainReader: createProviderKeychainReader(), cliInvoker: executionDecisionCliInvoker, currentCliInvoker: executionDecisionCurrentCliInvoker, resolveRepositoryPath });
+if (process.env.NODE_ENV !== "production") console.info(`Loop Engine main process: ${DESKTOP_MAIN_PROCESS_BUILD_IDENTIFIER}`);
 let mainWindow: BrowserWindow | null = null;
 
 function resolveRepositoryPath(): string | null {
@@ -152,6 +161,8 @@ const gateReassessmentHandler = createGateReassessmentHandler({ cliInvoker: gate
 ipcMain.handle("loop:gate-reassessment", (_event, projectName, profileOverride) => gateReassessmentHandler(projectName, profileOverride));
 const gateReassessmentEstimateHandler = createGateReassessmentEstimateHandler({ cliInvoker, resolveRepositoryPath });
 ipcMain.handle("loop:gate-reassessment-estimate", (_event, projectName) => gateReassessmentEstimateHandler(projectName));
+ipcMain.handle("loop:execution-decision-prepare", (_event, projectName) => executionDecisionController.prepare(projectName));
+ipcMain.handle("loop:execution-decision-approve", (_event, draftId) => executionDecisionController.approve(draftId));
 
 ipcMain.handle("loop:execution-start", (_event, request) =>
   startExecutionSession(request),
