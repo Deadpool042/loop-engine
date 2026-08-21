@@ -44,12 +44,17 @@ const RENEWABLE_DECISION_MESSAGES: Readonly<Record<string, string>> = {
   sha_stale: "Le projet a changé depuis la dernière autorisation.",
   decision_revalidation_required: "Cette décision doit être revue avant toute exécution.",
   candidate_authorization_mismatch: "Le candidat ne correspond plus à la décision autorisée.",
+  decision_draft_serialize_failed: "Ce brouillon ne peut pas être sérialisé. Préparez une nouvelle décision.",
 };
 export function executionDecisionRenewalMessage(code: unknown): string | null {
   return typeof code === "string" ? RENEWABLE_DECISION_MESSAGES[code] ?? null : null;
 }
 export function clearResolvedShaStalePlanError(error: string | null): string | null {
   return error?.startsWith("sha_stale:") ? null : error;
+}
+const DRAFT_CLEARING_APPROVE_FAILURE_CODES = new Set(["decision_draft_stale", "decision_draft_serialize_failed"]);
+export function shouldClearDraftOnApproveFailure(code: unknown): boolean {
+  return typeof code === "string" && DRAFT_CLEARING_APPROVE_FAILURE_CODES.has(code);
 }
 
 const ROADMAP_PROPOSAL_PROFILE_LABELS: Readonly<Record<string, string>> = {
@@ -631,7 +636,11 @@ export function App(): React.JSX.Element {
     try {
       const result = await window.loopDesktop.approveExecutionDecision(draftId);
       if (requestId !== decisionRequestId.current || selectedProjectNameRef.current !== projectName || (selectedCandidate?.id ?? null) !== candidateId) return;
-      if (!result.ok) { setDecisionError(result.message); if (result.code === "decision_draft_stale") { setDecisionDraft(null); setDecisionRenewalCode("sha_stale"); } return; }
+      if (!result.ok) {
+        setDecisionError(result.message);
+        if (shouldClearDraftOnApproveFailure(result.code)) { setDecisionDraft(null); setDecisionRenewalCode(result.code === "decision_draft_stale" ? "sha_stale" : result.code); }
+        return;
+      }
       setDecisionDraft(null); setDecisionRenewalCode(null); setDecisionError(null);
       if (!(await refreshApprovedProjectContext(projectName!, candidateId))) { setDecisionRenewalCode("sha_stale"); setDecisionError("Le contexte a changé. Préparez une nouvelle décision."); return; }
       if (requestId !== decisionRequestId.current || selectedProjectNameRef.current !== projectName) return;
