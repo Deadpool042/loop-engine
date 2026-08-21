@@ -22,7 +22,7 @@
     "audit:profiles": "tsx scripts/audit-profile-check.ts",
     "audit:release-check": "tsx scripts/audit-release-check.ts",
     "prototype:gui-cockpit": "tsx scripts/prototype-gui-cockpit-server.ts",
-    "gui:start": "electron-forge start",
+    "gui:start": "bash scripts/gui-start.sh",
     "gui:package": "electron-forge package",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

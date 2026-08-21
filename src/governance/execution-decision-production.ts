@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { resolveContextPath } from "../context/path.js";
-import type { ExecutionDecisionCurrent } from "./execution-decision-service.js";
+import type { ExecutionDecisionCurrent, ExecutionDecisionPublicationFailureCode, ExecutionDecisionPublicationResult } from "./execution-decision-service.js";
 import { loadConfig, type ProjectConfig } from "../core/config.js";
 import { findProject } from "../core/project.js";
 import { generateProjectReport } from "../core/reports.js";
@@ -45,13 +45,19 @@ export function createProductionExecutionDecisionService(propose: (current: Exec
 }
 
 export type DecisionPublication = Readonly<{ commit: () => boolean; recover: () => boolean }>;
+const PUBLISH_ERRNOS = new Set(["EMFILE", "ENFILE", "EACCES", "EPERM", "ENOENT", "ENOSPC", "EROFS", "EIO"]);
+function publicationFailure(code: ExecutionDecisionPublicationFailureCode, error?: unknown): Extract<ExecutionDecisionPublicationResult, { ok: false }> {
+  const errno = error instanceof Error && "code" in error && typeof error.code === "string" && PUBLISH_ERRNOS.has(error.code) ? error.code as Extract<ExecutionDecisionPublicationResult, { ok: false }>["errno"] : undefined;
+  return { ok: false, code, ...(errno === undefined ? {} : { errno }) };
+}
 export function createTransactionalDecisionPublisher(options: Readonly<{ writeFile?: typeof writeFileSync; rename?: typeof renameSync; readFile?: typeof readFileSync; exists?: typeof existsSync; remove?: typeof rmSync }>) {
   const write = options.writeFile ?? writeFileSync, rename = options.rename ?? renameSync, read = options.readFile ?? readFileSync, exists = options.exists ?? existsSync, remove = options.remove ?? rmSync;
-  return (projectPath: string, relativePath: string, contents: string): Readonly<{ ok: true; publication: DecisionPublication }> | Readonly<{ ok: false }> => {
-    const destination = resolveContextPath(projectPath, relativePath); if (!destination.insideProject) return { ok: false };
-    const previous = exists(destination.absolutePath) ? (() => { try { return read(destination.absolutePath, "utf8"); } catch { return null; } })() : undefined; if (previous === null) return { ok: false };
+  return (projectPath: string, relativePath: string, contents: string): Readonly<{ ok: true; publication: DecisionPublication }> | Extract<ExecutionDecisionPublicationResult, { ok: false }> => {
+    const destination = resolveContextPath(projectPath, relativePath); if (!destination.insideProject) return publicationFailure("decision_draft_write_failed");
+    let previous: string | undefined; if (exists(destination.absolutePath)) { try { previous = read(destination.absolutePath, "utf8"); } catch (error) { return publicationFailure("decision_draft_read_previous_failed", error); } }
     const temporary = join(dirname(destination.absolutePath), `.${randomUUID()}.tmp`);
-    try { write(temporary, contents, { mode: 0o600 }); rename(temporary, destination.absolutePath); } catch { try { remove(temporary, { force: true }); } catch {} return { ok: false }; }
+    try { write(temporary, contents, { mode: 0o600 }); } catch (error) { try { remove(temporary, { force: true }); } catch {} return publicationFailure("decision_draft_write_temp_failed", error); }
+    try { rename(temporary, destination.absolutePath); } catch (error) { try { remove(temporary, { force: true }); } catch {} return publicationFailure("decision_draft_rename_failed", error); }
     return { ok: true, publication: { commit: () => true, recover: () => { try { if (previous === undefined) remove(destination.absolutePath, { force: true }); else { const rollback = join(dirname(destination.absolutePath), `.${randomUUID()}.tmp`); write(rollback, previous, { mode: 0o600 }); rename(rollback, destination.absolutePath); } return true; } catch { return false; } } } };
   };
 }
@@ -60,6 +66,6 @@ export function createProductionTransactionPort() {
   const publish = createTransactionalDecisionPublisher({});
   return async (current: ExecutionDecisionCurrent, contents: string) => {
     const result = publish(current.projectPath, current.executionDecisionPath, contents);
-    return result.ok ? { ok: true as const, commit: result.publication.commit, recover: result.publication.recover } : { ok: false as const };
+    return result.ok ? { ok: true as const, commit: result.publication.commit, recover: result.publication.recover } : result;
   };
 }
