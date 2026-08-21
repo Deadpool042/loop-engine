@@ -61,6 +61,7 @@ import {
   type LoopProviderRegistry,
 } from "./provider-registry.js";
 import { runExecutionDecisionProposal, type ExecutionDecisionProposeInput } from "./execution-decision-proposal.js";
+import { getExecutionDecisionCurrentReport } from "./execution-decision-current.js";
 
 export type LoopApplicationCodexProviderOptions = Omit<
   CodexProviderConfiguration,
@@ -141,6 +142,7 @@ export type LoopApplicationAssembly = Readonly<{
   runLoopExecute: typeof runLoopExecuteWithProviderFailoverEvidence;
   runLoopPlan: typeof runLoopPlan;
   runExecutionDecisionProposal: (input: ExecutionDecisionProposeInput) => ReturnType<typeof runExecutionDecisionProposal>;
+  getExecutionDecisionCurrentReport: typeof getExecutionDecisionCurrentReport;
 }>;
 
 export type LoopApplicationConfig = ReturnType<
@@ -289,5 +291,6 @@ export function createLoopApplicationAssembly(
       isolatedRunExecute ?? runLoopExecuteWithProviderFailoverEvidence,
     runLoopPlan,
     runExecutionDecisionProposal,
+    getExecutionDecisionCurrentReport,
   });
 }

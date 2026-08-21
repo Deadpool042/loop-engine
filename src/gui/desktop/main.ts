@@ -26,6 +26,7 @@ import { createReviewHandler } from "./review-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 import { createDesktopExecutionDecisionController } from "./execution-decision-controller.js";
 import { DESKTOP_EXECUTION_DECISION_TIMEOUT_MS } from "./execution-decision-cli-proposer.js";
+import { DESKTOP_EXECUTION_DECISION_CURRENT_TIMEOUT_MS } from "./execution-decision-cli-current.js";
 
 export const DESKTOP_MAIN_PROCESS_BUILD_IDENTIFIER = process.env.GIT_COMMIT ?? "development";
 
@@ -35,8 +36,9 @@ const roadmapProposalCliInvoker = createCliInvoker({
 });
 const gateReassessmentCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_GATE_REASSESSMENT_TIMEOUT_MS + 5_000 });
 const executionDecisionCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_EXECUTION_DECISION_TIMEOUT_MS + 7_000 });
+const executionDecisionCurrentCliInvoker = createCliInvoker({ timeoutMs: DESKTOP_EXECUTION_DECISION_CURRENT_TIMEOUT_MS });
 const executionCloseGuard = createExecutionWindowCloseGuard();
-const executionDecisionController = createDesktopExecutionDecisionController({ keychainReader: createProviderKeychainReader(), cliInvoker: executionDecisionCliInvoker, resolveRepositoryPath });
+const executionDecisionController = createDesktopExecutionDecisionController({ keychainReader: createProviderKeychainReader(), cliInvoker: executionDecisionCliInvoker, currentCliInvoker: executionDecisionCurrentCliInvoker, resolveRepositoryPath });
 if (process.env.NODE_ENV !== "production") console.info(`Loop Engine main process: ${DESKTOP_MAIN_PROCESS_BUILD_IDENTIFIER}`);
 let mainWindow: BrowserWindow | null = null;
 

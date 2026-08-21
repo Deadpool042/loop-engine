@@ -25,21 +25,22 @@ export function getCurrentExecutionDecisionState(projectName: string, dependenci
   return { project: project.name, projectPath, candidateId: candidate.id, gitHead: head!, sourceDocument: candidate.path, executionDecisionPath: project.execution_decision, projectConfig: project };
 }
 
-export function validatePublishedExecutionDecision(current: ProductionCurrent, draft: ExecutionDecisionDraft, read: typeof readFileSync = readFileSync): boolean {
+export function validatePublishedExecutionDecision(current: ExecutionDecisionCurrent, draft: ExecutionDecisionDraft, read: typeof readFileSync = readFileSync): boolean {
   const destination = resolveContextPath(current.projectPath, current.executionDecisionPath); if (!destination.insideProject) return false;
   let raw: string; try { raw = read(destination.absolutePath, "utf8"); } catch { return false; }
   const parsed = parseExecutionDecisionFile(raw); if (!parsed.ok) return false;
-  const authorization = resolveExecutionAuthorization(current.projectConfig, current.projectPath, current.gitHead);
+  const project = (current as ProductionCurrent).projectConfig ?? findProject(loadConfig(), current.project); if (!project || resolve(project.path) !== current.projectPath || project.execution_decision !== current.executionDecisionPath) return false;
+  const authorization = resolveExecutionAuthorization(project, current.projectPath, current.gitHead);
   return authorization.governed && authorization.authorized && authorization.candidateId === draft.candidateId && JSON.stringify(authorization.allowedPaths) === JSON.stringify(draft.allowedPaths);
 }
 
-export function createProductionExecutionDecisionService(propose: (current: ExecutionDecisionCurrent) => Promise<ExecutionDecisionProviderProposal>) {
+export function createProductionExecutionDecisionService(propose: (current: ExecutionDecisionCurrent) => Promise<ExecutionDecisionProviderProposal>, dependencies: Readonly<{ current?: (projectName: string) => Promise<ExecutionDecisionCurrent | null> }> = {}) {
   const store = createExecutionDecisionDraftStore(); const publish = createProductionTransactionPort();
   return createExecutionDecisionService({
-    current: async (projectName) => getCurrentExecutionDecisionState(projectName),
+    current: dependencies.current ?? (async (projectName) => getCurrentExecutionDecisionState(projectName)),
     propose,
     publishTransaction: publish,
-    validate: async (current, draft) => { const fresh = getCurrentExecutionDecisionState(current.project); return fresh !== null && fresh.projectPath === current.projectPath && validatePublishedExecutionDecision(fresh, draft); },
+    validate: async (current, draft) => validatePublishedExecutionDecision(current, draft),
   }, store);
 }
 

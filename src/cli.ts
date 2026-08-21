@@ -68,6 +68,7 @@ import {
 import { terminal } from "./ui/terminal.js";
 import { printJsonError } from "./commands/json-error.js";
 import { printExecutionDecisionProposalJson } from "./commands/execution-decision-propose.js";
+import { printExecutionDecisionCurrentJson } from "./commands/execution-decision-current.js";
 
 const application = createLoopApplicationAssembly();
 
@@ -269,6 +270,10 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   if (timeoutValue !== "60000") failOption(json, "invalid_provider_timeout", "--provider-timeout-ms 60000 is required.");
   if (json) await printExecutionDecisionProposalJson(application, { project: project.name, candidateId, sourceDocument, gitHead, provider, model, effort, timeoutMs: 60_000 });
   else terminal.info("Execution-decision propose requires --json.");
+} else if (command === "execution-decision" && process.argv[3] === "current") {
+  const project = resolveProjectOrExit("execution-decision current", 4);
+  if (process.argv.includes("--json")) printExecutionDecisionCurrentJson(application, project.name);
+  else terminal.info("Execution-decision current requires --json.");
 } else if (command === "roadmap") {
   terminal.error(
     "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json] | roadmap propose-estimate <project> [--json] | roadmap propose <project> --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>] [--json]",
