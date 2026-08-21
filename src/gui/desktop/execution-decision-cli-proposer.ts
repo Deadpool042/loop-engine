@@ -2,9 +2,10 @@ import { ExecutionDecisionProviderFailure } from "../../governance/execution-dec
 import type { ExecutionDecisionCurrent, ExecutionDecisionProviderProposal } from "../../governance/execution-decision-service.js";
 import type { CliInvocationResult, CliInvoker } from "../cli-invoker.js";
 import type { ProviderKeychainReader } from "../keychain-reader.js";
+import { ExecutionDecisionPreparationPassthroughFailure } from "../../governance/execution-decision-errors.js";
 
 export const DESKTOP_EXECUTION_DECISION_TIMEOUT_MS = 60_000;
-export class ExecutionDecisionCliBoundaryFailure extends Error { constructor(readonly code: "repository_unavailable" | "cli_spawn_failed" | "cli_timeout" | "cli_response_invalid") { super(code); } }
+export class ExecutionDecisionCliBoundaryFailure extends ExecutionDecisionPreparationPassthroughFailure { constructor(readonly code: "repository_unavailable" | "cli_spawn_failed" | "cli_timeout" | "cli_response_invalid") { super(); this.message = code; this.name = "ExecutionDecisionCliBoundaryFailure"; } }
 type Parsed = Readonly<{ status: "completed"; proposal: ExecutionDecisionProviderProposal }> | Readonly<{ status: "stale" }> | Readonly<{ status: "failed"; failure: ConstructorParameters<typeof ExecutionDecisionProviderFailure>[0] }>;
 function boundary(code: ExecutionDecisionCliBoundaryFailure["code"]): never { throw new ExecutionDecisionCliBoundaryFailure(code); }
 function only(value: Record<string, unknown>, keys: readonly string[]): boolean { return Object.keys(value).every((key) => keys.includes(key)); }
