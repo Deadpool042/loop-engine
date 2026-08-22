@@ -52,23 +52,37 @@ export function isPlanForSelectedProject(
   return planProjectName !== null && planProjectName === selectedProjectName;
 }
 
-const STATIC_PLAN_STEP_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  "Prepare short project context (context)": "Préparation du contexte projet borné (context)",
-  "Prepare delegation prompt (prompt)": "Préparation du prompt de délégation (prompt)",
-  "Await explicit agent execution in mode execute":
-    "Attente d'une exécution explicite de l’agent en mode execute",
-  "Run local validation and audit before commit (validate, audit)":
-    "Validation et audit locaux avant commit (validate, audit)",
-  "Commit only in mode commit": "Commit uniquement en mode commit",
-  "Publish only in mode publish": "Publication uniquement en mode publish",
-});
+const STATIC_PLAN_STEP_LABELS: Readonly<Record<string, string>> = Object.freeze(
+  {
+    "Prepare short project context (context)":
+      "Préparation du contexte projet borné (context)",
+    "Prepare delegation prompt (prompt)":
+      "Préparation du prompt de délégation (prompt)",
+    "Await explicit agent execution in mode execute":
+      "Attente d'une exécution explicite de l’agent en mode execute",
+    "Run local validation and audit before commit (validate, audit)":
+      "Validation et audit locaux avant commit (validate, audit)",
+    "Commit only in mode commit": "Commit uniquement en mode commit",
+    "Publish only in mode publish": "Publication uniquement en mode publish",
+  },
+);
 
-function formatPlanStep(plan: PlanDetail, stepName: string, detail: string): string {
-  if (stepName === "planning" && detail === `Resolving project: ${plan.project}`) {
+function formatPlanStep(
+  plan: PlanDetail,
+  stepName: string,
+  detail: string,
+): string {
+  if (
+    stepName === "planning" &&
+    detail === `Resolving project: ${plan.project}`
+  ) {
     return `Résolution du projet : ${plan.project}`;
   }
 
-  if (stepName === "ready" && detail === `Selected candidate: ${plan.candidate.text}`) {
+  if (
+    stepName === "ready" &&
+    detail === `Selected candidate: ${plan.candidate.text}`
+  ) {
     return `Candidat confirmé : ${plan.candidate.id} — ${plan.candidate.text}`;
   }
 
@@ -93,13 +107,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
 }
 
-function parseProfile(value: unknown): PlanDetail["profile"] | null | undefined {
+function parseProfile(
+  value: unknown,
+): PlanDetail["profile"] | null | undefined {
   if (value === null) return null;
   if (!isRecord(value) || !isRecord(value.selection)) return undefined;
-  if (value.selection.outcome !== "selected" || !isRecord(value.selection.profile)) {
+  if (
+    value.selection.outcome !== "selected" ||
+    !isRecord(value.selection.profile)
+  ) {
     return null;
   }
 
@@ -204,7 +225,9 @@ export function parsePlanDetail(value: unknown): PlanDetail | null {
   }
 
   const steps = value.steps.map((step) =>
-    isRecord(step) && typeof step.name === "string" && isStringArray(step.details)
+    isRecord(step) &&
+    typeof step.name === "string" &&
+    isStringArray(step.details)
       ? { name: step.name, details: step.details }
       : null,
   );

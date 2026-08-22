@@ -63,7 +63,7 @@ interface LoopTaskRequirements {
   minimumEffort: AgentEffort;
   maximumEffort: AgentEffort;
   preferredProviders?: readonly AgentProvider[];
-  preferredProfileId?: string;
+  preferredCapabilityTier?: AgentProfileTier;
   allowedProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
   contextBudget: ContextBudget;
@@ -74,7 +74,7 @@ interface LoopTaskRequirements {
 
 `requiredCapabilities` dépend uniquement de la catégorie. `requiredPermissions` dépend du **plafond du mode** (`getAllowedPermissionsForMode`) filtré par les besoins de la catégorie — jamais l'inverse : c'est ce qui garantit qu'aucune capacité d'écriture n'est jamais requise en mode `plan`, quelle que soit la catégorie du lot.
 
-`preferredProfileId` (`CATEGORY_PREFERRED_PROFILE_ID` dans `src/policy/resolver.ts`) est la cible doctrinale de la catégorie — un id de profil de registry, jamais un nom de modèle codé en dur — sans jamais contraindre la sélection : `selectAgentProfile` reste un lookup pur sur les seules `requiredCapabilities`/`requiredPermissions`/effort/budget (voir "Cible de politique vs profil résolu" ci-dessous).
+`preferredCapabilityTier` (`CATEGORY_PREFERRED_CAPABILITY_TIER` dans `src/policy/resolver.ts`) exprime une préférence doctrinale abstraite et indépendante du fournisseur. Elle ne contraint jamais la sélection : `selectAgentProfile` reste un lookup pur sur les seules `requiredCapabilities`/`requiredPermissions`/effort/budget (voir "Cible de politique vs profil résolu" ci-dessous).
 
 ### `AgentPolicy`
 
@@ -115,12 +115,12 @@ Codes de statut (`AGENT_POLICY_STATUS_CODES`) : `resolved`, `no_safe_candidate`,
 
 ### Cible de politique vs profil résolu (`fallback`)
 
-`requirements.preferredProfileId` exprime la cible doctrinale d'une catégorie (ex. : le palier de raisonnement le plus capable pour `architecture`) — une **préférence**, jamais une exigence. `requirements.requiredCapabilities`/`requiredPermissions`/`minimumEffort`/budgets restent les seules contraintes fail-closed : un profil qui ne les satisfait pas n'est jamais sélectionné, préférence ou non.
+`requirements.preferredCapabilityTier` exprime la cible doctrinale abstraite d'une catégorie (par exemple `high_reasoning` pour `architecture`) — une **préférence**, jamais une exigence. `requirements.requiredCapabilities`/`requiredPermissions`/`minimumEffort`/budgets restent les seules contraintes fail-closed : un profil qui ne les satisfait pas n'est jamais sélectionné, préférence ou non.
 
-`resolution.fallback` compare, après coup, le profil réellement sélectionné (`selection.profile.id`) à `requirements.preferredProfileId` :
+`resolution.fallback` vérifie, après coup, si le profil réellement sélectionné déclare le tier préféré dans `selection.profile.tiers` :
 
-- `{ active: false, reason: null }` — la catégorie n'a pas de préférence déclarée, ou le profil préféré a été sélectionné tel quel ;
-- `{ active: true, reason: "preferred_profile_unavailable" }` — le profil sélectionné diffère de la préférence (typiquement parce que le profil préféré n'est pas encore intégré/tarifé dans le registry, ex. `claude_code.opus`, absent de `DEFAULT_AGENT_PROFILES` tant qu'aucune tarification Opus n'existe dans `src/text-only-provider/pricing.ts`).
+- `{ active: false, reason: null }` — la catégorie n'a pas de préférence déclarée, ou le profil sélectionné porte le tier préféré ;
+- `{ active: true, reason: "preferred_capability_tier_unavailable" }` — le profil sélectionné satisfait toutes les exigences obligatoires mais ne porte pas le tier doctrinal préféré actuellement disponible.
 
 Un `fallback` n'est **jamais** une escalade (`src/agents/escalation.ts`) : l'escalade ne se déclenche que sur un échec réel d'une tentative précédente (`previousProfileId` + `failureReason` explicites) et ne fait jamais partie de `resolvePolicy`. Un fallback reflète une préférence indisponible au moment de la résolution, sans jamais élever l'effort au-delà de `requirements.minimumEffort`.
 

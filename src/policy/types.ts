@@ -13,6 +13,7 @@ import type {
   AgentCapability,
   AgentEffort,
   AgentPermission,
+  AgentProfileTier,
   AgentProvider,
   AgentRuntime,
 } from "../agents/types.js";
@@ -78,12 +79,10 @@ export type LoopTaskRequirements = Readonly<{
   minimumEffort: AgentEffort;
   maximumEffort: AgentEffort;
   preferredProviders?: readonly AgentProvider[];
-  // The doctrinal ideal profile for this category (e.g. the strongest
-  // integrated reasoning tier for "architecture"), expressed as a registry
-  // profile id. Never a hardcoded model name and never gates selection —
-  // see CATEGORY_PREFERRED_PROFILE_ID in src/policy/resolver.ts. Absent
-  // when the category has no declared preference beyond its requirements.
-  preferredProfileId?: string;
+  // Optional doctrinal preference tier for this category. This is
+  // provider-independent and never gates selection: hard requirements remain
+  // capabilities/permissions/effort/budget only.
+  preferredCapabilityTier?: AgentProfileTier;
   allowedProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
   contextBudget: ContextBudget;
@@ -134,14 +133,14 @@ export const AGENT_POLICY_STATUS_CODES = [
 export type AgentPolicyStatusCode = (typeof AGENT_POLICY_STATUS_CODES)[number];
 
 export const AGENT_POLICY_FALLBACK_REASONS = [
-  "preferred_profile_unavailable",
+  "preferred_capability_tier_unavailable",
 ] as const;
 
 export type AgentPolicyFallbackReason =
   (typeof AGENT_POLICY_FALLBACK_REASONS)[number];
 
-// Reports whether the resolved selection is the category's doctrinal ideal
-// (requirements.preferredProfileId) or a degraded-but-compatible stand-in.
+// Reports whether the resolved selection fully satisfies the category's
+// optional doctrinal capability preference or uses a compatible fallback.
 // A fallback is never a requirements violation — the selected profile still
 // satisfies every required capability/permission/budget; it just is not the
 // preferred one, typically because that preferred profile is not yet

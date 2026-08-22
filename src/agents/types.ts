@@ -37,6 +37,10 @@ export const AGENT_CAPABILITIES = [
 
 export type AgentCapability = (typeof AGENT_CAPABILITIES)[number];
 
+export const AGENT_PROFILE_TIERS = ["high_reasoning"] as const;
+
+export type AgentProfileTier = (typeof AGENT_PROFILE_TIERS)[number];
+
 // git_tag is deliberately separate from git_push: creating a tag is never an
 // implicit consequence of a permission that allows pushing a branch. See
 // docs/architecture/agent-policy-engine.md.
@@ -95,6 +99,10 @@ export type AgentProfile = Readonly<{
   model: string;
   effort: AgentEffort;
   capabilities: readonly AgentCapability[];
+  // Optional descriptive tiers used by policy preferences only.
+  // They never grant capabilities or permissions and never affect selector
+  // eligibility/ranking unless a higher layer explicitly inspects them.
+  tiers?: readonly AgentProfileTier[];
   permissions: readonly AgentPermission[];
   budget: AgentBudget;
 }>;

@@ -1519,7 +1519,7 @@ export function App(): React.JSX.Element {
                               </p>
                               {planDetail.profile.fallbackActive && (
                                 <p className="mt-2 text-xs text-amber-800">
-                                  Fallback policy : profil préféré
+                                  Fallback policy : profil préféré indisponible
                                   indisponible — résolution disponible
                                   utilisée à la place.
                                 </p>

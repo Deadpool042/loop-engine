@@ -33,7 +33,9 @@ describe("GUI explicit plan contract", () => {
         steps: [
           {
             name: "completed",
-            details: ["Run local validation and audit before commit (validate, audit)"],
+            details: [
+              "Run local validation and audit before commit (validate, audit)",
+            ],
           },
         ],
         agentPolicy: {
@@ -76,7 +78,9 @@ describe("GUI explicit plan contract", () => {
         steps: [
           {
             name: "completed",
-            details: ["Run local validation and audit before commit (validate, audit)"],
+            details: [
+              "Run local validation and audit before commit (validate, audit)",
+            ],
           },
         ],
         profile: {
@@ -119,7 +123,10 @@ describe("GUI explicit plan contract", () => {
       },
       steps: [
         { name: "planning", details: ["Resolving project: lp-infra"] },
-        { name: "ready", details: ["Selected candidate: Runbook rollback (testé)"] },
+        {
+          name: "ready",
+          details: ["Selected candidate: Runbook rollback (testé)"],
+        },
         {
           name: "completed",
           details: [

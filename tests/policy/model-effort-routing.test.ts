@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { createAgentRegistry, defaultAgentRegistry } from "../../src/agents/registry.js";
+import {
+  createAgentRegistry,
+  defaultAgentRegistry,
+} from "../../src/agents/registry.js";
 import { escalateAgentProfile } from "../../src/agents/escalation.js";
 import type { AgentProfile } from "../../src/agents/types.js";
 import type { RoadmapCandidate } from "../../src/intelligence/roadmap.js";
@@ -24,13 +27,10 @@ import { resolvePolicy } from "../../src/policy/resolver.js";
 // "difficult diagnosis" is exercised via explicit escalation, the only
 // mechanism that legitimately reaches "high".
 //
-// Opus is not integrated in Loop Engine today: the Anthropic pricing table
-// (src/text-only-provider/pricing.ts) explicitly has no entry for
-// "claude-opus-5" (resolveAnthropicPricing returns null for it, see
-// tests/text-only-provider/pricing.test.ts). Adding it is out of scope for
-// this lot — no compatible, priced Opus profile exists to route to, so
-// "architecture"/"security" resolve to the cheapest capable Anthropic
-// profile instead: claude-sonnet-5 at effort medium.
+// Architecture expresses a provider-independent "high_reasoning" preference.
+// No default registry profile advertises that tier today, so the resolver
+// reports an explicit fallback while still selecting the smallest profile
+// satisfying the hard requirements.
 
 function candidate(text: string): RoadmapCandidate {
   return {
@@ -59,7 +59,9 @@ describe("generic model/effort routing matrix", () => {
     assert.equal(result.requirements.category, "code");
     assert.equal(result.selection?.outcome, "selected");
     assert.equal(
-      result.selection?.outcome === "selected" ? result.selection.profile.effort : null,
+      result.selection?.outcome === "selected"
+        ? result.selection.profile.effort
+        : null,
       "low",
     );
   });
@@ -69,17 +71,23 @@ describe("generic model/effort routing matrix", () => {
     assert.equal(result.requirements.category, "code");
     assert.equal(result.requirements.minimumEffort, "medium");
     assert.equal(
-      result.selection?.outcome === "selected" ? result.selection.profile.effort : null,
+      result.selection?.outcome === "selected"
+        ? result.selection.profile.effort
+        : null,
       "low",
     );
   });
 
   it("moderate bug/diagnosis lot ('tests' category) stays at medium, not high", () => {
-    const result = resolve("- [ ] Add regression tests for the flaky retry bug");
+    const result = resolve(
+      "- [ ] Add regression tests for the flaky retry bug",
+    );
     assert.equal(result.requirements.category, "tests");
     assert.equal(result.requirements.minimumEffort, "medium");
     assert.notEqual(
-      result.selection?.outcome === "selected" ? result.selection.profile.effort : null,
+      result.selection?.outcome === "selected"
+        ? result.selection.profile.effort
+        : null,
       "high",
     );
   });
@@ -91,7 +99,10 @@ describe("generic model/effort routing matrix", () => {
     assert.equal(result.requirements.category, "architecture");
     assert.equal(result.requirements.minimumEffort, "medium");
     assert.equal(result.selection?.outcome, "selected");
-    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    const profile =
+      result.selection?.outcome === "selected"
+        ? result.selection.profile
+        : null;
     assert.equal(profile?.model, "claude-sonnet-5");
     assert.equal(profile?.effort, "medium");
     assert.equal(profile?.capabilities.includes("long_context"), true);
@@ -102,7 +113,10 @@ describe("generic model/effort routing matrix", () => {
       "- [ ] ADR architecture du cockpit : frontière sécurité et accès VPS",
     );
     assert.equal(result.selection?.outcome, "selected");
-    const previous = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    const previous =
+      result.selection?.outcome === "selected"
+        ? result.selection.profile
+        : null;
     assert.equal(previous?.id, "claude_code.medium");
 
     const escalation = escalateAgentProfile({
@@ -138,25 +152,26 @@ describe("generic model/effort routing matrix", () => {
   });
 });
 
-// A registry profile carrying the declared preferred id
-// ("claude_code.opus") for the "architecture" fixture below — used only to
-// prove that resolvePolicy prefers it when it IS registered/compatible,
-// with no fallback reported. It is not added to defaultAgentRegistry.
+// Fixture-only profile that advertises the provider-independent doctrinal
+// tier used by architecture. It is deliberately not part of
+// defaultAgentRegistry: the test only proves that the policy recognizes the
+// preference when a compatible profile carrying that tier is available.
 function architecturePreferredProfile(
   overrides: Partial<AgentProfile> = {},
 ): AgentProfile {
   return {
-    id: "claude_code.opus",
-    runtime: "claude_code",
-    provider: "anthropic",
-    model: "claude-opus-5",
+    id: "fixture.high-reasoning",
+    runtime: "custom",
+    provider: "local",
+    model: "fixture-high-reasoning",
     effort: "medium",
     capabilities: ["code_edit", "shell_exec", "test_execution", "long_context"],
     permissions: ["read_only", "write_worktree", "shell_exec", "git_commit"],
+    tiers: ["high_reasoning"],
     budget: {
-      maxTokens: 400_000,
-      maxCostUsd: 20,
-      maxDurationMs: 900_000,
+      maxTokens: 150_000,
+      maxCostUsd: 4,
+      maxDurationMs: 300_000,
       maxCalls: 1,
       maxRepairs: 1,
     },
@@ -167,16 +182,22 @@ function architecturePreferredProfile(
 describe("policy target vs. resolved profile — fallback", () => {
   it("architecture declares a preferred profile id that is not registered today", () => {
     const result = resolve("- [ ] Revoir l'architecture du runner");
-    assert.equal(result.requirements.preferredProfileId, "claude_code.opus");
+    assert.equal(result.requirements.preferredCapabilityTier, "high_reasoning");
   });
 
   it("architecture with the preferred profile unavailable: resolves to the best compatible profile, fallback active with a stable reason", () => {
     const result = resolve("- [ ] Revoir l'architecture du runner");
     assert.equal(result.status, "resolved");
-    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    const profile =
+      result.selection?.outcome === "selected"
+        ? result.selection.profile
+        : null;
     assert.equal(profile?.id, "claude_code.medium");
     assert.equal(result.fallback.active, true);
-    assert.equal(result.fallback.reason, "preferred_profile_unavailable");
+    assert.equal(
+      result.fallback.reason,
+      "preferred_capability_tier_unavailable",
+    );
   });
 
   it("architecture with the preferred profile available and compatible: it is selected, fallback inactive", () => {
@@ -199,8 +220,11 @@ describe("policy target vs. resolved profile — fallback", () => {
     });
 
     assert.equal(result.status, "resolved");
-    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
-    assert.equal(profile?.id, "claude_code.opus");
+    const profile =
+      result.selection?.outcome === "selected"
+        ? result.selection.profile
+        : null;
+    assert.equal(profile?.id, "fixture.high-reasoning");
     assert.equal(result.fallback.active, false);
     assert.equal(result.fallback.reason, null);
   });
@@ -220,8 +244,11 @@ describe("policy target vs. resolved profile — fallback", () => {
       mode: "plan",
     });
 
-    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
-    assert.notEqual(profile?.id, "claude_code.opus");
+    const profile =
+      result.selection?.outcome === "selected"
+        ? result.selection.profile
+        : null;
+    assert.notEqual(profile?.id, "fixture.high-reasoning");
     assert.equal(profile?.id, "claude_code.medium");
     assert.equal(result.fallback.active, true);
   });
@@ -235,7 +262,11 @@ describe("policy target vs. resolved profile — fallback", () => {
       "- [ ] Review the last release", // review
     ]) {
       const result = resolve(text);
-      assert.equal(result.requirements.preferredProfileId, undefined, text);
+      assert.equal(
+        result.requirements.preferredCapabilityTier,
+        undefined,
+        text,
+      );
       assert.equal(result.fallback.active, false, text);
       assert.equal(result.fallback.reason, null, text);
     }
@@ -244,7 +275,10 @@ describe("policy target vs. resolved profile — fallback", () => {
   it("fallback and escalation are distinct: a fallback never bumps effort, and escalation is never triggered by an unavailable preference", () => {
     const result = resolve("- [ ] Revoir l'architecture du runner");
     assert.equal(result.fallback.active, true);
-    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    const profile =
+      result.selection?.outcome === "selected"
+        ? result.selection.profile
+        : null;
     // The fallback resolved to claude_code.medium — the same effort tier
     // the category requires — never escalating to "high" on its own.
     assert.equal(profile?.effort, "medium");
@@ -273,7 +307,10 @@ describe("H4-L1 (lp-infra) — real routing regression", () => {
     const result = resolve(H4_L1_TEXT);
     assert.equal(result.requirements.category, "architecture");
     assert.equal(result.status, "resolved");
-    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    const profile =
+      result.selection?.outcome === "selected"
+        ? result.selection.profile
+        : null;
     assert.equal(profile?.provider, "anthropic");
     assert.equal(profile?.model, "claude-sonnet-5");
     assert.notEqual(profile?.effort, "high");
@@ -283,15 +320,24 @@ describe("H4-L1 (lp-infra) — real routing regression", () => {
   it("the context budget is a bounded ceiling, not an artificial 40000-token floor", () => {
     const result = resolve(H4_L1_TEXT);
     assert.equal(result.requirements.contextBudget.maxEstimatedTokens, 15_000);
-    assert.notEqual(result.requirements.contextBudget.maxEstimatedTokens, 40_000);
+    assert.notEqual(
+      result.requirements.contextBudget.maxEstimatedTokens,
+      40_000,
+    );
   });
 
   it("reports an explicit, stable fallback reason instead of silently redefining the doctrine", () => {
     const result = resolve(H4_L1_TEXT);
-    assert.equal(result.requirements.preferredProfileId, "claude_code.opus");
+    assert.equal(result.requirements.preferredCapabilityTier, "high_reasoning");
     assert.equal(result.fallback.active, true);
-    assert.equal(result.fallback.reason, "preferred_profile_unavailable");
-    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    assert.equal(
+      result.fallback.reason,
+      "preferred_capability_tier_unavailable",
+    );
+    const profile =
+      result.selection?.outcome === "selected"
+        ? result.selection.profile
+        : null;
     assert.equal(profile?.id, "claude_code.medium");
   });
 });
@@ -306,7 +352,10 @@ describe("context budget: ceiling vs. actual estimate", () => {
       "| H4-L1 | ADR architecture du cockpit | ⬜ À faire |",
     );
     const estimatedRealTokens = 3642;
-    assert.ok(estimatedRealTokens < result.requirements.contextBudget.maxEstimatedTokens);
+    assert.ok(
+      estimatedRealTokens <
+        result.requirements.contextBudget.maxEstimatedTokens,
+    );
     assert.equal(result.requirements.minimumEffort, "medium");
   });
 
@@ -315,8 +364,14 @@ describe("context budget: ceiling vs. actual estimate", () => {
     // 15000-token context ceiling for medium effort; that headroom alone
     // must not bump the selected profile's effort.
     const result = resolve("- [ ] Revoir l'architecture du runner");
-    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    const profile =
+      result.selection?.outcome === "selected"
+        ? result.selection.profile
+        : null;
     assert.equal(profile?.effort, "medium");
-    assert.ok((profile?.budget.maxTokens ?? 0) > result.requirements.contextBudget.maxEstimatedTokens);
+    assert.ok(
+      (profile?.budget.maxTokens ?? 0) >
+        result.requirements.contextBudget.maxEstimatedTokens,
+    );
   });
 });

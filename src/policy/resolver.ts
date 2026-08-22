@@ -13,6 +13,7 @@ import {
   compareAgentEffort,
   type AgentCapability,
   type AgentPermission,
+  type AgentProfileTier,
 } from "../agents/types.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import {
@@ -146,19 +147,14 @@ const CATEGORY_MINIMUM_EFFORT: Readonly<
   none: "low",
 };
 
-// The doctrinal ideal profile per category, as a registry profile id — never
-// a hardcoded model name and never a selection requirement. A category
-// absent here has no declared preference: its resolution is never reported
-// as a fallback. "claude_code.opus" is intentionally NOT registered in
-// src/agents/registry.ts (no priced Opus profile exists yet — see
-// src/text-only-provider/pricing.ts, which has no entry for claude-opus-5);
-// referencing its would-be id here lets resolvePolicy report the gap
-// honestly (fallback.active) instead of silently redefining the doctrine
-// down to whatever is currently registered.
-const CATEGORY_PREFERRED_PROFILE_ID: Readonly<
-  Partial<Record<LoopTaskCategory, string>>
+// Optional provider-independent doctrinal preference per category. This is
+// descriptive policy metadata, never a hard selection requirement: concrete
+// profile eligibility remains governed only by capabilities, permissions,
+// effort and budget. A category absent here has no additional preference.
+const CATEGORY_PREFERRED_CAPABILITY_TIER: Readonly<
+  Partial<Record<LoopTaskCategory, AgentProfileTier>>
 > = {
-  architecture: "claude_code.opus",
+  architecture: "high_reasoning",
 };
 
 export function deriveRequiredPermissions(
@@ -190,7 +186,7 @@ export function deriveTaskRequirements(
 ): LoopTaskRequirements {
   const category = classifyLoopTaskCategory(candidate);
   const minimumEffort = CATEGORY_MINIMUM_EFFORT[category];
-  const preferredProfileId = CATEGORY_PREFERRED_PROFILE_ID[category];
+  const preferredCapabilityTier = CATEGORY_PREFERRED_CAPABILITY_TIER[category];
   const rationale: string[] = [
     candidate
       ? `category=${category} derived from candidate text keywords`
@@ -205,7 +201,9 @@ export function deriveTaskRequirements(
     requiredPermissions: deriveRequiredPermissions(category, mode),
     minimumEffort,
     maximumEffort: policy.maximumEffort,
-    ...(preferredProfileId === undefined ? {} : { preferredProfileId }),
+    ...(preferredCapabilityTier === undefined
+      ? {}
+      : { preferredCapabilityTier }),
     contextBudget: getContextBudgetForEffort(minimumEffort),
     executionBudget: DEFAULT_MODE_BUDGETS[mode],
     rationale,
@@ -255,7 +253,7 @@ function resolveFallback(
   requirements: LoopTaskRequirements,
   selection: AgentPolicyResolution["selection"],
 ): AgentPolicyFallback {
-  if (requirements.preferredProfileId === undefined) {
+  if (requirements.preferredCapabilityTier === undefined) {
     return NO_FALLBACK;
   }
 
@@ -263,16 +261,14 @@ function resolveFallback(
     return NO_FALLBACK;
   }
 
-  if (selection.profile.id === requirements.preferredProfileId) {
+  if (selection.profile.tiers?.includes(requirements.preferredCapabilityTier)) {
     return NO_FALLBACK;
   }
 
-  // The resolved profile already differs from the category's declared
-  // preference — that alone is the fallback signal, whether the preferred
-  // profile is simply unregistered (the common case today, e.g.
-  // "claude_code.opus") or registered but rejected by this specific
-  // request's requirements.
-  return { active: true, reason: "preferred_profile_unavailable" };
+  // The selected profile satisfies every hard requirement but does not carry
+  // the category's optional doctrinal preference tier. This is a capability
+  // fallback, not an escalation and not a requirements violation.
+  return { active: true, reason: "preferred_capability_tier_unavailable" };
 }
 
 // Pure, deterministic, and never invokes an agent: only ever reads the
@@ -414,7 +410,7 @@ export function resolvePolicy(
       : `merged budget allows ${String(budget.maxCalls)} call(s) in mode ${mode}`,
     ...(fallback.active
       ? [
-          `fallback: preferred profile "${requirements.preferredProfileId}" is unavailable; resolved to the best compatible profile "${selection.profile.id}" instead`,
+          `fallback: preferred capability tier "${requirements.preferredCapabilityTier}" is unavailable; resolved to the best compatible profile "${selection.profile.id}" instead`,
         ]
       : []),
   ];
