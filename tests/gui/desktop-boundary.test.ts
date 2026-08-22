@@ -23,6 +23,7 @@ describe("GUI desktop execution boundary", () => {
     assert.equal(api.execute.length, 1);
     assert.equal(api.startExecution.length, 1);
     assert.equal(api.executionSession.length, 1);
+    assert.equal(api.cancelExecution.length, 1);
     assert.equal(api.roadmapProposal.length, 2);
     assert.equal(api.roadmapProposalEstimate.length, 1);
     assert.equal(api.gateReassessment.length, 2);
@@ -46,6 +47,7 @@ describe("GUI desktop execution boundary", () => {
       model: "gpt-5.6-terra",
     });
     await api.executionSession("session-1");
+    await api.cancelExecution("session-1");
     await api.roadmapProposal("loop-engine", "auto");
     await api.roadmapProposalEstimate("loop-engine");
     await api.gateReassessment("lp-infra", "auto");
@@ -76,6 +78,7 @@ describe("GUI desktop execution boundary", () => {
         },
       ],
       ["loop:execution-session", "session-1"],
+      ["loop:execution-cancel", "session-1"],
       ["loop:roadmap-proposal", "loop-engine", "auto"],
       ["loop:roadmap-proposal-estimate", "loop-engine"],
       ["loop:gate-reassessment", "lp-infra", "auto"],
@@ -150,6 +153,10 @@ describe("GUI desktop execution boundary", () => {
     assert.match(
       mainSource,
       /ipcMain\.handle\("loop:execution-session", \(_event, sessionId\) =>\s*executionSessions\.get\(sessionId\),?\s*\)/s,
+    );
+    assert.match(
+      mainSource,
+      /ipcMain\.handle\("loop:execution-cancel", \(_event, sessionId\) =>\s*executionSessions\.cancel\(sessionId\),?\s*\)/s,
     );
     assert.match(
       mainSource,

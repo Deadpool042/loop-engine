@@ -109,11 +109,12 @@ ipcMain.handle("loop:plan", (_event, projectName, candidateId) =>
 
 const executionSessions = createExecutionSessionManager({
   createExecuteHandler(onProgress) {
-    return createExecuteHandler({
-      cliInvoker: createObservableExecuteCliInvoker({
-        timeoutMs: DESKTOP_EXECUTE_CLI_TIMEOUT_MS,
-        onProgress,
-      }),
+    const observableCliInvoker = createObservableExecuteCliInvoker({
+      timeoutMs: DESKTOP_EXECUTE_CLI_TIMEOUT_MS,
+      onProgress,
+    });
+    const handler = createExecuteHandler({
+      cliInvoker: observableCliInvoker,
       resolveRepositoryPath,
       async choosePatchDestination(defaultPath) {
         const options = {
@@ -127,6 +128,7 @@ const executionSessions = createExecutionSessionManager({
         return result.canceled || !result.filePath ? null : result.filePath;
       },
     });
+    return { handler, cancel: observableCliInvoker.cancel };
   },
 });
 
@@ -169,6 +171,9 @@ ipcMain.handle("loop:execution-start", (_event, request) =>
 );
 ipcMain.handle("loop:execution-session", (_event, sessionId) =>
   executionSessions.get(sessionId),
+);
+ipcMain.handle("loop:execution-cancel", (_event, sessionId) =>
+  executionSessions.cancel(sessionId),
 );
 ipcMain.handle("loop:execute", async (_event, request) => {
   const started = await startExecutionSession(request);

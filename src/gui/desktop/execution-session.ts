@@ -16,7 +16,8 @@ export type DesktopExecutionEventType =
   | "execution_started"
   | "validation_started"
   | "completed"
-  | "failed";
+  | "failed"
+  | "cancelled";
 
 export type DesktopExecutionEvent = Readonly<{
   sequence: number;
@@ -38,6 +39,10 @@ type ExecuteHandler = (request: unknown) => Promise<CliInvocationResult>;
 
 function failure(raw: string): CliInvocationResult {
   return Object.freeze({ ok: false as const, kind: "spawn-error", raw });
+}
+
+function cancelledFailure(raw: string): CliInvocationResult {
+  return Object.freeze({ ok: false as const, kind: "cancelled", raw });
 }
 
 function eventType(status: unknown): DesktopExecutionEventType | null {
@@ -76,7 +81,7 @@ export function createObservableExecuteCliInvoker(options: {
     args: readonly string[],
     options: { cwd: string; shell: false; stdio: ["ignore", "pipe", "pipe"] },
   ) => ChildProcessWithoutNullStreams;
-}): CliInvoker {
+}): CliInvoker & { cancel: () => boolean } {
   const executable = options.executable ?? "pnpm";
   const maxJsonBytes = options.maxJsonBytes ?? MAX_JSON_BYTES;
   const maxStderrRemainderBytes =
@@ -102,6 +107,9 @@ export function createObservableExecuteCliInvoker(options: {
   if (!Number.isInteger(terminationFinalGraceMs) || terminationFinalGraceMs <= 0) {
     throw new Error("GUI execution final termination grace must be a positive integer.");
   }
+  // Cancellation reuses the same SIGTERM/SIGKILL path as the timeout: it just
+  // requests termination of whichever invocation is currently in flight.
+  let requestActiveCancellation: (() => void) | null = null;
   return Object.freeze({
     invoke(command, args, cwd) {
       const invocationArgs = [
@@ -119,13 +127,17 @@ export function createObservableExecuteCliInvoker(options: {
         let stderrRemainder = "";
         let stderrRemainderBytes = 0;
         let discardStderrUntilNewline = false;
-        let terminationReason: "timeout" | "oversized-json" | null = null;
+        let terminationReason:
+          "timeout" | "oversized-json" | "cancelled" | null = null;
         const finish = (result: CliInvocationResult): void => {
           if (settled) return;
           settled = true;
           clearTimeout(timeout);
           clearTimeout(terminationGrace);
           clearTimeout(terminationFinalGrace);
+          if (requestActiveCancellation === cancelThisInvocation) {
+            requestActiveCancellation = null;
+          }
           resolve(result);
         };
         const child = spawnProcess(executable, invocationArgs, {
@@ -135,17 +147,23 @@ export function createObservableExecuteCliInvoker(options: {
         });
         let terminationGrace: ReturnType<typeof setTimeout> | undefined;
         let terminationFinalGrace: ReturnType<typeof setTimeout> | undefined;
-        const terminate = (reason: "timeout" | "oversized-json"): void => {
+        const terminate = (
+          reason: "timeout" | "oversized-json" | "cancelled",
+        ): void => {
           if (terminationReason !== null || settled) return;
           terminationReason = reason;
           child.kill("SIGTERM");
           terminationGrace = setTimeout(() => {
             child.kill("SIGKILL");
             terminationFinalGrace = setTimeout(() => {
-              finish(failure("CLI process termination could not be confirmed."));
+              finish(
+                failure("CLI process termination could not be confirmed."),
+              );
             }, terminationFinalGraceMs);
           }, terminationGraceMs);
         };
+        const cancelThisInvocation = (): void => terminate("cancelled");
+        requestActiveCancellation = cancelThisInvocation;
         const timeout = setTimeout(() => {
           terminate("timeout");
         }, options.timeoutMs);
@@ -218,6 +236,10 @@ export function createObservableExecuteCliInvoker(options: {
             finish(failure("CLI returned an oversized JSON result."));
             return;
           }
+          if (terminationReason === "cancelled") {
+            finish(cancelledFailure("CLI invocation was cancelled."));
+            return;
+          }
           try {
             finish(
               Object.freeze({
@@ -232,13 +254,18 @@ export function createObservableExecuteCliInvoker(options: {
         });
       });
     },
+    cancel(): boolean {
+      if (requestActiveCancellation === null) return false;
+      requestActiveCancellation();
+      return true;
+    },
   });
 }
 
 export function createExecutionSessionManager(options: {
   createExecuteHandler: (
     onProgress: (type: DesktopExecutionEventType) => void,
-  ) => ExecuteHandler;
+  ) => Readonly<{ handler: ExecuteHandler; cancel: () => boolean }>;
   generateId?: () => string;
   maxEvents?: number;
 }) {
@@ -247,6 +274,7 @@ export function createExecutionSessionManager(options: {
   let active: {
     session: DesktopExecutionSession;
     completion: Promise<void>;
+    cancel: () => boolean;
   } | null = null;
 
   function append(type: DesktopExecutionEventType): void {
@@ -282,12 +310,13 @@ export function createExecutionSessionManager(options: {
         ]),
         result: null,
       });
-      active = { session, completion: Promise.resolve() };
-      const handler = options.createExecuteHandler(append);
+      const { handler, cancel } = options.createExecuteHandler(append);
+      active = { session, completion: Promise.resolve(), cancel };
       const completion = handler(request)
         .then((result) => {
           if (!active) return;
-          if (!result.ok) append("failed");
+          if (!result.ok)
+            append(result.kind === "cancelled" ? "cancelled" : "failed");
           active.session = Object.freeze({ ...active.session, result });
         })
         .catch(() => {
@@ -308,6 +337,16 @@ export function createExecutionSessionManager(options: {
     },
     async waitForCompletion(id: string): Promise<void> {
       if (active?.session.id === id) await active.completion;
+    },
+    cancel(id: unknown): boolean {
+      if (
+        typeof id !== "string" ||
+        !active ||
+        active.session.id !== id ||
+        active.session.result !== null
+      )
+        return false;
+      return active.cancel();
     },
   });
 }
