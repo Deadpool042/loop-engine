@@ -47,13 +47,13 @@ The remaining gap is primarily operational rather than architectural. The reposi
 
 The following estimates are directional planning indicators, not release claims:
 
-| Dimension | Estimated maturity |
-| --- | ---: |
-| Architecture and contracts | 85–90% |
-| Local supervised execution | 75–80% |
-| Single-host product readiness | 65–70% |
-| Multi-host production readiness | 40–50% |
-| Autonomous delivery readiness | 55–60% |
+| Dimension                       | Estimated maturity |
+| ------------------------------- | -----------------: |
+| Architecture and contracts      |             85–90% |
+| Local supervised execution      |             75–80% |
+| Single-host product readiness   |             65–70% |
+| Multi-host production readiness |             40–50% |
+| Autonomous delivery readiness   |             55–60% |
 
 These estimates must be revised at the end of each macro-lot using evidence from tests, production-like scenarios, and operational acceptance criteria.
 
@@ -417,6 +417,10 @@ Loop Engine may be described as production-ready only when all of the following 
 ## Source of Truth
 
 This file is the strategic source of truth for V16 through V20. Detailed design documents may refine implementation but must not silently change macro-lot objectives or exit conditions.
+
+## Related Provider-Specific Roadmap
+
+`docs/roadmap/anthropic-provider-evolution.md` tracks Anthropic-specific provider consolidation and telemetry (status: not started) as a parallel, narrowly scoped track outside the V16–V20 macro-lot sequence above.
 
 ## Status Values
 
