@@ -1,4 +1,4 @@
-import YAML from "yaml";
+import { parse as parseYaml } from "yaml";
 import { parseAllowedPaths } from "../loop/file-scope.js";
 
 export const EXECUTION_DECISION_STATES = [
@@ -58,7 +58,7 @@ export function parseExecutionDecisionFile(
 ): ExecutionDecisionParseResult {
   let parsed: unknown;
   try {
-    parsed = YAML.parse(raw);
+    parsed = parseYaml(raw);
   } catch {
     return { ok: false, reason: "Execution decision file is not valid YAML." };
   }
