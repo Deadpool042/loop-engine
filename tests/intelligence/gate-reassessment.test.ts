@@ -31,3 +31,15 @@ test("calls the provider once and never mutates canonical gates or admissibility
   assert.equal(calls, 1); assert.equal(report.result.status, "completed"); assert.equal(JSON.stringify(context), before);
   if (report.assessment?.status === "review_recommended") assert.equal(report.assessment.gates[0]?.recommendation, "remove the gate immediately");
 });
+test("surfaces the provider failure's own telemetry, never a diagnosticMessage, on provider_error", async () => {
+  const context = canonicalContext();
+  const report = await generateGateReassessmentFromContext(context, { providerAvailable: true, model: "claude-haiku-4-5", timeoutMs: 60_000, provider: { invoke: async () => ({ status: "failed" as const, provider: "anthropic_api", model: "claude-haiku-4-5", code: "provider_server_error" as const, message: "Anthropic API request failed.", diagnosticMessage: "raw provider text sk-test-secret", durationMs: 45, attempts: 3, requestId: "req_gate_1", httpStatus: 503, truncated: false }) } });
+  assert.equal(report.result.status, "failed");
+  if (report.result.status === "failed") {
+    assert.equal(report.result.reason, "provider_error");
+    assert.equal(report.result.usage, undefined);
+    assert.equal(report.result.model, undefined);
+    assert.deepEqual(report.result.providerFailure, { code: "provider_server_error", durationMs: 45, attempts: 3, requestId: "req_gate_1", httpStatus: 503 });
+  }
+  assert.doesNotMatch(JSON.stringify(report), /raw provider text|sk-test-secret/);
+});

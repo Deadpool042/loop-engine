@@ -24,7 +24,9 @@ export type GateReassessment = Readonly<
   | { status: "no_new_signal"; reason: string }
   | { status: "review_recommended"; reason: string; gates: readonly Readonly<{ phase: string; blockedBy: string; observedSignal: string; recommendation: string }>[] }
 >;
-export type GateReassessmentReport = Readonly<{ schemaVersion: 1; project: Readonly<{ name: string }>; result: Readonly<{ status: "unavailable"; reason: string } | { status: "failed"; reason: "provider_error" | "invalid_reassessment_response"; validationFailureCode?: string; provider?: string; model?: string; effort?: AnthropicEffort | null; durationMs?: number; usage?: TextOnlyProviderUsage } | { status: "completed"; provider: string; model: string; effort: AnthropicEffort | null; durationMs: number; usage?: TextOnlyProviderUsage; normalizationWarnings?: readonly string[] }>; assessment?: GateReassessment }>;
+/** Present only for reason: "provider_error" — the underlying provider failure's own telemetry (never the validation telemetry, which requires a completed provider call), so a retried/failed call is never silently invisible. Never includes the provider's diagnosticMessage. */
+export type GateReassessmentProviderFailure = Readonly<{ code: string; durationMs: number; attempts?: number; requestId?: string; httpStatus?: number }>;
+export type GateReassessmentReport = Readonly<{ schemaVersion: 1; project: Readonly<{ name: string }>; result: Readonly<{ status: "unavailable"; reason: string } | { status: "failed"; reason: "provider_error" | "invalid_reassessment_response"; validationFailureCode?: string; provider?: string; model?: string; effort?: AnthropicEffort | null; durationMs?: number; usage?: TextOnlyProviderUsage; providerFailure?: GateReassessmentProviderFailure } | { status: "completed"; provider: string; model: string; effort: AnthropicEffort | null; durationMs: number; usage?: TextOnlyProviderUsage; normalizationWarnings?: readonly string[] }>; assessment?: GateReassessment }>;
 
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function bounded(value: unknown, max: number): Readonly<{ value: string; truncated: boolean }> | null {
@@ -63,7 +65,28 @@ export async function generateGateReassessmentFromContext(context: RoadmapPropos
   if (Buffer.byteLength(json, "utf8") > MAX_TEXT_ONLY_CONTEXT_BYTES) return unavailable("gate_reassessment_context_too_large");
   if (!input.providerAvailable) return unavailable("credential_unavailable");
   const invoked = await input.provider.invoke({ systemPrompt: GATE_REASSESSMENT_SYSTEM_PROMPT, contextJson: json, model: input.model, timeoutMs: input.timeoutMs, outputSchema: { schema: GATE_REASSESSMENT_OUTPUT_SCHEMA }, ...(input.effort === undefined ? {} : { effort: input.effort }) });
-  if (invoked.status === "failed") return { schemaVersion: 1, project: { name: context.project.name }, result: { status: "failed", reason: "provider_error" } };
+  if (invoked.status === "failed")
+    return {
+      schemaVersion: 1,
+      project: { name: context.project.name },
+      result: {
+        status: "failed",
+        reason: "provider_error",
+        providerFailure: {
+          code: invoked.code,
+          durationMs: invoked.durationMs,
+          ...(invoked.attempts === undefined
+            ? {}
+            : { attempts: invoked.attempts }),
+          ...(invoked.requestId === undefined
+            ? {}
+            : { requestId: invoked.requestId }),
+          ...(invoked.httpStatus === undefined
+            ? {}
+            : { httpStatus: invoked.httpStatus }),
+        },
+      },
+    };
   const parsed = parseGateReassessment(invoked.output);
   if (!parsed.ok) return { schemaVersion: 1, project: { name: context.project.name }, result: { status: "failed", reason: "invalid_reassessment_response", validationFailureCode: parsed.code, provider: invoked.provider, model: invoked.model, effort: invoked.effort ?? null, durationMs: invoked.durationMs, ...(invoked.usage ? { usage: invoked.usage } : {}) } };
   return { schemaVersion: 1, project: { name: context.project.name }, result: { status: "completed", provider: invoked.provider, model: invoked.model, effort: invoked.effort ?? null, durationMs: invoked.durationMs, ...(invoked.usage ? { usage: invoked.usage } : {}), ...(parsed.normalizationWarnings.length ? { normalizationWarnings: parsed.normalizationWarnings } : {}) }, assessment: parsed.assessment };

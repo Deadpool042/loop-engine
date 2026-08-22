@@ -53,11 +53,17 @@ export type TextOnlyProviderInput = Readonly<{
 export type TextOnlyProviderUsage = Readonly<{
   inputTokens: number;
   outputTokens: number;
+  /** Present only when the Anthropic response explicitly returns it; absent (never 0) when not returned, e.g. prompt caching not used. */
+  cacheCreationInputTokens?: number;
+  /** Present only when the Anthropic response explicitly returns it; absent (never 0) when not returned, e.g. prompt caching not used. */
+  cacheReadInputTokens?: number;
 }>;
 export type TextOnlyProviderSuccess = Readonly<{
   status: "completed";
   provider: string;
   model: string;
+  /** Model actually reported by the provider response's own `model` field, when present and non-empty; omitted otherwise. May differ from the requested `model` (e.g. snapshot resolution). */
+  respondedModel?: string;
   output: string;
   durationMs: number;
   truncated: false;
@@ -65,6 +71,14 @@ export type TextOnlyProviderSuccess = Readonly<{
   effort?: AnthropicEffort;
   /** Number of HTTP attempts actually made against the provider (present once at least one was made; only >1 when a transient error was retried). */
   attempts?: number;
+  /** Provider response ID (from the Anthropic `request-id` response header of the last attempt); a diagnostic identifier only, never a Loop Engine business identifier, never a secret. */
+  requestId?: string;
+  /**
+   * Local cost estimate in USD, derived strictly from `pricing.ts` and `usage` — never fabricated.
+   * Present only when `usage` is present. `null` when the model's pricing (or a required pricing
+   * dimension, e.g. cache tokens) is not in the pricing table; a finite number when known.
+   */
+  costUsd?: number | null;
 }>;
 export type TextOnlyProviderFailure = Readonly<{
   status: "failed";

@@ -702,3 +702,271 @@ describe("Anthropic API text-only provider", () => {
     assert.doesNotMatch(providerSource, /\btools\s*:/);
   });
 });
+
+describe("Anthropic API provider — usage & cost telemetry (R2)", () => {
+  // Well before the Sonnet 5 introductory-rate cutover (2026-09-01), so the
+  // cost assertions below stay deterministic against the pricing table's
+  // first entry regardless of the real system date.
+  const FIXED_NOW_MS = Date.parse("2026-08-20T00:00:00Z");
+
+  it("captures full usage, the responded model, request ID, and a known cost on a first-try success", async () => {
+    const provider = createAnthropicApiProvider({
+      transport: async () =>
+        new Response(
+          JSON.stringify({
+            model: "claude-sonnet-5-20260801",
+            content: [{ type: "text", text: "ok" }],
+            usage: { input_tokens: 100, output_tokens: 50 },
+          }),
+          { status: 200, headers: { "request-id": "req_abc123" } },
+        ),
+      environment: { ANTHROPIC_API_KEY: "test-secret" },
+      maxOutputTokens: 128,
+      sleep: noopSleep,
+      now: () => FIXED_NOW_MS,
+    });
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(result.status, "completed");
+    if (result.status !== "completed") return;
+    assert.equal(result.attempts, 1);
+    assert.equal(result.model, "claude-sonnet-5");
+    assert.equal(result.respondedModel, "claude-sonnet-5-20260801");
+    assert.equal(result.requestId, "req_abc123");
+    assert.deepEqual(result.usage, { inputTokens: 100, outputTokens: 50 });
+    assert.equal(
+      result.costUsd,
+      (100 * 2.0) / 1_000_000 + (50 * 10.0) / 1_000_000,
+    );
+  });
+
+  it("omits the responded model when the response does not return one", async () => {
+    const provider = providerWith(
+      async () =>
+        new Response(
+          JSON.stringify({
+            content: [{ type: "text", text: "ok" }],
+            usage: { input_tokens: 1, output_tokens: 1 },
+          }),
+        ),
+    );
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(result.status, "completed");
+    if (result.status !== "completed") return;
+    assert.equal(result.respondedModel, undefined);
+    assert.equal("respondedModel" in result, false);
+  });
+
+  it("projects cache creation/read tokens verbatim when the response returns them", async () => {
+    const provider = providerWith(
+      async () =>
+        new Response(
+          JSON.stringify({
+            content: [{ type: "text", text: "ok" }],
+            usage: {
+              input_tokens: 10,
+              output_tokens: 5,
+              cache_creation_input_tokens: 200,
+              cache_read_input_tokens: 300,
+            },
+          }),
+        ),
+    );
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(result.status, "completed");
+    if (result.status !== "completed") return;
+    assert.deepEqual(result.usage, {
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheCreationInputTokens: 200,
+      cacheReadInputTokens: 300,
+    });
+    // The pricing table has no cache read/write rates yet: mixing cache
+    // tokens into the input/output rate would fabricate a number, so the
+    // cost is reported unknown (null), never estimated.
+    assert.equal(result.costUsd, null);
+  });
+
+  it("omits cache token fields entirely rather than defaulting to 0 when the response does not return them", async () => {
+    const provider = providerWith(
+      async () =>
+        new Response(
+          JSON.stringify({
+            content: [{ type: "text", text: "ok" }],
+            usage: { input_tokens: 10, output_tokens: 5 },
+          }),
+        ),
+    );
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(result.status, "completed");
+    if (result.status !== "completed") return;
+    assert.equal("cacheCreationInputTokens" in (result.usage ?? {}), false);
+    assert.equal("cacheReadInputTokens" in (result.usage ?? {}), false);
+  });
+
+  it("returns cost null, never a fabricated estimate, for a model absent from the pricing table", async () => {
+    const provider = providerWith(
+      async () =>
+        new Response(
+          JSON.stringify({
+            content: [{ type: "text", text: "ok" }],
+            usage: { input_tokens: 10, output_tokens: 5 },
+          }),
+        ),
+    );
+
+    const result = await provider.invoke({
+      ...validInput,
+      model: "claude-experimental-unpriced",
+    });
+
+    assert.equal(result.status, "completed");
+    if (result.status !== "completed") return;
+    assert.equal(result.costUsd, null);
+  });
+
+  it("omits cost entirely when the provider returns no usage at all", async () => {
+    const provider = providerWith(
+      async () =>
+        new Response(
+          JSON.stringify({ content: [{ type: "text", text: "ok" }] }),
+        ),
+    );
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(result.status, "completed");
+    if (result.status !== "completed") return;
+    assert.equal(result.usage, undefined);
+    assert.equal("costUsd" in result, false);
+  });
+
+  it("captures the request ID from the response header on a non-retryable failure", async () => {
+    const provider = providerWith(
+      async () =>
+        new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: "invalid_request_error", message: "bad request" },
+          }),
+          { status: 400, headers: { "request-id": "req_fail_1" } },
+        ),
+    );
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(result.status, "failed");
+    if (result.status !== "failed") return;
+    assert.equal(result.requestId, "req_fail_1");
+    assert.equal(result.attempts, 1);
+    assert.equal(result.httpStatus, 400);
+    assert.ok(typeof result.durationMs === "number");
+  });
+
+  it("keeps only the last attempt's request ID after retries exhaust and the final failure is returned", async () => {
+    let calls = 0;
+    const provider = createAnthropicApiProvider({
+      transport: async () => {
+        calls++;
+        return new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: "overloaded_error", message: "busy" },
+          }),
+          { status: 529, headers: { "request-id": `req_attempt_${calls}` } },
+        );
+      },
+      environment: { ANTHROPIC_API_KEY: "test-secret" },
+      maxOutputTokens: 128,
+      sleep: noopSleep,
+    });
+
+    const result = await provider.invoke(validInput);
+
+    assert.equal(calls, 3);
+    assert.equal(result.status, "failed");
+    if (result.status !== "failed") return;
+    assert.equal(result.attempts, 3);
+    assert.equal(result.requestId, "req_attempt_3");
+  });
+
+  it("captures a total duration spanning every attempt and backoff, strictly greater than a single successful attempt's duration", async () => {
+    function buildClock() {
+      let clock = 0;
+      return () => {
+        clock += 100;
+        return clock;
+      };
+    }
+
+    const singleAttemptProvider = createAnthropicApiProvider({
+      transport: async () =>
+        new Response(
+          JSON.stringify({
+            content: [{ type: "text", text: "ok" }],
+            usage: { input_tokens: 1, output_tokens: 1 },
+          }),
+        ),
+      environment: { ANTHROPIC_API_KEY: "test-secret" },
+      maxOutputTokens: 128,
+      sleep: noopSleep,
+      now: buildClock(),
+    });
+    const singleAttemptResult = await singleAttemptProvider.invoke({
+      ...validInput,
+      timeoutMs: 10_000,
+    });
+
+    let retriedCalls = 0;
+    const retriedProvider = createAnthropicApiProvider({
+      transport: async () => {
+        retriedCalls++;
+        if (retriedCalls < 3)
+          return new Response(
+            JSON.stringify({
+              type: "error",
+              error: { type: "overloaded_error", message: "busy" },
+            }),
+            { status: 529 },
+          );
+        return new Response(
+          JSON.stringify({
+            content: [{ type: "text", text: "ok" }],
+            usage: { input_tokens: 1, output_tokens: 1 },
+          }),
+        );
+      },
+      environment: { ANTHROPIC_API_KEY: "test-secret" },
+      maxOutputTokens: 128,
+      sleep: noopSleep,
+      now: buildClock(),
+    });
+    const retriedResult = await retriedProvider.invoke({
+      ...validInput,
+      timeoutMs: 10_000,
+    });
+
+    assert.equal(singleAttemptResult.status, "completed");
+    assert.equal(retriedResult.status, "completed");
+    if (
+      singleAttemptResult.status !== "completed" ||
+      retriedResult.status !== "completed"
+    )
+      return;
+    assert.equal(singleAttemptResult.attempts, 1);
+    assert.equal(retriedResult.attempts, 3);
+    // Both providers use the same fixed 100ms-per-clock-read step; the
+    // retried call observes strictly more clock reads (extra budget checks
+    // and backoff-fit checks per retried attempt), so its total duration is
+    // strictly larger than the single-attempt call's — proof that
+    // `durationMs` covers every attempt and backoff, not only the last one.
+    assert.ok(retriedResult.durationMs > singleAttemptResult.durationMs);
+  });
+});
