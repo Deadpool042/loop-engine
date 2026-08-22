@@ -57,6 +57,12 @@ export function shouldClearDraftOnApproveFailure(code: unknown): boolean {
   return typeof code === "string" && DRAFT_CLEARING_APPROVE_FAILURE_CODES.has(code);
 }
 
+export function getDisplayedAgentRoutingReasons(
+  reasons: readonly string[],
+): readonly string[] {
+  return reasons.slice(0, 3);
+}
+
 const ROADMAP_PROPOSAL_PROFILE_LABELS: Readonly<Record<string, string>> = {
   economy: "Économique",
   balanced: "Équilibré",
@@ -1519,10 +1525,17 @@ export function App(): React.JSX.Element {
                               </p>
                               {planDetail.profile.fallbackActive && (
                                 <p className="mt-2 text-xs text-amber-800">
-                                  Fallback policy : profil préféré indisponible
-                                  indisponible — résolution disponible
-                                  utilisée à la place.
+                                  Fallback policy : préférence de capacité indisponible — résolution compatible utilisée à la place.
                                 </p>
+                              )}
+                              {planDetail.profile.reasons.length > 0 && (
+                                <ul className="mt-2 space-y-1 text-xs text-loop-muted">
+                                  {getDisplayedAgentRoutingReasons(
+                                    planDetail.profile.reasons,
+                                  ).map((reason, index) => (
+                                    <li key={`${index}:${reason}`}>{reason}</li>
+                                  ))}
+                                </ul>
                               )}
                               <ul className="mt-2 space-y-1 text-xs text-loop-muted">
                                 <li>
