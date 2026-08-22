@@ -1,4 +1,4 @@
-import YAML from "yaml";
+import { stringify as stringifyYaml } from "yaml";
 import { randomUUID } from "node:crypto";
 import { createExecutionDecisionDraft, type ExecutionDecisionDraft } from "./execution-decision-draft.js";
 
@@ -15,7 +15,7 @@ export function createExecutionDecisionDraftStore(maxDrafts = 16) {
 }
 
 export function serializeReadyExecutionDecision(draft: ExecutionDecisionDraft): string {
-  return YAML.stringify({ version: 1, project: draft.project, decision: { state: "READY", reason: "Approved explicit execution decision.", nextAction: "Run plan for the approved candidate.", candidate: { id: draft.candidateId, allowedPaths: draft.allowedPaths }, brief: { objective: draft.objective, deliverables: draft.deliverables, outOfScope: draft.outOfScope, ...(draft.forbiddenContentTerms === undefined ? {} : { forbiddenContentTerms: draft.forbiddenContentTerms }) } }, source: { document: draft.sourceDocument, gitHead: draft.gitHead } });
+  return stringifyYaml({ version: 1, project: draft.project, decision: { state: "READY", reason: "Approved explicit execution decision.", nextAction: "Run plan for the approved candidate.", candidate: { id: draft.candidateId, allowedPaths: draft.allowedPaths }, brief: { objective: draft.objective, deliverables: draft.deliverables, outOfScope: draft.outOfScope, ...(draft.forbiddenContentTerms === undefined ? {} : { forbiddenContentTerms: draft.forbiddenContentTerms }) } }, source: { document: draft.sourceDocument, gitHead: draft.gitHead } });
 }
 
 export function prepareStoredExecutionDecisionDraft(local: Parameters<typeof createExecutionDecisionDraft>[0], provider: Parameters<typeof createExecutionDecisionDraft>[1], store: ExecutionDecisionDraftStore) {

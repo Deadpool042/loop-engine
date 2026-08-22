@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import YAML from "yaml";
+import { parse as parseYaml } from "yaml";
 
 export type ProjectConfig = {
   name: string;
@@ -26,5 +26,5 @@ export type Config = {
 
 export function loadConfig(): Config {
   const raw = readFileSync("projects.yaml", "utf8");
-  return YAML.parse(raw) as Config;
+  return parseYaml(raw) as Config;
 }
