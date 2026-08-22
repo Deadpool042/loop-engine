@@ -16,6 +16,43 @@ import {
 } from "./types.js";
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
+/**
+ * Bounded, deterministic retry policy for clearly transient Anthropic
+ * Messages API errors only (HTTP 429 and the retryable 5xx statuses already
+ * classified as `provider_server_error` by `httpFailureCode`). Never
+ * retried: authentication, billing, permission, not-found, request-too-large
+ * and other validation-shaped 4xx errors, refusals, truncation, invalid
+ * responses, and local timeouts/transport failures. This is intentionally a
+ * single small local primitive, not a generic retry framework.
+ */
+const ANTHROPIC_MAX_ATTEMPTS = 3;
+const ANTHROPIC_RETRY_BASE_DELAY_MS = 250;
+const ANTHROPIC_RETRY_MAX_DELAY_MS = 2_000;
+const ANTHROPIC_RETRY_AFTER_MAX_MS = 30_000;
+const ANTHROPIC_RETRYABLE_HTTP_STATUSES: ReadonlySet<number> = new Set([
+  429, 500, 502, 503, 504, 529,
+]);
+export type AnthropicSleep = (delayMs: number) => Promise<void>;
+function defaultSleep(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+function parseRetryAfterMs(headerValue: string | null): number | null {
+  if (headerValue === null) return null;
+  const seconds = Number(headerValue);
+  if (!Number.isFinite(seconds) || seconds < 0) return null;
+  return Math.round(seconds * 1000);
+}
+/** Bounded backoff: honors a present, well-formed `Retry-After` (capped), otherwise deterministic exponential backoff (capped). */
+function anthropicRetryDelayMs(
+  attempt: number,
+  retryAfterHeader: string | null,
+): number {
+  const retryAfterMs = parseRetryAfterMs(retryAfterHeader);
+  if (retryAfterMs !== null)
+    return Math.min(retryAfterMs, ANTHROPIC_RETRY_AFTER_MAX_MS);
+  const exponential = ANTHROPIC_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+  return Math.min(exponential, ANTHROPIC_RETRY_MAX_DELAY_MS);
+}
 export type TextOnlyHttpRequest = Readonly<{
   url: string;
   method: "POST";
@@ -31,13 +68,19 @@ export type AnthropicApiProviderOptions = Readonly<{
   transport?: TextOnlyHttpTransport;
   maxOutputTokens?: number;
   now?: () => number;
+  /** Injectable delay primitive for deterministic retry-backoff tests; defaults to a real `setTimeout`-based sleep. */
+  sleep?: AnthropicSleep;
 }>;
 type AnthropicMessageResponse = Readonly<{
   content?: unknown;
   usage?: Readonly<{ input_tokens?: unknown; output_tokens?: unknown }>;
   stop_reason?: unknown;
 }>;
-type AnthropicErrorEnvelope = Readonly<{ type?: unknown; error?: Readonly<{ type?: unknown; message?: unknown }>; request_id?: unknown }>;
+type AnthropicErrorEnvelope = Readonly<{
+  type?: unknown;
+  error?: Readonly<{ type?: unknown; message?: unknown }>;
+  request_id?: unknown;
+}>;
 function defaultTransport(request: TextOnlyHttpRequest): Promise<Response> {
   return fetch(request.url, {
     method: request.method,
@@ -121,7 +164,13 @@ function failure(
   message: string,
   durationMs: number,
   truncated = false,
-  diagnostics: Readonly<{ httpStatus?: number; providerErrorType?: string; requestId?: string; diagnosticMessage?: string }> = {},
+  diagnostics: Readonly<{
+    httpStatus?: number;
+    providerErrorType?: string;
+    requestId?: string;
+    diagnosticMessage?: string;
+  }> = {},
+  attempts?: number,
 ): TextOnlyProviderFailure {
   return Object.freeze({
     status: "failed",
@@ -132,13 +181,51 @@ function failure(
     durationMs,
     truncated,
     ...diagnostics,
+    ...(attempts === undefined ? {} : { attempts }),
   });
 }
-function boundedString(value: unknown, max = 512): string | undefined { return typeof value === "string" && value.length > 0 && Buffer.byteLength(value, "utf8") <= max ? value : undefined; }
-function parseAnthropicError(body: string): Readonly<{ providerErrorType?: string; requestId?: string; diagnosticMessage?: string }> {
-  try { const parsed = JSON.parse(body) as AnthropicErrorEnvelope; if (parsed.type !== "error") return {}; return Object.freeze({ ...(boundedString(parsed.error?.type, 96) === undefined ? {} : { providerErrorType: boundedString(parsed.error?.type, 96)! }), ...(boundedString(parsed.request_id, 256) === undefined ? {} : { requestId: boundedString(parsed.request_id, 256)! }), ...(boundedString(parsed.error?.message) === undefined ? {} : { diagnosticMessage: boundedString(parsed.error?.message)! }) }); } catch { return {}; }
+function boundedString(value: unknown, max = 512): string | undefined {
+  return typeof value === "string" &&
+    value.length > 0 &&
+    Buffer.byteLength(value, "utf8") <= max
+    ? value
+    : undefined;
 }
-function httpFailureCode(status: number): TextOnlyProviderFailureCode { if (status === 400) return "provider_request_failed"; if (status === 401) return "provider_authentication_failed"; if (status === 402) return "provider_billing_failed"; if (status === 403) return "provider_permission_denied"; if (status === 404) return "provider_not_found"; if (status === 413) return "provider_request_too_large"; if (status === 429) return "provider_rate_limited"; if ([500,502,503,504,529].includes(status)) return "provider_server_error"; return "provider_request_failed"; }
+function parseAnthropicError(body: string): Readonly<{
+  providerErrorType?: string;
+  requestId?: string;
+  diagnosticMessage?: string;
+}> {
+  try {
+    const parsed = JSON.parse(body) as AnthropicErrorEnvelope;
+    if (parsed.type !== "error") return {};
+    return Object.freeze({
+      ...(boundedString(parsed.error?.type, 96) === undefined
+        ? {}
+        : { providerErrorType: boundedString(parsed.error?.type, 96)! }),
+      ...(boundedString(parsed.request_id, 256) === undefined
+        ? {}
+        : { requestId: boundedString(parsed.request_id, 256)! }),
+      ...(boundedString(parsed.error?.message) === undefined
+        ? {}
+        : { diagnosticMessage: boundedString(parsed.error?.message)! }),
+    });
+  } catch {
+    return {};
+  }
+}
+function httpFailureCode(status: number): TextOnlyProviderFailureCode {
+  if (status === 400) return "provider_request_failed";
+  if (status === 401) return "provider_authentication_failed";
+  if (status === 402) return "provider_billing_failed";
+  if (status === 403) return "provider_permission_denied";
+  if (status === 404) return "provider_not_found";
+  if (status === 413) return "provider_request_too_large";
+  if (status === 429) return "provider_rate_limited";
+  if ([500, 502, 503, 504, 529].includes(status))
+    return "provider_server_error";
+  return "provider_request_failed";
+}
 async function readBoundedResponseBody(
   response: Response,
 ): Promise<{ body: string; exceeded: boolean }> {
@@ -283,111 +370,178 @@ export function createAnthropicApiProvider(
           "Anthropic API credential is unavailable.",
           now() - startedAt,
         );
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
-      try {
-        const outputConfig = {
-          ...(input.outputSchema === undefined
-            ? {}
-            : {
-                format: {
-                  type: "json_schema" as const,
-                  schema: toAnthropicOutputSchema(input.outputSchema.schema),
-                },
-              }),
-          ...(input.effort === undefined ? {} : { effort: input.effort }),
-        };
-        const body = {
-          model,
-          system: input.systemPrompt,
-          messages: [{ role: "user", content: input.contextJson }],
-          max_tokens: maxOutputTokens,
-          tool_choice: { type: "none" as const },
-          ...(Object.keys(outputConfig).length === 0
-            ? {}
-            : { output_config: outputConfig }),
-        };
-        const response = await transport(
-          Object.freeze({
-            url: ANTHROPIC_MESSAGES_URL,
-            method: "POST",
-            headers: Object.freeze({
-              "content-type": "application/json",
-              "x-api-key": apiKey,
-              "anthropic-version": ANTHROPIC_VERSION,
+      const sleep = options.sleep ?? defaultSleep;
+      const outputConfig = {
+        ...(input.outputSchema === undefined
+          ? {}
+          : {
+              format: {
+                type: "json_schema" as const,
+                schema: toAnthropicOutputSchema(input.outputSchema.schema),
+                strict: true as const,
+              },
             }),
-            body: JSON.stringify(body),
-            signal: controller.signal,
-          }),
-        );
-        const raw = await readBoundedResponseBody(response);
-        if (raw.exceeded)
+        ...(input.effort === undefined ? {} : { effort: input.effort }),
+      };
+      const body = {
+        model,
+        system: input.systemPrompt,
+        messages: [{ role: "user", content: input.contextJson }],
+        max_tokens: maxOutputTokens,
+        tool_choice: { type: "none" as const },
+        ...(Object.keys(outputConfig).length === 0
+          ? {}
+          : { output_config: outputConfig }),
+      };
+      const requestBody = JSON.stringify(body);
+      // Retries stay inside the caller's original timeout budget: each
+      // attempt's AbortController is armed with whatever remains until
+      // `deadlineAt`, never with a fresh full `input.timeoutMs`, so a
+      // retried call cannot silently take longer overall than a
+      // non-retried one was already bounded to.
+      const deadlineAt = startedAt + input.timeoutMs;
+      for (let attempt = 1; attempt <= ANTHROPIC_MAX_ATTEMPTS; attempt++) {
+        const remainingBudgetMs = deadlineAt - now();
+        if (remainingBudgetMs <= 0)
           return failure(
             model,
-            "output_limit_exceeded",
-            "Anthropic API response exceeded the output limit.",
-            now() - startedAt,
-            true,
-          );
-        if (!response.ok) {
-          const code = httpFailureCode(response.status);
-          return failure(
-            model,
-            code,
-            "Anthropic API request failed.",
+            "provider_timeout",
+            "Anthropic API request timed out.",
             now() - startedAt,
             false,
-            { httpStatus: response.status, ...parseAnthropicError(raw.body) },
+            {},
+            attempt - 1,
           );
-        }
-        const stopReason = parseStopReason(raw.body);
-        if (stopReason === "refusal")
-          return failure(
-            model,
-            "provider_refused",
-            "Anthropic API refused the request.",
-            now() - startedAt,
-          );
-        if (stopReason === "max_tokens")
-          return failure(
-            model,
-            "provider_output_truncated",
-            "Anthropic API response was truncated by the output token limit.",
-            now() - startedAt,
-            true,
-          );
-        const parsed = parseTextOutput(raw.body);
-        if (parsed === null)
-          return failure(
-            model,
-            "provider_response_invalid",
-            "Anthropic API response was invalid.",
-            now() - startedAt,
-          );
-        return Object.freeze({
-          status: "completed",
-          provider: "anthropic_api",
-          model,
-          output: parsed.output,
-          durationMs: now() - startedAt,
-          truncated: false,
-          ...(parsed.usage === undefined ? {} : { usage: parsed.usage }),
-          ...(input.effort === undefined ? {} : { effort: input.effort }),
-        });
-      } catch {
-        return failure(
-          model,
-          controller.signal.aborted
-            ? "provider_timeout"
-            : "provider_unavailable",
-          controller.signal.aborted
-            ? "Anthropic API request timed out."
-            : "Anthropic API request could not be completed.",
-          now() - startedAt,
+        const controller = new AbortController();
+        const timeout = setTimeout(
+          () => controller.abort(),
+          Math.min(input.timeoutMs, remainingBudgetMs),
         );
-      } finally {
-        clearTimeout(timeout);
+        try {
+          const response = await transport(
+            Object.freeze({
+              url: ANTHROPIC_MESSAGES_URL,
+              method: "POST",
+              headers: Object.freeze({
+                "content-type": "application/json",
+                "x-api-key": apiKey,
+                "anthropic-version": ANTHROPIC_VERSION,
+              }),
+              body: requestBody,
+              signal: controller.signal,
+            }),
+          );
+          const raw = await readBoundedResponseBody(response);
+          if (raw.exceeded)
+            return failure(
+              model,
+              "output_limit_exceeded",
+              "Anthropic API response exceeded the output limit.",
+              now() - startedAt,
+              true,
+              {},
+              attempt,
+            );
+          if (!response.ok) {
+            const code = httpFailureCode(response.status);
+            const delayMs = anthropicRetryDelayMs(
+              attempt,
+              response.headers.get("retry-after"),
+            );
+            const canRetry =
+              ANTHROPIC_RETRYABLE_HTTP_STATUSES.has(response.status) &&
+              attempt < ANTHROPIC_MAX_ATTEMPTS &&
+              delayMs < deadlineAt - now();
+            if (canRetry) {
+              await sleep(delayMs);
+              continue;
+            }
+            return failure(
+              model,
+              code,
+              "Anthropic API request failed.",
+              now() - startedAt,
+              false,
+              {
+                httpStatus: response.status,
+                ...parseAnthropicError(raw.body),
+              },
+              attempt,
+            );
+          }
+          const stopReason = parseStopReason(raw.body);
+          if (stopReason === "refusal")
+            return failure(
+              model,
+              "provider_refused",
+              "Anthropic API refused the request.",
+              now() - startedAt,
+              false,
+              {},
+              attempt,
+            );
+          if (stopReason === "max_tokens")
+            return failure(
+              model,
+              "provider_output_truncated",
+              "Anthropic API response was truncated by the output token limit.",
+              now() - startedAt,
+              true,
+              {},
+              attempt,
+            );
+          const parsed = parseTextOutput(raw.body);
+          if (parsed === null)
+            return failure(
+              model,
+              "provider_response_invalid",
+              "Anthropic API response was invalid.",
+              now() - startedAt,
+              false,
+              {},
+              attempt,
+            );
+          return Object.freeze({
+            status: "completed",
+            provider: "anthropic_api",
+            model,
+            output: parsed.output,
+            durationMs: now() - startedAt,
+            truncated: false,
+            attempts: attempt,
+            ...(parsed.usage === undefined ? {} : { usage: parsed.usage }),
+            ...(input.effort === undefined ? {} : { effort: input.effort }),
+          });
+        } catch {
+          return failure(
+            model,
+            controller.signal.aborted
+              ? "provider_timeout"
+              : "provider_unavailable",
+            controller.signal.aborted
+              ? "Anthropic API request timed out."
+              : "Anthropic API request could not be completed.",
+            now() - startedAt,
+            false,
+            {},
+            attempt,
+          );
+        } finally {
+          clearTimeout(timeout);
+        }
       }
+      // Unreachable: every loop iteration above either returns or retries
+      // within the fixed ANTHROPIC_MAX_ATTEMPTS bound, so this is a
+      // defensive, never-hit fallback rather than a live code path.
+      return failure(
+        model,
+        "provider_unavailable",
+        "Anthropic API request could not be completed.",
+        now() - startedAt,
+        false,
+        {},
+        ANTHROPIC_MAX_ATTEMPTS,
+      );
     },
   });
 }

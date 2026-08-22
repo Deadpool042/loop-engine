@@ -63,6 +63,8 @@ export type TextOnlyProviderSuccess = Readonly<{
   truncated: false;
   usage?: TextOnlyProviderUsage;
   effort?: AnthropicEffort;
+  /** Number of HTTP attempts actually made against the provider (present once at least one was made; only >1 when a transient error was retried). */
+  attempts?: number;
 }>;
 export type TextOnlyProviderFailure = Readonly<{
   status: "failed";
@@ -77,6 +79,8 @@ export type TextOnlyProviderFailure = Readonly<{
   requestId?: string;
   /** Bounded and private to main-process diagnostics; never project it to IPC. */
   diagnosticMessage?: string;
+  /** Number of HTTP attempts actually made against the provider (present once at least one was made; only >1 when a transient error was retried). */
+  attempts?: number;
 }>;
 export type TextOnlyProviderResult =
   TextOnlyProviderSuccess | TextOnlyProviderFailure;

@@ -1,4 +1,8 @@
 import type { AnthropicEffort } from "../text-only-provider/index.js";
+import {
+  ANTHROPIC_HAIKU_4_5_MODEL,
+  ANTHROPIC_SONNET_5_MODEL,
+} from "../text-only-provider/pricing.js";
 import type { RoadmapProposalContextReport } from "../core/reports.js";
 
 /**
@@ -29,9 +33,9 @@ const PROFILE_CONFIG: Readonly<
     Readonly<{ model: string; effort: AnthropicEffort | null }>
   >
 > = Object.freeze({
-  economy: Object.freeze({ model: "claude-haiku-4-5", effort: null }),
-  balanced: Object.freeze({ model: "claude-sonnet-5", effort: "low" as const }),
-  deep: Object.freeze({ model: "claude-sonnet-5", effort: "medium" as const }),
+  economy: Object.freeze({ model: ANTHROPIC_HAIKU_4_5_MODEL, effort: null }),
+  balanced: Object.freeze({ model: ANTHROPIC_SONNET_5_MODEL, effort: "low" as const }),
+  deep: Object.freeze({ model: ANTHROPIC_SONNET_5_MODEL, effort: "medium" as const }),
 });
 
 const HIGH_COMPLEXITY_BLOCKED_THRESHOLD = 3;

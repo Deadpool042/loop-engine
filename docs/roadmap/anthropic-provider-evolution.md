@@ -1,6 +1,6 @@
 # Anthropic Provider Evolution Roadmap
 
-Status: PLANNED (no lot started)
+Status: R1 done, R2 next
 Baseline: state of `main` at `341ed14`
 Scope: Anthropic-specific provider consolidation and telemetry only — not a new macro-lot in the `roadmap-v16.md` V16–V20 sequence, and not a routing/architecture rewrite.
 
@@ -40,7 +40,7 @@ This boundary must remain explicit in code, docs, and every lot below:
 | Capability                                                     | State                | Note                                                                                                              |
 | -------------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | Direct Messages API call, `tool_choice: none`                  | EXISTING             | `anthropic-api-provider.ts`                                                                                       |
-| Structured outputs (`output_config.format`)                    | EXISTING             | schema already wired, `strict` not yet set                                                                        |
+| Structured outputs (`output_config.format`)                    | EXISTING             | schema wired, `strict: true` set since R1                                                                         |
 | Secrets via macOS Keychain, never exposed to Electron renderer | EXISTING             | per validated audit                                                                                               |
 | Capability-based routing (`preferredCapabilityTier`)           | EXISTING             | `src/policy/resolver.ts` — not extended by this roadmap                                                           |
 | Token accounting (input/output)                                | PARTIAL              | no cache write/read tokens                                                                                        |
@@ -49,7 +49,7 @@ This boundary must remain explicit in code, docs, and every lot below:
 | Batch API (`/v1/messages/batches`)                             | ABSENT               |                                                                                                                   |
 | Files API (`/v1/files`)                                        | ABSENT               |                                                                                                                   |
 | Streaming                                                      | ABSENT               |                                                                                                                   |
-| Retries on transient errors                                    | ABSENT               | single attempt only                                                                                               |
+| Retries on transient errors                                    | EXISTING             | bounded/deterministic since R1 — 429 and transient 5xx only, max 3 attempts                                       |
 | General tool use in the text-only provider                     | SHOULD_NOT_IMPLEMENT | no demonstrated use case                                                                                          |
 | Anthropic-hosted memory as source of truth                     | SHOULD_NOT_IMPLEMENT | the `memory_20250818` tool is entirely client-side; Anthropic stores nothing persistently on Loop Engine's behalf |
 
@@ -92,11 +92,11 @@ Any durable memory belonging to Loop Engine — existing or extended under R4 �
 
 ## Lots
 
-Global status: **not started**. No lot below has begun; no application code has been modified by this roadmap document.
+Global status: **R1 done**. R2–R4 and the LATER lots below have not begun.
 
 ### R1 — Anthropic Provider Consolidation
 
-- Status: `PLANNED`
+- Status: `DONE`
 - Prerequisites: none (existing provider code already in `main`)
 - Entry criteria: this roadmap merged; no other in-flight change to `src/text-only-provider/**`
 - Scope: single source of truth for supported/priced model IDs; remove duplicated hardcoded IDs at the four listed sites; `strict: true` where already supported by the contract; bounded/deterministic retries limited to clearly transient errors; consistent error/usage reporting; correct `provider-adapters.md` if the stub/wired divergence is reconfirmed at execution time
@@ -106,6 +106,12 @@ Global status: **not started**. No lot below has begun; no application code has 
 - Acceptance criteria: no hardcoded Anthropic model ID remains outside the single source of truth; retries never fire on auth/validation/non-transient 4xx (covered by tests); `provider-adapters.md` no longer implies the Anthropic API provider is a stub; `pnpm run ci` passes
 - Validations: `pnpm run ci` (typecheck, tests, json-check, `audit:strict`, `audit:profiles`)
 - Indicative AI policy: Code, Claude Code, Sonnet, Medium
+- Decisions actually taken:
+  - Single source of truth: `ANTHROPIC_HAIKU_4_5_MODEL` / `ANTHROPIC_SONNET_5_MODEL` constants added to the existing `src/text-only-provider/pricing.ts` (no new module, no generic model registry). `AnthropicPricingModel` is now derived from these constants. `src/agents/registry.ts`, `src/intelligence/roadmap-proposal-routing.ts`, and `src/cli.ts:311` (the fourth site) now import these constants instead of repeating the literal strings; `pricing.ts` itself uses them internally. `preferredCapabilityTier` and `src/policy/resolver.ts` were not touched.
+  - `strict: true` was added to `output_config.format` in `anthropic-api-provider.ts` unconditionally whenever an `outputSchema` is provided; the contract shape (`{ type: "json_schema", schema, strict }`) is additive and does not change any existing field.
+  - Retries: a small local primitive inside `anthropic-api-provider.ts` (no shared/generic retry framework). Bounded to `ANTHROPIC_MAX_ATTEMPTS = 3` total attempts. Retried only on HTTP `429` and the already-classified transient 5xx set `{500, 502, 503, 504, 529}`. Never retried: `400/401/402/403/404/413`, refusals, output truncation, invalid responses, local timeouts/transport failures. Backoff honors a well-formed `Retry-After` header (capped at 30s), otherwise deterministic exponential backoff (250ms base, doubling, capped at 2s). The delay primitive is injectable (`AnthropicApiProviderOptions.sleep`) for deterministic tests; production defaults to a real `setTimeout`-based sleep. **Timeout budget decision:** the pre-existing `input.timeoutMs` remains the total wall-clock budget for the whole call, not a per-attempt budget — retries never make a call take longer overall than a single non-retried attempt already could. A shared `deadlineAt` bounds every attempt's `AbortController` to whatever time remains, and a retry is only taken if its backoff delay still fits inside that remaining budget; otherwise the last observed failure is returned immediately instead of waiting past the caller's budget.
+  - Observability: `TextOnlyProviderSuccess`/`TextOnlyProviderFailure` gained an optional `attempts` field (additive, only present once at least one HTTP attempt was made) so a retried/failed call remains visible instead of silently disappearing. No cost/usage telemetry platform was built (left to R2).
+  - `provider-adapters.md` corrected: the stub/wired divergence was reconfirmed by direct code inspection and the document now states explicitly that it only describes `src/providers/` and does not describe `anthropic-api-provider.ts` / `claude-code-cli-executor.ts`.
 
 ### R2 — Usage & Cost Telemetry
 
