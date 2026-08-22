@@ -63,6 +63,12 @@ export function getDisplayedAgentRoutingReasons(
   return reasons.slice(0, 3);
 }
 
+export function canCancelExecution(
+  session: Pick<DesktopExecutionSession, "result"> | null,
+): boolean {
+  return session !== null && session.result === null;
+}
+
 const ROADMAP_PROPOSAL_PROFILE_LABELS: Readonly<Record<string, string>> = {
   economy: "Économique",
   balanced: "Équilibré",
@@ -284,6 +290,7 @@ export function App(): React.JSX.Element {
   > | null>(null);
   const [executionSession, setExecutionSession] =
     useState<DesktopExecutionSession | null>(null);
+  const [cancelLoading, setCancelLoading] = useState(false);
   const [proposalLoading, setProposalLoading] = useState(false);
   const [proposalProfileSelection, setProposalProfileSelection] =
     useState<RoadmapProposalProfileOverride>("auto");
@@ -678,6 +685,7 @@ export function App(): React.JSX.Element {
     setExecuteMessage(null);
     setExecuteResult(null);
     setExecutionSession(null);
+    setCancelLoading(false);
     try {
       const started = await window.loopDesktop.startExecution({
         projectName: selectedProjectName,
@@ -697,6 +705,17 @@ export function App(): React.JSX.Element {
     }
   }
 
+  async function cancelActiveExecution(): Promise<void> {
+    const session = executionSession;
+    if (session === null || session.result !== null) return;
+    setCancelLoading(true);
+    try {
+      await window.loopDesktop.cancelExecution(session.id);
+    } catch {
+      // Best-effort cancellation request; polling reflects the real outcome.
+    }
+  }
+
   useEffect(() => {
     const session = executionSession;
     if (session === null || session.result !== null) return;
@@ -710,6 +729,7 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     if (executionSession?.result !== null && executionSession !== null) {
+      setCancelLoading(false);
       if (!executionSession.result.ok)
         setExecuteMessage(executionSession.result.raw);
       else if (
@@ -1644,6 +1664,20 @@ export function App(): React.JSX.Element {
                               ? "Exécution isolée en cours…"
                               : "Confirmer et choisir la destination du patch"}
                           </Button>
+                          {canCancelExecution(executionSession) && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="mt-3 ml-2"
+                              disabled={cancelLoading}
+                              onClick={cancelActiveExecution}
+                            >
+                              {cancelLoading
+                                ? "Annulation demandée…"
+                                : "Annuler l’exécution"}
+                            </Button>
+                          )}
                           {executionSession && (
                             <section
                               className="mt-4 rounded-md border border-loop-line bg-neutral-50 p-4"
@@ -1666,11 +1700,16 @@ export function App(): React.JSX.Element {
                               <p className="mt-3 text-sm font-medium">
                                 Statut :{" "}
                                 {executionSession.result === null
-                                  ? "en cours"
+                                  ? cancelLoading
+                                    ? "annulation demandée…"
+                                    : "en cours"
                                   : executionSession.events.at(-1)?.type ===
-                                      "failed"
-                                    ? "échec"
-                                    : "terminé"}
+                                      "cancelled"
+                                    ? "annulé"
+                                    : executionSession.events.at(-1)?.type ===
+                                        "failed"
+                                      ? "échec"
+                                      : "terminé"}
                               </p>
                               <p className="mt-1 text-sm text-loop-muted">
                                 Export du patch :{" "}
@@ -1693,6 +1732,7 @@ export function App(): React.JSX.Element {
                                         validation_started: "Validation",
                                         completed: "Terminé",
                                         failed: "Échec",
+                                        cancelled: "Annulé",
                                       }[event.type]
                                     }
                                   </li>

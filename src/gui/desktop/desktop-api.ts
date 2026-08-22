@@ -22,6 +22,7 @@ export type LoopDesktopApi = Readonly<{
   executionSession: (
     sessionId: string,
   ) => Promise<DesktopExecutionSession | null>;
+  cancelExecution: (sessionId: string) => Promise<boolean>;
   roadmapProposal: (
     projectName: string,
     profileOverride: RoadmapProposalProfileOverride,
@@ -45,6 +46,7 @@ export function createLoopDesktopApi(
       | "loop:execute"
       | "loop:execution-start"
       | "loop:execution-session"
+      | "loop:execution-cancel"
       | "loop:roadmap-proposal"
       | "loop:roadmap-proposal-estimate"
       | "loop:gate-reassessment"
@@ -81,6 +83,12 @@ export function createLoopDesktopApi(
         "loop:execution-session",
         sessionId,
       ) as unknown as Promise<DesktopExecutionSession | null>;
+    },
+    cancelExecution(sessionId) {
+      return invoke(
+        "loop:execution-cancel",
+        sessionId,
+      ) as unknown as Promise<boolean>;
     },
     roadmapProposal(projectName, profileOverride) {
       return invoke("loop:roadmap-proposal", projectName, profileOverride);

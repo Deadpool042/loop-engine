@@ -7,7 +7,10 @@ import {
   createObservableExecuteCliInvoker,
 } from "../../src/gui/desktop/execution-session.js";
 import { createExecutionWindowCloseGuard } from "../../src/gui/desktop/execution-window-close-guard.js";
-import { startExecutionSessionPolling } from "../../src/gui/desktop/app.js";
+import {
+  canCancelExecution,
+  startExecutionSessionPolling,
+} from "../../src/gui/desktop/app.js";
 
 const request = {
   projectName: "loop-engine",
@@ -29,13 +32,16 @@ describe("GUI observable execution session", () => {
     };
     const sessions = createExecutionSessionManager({
       createExecuteHandler(onProgress) {
-        return async () => {
-          onProgress("preparing");
-          onProgress("execution_started");
-          await pending;
-          onProgress("validation_started");
-          onProgress("completed");
-          return finalResult;
+        return {
+          handler: async () => {
+            onProgress("preparing");
+            onProgress("execution_started");
+            await pending;
+            onProgress("validation_started");
+            onProgress("completed");
+            return finalResult;
+          },
+          cancel: () => false,
         };
       },
       generateId: () => "session-1",
@@ -73,13 +79,16 @@ describe("GUI observable execution session", () => {
   it("bounds public event retention and represents a terminal execution error without raw process output", async () => {
     const sessions = createExecutionSessionManager({
       createExecuteHandler(onProgress) {
-        return async () => {
-          for (let index = 0; index < 8; index += 1) onProgress("preparing");
-          return {
-            ok: false as const,
-            kind: "spawn-error" as const,
-            raw: "Execution failed.",
-          };
+        return {
+          handler: async () => {
+            for (let index = 0; index < 8; index += 1) onProgress("preparing");
+            return {
+              ok: false as const,
+              kind: "spawn-error" as const,
+              raw: "Execution failed.",
+            };
+          },
+          cancel: () => false,
         };
       },
       generateId: () => "session-bounded",
@@ -209,6 +218,202 @@ describe("GUI observable execution session", () => {
       raw: "CLI process termination could not be confirmed.",
     });
     assert.equal(guard.active, false);
+  });
+
+  it("cancels an active invocation via the same SIGTERM path and confirms it as a distinct cancelled outcome", async () => {
+    const child = fakeChild();
+    const invoker = createObservableExecuteCliInvoker({
+      timeoutMs: 60_000,
+      terminationGraceMs: 5,
+      spawnProcess: () => child.process,
+      onProgress: () => {},
+    });
+    const pending = invoker.invoke("run", [], "/trusted");
+
+    assert.equal(invoker.cancel(), true);
+    assert.deepEqual(child.kills, ["SIGTERM"]);
+    child.process.emit("close", null);
+    assert.deepEqual(await pending, {
+      ok: false,
+      kind: "cancelled",
+      raw: "CLI invocation was cancelled.",
+    });
+  });
+
+  it("escalates a cancellation to SIGKILL, reusing the timeout termination grace, when the process ignores SIGTERM", async () => {
+    const child = fakeChild();
+    const invoker = createObservableExecuteCliInvoker({
+      timeoutMs: 60_000,
+      terminationGraceMs: 5,
+      spawnProcess: () => child.process,
+      onProgress: () => {},
+    });
+    const pending = invoker.invoke("run", [], "/trusted");
+
+    invoker.cancel();
+    await new Promise((resolve) => setTimeout(resolve, 8));
+    assert.deepEqual(child.kills, ["SIGTERM", "SIGKILL"]);
+    child.process.emit("close", null);
+    assert.deepEqual(await pending, {
+      ok: false,
+      kind: "cancelled",
+      raw: "CLI invocation was cancelled.",
+    });
+  });
+
+  it("treats a repeated cancellation request as a no-op once one is already in flight", async () => {
+    const child = fakeChild();
+    const invoker = createObservableExecuteCliInvoker({
+      timeoutMs: 60_000,
+      terminationGraceMs: 5_000,
+      spawnProcess: () => child.process,
+      onProgress: () => {},
+    });
+    const pending = invoker.invoke("run", [], "/trusted");
+
+    assert.equal(invoker.cancel(), true);
+    assert.equal(invoker.cancel(), true);
+    assert.deepEqual(child.kills, ["SIGTERM"]);
+    child.process.emit("close", null);
+    await pending;
+  });
+
+  it("reports no active invocation to cancel when none is running", () => {
+    const invoker = createObservableExecuteCliInvoker({
+      timeoutMs: 60_000,
+      spawnProcess: () => fakeChild().process,
+      onProgress: () => {},
+    });
+
+    assert.equal(invoker.cancel(), false);
+  });
+
+  it("keeps a natural success result deterministic when cancellation loses the race against a confirmed exit", async () => {
+    const child = fakeChild();
+    const invoker = createObservableExecuteCliInvoker({
+      timeoutMs: 60_000,
+      spawnProcess: () => child.process,
+      onProgress: () => {},
+    });
+    const pending = invoker.invoke("run", [], "/trusted");
+
+    child.stdout.emit("data", '{"schemaVersion":1}');
+    child.process.emit("close", 0);
+    assert.deepEqual(await pending, {
+      ok: true,
+      json: { schemaVersion: 1 },
+      exitCode: 0,
+    });
+    assert.equal(invoker.cancel(), false);
+    assert.deepEqual(child.kills, []);
+  });
+
+  it("keeps the close guard active through a cancellation until termination is confirmed", async () => {
+    const child = fakeChild();
+    const invoker = createObservableExecuteCliInvoker({
+      timeoutMs: 60_000,
+      terminationGraceMs: 5,
+      spawnProcess: () => child.process,
+      onProgress: () => {},
+    });
+    const guard = createExecutionWindowCloseGuard();
+    const running = guard.run(() => invoker.invoke("run", [], "/trusted"));
+
+    invoker.cancel();
+    assert.equal(guard.active, true);
+    assert.deepEqual(child.kills, ["SIGTERM"]);
+    child.process.emit("close", null);
+    assert.deepEqual(await running, {
+      ok: false,
+      kind: "cancelled",
+      raw: "CLI invocation was cancelled.",
+    });
+    assert.equal(guard.active, false);
+  });
+
+  it("marks a cancelled execution session with a single terminal cancelled event, never before confirmation", async () => {
+    const child = fakeChild();
+    const sessions = createExecutionSessionManager({
+      createExecuteHandler(onProgress) {
+        const invoker = createObservableExecuteCliInvoker({
+          timeoutMs: 60_000,
+          terminationGraceMs: 5,
+          spawnProcess: () => child.process,
+          onProgress,
+        });
+        return {
+          handler: () => invoker.invoke("run", [], "/trusted"),
+          cancel: invoker.cancel,
+        };
+      },
+      generateId: () => "session-cancel",
+    });
+
+    const started = await sessions.start(request);
+    assert.equal(started.ok, true);
+    assert.equal(sessions.cancel("session-cancel"), true);
+    assert.deepEqual(child.kills, ["SIGTERM"]);
+    assert.equal(sessions.get("session-cancel")?.result, null);
+
+    child.process.emit("close", null);
+    await sessions.waitForCompletion("session-cancel");
+    const completed = sessions.get("session-cancel");
+    assert.deepEqual(completed?.result, {
+      ok: false,
+      kind: "cancelled",
+      raw: "CLI invocation was cancelled.",
+    });
+    assert.deepEqual(
+      completed?.events.map((event) => event.type).slice(-1),
+      ["cancelled"],
+    );
+    assert.equal(
+      completed?.events.filter((event) => event.type === "cancelled").length,
+      1,
+    );
+  });
+
+  it("fails cleanly, as an explicit no-op, when cancelling with no matching active session", () => {
+    const sessions = createExecutionSessionManager({
+      createExecuteHandler: () => ({
+        handler: async () => ({ ok: true as const, json: {}, exitCode: 0 }),
+        cancel: () => false,
+      }),
+    });
+
+    assert.equal(sessions.cancel("missing-session"), false);
+    assert.equal(sessions.cancel(42), false);
+  });
+
+  it("does not forward cancellation once the session already reached a terminal result", async () => {
+    let cancelCalls = 0;
+    const sessions = createExecutionSessionManager({
+      createExecuteHandler() {
+        return {
+          handler: async () => ({ ok: true as const, json: {}, exitCode: 0 }),
+          cancel: () => {
+            cancelCalls += 1;
+            return true;
+          },
+        };
+      },
+      generateId: () => "session-done",
+    });
+
+    await sessions.start(request);
+    await sessions.waitForCompletion("session-done");
+
+    assert.equal(sessions.cancel("session-done"), false);
+    assert.equal(cancelCalls, 0);
+  });
+
+  it("allows cancellation only while a GUI execution session is truly active", () => {
+    assert.equal(canCancelExecution(null), false);
+    assert.equal(canCancelExecution({ result: null }), true);
+    assert.equal(
+      canCancelExecution({ result: { ok: true, json: {}, exitCode: 0 } }),
+      false,
+    );
   });
 
   it("polls one session only on its cadence, never overlaps requests, and stops after a terminal snapshot", async () => {
