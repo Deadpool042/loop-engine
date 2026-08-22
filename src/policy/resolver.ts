@@ -122,6 +122,12 @@ const CATEGORY_NEEDS_WRITE: Readonly<Record<LoopTaskCategory, boolean>> = {
   none: false,
 };
 
+// "high" is reserved for a demonstrated last resort (see
+// src/agents/escalation.ts, only reachable after a real prior attempt with a
+// failureReason) — never the static default for a category, however
+// sensitive. Architecture/security-flavored work defaults to "medium": a
+// deliberately more capable/careful profile than routine development, but
+// not an automatic maximum-effort escalation.
 const CATEGORY_MINIMUM_EFFORT: Readonly<
   Record<LoopTaskCategory, LoopTaskRequirements["minimumEffort"]>
 > = {
@@ -129,7 +135,7 @@ const CATEGORY_MINIMUM_EFFORT: Readonly<
   code: "medium",
   tests: "medium",
   validation: "low",
-  architecture: "high",
+  architecture: "medium",
   review: "low",
   none: "low",
 };

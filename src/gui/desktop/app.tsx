@@ -1513,8 +1513,9 @@ export function App(): React.JSX.Element {
                               </p>
                               <p className="mt-2 text-sm text-loop-muted">
                                 Catégorie : {planDetail.profile.category} ·
-                                budget de contexte :{" "}
-                                {planDetail.profile.contextBudgetTokens} tokens.
+                                budget maximal de contexte :{" "}
+                                {planDetail.profile.contextBudgetTokens} tokens
+                                (plafond, pas une consommation réelle).
                               </p>
                               <ul className="mt-2 space-y-1 text-xs text-loop-muted">
                                 <li>

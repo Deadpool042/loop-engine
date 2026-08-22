@@ -264,7 +264,7 @@ describe("resolvePolicy — gates, in order", () => {
       registry: createAgentRegistry([
         profile({ id: "p", effort: "max", capabilities: ["long_context"] }),
       ]),
-      candidate: candidate({ text: "- [ ] Revoir l'architecture globale" }), // category "architecture" -> minimumEffort "high"
+      candidate: candidate({ text: "- [ ] Revoir l'architecture globale" }), // category "architecture" -> minimumEffort "medium"
       mode: "plan",
     });
 
