@@ -52,6 +52,7 @@ import {
 } from "./commands/roadmap-propose-estimate.js";
 import { printGateReassessment, printGateReassessmentEstimateJson, printGateReassessmentJson } from "./commands/gate-reassess.js";
 import { ANTHROPIC_EFFORT_VALUES } from "./text-only-provider/index.js";
+import { ANTHROPIC_SONNET_5_MODEL } from "./text-only-provider/pricing.js";
 import {
   printAuditReport,
   printAuditReportJson,
@@ -265,7 +266,7 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   const timeoutValue = optionValue("--provider-timeout-ms");
   if (!candidateId || !sourceDocument || !gitHead) failOption(json, "missing_candidate_value", "--candidate, --source-document, and --git-head are required.");
   if (provider !== "anthropic_api") failOption(json, "unsupported_provider", "--provider anthropic_api is required.");
-  if (model !== "claude-sonnet-5") failOption(json, "missing_provider_model", "--provider-model claude-sonnet-5 is required.");
+  if (model !== ANTHROPIC_SONNET_5_MODEL) failOption(json, "missing_provider_model", "--provider-model claude-sonnet-5 is required.");
   if (effort !== "low") failOption(json, "invalid_provider_effort", "--provider-effort low is required.");
   if (timeoutValue !== "60000") failOption(json, "invalid_provider_timeout", "--provider-timeout-ms 60000 is required.");
   if (json) await printExecutionDecisionProposalJson(application, { project: project.name, candidateId, sourceDocument, gitHead, provider, model, effort, timeoutMs: 60_000 });

@@ -1,5 +1,29 @@
 # Provider Adapters
 
+## Périmètre de ce document
+
+Ce document décrit uniquement la couche Provider interne `src/providers/`
+(adaptateurs OpenClaw/Claude Code/Codex, tous inertes). Il ne décrit pas les
+deux intégrations Anthropic réelles et câblées du dépôt, qui vivent en dehors
+de `src/providers/` et n'en dépendent pas :
+
+- `src/text-only-provider/anthropic-api-provider.ts` — un client HTTP réel
+  vers l'API Anthropic Messages (`/v1/messages`), utilisé uniquement pour des
+  décisions de gouvernance consultatives (roadmap-proposal, reassess-gates).
+  `tool_choice: { type: "none" }`, pas d'outil, pas de capacité projet, pas
+  d'accès fichier. Voir `docs/roadmap/anthropic-provider-evolution.md` pour la
+  frontière exacte avec Claude Code.
+- `src/loop/claude-code-cli-executor.ts` — un `LoopExecutor` réel qui spawn le
+  CLI officiel `claude` via `node:child_process`, utilisé comme runtime de
+  développement interactif en mode `execute` (jamais activé par défaut).
+
+Un lecteur de ce seul document pourrait conclure à tort qu'aucune intégration
+Anthropic n'est câblée dans le dépôt : c'est faux pour les deux chemins de
+code ci-dessus, vrai uniquement pour les stubs `src/providers/` décrits
+ci-dessous. Les deux zones restent conceptuellement distinctes et ne
+fusionnent pas : `src/providers/` reste un plan Provider interne inerte,
+sans lien avec ces deux intégrations réelles.
+
 ## Statut
 
 V10.2 ajoute une couche Provider interne et déterministe. Elle prépare les
@@ -7,7 +31,10 @@ intégrations futures pour OpenClaw, Claude Code et Codex sans appeler de modèl
 sans réseau, sans lecture de credentials et sans exécution de processus.
 
 Les trois adaptateurs actuels sont des stubs. Ils construisent seulement un
-`ProviderExecutionPlan` inerte avec le statut `not_implemented`.
+`ProviderExecutionPlan` inerte avec le statut `not_implemented`. Ce statut
+`not_implemented` concerne exclusivement ce plan Provider interne — il ne
+signifie pas qu'aucune intégration Anthropic n'existe ailleurs dans le dépôt
+(voir « Périmètre de ce document » ci-dessus).
 
 ## Frontières
 

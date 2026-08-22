@@ -6,7 +6,17 @@
  * never call the network at runtime to fetch pricing.
  */
 
-export type AnthropicPricingModel = "claude-haiku-4-5" | "claude-sonnet-5";
+/**
+ * Single source of truth for supported Anthropic model IDs used by this
+ * feature. Every call site that needs a concrete Anthropic model ID
+ * (registry profiles, roadmap-proposal routing, CLI validation, pricing)
+ * must import these constants instead of repeating the literal string.
+ */
+export const ANTHROPIC_HAIKU_4_5_MODEL = "claude-haiku-4-5" as const;
+export const ANTHROPIC_SONNET_5_MODEL = "claude-sonnet-5" as const;
+
+export type AnthropicPricingModel =
+  typeof ANTHROPIC_HAIKU_4_5_MODEL | typeof ANTHROPIC_SONNET_5_MODEL;
 
 export type AnthropicPricingEntry = Readonly<{
   effectiveFrom: string; // ISO date (inclusive)
@@ -18,14 +28,14 @@ export type AnthropicPricingEntry = Readonly<{
 const ANTHROPIC_PRICING_TABLE: Readonly<
   Record<AnthropicPricingModel, readonly AnthropicPricingEntry[]>
 > = Object.freeze({
-  "claude-haiku-4-5": Object.freeze([
+  [ANTHROPIC_HAIKU_4_5_MODEL]: Object.freeze([
     Object.freeze({
       effectiveFrom: "1970-01-01",
       inputUsdPerMillionTokens: 1.0,
       outputUsdPerMillionTokens: 5.0,
     }),
   ]),
-  "claude-sonnet-5": Object.freeze([
+  [ANTHROPIC_SONNET_5_MODEL]: Object.freeze([
     Object.freeze({
       effectiveFrom: "1970-01-01",
       effectiveTo: "2026-09-01",
@@ -43,7 +53,9 @@ const ANTHROPIC_PRICING_TABLE: Readonly<
 export function isAnthropicPricingModel(
   value: string,
 ): value is AnthropicPricingModel {
-  return value === "claude-haiku-4-5" || value === "claude-sonnet-5";
+  return (
+    value === ANTHROPIC_HAIKU_4_5_MODEL || value === ANTHROPIC_SONNET_5_MODEL
+  );
 }
 
 /** Resolves the pricing entry in effect for a model at a given ISO date (defaults to now). */

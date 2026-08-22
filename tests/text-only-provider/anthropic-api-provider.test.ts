@@ -16,6 +16,10 @@ const validInput = Object.freeze({
   timeoutMs: 1_000,
 });
 
+function noopSleep(): Promise<void> {
+  return Promise.resolve();
+}
+
 function providerWith(
   transport: (request: TextOnlyHttpRequest) => Promise<Response>,
   environment: Readonly<Record<string, string | undefined>> = {
@@ -26,12 +30,184 @@ function providerWith(
     transport,
     environment,
     maxOutputTokens: 128,
+    sleep: noopSleep,
   });
 }
 
 describe("Anthropic API text-only provider", () => {
-  for (const [status, errorType, code] of [[400,"invalid_request_error","provider_request_failed"],[401,"authentication_error","provider_authentication_failed"],[402,"billing_error","provider_billing_failed"],[403,"permission_error","provider_permission_denied"],[404,"not_found_error","provider_not_found"],[413,"invalid_request_error","provider_request_too_large"],[429,"rate_limit_error","provider_rate_limited"],[500,"api_error","provider_server_error"],[529,"overloaded_error","provider_server_error"]] as const) it(`classifies HTTP ${status} without retaining raw response data`, async () => { let calls=0; const provider=providerWith(async()=>{calls++;return new Response(JSON.stringify({type:"error",error:{type:errorType,message:"safe diagnostic"},request_id:"req_test"}),{status});}); const result=await provider.invoke(validInput); assert.equal(calls,1); assert.equal(result.status,"failed"); if(result.status==="failed"){assert.equal(result.code,code);assert.equal(result.httpStatus,status);assert.equal(result.providerErrorType,errorType);assert.equal(result.requestId,"req_test");assert.doesNotMatch(JSON.stringify(result),/test-secret/);} });
-  it("keeps malformed error bodies bounded and classifies a single request", async () => { let calls=0; const provider=providerWith(async()=>{calls++;return new Response("not-json",{status:400});}); const result=await provider.invoke(validInput); assert.equal(calls,1);assert.equal(result.status,"failed");if(result.status==="failed"){assert.equal(result.code,"provider_request_failed");assert.equal(result.httpStatus,400);assert.equal(result.providerErrorType,undefined);}});
+  for (const [status, errorType, code] of [
+    [400, "invalid_request_error", "provider_request_failed"],
+    [401, "authentication_error", "provider_authentication_failed"],
+    [402, "billing_error", "provider_billing_failed"],
+    [403, "permission_error", "provider_permission_denied"],
+    [404, "not_found_error", "provider_not_found"],
+    [413, "invalid_request_error", "provider_request_too_large"],
+  ] as const)
+    it(`classifies HTTP ${status} without retaining raw response data and never retries`, async () => {
+      let calls = 0;
+      const provider = providerWith(async () => {
+        calls++;
+        return new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: errorType, message: "safe diagnostic" },
+            request_id: "req_test",
+          }),
+          { status },
+        );
+      });
+      const result = await provider.invoke(validInput);
+      assert.equal(calls, 1);
+      assert.equal(result.status, "failed");
+      if (result.status === "failed") {
+        assert.equal(result.code, code);
+        assert.equal(result.httpStatus, status);
+        assert.equal(result.providerErrorType, errorType);
+        assert.equal(result.requestId, "req_test");
+        assert.equal(result.attempts, 1);
+        assert.doesNotMatch(JSON.stringify(result), /test-secret/);
+      }
+    });
+
+  for (const [status, errorType] of [
+    [429, "rate_limit_error"],
+    [500, "api_error"],
+    [502, "api_error"],
+    [503, "api_error"],
+    [504, "api_error"],
+    [529, "overloaded_error"],
+  ] as const)
+    it(`retries transient HTTP ${status} up to the bounded attempt limit then returns the last failure`, async () => {
+      let calls = 0;
+      const provider = providerWith(async () => {
+        calls++;
+        return new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: errorType, message: "safe diagnostic" },
+            request_id: "req_test",
+          }),
+          { status },
+        );
+      });
+      const result = await provider.invoke(validInput);
+      assert.equal(calls, 3);
+      assert.equal(result.status, "failed");
+      if (result.status === "failed") {
+        assert.equal(
+          result.code,
+          status === 429 ? "provider_rate_limited" : "provider_server_error",
+        );
+        assert.equal(result.httpStatus, status);
+        assert.equal(result.attempts, 3);
+        assert.doesNotMatch(JSON.stringify(result), /test-secret/);
+      }
+    });
+
+  it("stops retrying and returns success as soon as a transient error recovers", async () => {
+    let calls = 0;
+    const provider = providerWith(async () => {
+      calls++;
+      if (calls < 3)
+        return new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: "overloaded_error", message: "safe diagnostic" },
+          }),
+          { status: 529 },
+        );
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: "ok" }],
+          usage: { input_tokens: 1, output_tokens: 1 },
+        }),
+        { status: 200 },
+      );
+    });
+    const result = await provider.invoke(validInput);
+    assert.equal(calls, 3);
+    assert.equal(result.status, "completed");
+    if (result.status === "completed") {
+      assert.equal(result.attempts, 3);
+    }
+  });
+
+  it("honors a reasonable Retry-After header when retrying a 429", async () => {
+    const delays: number[] = [];
+    let calls = 0;
+    const provider = createAnthropicApiProvider({
+      transport: async () => {
+        calls++;
+        return new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: "rate_limit_error", message: "slow down" },
+          }),
+          { status: 429, headers: { "retry-after": "2" } },
+        );
+      },
+      environment: { ANTHROPIC_API_KEY: "test-secret" },
+      maxOutputTokens: 128,
+      sleep: async (ms) => {
+        delays.push(ms);
+      },
+    });
+    const result = await provider.invoke({ ...validInput, timeoutMs: 10_000 });
+    assert.equal(calls, 3);
+    assert.equal(result.status, "failed");
+    assert.deepEqual(delays, [2000, 2000]);
+  });
+
+  it("stops retrying once the caller's timeout budget cannot fit the next backoff, without exceeding it", async () => {
+    const delays: number[] = [];
+    let calls = 0;
+    const provider = createAnthropicApiProvider({
+      transport: async () => {
+        calls++;
+        return new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: "rate_limit_error", message: "slow down" },
+          }),
+          { status: 429, headers: { "retry-after": "5" } },
+        );
+      },
+      environment: { ANTHROPIC_API_KEY: "test-secret" },
+      maxOutputTokens: 128,
+      // Real wall-clock time barely advances during this test (the fake
+      // sleep never actually waits), so a 1s timeout budget cannot fit a
+      // 5s Retry-After-driven backoff: the second attempt must be refused
+      // and the last observed 429 failure returned immediately instead of
+      // retrying past the caller's original timeout budget.
+      sleep: async (ms) => {
+        delays.push(ms);
+      },
+    });
+    const result = await provider.invoke({ ...validInput, timeoutMs: 1_000 });
+    assert.equal(calls, 1);
+    assert.deepEqual(delays, []);
+    assert.equal(result.status, "failed");
+    if (result.status === "failed") {
+      assert.equal(result.code, "provider_rate_limited");
+      assert.equal(result.attempts, 1);
+    }
+  });
+
+  it("keeps malformed error bodies bounded and classifies a single request", async () => {
+    let calls = 0;
+    const provider = providerWith(async () => {
+      calls++;
+      return new Response("not-json", { status: 400 });
+    });
+    const result = await provider.invoke(validInput);
+    assert.equal(calls, 1);
+    assert.equal(result.status, "failed");
+    if (result.status === "failed") {
+      assert.equal(result.code, "provider_request_failed");
+      assert.equal(result.httpStatus, 400);
+      assert.equal(result.providerErrorType, undefined);
+    }
+  });
   it("sends exactly one bounded tool-free Messages request", async () => {
     const requests: TextOnlyHttpRequest[] = [];
     const provider = providerWith(async (request) => {
@@ -102,6 +278,7 @@ describe("Anthropic API text-only provider", () => {
       format: {
         type: "json_schema",
         schema: { type: "object", additionalProperties: false },
+        strict: true,
       },
     });
   });
@@ -151,6 +328,7 @@ describe("Anthropic API text-only provider", () => {
             },
           },
         },
+        strict: true,
       },
     });
   });
@@ -190,7 +368,11 @@ describe("Anthropic API text-only provider", () => {
                   properties: {
                     status: { type: "string", const: "proposed" },
                     summary: { type: "string", maxLength: 500 },
-                    lots: { type: "array", maxItems: 3, items: { type: "string" } },
+                    lots: {
+                      type: "array",
+                      maxItems: 3,
+                      items: { type: "string" },
+                    },
                   },
                 },
               ],
@@ -208,10 +390,8 @@ describe("Anthropic API text-only provider", () => {
         unknown
       >
     ).schema as Record<string, unknown>;
-    const anyOf = (schema.properties as Record<string, unknown>).status as Record<
-      string,
-      unknown
-    >;
+    const anyOf = (schema.properties as Record<string, unknown>)
+      .status as Record<string, unknown>;
     assert.equal(Array.isArray(anyOf.anyOf), true);
     const branches = anyOf.anyOf as Record<string, unknown>[];
     assert.deepEqual(branches[0]?.required, ["status", "reason"]);
@@ -274,10 +454,7 @@ describe("Anthropic API text-only provider", () => {
     assert.equal(result.status, "failed");
     if (result.status === "failed") {
       assert.equal(result.code, "provider_refused");
-      assert.doesNotMatch(
-        JSON.stringify(result),
-        /sensitive model text/,
-      );
+      assert.doesNotMatch(JSON.stringify(result), /sensitive model text/);
     }
   });
 
@@ -301,10 +478,7 @@ describe("Anthropic API text-only provider", () => {
     if (result.status === "failed") {
       assert.equal(result.code, "provider_output_truncated");
       assert.equal(result.truncated, true);
-      assert.doesNotMatch(
-        JSON.stringify(result),
-        /partial sensitive output/,
-      );
+      assert.doesNotMatch(JSON.stringify(result), /partial sensitive output/);
     }
   });
 

@@ -1,3 +1,7 @@
+import {
+  ANTHROPIC_HAIKU_4_5_MODEL,
+  ANTHROPIC_SONNET_5_MODEL,
+} from "../text-only-provider/pricing.js";
 import type { AgentProfile } from "./types.js";
 
 export type AgentRegistry = Readonly<{
@@ -38,7 +42,7 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     id: "claude_code.low",
     runtime: "claude_code",
     provider: "anthropic",
-    model: "claude-haiku-4-5",
+    model: ANTHROPIC_HAIKU_4_5_MODEL,
     effort: "low",
     capabilities: ["code_edit", "shell_exec", "test_execution"],
     permissions: ["read_only", "write_worktree", "shell_exec"],
@@ -59,7 +63,7 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     id: "claude_code.medium",
     runtime: "claude_code",
     provider: "anthropic",
-    model: "claude-sonnet-5",
+    model: ANTHROPIC_SONNET_5_MODEL,
     effort: "medium",
     capabilities: [
       "code_edit",
@@ -80,7 +84,7 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     id: "claude_code.high",
     runtime: "claude_code",
     provider: "anthropic",
-    model: "claude-sonnet-5",
+    model: ANTHROPIC_SONNET_5_MODEL,
     effort: "high",
     capabilities: [
       "code_edit",
