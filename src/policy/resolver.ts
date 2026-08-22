@@ -13,6 +13,7 @@ import {
   compareAgentEffort,
   type AgentCapability,
   type AgentPermission,
+  type AgentProfileTier,
 } from "../agents/types.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import {
@@ -28,12 +29,18 @@ import {
 } from "./defaults.js";
 import type {
   AgentPolicy,
+  AgentPolicyFallback,
   AgentPolicyMode,
   AgentPolicyRequest,
   AgentPolicyResolution,
   LoopTaskCategory,
   LoopTaskRequirements,
 } from "./types.js";
+
+const NO_FALLBACK: AgentPolicyFallback = Object.freeze({
+  active: false,
+  reason: null,
+});
 
 // Keyword matching is deterministic and favors precision over recall (same
 // philosophy as src/intelligence/roadmap.ts): an unmatched lot defaults to
@@ -122,6 +129,12 @@ const CATEGORY_NEEDS_WRITE: Readonly<Record<LoopTaskCategory, boolean>> = {
   none: false,
 };
 
+// "high" is reserved for a demonstrated last resort (see
+// src/agents/escalation.ts, only reachable after a real prior attempt with a
+// failureReason) — never the static default for a category, however
+// sensitive. Architecture/security-flavored work defaults to "medium": a
+// deliberately more capable/careful profile than routine development, but
+// not an automatic maximum-effort escalation.
 const CATEGORY_MINIMUM_EFFORT: Readonly<
   Record<LoopTaskCategory, LoopTaskRequirements["minimumEffort"]>
 > = {
@@ -129,9 +142,19 @@ const CATEGORY_MINIMUM_EFFORT: Readonly<
   code: "medium",
   tests: "medium",
   validation: "low",
-  architecture: "high",
+  architecture: "medium",
   review: "low",
   none: "low",
+};
+
+// Optional provider-independent doctrinal preference per category. This is
+// descriptive policy metadata, never a hard selection requirement: concrete
+// profile eligibility remains governed only by capabilities, permissions,
+// effort and budget. A category absent here has no additional preference.
+const CATEGORY_PREFERRED_CAPABILITY_TIER: Readonly<
+  Partial<Record<LoopTaskCategory, AgentProfileTier>>
+> = {
+  architecture: "high_reasoning",
 };
 
 export function deriveRequiredPermissions(
@@ -163,6 +186,7 @@ export function deriveTaskRequirements(
 ): LoopTaskRequirements {
   const category = classifyLoopTaskCategory(candidate);
   const minimumEffort = CATEGORY_MINIMUM_EFFORT[category];
+  const preferredCapabilityTier = CATEGORY_PREFERRED_CAPABILITY_TIER[category];
   const rationale: string[] = [
     candidate
       ? `category=${category} derived from candidate text keywords`
@@ -177,6 +201,9 @@ export function deriveTaskRequirements(
     requiredPermissions: deriveRequiredPermissions(category, mode),
     minimumEffort,
     maximumEffort: policy.maximumEffort,
+    ...(preferredCapabilityTier === undefined
+      ? {}
+      : { preferredCapabilityTier }),
     contextBudget: getContextBudgetForEffort(minimumEffort),
     executionBudget: DEFAULT_MODE_BUDGETS[mode],
     rationale,
@@ -202,6 +229,7 @@ function resolution(
     requiredCapabilities: requirements.requiredCapabilities,
     requiredPermissions: requirements.requiredPermissions,
   },
+  fallback: AgentPolicyFallback = NO_FALLBACK,
 ): AgentPolicyResolution {
   return {
     policyId: policy.id,
@@ -211,7 +239,36 @@ function resolution(
     selectionRequest,
     selection,
     reasons,
+    fallback,
   };
+}
+
+// A fallback is only ever reported alongside a genuine, requirements-
+// satisfying selection — never as a substitute for a failed resolution
+// (those already carry their own status code). It never influences which
+// profile gets selected: selectAgentProfile already ran and picked the
+// cheapest requirements-satisfying profile; this only compares that outcome
+// against the category's declared preference, purely for explainability.
+function resolveFallback(
+  requirements: LoopTaskRequirements,
+  selection: AgentPolicyResolution["selection"],
+): AgentPolicyFallback {
+  if (requirements.preferredCapabilityTier === undefined) {
+    return NO_FALLBACK;
+  }
+
+  if (selection?.outcome !== "selected") {
+    return NO_FALLBACK;
+  }
+
+  if (selection.profile.tiers?.includes(requirements.preferredCapabilityTier)) {
+    return NO_FALLBACK;
+  }
+
+  // The selected profile satisfies every hard requirement but does not carry
+  // the category's optional doctrinal preference tier. This is a capability
+  // fallback, not an escalation and not a requirements violation.
+  return { active: true, reason: "preferred_capability_tier_unavailable" };
 }
 
 // Pure, deterministic, and never invokes an agent: only ever reads the
@@ -345,11 +402,17 @@ export function resolvePolicy(
     );
   }
 
+  const fallback = resolveFallback(requirements, selection);
   const reasons = [
     `selected agent profile "${selection.profile.id}" (effort ${selection.profile.effort}) as a forecast preview`,
     mode === "plan"
       ? `mode plan never calls an agent (this run's own budget.maxCalls is ${String(requirements.executionBudget.maxCalls)} by design); forecast simulated as mode execute`
       : `merged budget allows ${String(budget.maxCalls)} call(s) in mode ${mode}`,
+    ...(fallback.active
+      ? [
+          `fallback: preferred capability tier "${requirements.preferredCapabilityTier}" is unavailable; resolved to the best compatible profile "${selection.profile.id}" instead`,
+        ]
+      : []),
   ];
 
   return resolution(
@@ -360,5 +423,6 @@ export function resolvePolicy(
     reasons,
     selection,
     selectionRequest,
+    fallback,
   );
 }

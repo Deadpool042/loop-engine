@@ -63,6 +63,7 @@ interface LoopTaskRequirements {
   minimumEffort: AgentEffort;
   maximumEffort: AgentEffort;
   preferredProviders?: readonly AgentProvider[];
+  preferredCapabilityTier?: AgentProfileTier;
   allowedProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
   contextBudget: ContextBudget;
@@ -72,6 +73,8 @@ interface LoopTaskRequirements {
 ```
 
 `requiredCapabilities` dépend uniquement de la catégorie. `requiredPermissions` dépend du **plafond du mode** (`getAllowedPermissionsForMode`) filtré par les besoins de la catégorie — jamais l'inverse : c'est ce qui garantit qu'aucune capacité d'écriture n'est jamais requise en mode `plan`, quelle que soit la catégorie du lot.
+
+`preferredCapabilityTier` (`CATEGORY_PREFERRED_CAPABILITY_TIER` dans `src/policy/resolver.ts`) exprime une préférence doctrinale abstraite et indépendante du fournisseur. Elle ne contraint jamais la sélection : `selectAgentProfile` reste un lookup pur sur les seules `requiredCapabilities`/`requiredPermissions`/effort/budget (voir "Cible de politique vs profil résolu" ci-dessous).
 
 ### `AgentPolicy`
 
@@ -104,10 +107,22 @@ interface AgentPolicyResolution {
   selectionRequest: AgentSelectionRequest;
   selection: AgentSelectionResult | null;
   reasons: readonly string[];
+  fallback: AgentPolicyFallback; // { active: boolean; reason: AgentPolicyFallbackReason | null }
 }
 ```
 
 Codes de statut (`AGENT_POLICY_STATUS_CODES`) : `resolved`, `no_safe_candidate`, `no_compatible_agent`, `policy_disabled`, `permission_denied`, `budget_exhausted`, `effort_not_supported`, `provider_not_allowed`, `runtime_not_allowed`. Chacun est déterministe et couvert par des tests (`tests/policy/resolver.test.ts`) ; aucun profil absent ou incompatible ne provoque d'exception non structurée.
+
+### Cible de politique vs profil résolu (`fallback`)
+
+`requirements.preferredCapabilityTier` exprime la cible doctrinale abstraite d'une catégorie (par exemple `high_reasoning` pour `architecture`) — une **préférence**, jamais une exigence. `requirements.requiredCapabilities`/`requiredPermissions`/`minimumEffort`/budgets restent les seules contraintes fail-closed : un profil qui ne les satisfait pas n'est jamais sélectionné, préférence ou non.
+
+`resolution.fallback` vérifie, après coup, si le profil réellement sélectionné déclare le tier préféré dans `selection.profile.tiers` :
+
+- `{ active: false, reason: null }` — la catégorie n'a pas de préférence déclarée, ou le profil sélectionné porte le tier préféré ;
+- `{ active: true, reason: "preferred_capability_tier_unavailable" }` — le profil sélectionné satisfait toutes les exigences obligatoires mais ne porte pas le tier doctrinal préféré actuellement disponible.
+
+Un `fallback` n'est **jamais** une escalade (`src/agents/escalation.ts`) : l'escalade ne se déclenche que sur un échec réel d'une tentative précédente (`previousProfileId` + `failureReason` explicites) et ne fait jamais partie de `resolvePolicy`. Un fallback reflète une préférence indisponible au moment de la résolution, sans jamais élever l'effort au-delà de `requirements.minimumEffort`.
 
 ## Permissions par mode
 
@@ -236,7 +251,7 @@ Inchangée par rapport à `agent-orchestration.md` : aucune hiérarchie fixe. La
 Dans ce lot :
 
 - `src/agents/types.ts` — ajout de la permission `git_tag`, distincte de `git_push`, jamais implicite ;
-- `src/policy/types.ts` — `AgentPolicyMode`, `LoopTaskCategory`, `ContextBudget`, `LoopTaskRequirements`, `AgentPolicy`, `AgentPolicyRequest`, `AgentPolicyResolution`, `AGENT_POLICY_STATUS_CODES` ;
+- `src/policy/types.ts` — `AgentPolicyMode`, `LoopTaskCategory`, `ContextBudget`, `LoopTaskRequirements`, `AgentPolicy`, `AgentPolicyRequest`, `AgentPolicyResolution`, `AgentPolicyFallback`, `AGENT_POLICY_STATUS_CODES`, `AGENT_POLICY_FALLBACK_REASONS` ;
 - `src/policy/defaults.ts` — plafonds de permissions par mode, budgets par mode, budget de simulation de sélection (`getForecastSelectionBudgetForMode`), primitives de fusion restrictive, budget de contexte par effort, `DEFAULT_AGENT_POLICY` ;
 - `src/policy/resolver.ts` — `classifyLoopTaskCategory`, `deriveRequiredPermissions`, `deriveTaskRequirements`, `resolvePolicy` ;
 - intégration additive au `LoopRunner` (mode `plan` uniquement) — champ `agentPolicy` sur `LoopRunResult`, sélection prévisionnelle, jamais d'appel réel.

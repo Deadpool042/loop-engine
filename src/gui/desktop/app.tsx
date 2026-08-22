@@ -1513,9 +1513,17 @@ export function App(): React.JSX.Element {
                               </p>
                               <p className="mt-2 text-sm text-loop-muted">
                                 Catégorie : {planDetail.profile.category} ·
-                                budget de contexte :{" "}
-                                {planDetail.profile.contextBudgetTokens} tokens.
+                                budget maximal de contexte :{" "}
+                                {planDetail.profile.contextBudgetTokens} tokens
+                                (plafond, pas une consommation réelle).
                               </p>
+                              {planDetail.profile.fallbackActive && (
+                                <p className="mt-2 text-xs text-amber-800">
+                                  Fallback policy : profil préféré indisponible
+                                  indisponible — résolution disponible
+                                  utilisée à la place.
+                                </p>
+                              )}
                               <ul className="mt-2 space-y-1 text-xs text-loop-muted">
                                 <li>
                                   Profil choisi automatiquement selon le type,

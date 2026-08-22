@@ -51,6 +51,32 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     },
   },
   {
+    // Fills the low -> high gap in the Claude Code ladder (mirroring the
+    // codex.low/medium/high ladder below) so architecture/security-flavored
+    // work — which requires long_context — can resolve to a medium-effort
+    // profile instead of jumping straight to claude_code.high. See
+    // CATEGORY_MINIMUM_EFFORT.architecture in src/policy/resolver.ts.
+    id: "claude_code.medium",
+    runtime: "claude_code",
+    provider: "anthropic",
+    model: "claude-sonnet-5",
+    effort: "medium",
+    capabilities: [
+      "code_edit",
+      "shell_exec",
+      "test_execution",
+      "long_context",
+    ],
+    permissions: ["read_only", "write_worktree", "shell_exec", "git_commit"],
+    budget: {
+      maxTokens: 150_000,
+      maxCostUsd: 4,
+      maxDurationMs: 300_000,
+      maxCalls: 1,
+      maxRepairs: 1,
+    },
+  },
+  {
     id: "claude_code.high",
     runtime: "claude_code",
     provider: "anthropic",
