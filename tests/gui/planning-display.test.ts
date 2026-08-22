@@ -142,6 +142,78 @@ describe("GUI planning display", () => {
     );
   });
 
+  it("renders factually correct headings for deferred and external planning", () => {
+    const cases: ReadonlyArray<{
+      recommendation: "deferred_no_work" | "external_planning_source";
+      mode: "deferred" | "external";
+      expected: { heading: string; description: string; roadmapDetail: string };
+    }> = [
+      {
+        recommendation: "deferred_no_work",
+        mode: "deferred",
+        expected: {
+          heading: "Roadmap différée",
+          description: "Ce projet a explicitement différé son travail de roadmap.",
+          roadmapDetail: "Aucune roadmap requise pour le moment.",
+        },
+      },
+      {
+        recommendation: "external_planning_source",
+        mode: "external",
+        expected: {
+          heading: "Planning externe",
+          description:
+            "Ce projet est piloté par une source de planning externe à Loop Engine.",
+          roadmapDetail: "Aucun travail n’est recommandé depuis ce cockpit.",
+        },
+      },
+    ];
+
+    for (const testCase of cases) {
+      assert.deepEqual(
+        getPlanningDisplay(
+          context({
+            planning: {
+              mode: testCase.mode,
+              roadmapConfigured: false,
+              recommendation: testCase.recommendation,
+            },
+            roadmap: { ...context().roadmap, available: false, paths: [] },
+          }),
+        ),
+        {
+          modeLabel: testCase.mode === "deferred" ? "Différé" : "Externe",
+          heading: testCase.expected.heading,
+          description: testCase.expected.description,
+          roadmapDetail: testCase.expected.roadmapDetail,
+          blockedGates: [],
+          showRoadmapProposalAction: false,
+          showGateReassessmentAction: false,
+        },
+      );
+    }
+  });
+
+  it("keeps the deferred/external message even when closed phase gates exist", () => {
+    assert.equal(
+      getPlanningDisplay(
+        context({
+          planning: {
+            mode: "deferred",
+            roadmapConfigured: true,
+            recommendation: "deferred_no_work",
+          },
+          roadmap: {
+            ...context().roadmap,
+            stats: { ...context().roadmap.stats!, todo: 6 },
+            phaseGates: [{ phaseId: "H4", state: "closed" }],
+          },
+        }),
+      ).heading,
+      "Roadmap différée",
+    );
+  });
+
   it("hides the roadmap proposal action outside roadmap mode even with todo: 0", () => {
     assert.equal(
       getPlanningDisplay(

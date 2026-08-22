@@ -62,6 +62,31 @@ export function getPlanningDisplay(detail: ContextDetail): PlanningDisplay {
     });
   }
 
+  if (detail.planning?.recommendation === "deferred_no_work") {
+    return Object.freeze({
+      ...base,
+      heading: "Roadmap différée",
+      description: "Ce projet a explicitement différé son travail de roadmap.",
+      roadmapDetail: "Aucune roadmap requise pour le moment.",
+      blockedGates: Object.freeze([]),
+      showRoadmapProposalAction: false,
+      showGateReassessmentAction: false,
+    });
+  }
+
+  if (detail.planning?.recommendation === "external_planning_source") {
+    return Object.freeze({
+      ...base,
+      heading: "Planning externe",
+      description:
+        "Ce projet est piloté par une source de planning externe à Loop Engine.",
+      roadmapDetail: "Aucun travail n’est recommandé depuis ce cockpit.",
+      blockedGates: Object.freeze([]),
+      showRoadmapProposalAction: false,
+      showGateReassessmentAction: false,
+    });
+  }
+
   const blockedGates = detail.roadmap.phaseGates
     .filter((gate) => gate.state === "closed")
     .map((gate) =>
