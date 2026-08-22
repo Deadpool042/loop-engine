@@ -87,6 +87,8 @@ describe("GUI explicit plan contract", () => {
           category: "documentation",
           reasons: ["small bounded documentation lot"],
           contextBudgetTokens: 5000,
+          fallbackActive: false,
+          fallbackReason: null,
         },
         context: {
           files: ["docs/roadmap/projet-lp-infra.md"],

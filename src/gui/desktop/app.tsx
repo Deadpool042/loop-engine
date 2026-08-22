@@ -1517,6 +1517,13 @@ export function App(): React.JSX.Element {
                                 {planDetail.profile.contextBudgetTokens} tokens
                                 (plafond, pas une consommation réelle).
                               </p>
+                              {planDetail.profile.fallbackActive && (
+                                <p className="mt-2 text-xs text-amber-800">
+                                  Fallback policy : profil préféré
+                                  indisponible — résolution disponible
+                                  utilisée à la place.
+                                </p>
+                              )}
                               <ul className="mt-2 space-y-1 text-xs text-loop-muted">
                                 <li>
                                   Profil choisi automatiquement selon le type,

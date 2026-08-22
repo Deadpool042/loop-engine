@@ -78,6 +78,12 @@ export type LoopTaskRequirements = Readonly<{
   minimumEffort: AgentEffort;
   maximumEffort: AgentEffort;
   preferredProviders?: readonly AgentProvider[];
+  // The doctrinal ideal profile for this category (e.g. the strongest
+  // integrated reasoning tier for "architecture"), expressed as a registry
+  // profile id. Never a hardcoded model name and never gates selection —
+  // see CATEGORY_PREFERRED_PROFILE_ID in src/policy/resolver.ts. Absent
+  // when the category has no declared preference beyond its requirements.
+  preferredProfileId?: string;
   allowedProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
   contextBudget: ContextBudget;
@@ -127,6 +133,26 @@ export const AGENT_POLICY_STATUS_CODES = [
 
 export type AgentPolicyStatusCode = (typeof AGENT_POLICY_STATUS_CODES)[number];
 
+export const AGENT_POLICY_FALLBACK_REASONS = [
+  "preferred_profile_unavailable",
+] as const;
+
+export type AgentPolicyFallbackReason =
+  (typeof AGENT_POLICY_FALLBACK_REASONS)[number];
+
+// Reports whether the resolved selection is the category's doctrinal ideal
+// (requirements.preferredProfileId) or a degraded-but-compatible stand-in.
+// A fallback is never a requirements violation — the selected profile still
+// satisfies every required capability/permission/budget; it just is not the
+// preferred one, typically because that preferred profile is not yet
+// registered/priced (see docs/architecture/agent-policy-engine.md). Distinct
+// from escalation (src/agents/escalation.ts): a fallback reflects
+// unavailable preference at resolution time, never a real failed attempt.
+export type AgentPolicyFallback = Readonly<{
+  active: boolean;
+  reason: AgentPolicyFallbackReason | null;
+}>;
+
 export type AgentPolicyResolution = Readonly<{
   policyId: string;
   mode: AgentPolicyMode;
@@ -138,6 +164,7 @@ export type AgentPolicyResolution = Readonly<{
   // docs/architecture/agent-policy-engine.md. Never used to invoke an agent.
   selection: AgentSelectionResult | null;
   reasons: readonly string[];
+  fallback: AgentPolicyFallback;
 }>;
 
 // Capability & Policy Engine (V10.7). These contracts are a separate,

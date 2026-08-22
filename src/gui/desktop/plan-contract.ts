@@ -18,6 +18,8 @@ export type PlanDetail = Readonly<{
     category: string;
     reasons: readonly string[];
     contextBudgetTokens: number;
+    fallbackActive: boolean;
+    fallbackReason: string | null;
   }> | null;
   context: Readonly<{
     files: readonly string[];
@@ -117,6 +119,14 @@ function parseProfile(value: unknown): PlanDetail["profile"] | null | undefined 
     return undefined;
   }
 
+  // Additive and optional: absent on older responses, treated as no fallback.
+  const fallback = isRecord(value.fallback) ? value.fallback : undefined;
+  const fallbackActive = fallback?.active === true;
+  const fallbackReason =
+    fallbackActive && typeof fallback?.reason === "string"
+      ? fallback.reason
+      : null;
+
   return Object.freeze({
     id: profile.id,
     provider: profile.provider,
@@ -125,6 +135,8 @@ function parseProfile(value: unknown): PlanDetail["profile"] | null | undefined 
     category: requirements.category,
     reasons: Object.freeze([...value.reasons]),
     contextBudgetTokens: requirements.contextBudget.maxEstimatedTokens,
+    fallbackActive,
+    fallbackReason,
   });
 }
 

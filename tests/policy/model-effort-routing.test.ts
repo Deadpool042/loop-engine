@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { defaultAgentRegistry } from "../../src/agents/registry.js";
+import { createAgentRegistry, defaultAgentRegistry } from "../../src/agents/registry.js";
 import { escalateAgentProfile } from "../../src/agents/escalation.js";
+import type { AgentProfile } from "../../src/agents/types.js";
 import type { RoadmapCandidate } from "../../src/intelligence/roadmap.js";
 import { DEFAULT_AGENT_POLICY } from "../../src/policy/defaults.js";
 import { resolvePolicy } from "../../src/policy/resolver.js";
@@ -137,6 +138,133 @@ describe("generic model/effort routing matrix", () => {
   });
 });
 
+// A registry profile carrying the declared preferred id
+// ("claude_code.opus") for the "architecture" fixture below — used only to
+// prove that resolvePolicy prefers it when it IS registered/compatible,
+// with no fallback reported. It is not added to defaultAgentRegistry.
+function architecturePreferredProfile(
+  overrides: Partial<AgentProfile> = {},
+): AgentProfile {
+  return {
+    id: "claude_code.opus",
+    runtime: "claude_code",
+    provider: "anthropic",
+    model: "claude-opus-5",
+    effort: "medium",
+    capabilities: ["code_edit", "shell_exec", "test_execution", "long_context"],
+    permissions: ["read_only", "write_worktree", "shell_exec", "git_commit"],
+    budget: {
+      maxTokens: 400_000,
+      maxCostUsd: 20,
+      maxDurationMs: 900_000,
+      maxCalls: 1,
+      maxRepairs: 1,
+    },
+    ...overrides,
+  };
+}
+
+describe("policy target vs. resolved profile — fallback", () => {
+  it("architecture declares a preferred profile id that is not registered today", () => {
+    const result = resolve("- [ ] Revoir l'architecture du runner");
+    assert.equal(result.requirements.preferredProfileId, "claude_code.opus");
+  });
+
+  it("architecture with the preferred profile unavailable: resolves to the best compatible profile, fallback active with a stable reason", () => {
+    const result = resolve("- [ ] Revoir l'architecture du runner");
+    assert.equal(result.status, "resolved");
+    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    assert.equal(profile?.id, "claude_code.medium");
+    assert.equal(result.fallback.active, true);
+    assert.equal(result.fallback.reason, "preferred_profile_unavailable");
+  });
+
+  it("architecture with the preferred profile available and compatible: it is selected, fallback inactive", () => {
+    // A minimal registry (not defaultAgentRegistry) where the preferred
+    // profile is the only one satisfying architecture's requirements —
+    // isolates "is the preference honored when available" from
+    // pickSmallestCapable's cheapest-first tie-breaking against
+    // claude_code.medium, which is a separate, real registry-availability
+    // fact covered by the "unavailable" test below.
+    const registryWithPreferred = createAgentRegistry([
+      defaultAgentRegistry.profiles.find((p) => p.id === "claude_code.low")!,
+      architecturePreferredProfile(),
+    ]);
+
+    const result = resolvePolicy({
+      policy: DEFAULT_AGENT_POLICY,
+      registry: registryWithPreferred,
+      candidate: candidate("- [ ] Revoir l'architecture du runner"),
+      mode: "plan",
+    });
+
+    assert.equal(result.status, "resolved");
+    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    assert.equal(profile?.id, "claude_code.opus");
+    assert.equal(result.fallback.active, false);
+    assert.equal(result.fallback.reason, null);
+  });
+
+  it("a preferred profile that exists but does not satisfy a hard requirement is never selected just to avoid a fallback (requirements stay fail-closed)", () => {
+    const registryWithIncompatiblePreferred = createAgentRegistry([
+      ...defaultAgentRegistry.profiles,
+      // Declares the preferred id but is missing long_context — a real,
+      // required capability for "architecture" — so it must never win.
+      architecturePreferredProfile({ capabilities: ["code_edit"] }),
+    ]);
+
+    const result = resolvePolicy({
+      policy: DEFAULT_AGENT_POLICY,
+      registry: registryWithIncompatiblePreferred,
+      candidate: candidate("- [ ] Revoir l'architecture du runner"),
+      mode: "plan",
+    });
+
+    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    assert.notEqual(profile?.id, "claude_code.opus");
+    assert.equal(profile?.id, "claude_code.medium");
+    assert.equal(result.fallback.active, true);
+  });
+
+  it("categories without a declared preference never report an artificial fallback", () => {
+    for (const text of [
+      "- [ ] Bump the lockfile and rerun ci", // code
+      "- [ ] Rédiger la documentation du module policy", // documentation
+      "- [ ] Add regression tests for the flaky retry bug", // tests
+      "- [ ] Renforcer l'audit et la validation", // validation
+      "- [ ] Review the last release", // review
+    ]) {
+      const result = resolve(text);
+      assert.equal(result.requirements.preferredProfileId, undefined, text);
+      assert.equal(result.fallback.active, false, text);
+      assert.equal(result.fallback.reason, null, text);
+    }
+  });
+
+  it("fallback and escalation are distinct: a fallback never bumps effort, and escalation is never triggered by an unavailable preference", () => {
+    const result = resolve("- [ ] Revoir l'architecture du runner");
+    assert.equal(result.fallback.active, true);
+    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    // The fallback resolved to claude_code.medium — the same effort tier
+    // the category requires — never escalating to "high" on its own.
+    assert.equal(profile?.effort, "medium");
+
+    // Escalation is a separate, opt-in call that requires a real prior
+    // profile and failure reason; resolvePolicy itself never calls it.
+    const escalation = escalateAgentProfile({
+      registry: defaultAgentRegistry,
+      request: result.selectionRequest!,
+      previousProfileId: profile!.id,
+      failureReason: "validation_failed",
+    });
+    assert.equal(escalation.outcome, "escalated");
+    assert.equal(
+      escalation.outcome === "escalated" ? escalation.profile.effort : null,
+      "high",
+    );
+  });
+});
+
 describe("H4-L1 (lp-infra) — real routing regression", () => {
   const H4_L1_TEXT =
     "| H4-L1 | [P1] ADR architecture du cockpit : responsabilités, frontière sécurité, accès VPS/services, modèle read-only vs actions et choix technologique minimal ; aucune implémentation avant ADR accepté | ⬜ À faire |";
@@ -156,6 +284,15 @@ describe("H4-L1 (lp-infra) — real routing regression", () => {
     const result = resolve(H4_L1_TEXT);
     assert.equal(result.requirements.contextBudget.maxEstimatedTokens, 15_000);
     assert.notEqual(result.requirements.contextBudget.maxEstimatedTokens, 40_000);
+  });
+
+  it("reports an explicit, stable fallback reason instead of silently redefining the doctrine", () => {
+    const result = resolve(H4_L1_TEXT);
+    assert.equal(result.requirements.preferredProfileId, "claude_code.opus");
+    assert.equal(result.fallback.active, true);
+    assert.equal(result.fallback.reason, "preferred_profile_unavailable");
+    const profile = result.selection?.outcome === "selected" ? result.selection.profile : null;
+    assert.equal(profile?.id, "claude_code.medium");
   });
 });
 

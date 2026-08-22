@@ -28,12 +28,18 @@ import {
 } from "./defaults.js";
 import type {
   AgentPolicy,
+  AgentPolicyFallback,
   AgentPolicyMode,
   AgentPolicyRequest,
   AgentPolicyResolution,
   LoopTaskCategory,
   LoopTaskRequirements,
 } from "./types.js";
+
+const NO_FALLBACK: AgentPolicyFallback = Object.freeze({
+  active: false,
+  reason: null,
+});
 
 // Keyword matching is deterministic and favors precision over recall (same
 // philosophy as src/intelligence/roadmap.ts): an unmatched lot defaults to
@@ -140,6 +146,21 @@ const CATEGORY_MINIMUM_EFFORT: Readonly<
   none: "low",
 };
 
+// The doctrinal ideal profile per category, as a registry profile id — never
+// a hardcoded model name and never a selection requirement. A category
+// absent here has no declared preference: its resolution is never reported
+// as a fallback. "claude_code.opus" is intentionally NOT registered in
+// src/agents/registry.ts (no priced Opus profile exists yet — see
+// src/text-only-provider/pricing.ts, which has no entry for claude-opus-5);
+// referencing its would-be id here lets resolvePolicy report the gap
+// honestly (fallback.active) instead of silently redefining the doctrine
+// down to whatever is currently registered.
+const CATEGORY_PREFERRED_PROFILE_ID: Readonly<
+  Partial<Record<LoopTaskCategory, string>>
+> = {
+  architecture: "claude_code.opus",
+};
+
 export function deriveRequiredPermissions(
   category: LoopTaskCategory,
   mode: AgentPolicyMode,
@@ -169,6 +190,7 @@ export function deriveTaskRequirements(
 ): LoopTaskRequirements {
   const category = classifyLoopTaskCategory(candidate);
   const minimumEffort = CATEGORY_MINIMUM_EFFORT[category];
+  const preferredProfileId = CATEGORY_PREFERRED_PROFILE_ID[category];
   const rationale: string[] = [
     candidate
       ? `category=${category} derived from candidate text keywords`
@@ -183,6 +205,7 @@ export function deriveTaskRequirements(
     requiredPermissions: deriveRequiredPermissions(category, mode),
     minimumEffort,
     maximumEffort: policy.maximumEffort,
+    ...(preferredProfileId === undefined ? {} : { preferredProfileId }),
     contextBudget: getContextBudgetForEffort(minimumEffort),
     executionBudget: DEFAULT_MODE_BUDGETS[mode],
     rationale,
@@ -208,6 +231,7 @@ function resolution(
     requiredCapabilities: requirements.requiredCapabilities,
     requiredPermissions: requirements.requiredPermissions,
   },
+  fallback: AgentPolicyFallback = NO_FALLBACK,
 ): AgentPolicyResolution {
   return {
     policyId: policy.id,
@@ -217,7 +241,38 @@ function resolution(
     selectionRequest,
     selection,
     reasons,
+    fallback,
   };
+}
+
+// A fallback is only ever reported alongside a genuine, requirements-
+// satisfying selection — never as a substitute for a failed resolution
+// (those already carry their own status code). It never influences which
+// profile gets selected: selectAgentProfile already ran and picked the
+// cheapest requirements-satisfying profile; this only compares that outcome
+// against the category's declared preference, purely for explainability.
+function resolveFallback(
+  requirements: LoopTaskRequirements,
+  selection: AgentPolicyResolution["selection"],
+): AgentPolicyFallback {
+  if (requirements.preferredProfileId === undefined) {
+    return NO_FALLBACK;
+  }
+
+  if (selection?.outcome !== "selected") {
+    return NO_FALLBACK;
+  }
+
+  if (selection.profile.id === requirements.preferredProfileId) {
+    return NO_FALLBACK;
+  }
+
+  // The resolved profile already differs from the category's declared
+  // preference — that alone is the fallback signal, whether the preferred
+  // profile is simply unregistered (the common case today, e.g.
+  // "claude_code.opus") or registered but rejected by this specific
+  // request's requirements.
+  return { active: true, reason: "preferred_profile_unavailable" };
 }
 
 // Pure, deterministic, and never invokes an agent: only ever reads the
@@ -351,11 +406,17 @@ export function resolvePolicy(
     );
   }
 
+  const fallback = resolveFallback(requirements, selection);
   const reasons = [
     `selected agent profile "${selection.profile.id}" (effort ${selection.profile.effort}) as a forecast preview`,
     mode === "plan"
       ? `mode plan never calls an agent (this run's own budget.maxCalls is ${String(requirements.executionBudget.maxCalls)} by design); forecast simulated as mode execute`
       : `merged budget allows ${String(budget.maxCalls)} call(s) in mode ${mode}`,
+    ...(fallback.active
+      ? [
+          `fallback: preferred profile "${requirements.preferredProfileId}" is unavailable; resolved to the best compatible profile "${selection.profile.id}" instead`,
+        ]
+      : []),
   ];
 
   return resolution(
@@ -366,5 +427,6 @@ export function resolvePolicy(
     reasons,
     selection,
     selectionRequest,
+    fallback,
   );
 }
