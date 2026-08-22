@@ -14,6 +14,7 @@ import {
   type TextOnlyProviderResult,
   type TextOnlyProviderUsage,
 } from "./types.js";
+import { calculateCostUsd, resolveAnthropicPricing } from "./pricing.js";
 const ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 /**
@@ -73,7 +74,13 @@ export type AnthropicApiProviderOptions = Readonly<{
 }>;
 type AnthropicMessageResponse = Readonly<{
   content?: unknown;
-  usage?: Readonly<{ input_tokens?: unknown; output_tokens?: unknown }>;
+  model?: unknown;
+  usage?: Readonly<{
+    input_tokens?: unknown;
+    output_tokens?: unknown;
+    cache_creation_input_tokens?: unknown;
+    cache_read_input_tokens?: unknown;
+  }>;
   stop_reason?: unknown;
 }>;
 type AnthropicErrorEnvelope = Readonly<{
@@ -214,6 +221,28 @@ function parseAnthropicError(body: string): Readonly<{
     return {};
   }
 }
+/**
+ * Local cost estimate strictly from `pricing.ts`, never a fabricated
+ * estimate: `null` when the model is not in the pricing table for the given
+ * date, or when cache tokens are present (the pricing table has no cache
+ * read/write rates yet, so mixing them into the input/output rate would be
+ * a fabricated number rather than a known one).
+ */
+function costUsdForUsage(
+  model: string,
+  usage: TextOnlyProviderUsage,
+  atIsoDate: string,
+): number | null {
+  if (
+    usage.cacheCreationInputTokens !== undefined ||
+    usage.cacheReadInputTokens !== undefined
+  )
+    return null;
+  const pricing = resolveAnthropicPricing(model, atIsoDate);
+  return pricing === null
+    ? null
+    : calculateCostUsd(usage.inputTokens, usage.outputTokens, pricing);
+}
 function httpFailureCode(status: number): TextOnlyProviderFailureCode {
   if (status === 400) return "provider_request_failed";
   if (status === 401) return "provider_authentication_failed";
@@ -256,20 +285,24 @@ async function readBoundedResponseBody(
   return { body: new TextDecoder().decode(bytes), exceeded: false };
 }
 function parseUsage(value: unknown): TextOnlyProviderUsage | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const usage = value as NonNullable<AnthropicMessageResponse["usage"]>;
   if (
-    typeof value !== "object" ||
-    value === null ||
-    !Number.isInteger(
-      (value as AnthropicMessageResponse["usage"])?.input_tokens,
-    ) ||
-    !Number.isInteger(
-      (value as AnthropicMessageResponse["usage"])?.output_tokens,
-    )
+    !Number.isInteger(usage.input_tokens) ||
+    !Number.isInteger(usage.output_tokens)
   )
     return undefined;
   return Object.freeze({
-    inputTokens: (value as { input_tokens: number }).input_tokens,
-    outputTokens: (value as { output_tokens: number }).output_tokens,
+    inputTokens: usage.input_tokens as number,
+    outputTokens: usage.output_tokens as number,
+    ...(Number.isInteger(usage.cache_creation_input_tokens)
+      ? {
+          cacheCreationInputTokens: usage.cache_creation_input_tokens as number,
+        }
+      : {}),
+    ...(Number.isInteger(usage.cache_read_input_tokens)
+      ? { cacheReadInputTokens: usage.cache_read_input_tokens as number }
+      : {}),
   });
 }
 function parseStopReason(body: string): string | null {
@@ -280,9 +313,11 @@ function parseStopReason(body: string): string | null {
     return null;
   }
 }
-function parseTextOutput(
-  body: string,
-): { output: string; usage?: TextOnlyProviderUsage } | null {
+function parseTextOutput(body: string): {
+  output: string;
+  usage?: TextOnlyProviderUsage;
+  respondedModel?: string;
+} | null {
   try {
     const parsed = JSON.parse(body) as AnthropicMessageResponse;
     if (!Array.isArray(parsed.content)) return null;
@@ -298,7 +333,15 @@ function parseTextOutput(
     const output = texts.join("");
     if (byteLength(output) > MAX_TEXT_ONLY_OUTPUT_BYTES) return null;
     const usage = parseUsage(parsed.usage);
-    return usage === undefined ? { output } : { output, usage };
+    const respondedModel =
+      typeof parsed.model === "string" && parsed.model.trim().length > 0
+        ? parsed.model
+        : undefined;
+    return {
+      output,
+      ...(usage === undefined ? {} : { usage }),
+      ...(respondedModel === undefined ? {} : { respondedModel }),
+    };
   } catch {
     return null;
   }
@@ -431,6 +474,16 @@ export function createAnthropicApiProvider(
               signal: controller.signal,
             }),
           );
+          // The Anthropic Messages API returns a `request-id` response
+          // header on every response, success or failure. It is a
+          // diagnostic identifier only (never a secret, never a Loop
+          // Engine business identifier). Only the last attempt's request
+          // ID is kept — sufficient for diagnosing the outcome actually
+          // returned to the caller, without accumulating a list.
+          const requestId = boundedString(
+            response.headers.get("request-id") ?? undefined,
+            256,
+          );
           const raw = await readBoundedResponseBody(response);
           if (raw.exceeded)
             return failure(
@@ -439,7 +492,7 @@ export function createAnthropicApiProvider(
               "Anthropic API response exceeded the output limit.",
               now() - startedAt,
               true,
-              {},
+              { ...(requestId === undefined ? {} : { requestId }) },
               attempt,
             );
           if (!response.ok) {
@@ -465,6 +518,11 @@ export function createAnthropicApiProvider(
               {
                 httpStatus: response.status,
                 ...parseAnthropicError(raw.body),
+                // The response header is more reliable than the JSON error
+                // envelope's `request_id` field (always present, not
+                // dependent on a well-formed body), so it wins when both
+                // are available.
+                ...(requestId === undefined ? {} : { requestId }),
               },
               attempt,
             );
@@ -477,7 +535,7 @@ export function createAnthropicApiProvider(
               "Anthropic API refused the request.",
               now() - startedAt,
               false,
-              {},
+              { ...(requestId === undefined ? {} : { requestId }) },
               attempt,
             );
           if (stopReason === "max_tokens")
@@ -487,7 +545,7 @@ export function createAnthropicApiProvider(
               "Anthropic API response was truncated by the output token limit.",
               now() - startedAt,
               true,
-              {},
+              { ...(requestId === undefined ? {} : { requestId }) },
               attempt,
             );
           const parsed = parseTextOutput(raw.body);
@@ -498,7 +556,7 @@ export function createAnthropicApiProvider(
               "Anthropic API response was invalid.",
               now() - startedAt,
               false,
-              {},
+              { ...(requestId === undefined ? {} : { requestId }) },
               attempt,
             );
           return Object.freeze({
@@ -509,8 +567,21 @@ export function createAnthropicApiProvider(
             durationMs: now() - startedAt,
             truncated: false,
             attempts: attempt,
-            ...(parsed.usage === undefined ? {} : { usage: parsed.usage }),
+            ...(parsed.usage === undefined
+              ? {}
+              : {
+                  usage: parsed.usage,
+                  costUsd: costUsdForUsage(
+                    model,
+                    parsed.usage,
+                    new Date(now()).toISOString().slice(0, 10),
+                  ),
+                }),
             ...(input.effort === undefined ? {} : { effort: input.effort }),
+            ...(parsed.respondedModel === undefined
+              ? {}
+              : { respondedModel: parsed.respondedModel }),
+            ...(requestId === undefined ? {} : { requestId }),
           });
         } catch {
           return failure(

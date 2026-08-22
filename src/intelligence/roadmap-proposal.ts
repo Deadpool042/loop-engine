@@ -116,6 +116,21 @@ export type RoadmapProposalReport = Readonly<{
         effort?: AnthropicEffort | null;
         durationMs?: number;
         usage?: TextOnlyProviderUsage;
+        /**
+         * Present only for reason: "provider_error" — the underlying
+         * provider failure's own telemetry (never the validation telemetry
+         * above, which requires a completed provider call). Kept so a
+         * retried/failed call is never silently invisible from reporting.
+         * Never includes the provider's diagnosticMessage (may carry raw
+         * provider text).
+         */
+        providerFailure?: Readonly<{
+          code: string;
+          durationMs: number;
+          attempts?: number;
+          requestId?: string;
+          httpStatus?: number;
+        }>;
       }
     | {
         status: "completed";
@@ -505,7 +520,23 @@ export async function generateRoadmapProposalFromContext(
     return {
       schemaVersion: 1,
       project: { name: context.project.name },
-      result: { status: "failed", reason: "provider_error" },
+      result: {
+        status: "failed",
+        reason: "provider_error",
+        providerFailure: {
+          code: result.code,
+          durationMs: result.durationMs,
+          ...(result.attempts === undefined
+            ? {}
+            : { attempts: result.attempts }),
+          ...(result.requestId === undefined
+            ? {}
+            : { requestId: result.requestId }),
+          ...(result.httpStatus === undefined
+            ? {}
+            : { httpStatus: result.httpStatus }),
+        },
+      },
     };
   const parsed = parseModelProposal(result.output);
   if (!parsed.ok)

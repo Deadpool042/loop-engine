@@ -1,6 +1,6 @@
 # Anthropic Provider Evolution Roadmap
 
-Status: R1 done, R2 next
+Status: R1 done, R2 done, R3 blocked on evidence
 Baseline: state of `main` at `341ed14`
 Scope: Anthropic-specific provider consolidation and telemetry only — not a new macro-lot in the `roadmap-v16.md` V16–V20 sequence, and not a routing/architecture rewrite.
 
@@ -92,7 +92,7 @@ Any durable memory belonging to Loop Engine — existing or extended under R4 �
 
 ## Lots
 
-Global status: **R1 done**. R2–R4 and the LATER lots below have not begun.
+Global status: **R1 and R2 done**. R3 stays `BLOCKED_ON_EVIDENCE` (see R2 decisions below). R4 and the LATER lots below have not begun.
 
 ### R1 — Anthropic Provider Consolidation
 
@@ -115,7 +115,7 @@ Global status: **R1 done**. R2–R4 and the LATER lots below have not begun.
 
 ### R2 — Usage & Cost Telemetry
 
-- Status: `PLANNED`
+- Status: `DONE`
 - Prerequisites: R1 merged (single source of truth for model IDs/pricing simplifies cost calculation)
 - Entry criteria: R1 done
 - Scope: capture, when available, per call: model actually used, input/output tokens, cache write/create tokens, cache read tokens, cost, duration, request ID, error classification, batch info (stored for later, not consumed yet)
@@ -125,6 +125,18 @@ Global status: **R1 done**. R2–R4 and the LATER lots below have not begun.
 - Acceptance criteria: every Anthropic API call in the text-only provider produces a telemetry record with the fields above (fields explicitly marked unknown/unavailable when the API does not return them); no telemetry write blocks or alters the provider call path; `pnpm run ci` passes
 - Validations: `pnpm run ci`
 - Indicative AI policy: Code, Claude Code, Sonnet, Medium
+- Decisions actually taken:
+  - No new telemetry system was built. The existing `TextOnlyProviderSuccess`/`TextOnlyProviderFailure` contract (`src/text-only-provider/types.ts`) was extended additively — the same extension point R1 already used for `attempts`:
+    - `TextOnlyProviderUsage` gained optional `cacheCreationInputTokens` / `cacheReadInputTokens`, present only when the Anthropic response explicitly returns them (never defaulted to `0`).
+    - `TextOnlyProviderSuccess` gained optional `respondedModel` (the response body's own `model` field, when present and non-empty — may differ from the requested `model`), `requestId` (from the `request-id` response header of the last attempt), and `costUsd` (`number | null`).
+    - `TextOnlyProviderFailure.requestId` is now also populated from the `request-id` response header (previously only from the JSON error envelope's `request_id` field when present); the header takes priority since it is always present, unlike the JSON body.
+  - Only the **last attempt's** request ID is kept on both success and failure — sufficient to diagnose the outcome actually returned to the caller; no accumulated per-attempt list, matching the "smallest solution" instruction.
+  - `durationMs` already covered every attempt and backoff since R1 (a single `startedAt`/`now()` pair spans the whole retry loop); R2 added a deterministic test proving this (a retried call's duration is strictly greater than a single-attempt call's, using a shared injectable, incrementing fake clock — no real `sleep`/timers in tests).
+  - Cost: `costUsdForUsage` in `anthropic-api-provider.ts` reuses `resolveAnthropicPricing`/`calculateCostUsd` from `pricing.ts` strictly (no tariff duplication). It returns `null` — never a fabricated estimate — when the model is absent from the pricing table, or when cache tokens are present (the pricing table has no cache read/write rates yet, so blending them into the input/output rate would be an invented number). `costUsd` is present only when `usage` is present.
+  - Batch info: not captured. No caller of the text-only provider uses or plans to use the Batch API (see roadmap `LATER — Batch API`, still ungated); adding an always-absent field would be dead surface, so it was intentionally left out rather than added as a permanently-`undefined` placeholder.
+  - Point-of-integration priority 2 (governance/roadmap callers): `src/intelligence/roadmap-proposal.ts` and `src/intelligence/gate-reassessment.ts` previously discarded **all** telemetry on a provider-level failure (`reason: "provider_error"`), silently violating the R1 decision that "a retried/failed call must not silently disappear from usage/cost telemetry." Both reports gained an additive `providerFailure?: { code, durationMs, attempts?, requestId?, httpStatus? }` field, populated only for `reason: "provider_error"`, kept structurally distinct from the pre-existing validation-failure telemetry fields (`provider`/`model`/`effort`/`durationMs`/`usage`, which remain reserved for `reason: "invalid_*_response"` as already documented). `diagnosticMessage` is never projected. This was judged in-scope as explicit priority-2 integration work called out by this roadmap, not scope creep.
+  - GUI/allowlist consumers (`src/composition/execution-decision-proposal.ts`, `src/gui/desktop/execution-decision-controller.ts`, `src/gui/desktop/execution-decision-cli-proposer.ts`) were deliberately **not** touched: they already use a strict field allowlist (`only(result, [...])`) as a security/minimality boundary, and surfacing new fields there without a driving GUI need would be exactly the "GUI just to display" case this roadmap excludes from R2.
+  - No persistence was added anywhere. Every field above is scoped to a single provider call's return value; nothing is written to disk, a database, or an event bus.
 
 ### R3 — Prompt Caching (gated)
 
@@ -138,6 +150,7 @@ Global status: **R1 done**. R2–R4 and the LATER lots below have not begun.
 - Acceptance criteria (once gated in): cached segments are exactly the ones justified by R2 evidence; cost/telemetry from R2 shows the expected reduction after activation; `pnpm run ci` passes
 - Validations: `pnpm run ci`
 - Indicative AI policy: Code, Claude Code, Sonnet, Medium
+- Post-R2 evaluation: still `BLOCKED_ON_EVIDENCE`. R2 makes the necessary fields observable on a _single call's_ return value (`respondedModel`, tokens, cache tokens, cost, duration, request ID), but this roadmap explicitly rejected adding any new persistence in R2 (see R2 decisions above and the "hors périmètre strict" boundary). Without persisted, cross-call telemetry there is no way to observe repetition across calls — a stable/repeated context and a measurable token/cost benefit are properties of _sequences_ of calls, not of one call's data. The entry gate ("R2 telemetry shows a stable/repeated context across calls... AND a measurable expected token/cost benefit... both evidenced by captured R2 data") therefore cannot be met by R2 alone in the near-total majority of cases, and is not met here. R3 remains `BLOCKED_ON_EVIDENCE`, not `PLANNED`; moving it forward would require either manually collecting and reviewing telemetry across a real sequence of governance/roadmap calls over time, or a future, separately-decided persistence lot — neither of which this roadmap authorizes by itself.
 
 ### R4 — Governed Project Memory (Anthropic-relevant scope)
 

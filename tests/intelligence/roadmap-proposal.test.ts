@@ -288,16 +288,23 @@ test("25. a parse failure after a completed provider call preserves telemetry (a
     assert.ok((ROADMAP_PROPOSAL_VALIDATION_FAILURE_CODES as readonly string[]).includes(result.result.validationFailureCode as string));
   }
 });
-test("26. provider-level failures never carry validation telemetry, and no secret leaks", async () => {
-  const provider: TextOnlyProvider = { async invoke() { return { status: "failed", provider: "anthropic_api", model: "claude-haiku-4-5", code: "credential_unavailable", message: "no credential", durationMs: 3, truncated: false }; } };
+test("26. provider-level failures never carry validation telemetry, expose only structured providerFailure telemetry, and no secret/diagnostic-message leaks", async () => {
+  const provider: TextOnlyProvider = { async invoke() { return { status: "failed", provider: "anthropic_api", model: "claude-haiku-4-5", code: "credential_unavailable", message: "no credential", diagnosticMessage: "api key sk-test-secret rejected", durationMs: 3, attempts: 1, requestId: "req_26", truncated: false }; } };
   const result = await generateRoadmapProposalFromContext(context() as never, { provider, providerAvailable: true, model: "claude-haiku-4-5", timeoutMs: 1000 });
   assert.equal(result.result.status, "failed");
   if (result.result.status === "failed") {
     assert.equal(result.result.reason, "provider_error");
     assert.equal(result.result.validationFailureCode, undefined);
     assert.equal(result.result.usage, undefined);
+    assert.equal(result.result.model, undefined);
+    assert.deepEqual(result.result.providerFailure, {
+      code: "credential_unavailable",
+      durationMs: 3,
+      attempts: 1,
+      requestId: "req_26",
+    });
   }
-  assert.doesNotMatch(JSON.stringify(result), /credential/);
+  assert.doesNotMatch(JSON.stringify(result), /no credential|sk-test-secret/);
 });
 test("27. refuses unavailable, truncated and missing-credential contexts before provider", async () => {
   const calls = { value: 0 };
