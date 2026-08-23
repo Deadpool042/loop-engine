@@ -283,3 +283,73 @@ réellement exécuté avant l'appel provider. La décision READY lie donc le can
 au SHA de ce worktree, sans devoir être présente dans le commit qu'elle autorise :
 cette séparation project-scoped évite toute circularité entre son contenu et le
 SHA autorisé. Une divergence bloque avant tout appel provider.
+
+## Run History (évidence d'exécution inter-run)
+
+Le Run History est une couche d'**observabilité**, distincte de toute mémoire
+gouvernée : elle persiste des faits d'exécution déjà produits par le
+LoopRunner, sans jamais dériver, inférer, ou décider quoi que ce soit à partir
+d'eux. C'est le premier historique inter-run persistant de Loop Engine.
+
+**Run History ≠ Project Memory.** Le Run History enregistre des faits bruts
+(un `LoopRunResult` terminal, tel quel). La mémoire projet — la couche RAG
+locale documentée dans `docs/architecture/memory-layer.md`
+(`.loop-engine/rag-index.json`) — reconstruit un contexte dérivé et gouverné à
+partir de la documentation du dépôt. Les deux mécanismes ne partagent ni
+fichier, ni modèle, ni cycle de vie.
+
+- **Écriture.** `recordLoopRunHistory` (`src/core/run-history.ts`) est appelé
+  une seule fois par invocation `run`, juste après que `runLoopPlan`,
+  `runLoopExecute` ou `runLoopCommit` a résolu un `LoopRunResult`
+  (`src/commands/run.ts`). Seul un statut **terminal**
+  (`completed`, `blocked`, `failed`, `cancelled`) est écrit ; un état
+  intermédiaire (`idle`, `planning`, `ready`, `executing`, `validating`,
+  `repairing`) ne produit jamais d'entrée. Un run produit au maximum une
+  entrée d'historique. Les trois modes (`plan`, `execute`, `commit`) sont
+  journalisés uniformément : un cycle `plan` bloqué ou échoué (candidat
+  refusé, aucun candidat sûr, etc.) est déjà un fait d'exécution réel et utile
+  à l'analyse ultérieure (répétition d'échecs, stagnation) ; en exclure un
+  mode par défaut serait un jugement métier que ce lot n'introduit pas.
+- **Contrat persisté.** Chaque ligne du journal est le `LoopRunResult`
+  lui-même, sérialisé tel quel : il porte déjà `schemaVersion`, `project`
+  (identité canonique du projet, la même clé `name` que `projects.yaml`) et
+  `completedAt`. Aucune enveloppe supplémentaire n'a été introduite : elle
+  aurait dupliqué un modèle déjà complet.
+- **Emplacement.** `.loop-engine/runs/<project>.jsonl` — append-only, une
+  ligne JSON par run terminal, dans le même répertoire local, reconstructible
+  et ignoré par Git (`.loop-engine/`) que l'index RAG.
+- **Isolation projet.** Le nom de fichier est dérivé du champ `project` du
+  résultat (identique à la clé `name` de `projects.yaml`) et validé contre un
+  identifiant strict avant toute résolution de chemin, ce qui empêche toute
+  collision entre projets, toute lecture cross-project et tout path
+  traversal.
+- **Échec d'écriture.** Un échec d'écriture (identité de projet invalide,
+  erreur système de fichiers) ne transforme jamais un run réussi en échec :
+  le `LoopRunResult` gouverné n'est pas muté. Il n'est cependant jamais
+  silencieux — `run` le signale explicitement (`terminal.warning(...)` en
+  sortie humaine, `LOOP_RUN_HISTORY_WRITE_FAILED:` sur `stderr` en JSON, à
+  l'image du canal `LOOP_EXECUTION_EVENT:` déjà utilisé par
+  `--progress-events`).
+- **Lecture.** `pnpm loop runs <project> [--json] [--limit N]`
+  (`src/commands/runs.ts`, `generateRunHistoryReport` dans
+  `src/core/reports.ts`) expose une vue bornée, en lecture seule, la plus
+  récente d'abord — c'est-à-dire l'exact inverse de l'ordre d'ajout physique
+  du journal, qui n'est jamais réordonné sur disque. La lecture scanne le
+  journal en blocs de taille fixe et ne conserve jamais en mémoire plus que
+  la fenêtre demandée (`limit`, défaut 20, plafond 100), quelle que soit la
+  taille du fichier sur disque.
+- **Corruption.** Un journal absent n'est pas une corruption : c'est
+  simplement l'absence de run enregistré. Une ligne invalide (JSON
+  imparsable, `schemaVersion` inconnu, entrée rattachée à un autre projet)
+  est ignorée mais jamais masquée : elle est comptée dans `corruptedLines`,
+  toujours exposé dans le rapport.
+- **Rétention.** Aucun moteur de rétention n'est implémenté dans ce lot : le
+  journal reste append-only sans limite physique. Seule la lecture est
+  bornée. Une politique de rétention sera décidée ultérieurement, sur preuve
+  d'un volume réel observé en usage.
+- **Hors périmètre (explicitement).** Le Run History observe ; il ne
+  gouverne rien. Aucun détecteur de stagnation, aucun circuit breaker, aucune
+  politique de retry basée sur l'historique, aucun cap de dépense cumulée,
+  aucune auto-escalade ou auto-downgrade ne sont introduits par ce
+  mécanisme — ces capacités restent différées jusqu'à preuve fournie par
+  l'historique réel une fois en usage.

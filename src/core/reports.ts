@@ -1,9 +1,12 @@
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  closeSync,
   existsSync,
   mkdirSync,
+  openSync,
   readFileSync,
+  readSync,
   readdirSync,
   renameSync,
   statSync,
@@ -14,6 +17,13 @@ import { join, resolve } from "node:path";
 import type { Config, ProjectConfig } from "./config.js";
 import { docExists } from "./docs.js";
 import { isGitRepository } from "./git.js";
+import { LOOP_RUN_STATUSES, type LoopRunResult } from "../loop/types.js";
+import {
+  DEFAULT_RUN_HISTORY_LIMIT,
+  InvalidRunHistoryProjectIdentityError,
+  MAX_RUN_HISTORY_LIMIT,
+  resolveRunHistoryFilePath,
+} from "./run-history.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import {
   generateRoadmapProposalFromContext,
@@ -141,7 +151,10 @@ export function generateRoadmapProposalContextReport(
     },
   };
 
-  if (!snapshot.objective.eligibleForRoadmapProposal && !options.allowIneligibleObjective) {
+  if (
+    !snapshot.objective.eligibleForRoadmapProposal &&
+    !options.allowIneligibleObjective
+  ) {
     return Object.freeze({
       ...report,
       context: null,
@@ -285,7 +298,11 @@ export function generateRoadmapProposalEstimateReport(project: ProjectConfig) {
     const estimatedCostUsd =
       pricing === null
         ? undefined
-        : calculateCostUsd(estimatedInputTokens, estimatedOutputTokens, pricing);
+        : calculateCostUsd(
+            estimatedInputTokens,
+            estimatedOutputTokens,
+            pricing,
+          );
     return Object.freeze({
       profile,
       model: resolved.model,
@@ -315,9 +332,17 @@ export function generateRoadmapProposalEstimateReport(project: ProjectConfig) {
 
 export async function generateGateReassessmentReport(
   project: ProjectConfig,
-  input: Readonly<{ provider: TextOnlyProvider; providerAvailable: boolean; model?: string; effort?: AnthropicEffort; timeoutMs: number }>,
+  input: Readonly<{
+    provider: TextOnlyProvider;
+    providerAvailable: boolean;
+    model?: string;
+    effort?: AnthropicEffort;
+    timeoutMs: number;
+  }>,
 ) {
-  const context = generateRoadmapProposalContextReport(project, { allowIneligibleObjective: true });
+  const context = generateRoadmapProposalContextReport(project, {
+    allowIneligibleObjective: true,
+  });
   const auto = input.model === undefined;
   const routing = auto ? selectRoadmapProposalProfile(context) : null;
   const base = await generateGateReassessmentFromContext(context, {
@@ -326,20 +351,85 @@ export async function generateGateReassessmentReport(
     ...(auto && routing!.effort !== null ? { effort: routing!.effort } : {}),
   });
   const report = auto ? { ...base, profile: routing!.profile } : base;
-  if (report.result.status === "unavailable" || report.result.usage === undefined || report.result.model === undefined) return report;
+  if (
+    report.result.status === "unavailable" ||
+    report.result.usage === undefined ||
+    report.result.model === undefined
+  )
+    return report;
   const pricing = resolveAnthropicPricing(report.result.model);
-  return pricing === null ? report : { ...report, result: { ...report.result, actualCalculatedCostUsd: calculateCostUsd(report.result.usage.inputTokens, report.result.usage.outputTokens, pricing), pricingEffectiveDate: pricing.effectiveFrom } };
+  return pricing === null
+    ? report
+    : {
+        ...report,
+        result: {
+          ...report.result,
+          actualCalculatedCostUsd: calculateCostUsd(
+            report.result.usage.inputTokens,
+            report.result.usage.outputTokens,
+            pricing,
+          ),
+          pricingEffectiveDate: pricing.effectiveFrom,
+        },
+      };
 }
 
 export function generateGateReassessmentEstimateReport(project: ProjectConfig) {
-  const context = generateRoadmapProposalContextReport(project, { allowIneligibleObjective: true });
+  const context = generateRoadmapProposalContextReport(project, {
+    allowIneligibleObjective: true,
+  });
   const json = buildGateReassessmentContext(context);
-  if (json === null) return { schemaVersion: 1 as const, project: { name: context.project.name }, estimate: { status: "unavailable" as const, reason: "gate_reassessment_context_unavailable" } };
+  if (json === null)
+    return {
+      schemaVersion: 1 as const,
+      project: { name: context.project.name },
+      estimate: {
+        status: "unavailable" as const,
+        reason: "gate_reassessment_context_unavailable",
+      },
+    };
   const routing = selectRoadmapProposalProfile(context);
-  const input = estimateTokenCount(GATE_REASSESSMENT_SYSTEM_PROMPT) + estimateTokenCount(json) + estimateTokenCount(JSON.stringify(toAnthropicOutputSchema(GATE_REASSESSMENT_OUTPUT_SCHEMA))) + GATE_REASSESSMENT_ESTIMATED_STRUCTURED_OUTPUT_OVERHEAD_TOKENS;
-  const options = ROADMAP_PROPOSAL_PROFILES.map((profile) => { const resolved = resolveRoadmapProposalProfile(profile); const pricing = resolveAnthropicPricing(resolved.model); return Object.freeze({ profile, model: resolved.model, effort: resolved.effort, estimatedInputTokens: input, estimatedOutputTokens: GATE_REASSESSMENT_ESTIMATED_OUTPUT_TOKENS, ...(pricing === null ? {} : { estimatedCostUsd: calculateCostUsd(input, GATE_REASSESSMENT_ESTIMATED_OUTPUT_TOKENS, pricing), pricingEffectiveDate: pricing.effectiveFrom }) }); });
-  const recommended = options.find((option) => option.profile === routing.profile)!;
-  return { schemaVersion: 1 as const, project: { name: context.project.name }, estimate: { status: "available" as const, ...recommended, reason: routing.reason, options } };
+  const input =
+    estimateTokenCount(GATE_REASSESSMENT_SYSTEM_PROMPT) +
+    estimateTokenCount(json) +
+    estimateTokenCount(
+      JSON.stringify(toAnthropicOutputSchema(GATE_REASSESSMENT_OUTPUT_SCHEMA)),
+    ) +
+    GATE_REASSESSMENT_ESTIMATED_STRUCTURED_OUTPUT_OVERHEAD_TOKENS;
+  const options = ROADMAP_PROPOSAL_PROFILES.map((profile) => {
+    const resolved = resolveRoadmapProposalProfile(profile);
+    const pricing = resolveAnthropicPricing(resolved.model);
+    return Object.freeze({
+      profile,
+      model: resolved.model,
+      effort: resolved.effort,
+      estimatedInputTokens: input,
+      estimatedOutputTokens: GATE_REASSESSMENT_ESTIMATED_OUTPUT_TOKENS,
+      ...(pricing === null
+        ? {}
+        : {
+            estimatedCostUsd: calculateCostUsd(
+              input,
+              GATE_REASSESSMENT_ESTIMATED_OUTPUT_TOKENS,
+              pricing,
+            ),
+            pricingEffectiveDate: pricing.effectiveFrom,
+          }),
+    });
+  });
+  const recommended = options.find(
+    (option) => option.profile === routing.profile,
+  )!;
+  return {
+    schemaVersion: 1 as const,
+    project: { name: context.project.name },
+    estimate: {
+      status: "available" as const,
+      ...recommended,
+      reason: routing.reason,
+      options,
+    },
+  };
 }
 
 export function generateProjectContextReport(project: ProjectConfig) {
@@ -768,5 +858,158 @@ export function generateRagSearchReport(
         score: result.score,
         snippet: ragSnippet(result.document.content, normalizedQuery),
       })),
+  };
+}
+
+const RUN_HISTORY_READ_CHUNK_BYTES = 64 * 1024;
+
+export type LoopRunHistoryReport = Readonly<{
+  schemaVersion: 1;
+  project: string;
+  limit: number;
+  /** Most recent first. Physical append order on disk is never reordered. */
+  entries: readonly LoopRunResult[];
+  /**
+   * Lines skipped because they were invalid JSON, an unrecognized schema, or
+   * scoped to a different project than the requested journal. Corruption is
+   * never silently dropped: it is always surfaced through this count.
+   */
+  corruptedLines: number;
+  error?: "invalid_project_identity";
+}>;
+
+function normalizeRunHistoryLimit(limit: number | undefined): number {
+  if (limit === undefined || !Number.isFinite(limit) || limit <= 0) {
+    return DEFAULT_RUN_HISTORY_LIMIT;
+  }
+  return Math.min(Math.trunc(limit), MAX_RUN_HISTORY_LIMIT);
+}
+
+function isKnownLoopRunHistoryEntry(
+  value: unknown,
+  expectedProject: string,
+): value is LoopRunResult {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<LoopRunResult>;
+  return (
+    candidate.schemaVersion === 1 &&
+    typeof candidate.runId === "string" &&
+    candidate.project === expectedProject &&
+    typeof candidate.status === "string" &&
+    (LOOP_RUN_STATUSES as readonly string[]).includes(candidate.status) &&
+    typeof candidate.startedAt === "string" &&
+    (candidate.completedAt === null ||
+      typeof candidate.completedAt === "string")
+  );
+}
+
+/**
+ * Reads a bounded window of the most recent history entries without loading
+ * the whole file into memory: the journal is scanned sequentially in
+ * fixed-size chunks and only the last `limit` valid entries are ever held at
+ * once, regardless of how large the on-disk journal has grown.
+ */
+function readBoundedRunHistoryEntries(
+  filePath: string,
+  limit: number,
+  projectName: string,
+): Readonly<{ entries: readonly LoopRunResult[]; corruptedLines: number }> {
+  const fd = openSync(filePath, "r");
+  const window: LoopRunResult[] = [];
+  let corruptedLines = 0;
+  let leftover = "";
+
+  function processLine(rawLine: string): void {
+    const line = rawLine.trim();
+    if (line.length === 0) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      corruptedLines += 1;
+      return;
+    }
+    if (!isKnownLoopRunHistoryEntry(parsed, projectName)) {
+      corruptedLines += 1;
+      return;
+    }
+    window.push(parsed);
+    if (window.length > limit) window.shift();
+  }
+
+  try {
+    const buffer = Buffer.alloc(RUN_HISTORY_READ_CHUNK_BYTES);
+    let bytesRead: number;
+    while (
+      (bytesRead = readSync(
+        fd,
+        buffer,
+        0,
+        RUN_HISTORY_READ_CHUNK_BYTES,
+        null,
+      )) > 0
+    ) {
+      leftover += buffer.toString("utf8", 0, bytesRead);
+      const lines = leftover.split("\n");
+      leftover = lines.pop() ?? "";
+      for (const line of lines) processLine(line);
+    }
+    if (leftover.length > 0) processLine(leftover);
+  } finally {
+    closeSync(fd);
+  }
+
+  window.reverse();
+  return Object.freeze({ entries: Object.freeze(window), corruptedLines });
+}
+
+/**
+ * Bounded, deterministic, read-only view of a project's run history, most
+ * recent entry first. A missing journal is not corruption: it means no run
+ * has been recorded yet for that project, and is reported as an empty
+ * history rather than an error. No retention/eviction is implemented on the
+ * journal itself in this lot -- only this read path is bounded.
+ */
+export function generateRunHistoryReport(
+  projectName: string,
+  options: Readonly<{ limit?: number }> = {},
+): LoopRunHistoryReport {
+  const limit = normalizeRunHistoryLimit(options.limit);
+  let filePath: string;
+  try {
+    filePath = resolveRunHistoryFilePath(projectName);
+  } catch (error) {
+    if (error instanceof InvalidRunHistoryProjectIdentityError) {
+      return {
+        schemaVersion: 1,
+        project: projectName,
+        limit,
+        entries: [],
+        corruptedLines: 0,
+        error: "invalid_project_identity",
+      };
+    }
+    throw error;
+  }
+  if (!existsSync(filePath)) {
+    return {
+      schemaVersion: 1,
+      project: projectName,
+      limit,
+      entries: [],
+      corruptedLines: 0,
+    };
+  }
+  const { entries, corruptedLines } = readBoundedRunHistoryEntries(
+    filePath,
+    limit,
+    projectName,
+  );
+  return {
+    schemaVersion: 1,
+    project: projectName,
+    limit,
+    entries,
+    corruptedLines,
   };
 }

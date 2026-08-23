@@ -136,9 +136,7 @@ export async function runLoopRunCommand(
   }
 
   const executionDependencies = {
-    ...(application.loopExecutor
-      ? { executor: application.loopExecutor }
-      : {}),
+    ...(application.loopExecutor ? { executor: application.loopExecutor } : {}),
     ...(application.loopAgentRegistry
       ? { agentRegistry: application.loopAgentRegistry }
       : {}),
@@ -160,7 +158,9 @@ export async function runLoopRunCommand(
       ...(options.exportPatchPath === undefined
         ? {}
         : { exportPatchPath: options.exportPatchPath }),
-      ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
+      ...(options.onProgress === undefined
+        ? {}
+        : { onProgress: options.onProgress }),
       ...executionDependencies,
     });
   } else {
@@ -176,6 +176,23 @@ export async function runLoopRunCommand(
       commitMessage: options.commitMessage,
       ...executionDependencies,
     });
+  }
+
+  const historyOutcome = application.recordLoopRunHistory(result);
+  if (!historyOutcome.ok) {
+    const detail = {
+      code: historyOutcome.code ?? "write_failed",
+      message: historyOutcome.message ?? "Run history write failed.",
+    };
+    if (json) {
+      process.stderr.write(
+        `LOOP_RUN_HISTORY_WRITE_FAILED:${JSON.stringify(detail)}\n`,
+      );
+    } else {
+      terminal.warning(
+        `Run history not recorded: ${detail.code} — ${detail.message}`,
+      );
+    }
   }
 
   if (json) {

@@ -99,6 +99,7 @@ export * from "./dispatch.js";
 export * from "./boundary.js";
 export * from "./transports.js";
 export * from "./reports.js";
+export * from "./run-history.js";
 export * from "./types.js";
 export {
   generateRoadmapProposalFromContext,
@@ -134,7 +135,11 @@ export {
   isAuditRuleTag,
   type AuditRuleSelection,
 } from "../audit/registry.js";
-export { LOOP_RUN_MODES, type LoopRunMode, type LoopRunResult } from "../loop/types.js";
+export {
+  LOOP_RUN_MODES,
+  type LoopRunMode,
+  type LoopRunResult,
+} from "../loop/types.js";
 export * from "../loop/durable-execution.js";
 export * from "../loop/durable-execution-controller.js";
 export * from "../loop/durable-execution-integrity.js";
@@ -170,7 +175,17 @@ export {
   LOOP_PROVIDER_FAILOVER_EVIDENCE_FINGERPRINT_ALGORITHM,
   type LoopProviderFailoverEvidenceFingerprint,
 } from "../loop/provider-failover-evidence-integrity.js";
-export { runLoopExecute, type LoopRunExecuteOptions } from "../loop/execute-runner.js";
+export {
+  runLoopExecute,
+  type LoopRunExecuteOptions,
+} from "../loop/execute-runner.js";
 export { runLoopExecuteWithProviderFailoverEvidence } from "../loop/provider-failover-runner.js";
-export { runLoopCommit, type LoopRunCommitOptions } from "../loop/commit-runner.js";
-export { gitLoopCommitter, type LoopCommitter, type LoopCommitResult } from "../loop/git-committer.js";
+export {
+  runLoopCommit,
+  type LoopRunCommitOptions,
+} from "../loop/commit-runner.js";
+export {
+  gitLoopCommitter,
+  type LoopCommitter,
+  type LoopCommitResult,
+} from "../loop/git-committer.js";

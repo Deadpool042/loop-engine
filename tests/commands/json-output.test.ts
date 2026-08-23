@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { execSync } from "node:child_process";
 import { describe, it } from "node:test";
 
+import { withRagIndexLock } from "./rag-index-lock.js";
+
 function runJson(command: string): unknown {
   const output = execSync(command, {
     cwd: process.cwd(),
@@ -117,7 +119,10 @@ describe("json outputs", () => {
     assert.equal(json.schemaVersion, 1);
     assert.equal(json.project?.name, "loop-engine");
     assert.equal(json.planning?.mode, "roadmap");
-    assert.equal(json.objective?.source, "docs/architecture/final-objective.md");
+    assert.equal(
+      json.objective?.source,
+      "docs/architecture/final-objective.md",
+    );
     assert.equal(typeof json.objective?.content, "string");
     assert.equal(json.objective?.eligibleForRoadmapProposal, true);
     assert.equal(json.context, "available");
@@ -285,5 +290,46 @@ describe("json outputs", () => {
     };
 
     assert.equal(json.mode, "plan");
+  });
+
+  // `.loop-engine/` is a shared per-repo artifact directory: rag-index tests
+  // elsewhere delete and rebuild it wholesale. Both `run` (write) and `runs`
+  // (read) below must run under the same cross-process lock those tests use,
+  // or a concurrent rag-index rebuild can wipe the journal mid-assertion.
+  it("runs --json exposes a bounded, read-only run history report", async () => {
+    await withRagIndexLock(() => {
+      // Ensure at least one terminal run has been recorded for loop-engine.
+      runJson("pnpm exec tsx src/cli.ts run loop-engine --mode plan --json");
+
+      const json = runJson(
+        "pnpm exec tsx src/cli.ts runs loop-engine --json",
+      ) as {
+        schemaVersion?: unknown;
+        project?: unknown;
+        limit?: unknown;
+        entries?: unknown[];
+        corruptedLines?: unknown;
+      };
+
+      assert.equal(json.schemaVersion, 1);
+      assert.equal(json.project, "loop-engine");
+      assert.ok(typeof json.limit === "number");
+      assert.ok(Array.isArray(json.entries));
+      assert.ok((json.entries?.length ?? 0) > 0);
+      assert.equal(json.corruptedLines, 0);
+    });
+  });
+
+  it("runs --json --limit bounds the returned entries", async () => {
+    await withRagIndexLock(() => {
+      runJson("pnpm exec tsx src/cli.ts run loop-engine --mode plan --json");
+
+      const json = runJson(
+        "pnpm exec tsx src/cli.ts runs loop-engine --json --limit 1",
+      ) as { limit?: unknown; entries?: unknown[] };
+
+      assert.equal(json.limit, 1);
+      assert.ok((json.entries?.length ?? 0) <= 1);
+    });
   });
 });

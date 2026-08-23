@@ -36,13 +36,14 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 
 - [x] V24.0 — état de planning explicite (`roadmap`, `maintenance`, `deferred`, `external`) et découverte bornée des seuls emplacements conventionnels dans le root d'un projet déjà déclaré. Aucune lecture de contenu, aucun scan global ou récursif et aucune création de travail.
 - [x] V24.1 — `loop roadmap status <project> [--json]` : rapport déterministe, read-only, distinguant roadmap configurée, roadmap détectée non raccordée, absence réelle, maintenance, report et source externe. Le parser, `next`, l'admissibilité et le runner restent inchangés.
+- [x] V24.2 — Run History / Execution Evidence Store : persistance append-only, project-scoped du résultat terminal de chaque cycle `run` (`.loop-engine/runs/<project>.jsonl`) et lecture bornée `loop runs <project> [--json] [--limit N]`, la plus récente d'abord. Observabilité pure — aucun détecteur de stagnation, circuit breaker ou cap de dépense cumulée ; ces capacités restent différées jusqu'à preuve d'usage réel. Voir `docs/architecture/autonomous-loop-runner.md` (section « Run History »).
 
 ## Gel architectural
 
 - Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).
 - [x] V22.0 — Durcir le contenu des candidats multi-lignes afin de conserver le chemin cible et les contraintes dans le prompt.
 - [x] V22.1 — Exiger une frontière candidate explicite en début de ligne afin que la prose contenant « prochain lot », « lot » ou « TODO » ne soit jamais sélectionnée comme travail exécutable.
-  Préserver les formats explicites historiques (`- [ ]`, `TODO`, `Prochain`, `Lot`, `H1-L` à `H3-L`, `⏳`) et livrer la couverture adversariale dans le même lot.
+      Préserver les formats explicites historiques (`- [ ]`, `TODO`, `Prochain`, `Lot`, `H1-L` à `H3-L`, `⏳`) et livrer la couverture adversariale dans le même lot.
 - Une abstraction nouvelle exige deux usages réels, deux implémentations réelles ou une frontière externe démontrée.
 - Les objets intermédiaires internes restent libres de refactor et ne deviennent pas des contrats versionnés par défaut.
 - Les prochains changements doivent rendre la boucle plus utilisable, plus sûre ou plus observable dans un scénario exécuté.

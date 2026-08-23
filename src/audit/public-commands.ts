@@ -8,6 +8,7 @@ export const PUBLIC_COMMANDS = [
   "handoff",
   "rag-search",
   "run",
+  "runs",
 ] as const;
 
 export const PUBLIC_JSON_COMMAND_FILES = [
@@ -19,4 +20,5 @@ export const PUBLIC_JSON_COMMAND_FILES = [
   "src/commands/handoff.ts",
   "src/commands/rag-search.ts",
   "src/commands/run.ts",
+  "src/commands/runs.ts",
 ] as const;

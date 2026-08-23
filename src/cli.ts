@@ -50,7 +50,11 @@ import {
   printRoadmapProposalEstimate,
   printRoadmapProposalEstimateJson,
 } from "./commands/roadmap-propose-estimate.js";
-import { printGateReassessment, printGateReassessmentEstimateJson, printGateReassessmentJson } from "./commands/gate-reassess.js";
+import {
+  printGateReassessment,
+  printGateReassessmentEstimateJson,
+  printGateReassessmentJson,
+} from "./commands/gate-reassess.js";
 import { ANTHROPIC_EFFORT_VALUES } from "./text-only-provider/index.js";
 import { ANTHROPIC_SONNET_5_MODEL } from "./text-only-provider/pricing.js";
 import {
@@ -59,6 +63,7 @@ import {
   printAuditRuleManifest,
 } from "./commands/audit.js";
 import { isLoopRunMode, runLoopRunCommand } from "./commands/run.js";
+import { printRunHistory } from "./commands/runs.js";
 import {
   createLoopApplicationAssembly,
   LOOP_PROVIDER_IDS,
@@ -244,16 +249,44 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   json
     ? await printRoadmapProposalJson(application, project, input)
     : await printRoadmapProposal(application, project, input);
-} else if (command === "roadmap" && process.argv[3] === "reassess-gates-estimate") {
+} else if (
+  command === "roadmap" &&
+  process.argv[3] === "reassess-gates-estimate"
+) {
   const project = resolveProjectOrExit("roadmap reassess-gates-estimate", 4);
   printGateReassessmentEstimateJson(application, project);
 } else if (command === "roadmap" && process.argv[3] === "reassess-gates") {
-  const json = process.argv.includes("--json"); const project = resolveProjectOrExit("roadmap reassess-gates", 4);
-  const provider = optionValue("--provider"); const model = optionValue("--provider-model"); const effort = optionValue("--provider-effort"); const timeoutMs = Number(optionValue("--provider-timeout-ms") ?? "60000");
-  if (provider !== "anthropic_api") failOption(json, "unsupported_provider", "--provider anthropic_api is required.");
-  if (effort !== undefined && (!model || !(ANTHROPIC_EFFORT_VALUES as readonly string[]).includes(effort))) failOption(json, "invalid_provider_effort", "Invalid --provider-effort value.");
-  const input = { ...(model ? { model } : {}), ...(effort ? { effort: effort as (typeof ANTHROPIC_EFFORT_VALUES)[number] } : {}), timeoutMs };
-  json ? await printGateReassessmentJson(application, project, input) : await printGateReassessment(application, project, input);
+  const json = process.argv.includes("--json");
+  const project = resolveProjectOrExit("roadmap reassess-gates", 4);
+  const provider = optionValue("--provider");
+  const model = optionValue("--provider-model");
+  const effort = optionValue("--provider-effort");
+  const timeoutMs = Number(optionValue("--provider-timeout-ms") ?? "60000");
+  if (provider !== "anthropic_api")
+    failOption(
+      json,
+      "unsupported_provider",
+      "--provider anthropic_api is required.",
+    );
+  if (
+    effort !== undefined &&
+    (!model || !(ANTHROPIC_EFFORT_VALUES as readonly string[]).includes(effort))
+  )
+    failOption(
+      json,
+      "invalid_provider_effort",
+      "Invalid --provider-effort value.",
+    );
+  const input = {
+    ...(model ? { model } : {}),
+    ...(effort
+      ? { effort: effort as (typeof ANTHROPIC_EFFORT_VALUES)[number] }
+      : {}),
+    timeoutMs,
+  };
+  json
+    ? await printGateReassessmentJson(application, project, input)
+    : await printGateReassessment(application, project, input);
 } else if (command === "execution-decision" && process.argv[3] === "propose") {
   const json = process.argv.includes("--json");
   const project = resolveProjectOrExit("execution-decision propose", 4);
@@ -264,16 +297,52 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   const model = optionValue("--provider-model");
   const effort = optionValue("--provider-effort");
   const timeoutValue = optionValue("--provider-timeout-ms");
-  if (!candidateId || !sourceDocument || !gitHead) failOption(json, "missing_candidate_value", "--candidate, --source-document, and --git-head are required.");
-  if (provider !== "anthropic_api") failOption(json, "unsupported_provider", "--provider anthropic_api is required.");
-  if (model !== ANTHROPIC_SONNET_5_MODEL) failOption(json, "missing_provider_model", "--provider-model claude-sonnet-5 is required.");
-  if (effort !== "low") failOption(json, "invalid_provider_effort", "--provider-effort low is required.");
-  if (timeoutValue !== "60000") failOption(json, "invalid_provider_timeout", "--provider-timeout-ms 60000 is required.");
-  if (json) await printExecutionDecisionProposalJson(application, { project: project.name, candidateId, sourceDocument, gitHead, provider, model, effort, timeoutMs: 60_000 });
+  if (!candidateId || !sourceDocument || !gitHead)
+    failOption(
+      json,
+      "missing_candidate_value",
+      "--candidate, --source-document, and --git-head are required.",
+    );
+  if (provider !== "anthropic_api")
+    failOption(
+      json,
+      "unsupported_provider",
+      "--provider anthropic_api is required.",
+    );
+  if (model !== ANTHROPIC_SONNET_5_MODEL)
+    failOption(
+      json,
+      "missing_provider_model",
+      "--provider-model claude-sonnet-5 is required.",
+    );
+  if (effort !== "low")
+    failOption(
+      json,
+      "invalid_provider_effort",
+      "--provider-effort low is required.",
+    );
+  if (timeoutValue !== "60000")
+    failOption(
+      json,
+      "invalid_provider_timeout",
+      "--provider-timeout-ms 60000 is required.",
+    );
+  if (json)
+    await printExecutionDecisionProposalJson(application, {
+      project: project.name,
+      candidateId,
+      sourceDocument,
+      gitHead,
+      provider,
+      model,
+      effort,
+      timeoutMs: 60_000,
+    });
   else terminal.info("Execution-decision propose requires --json.");
 } else if (command === "execution-decision" && process.argv[3] === "current") {
   const project = resolveProjectOrExit("execution-decision current", 4);
-  if (process.argv.includes("--json")) printExecutionDecisionCurrentJson(application, project.name);
+  if (process.argv.includes("--json"))
+    printExecutionDecisionCurrentJson(application, project.name);
   else terminal.info("Execution-decision current requires --json.");
 } else if (command === "roadmap") {
   terminal.error(
@@ -506,9 +575,33 @@ else if (command === "review") {
     },
   );
   if (exitCode !== 0) process.exitCode = exitCode;
+} else if (command === "runs") {
+  const project = resolveProjectOrExit("runs");
+  const json = process.argv.includes("--json");
+  const limitValue = optionValue("--limit");
+  if (hasOption("--limit") && limitValue === undefined) {
+    failOption(
+      json,
+      "missing_run_history_limit_value",
+      "Missing value for --limit",
+    );
+  }
+  const limit =
+    limitValue === undefined ? undefined : Number.parseInt(limitValue, 10);
+  if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
+    failOption(
+      json,
+      "invalid_run_history_limit",
+      `Invalid --limit value: ${limitValue}`,
+    );
+  }
+  printRunHistory(application, project.name, {
+    ...(json ? { json } : {}),
+    ...(limit !== undefined ? { limit } : {}),
+  });
 } else {
   terminal.error(
-    "Usage: pnpm loop help|summary|status|doctor|roadmap status|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>",
+    "Usage: pnpm loop help|summary|status|doctor|roadmap status|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>|runs <project>",
   );
   process.exit(1);
 }

@@ -75,9 +75,17 @@ export function printHelp(): void {
   terminal.info(
     "Options provider: --provider-model <model> --provider-timeout-ms <ms>",
   );
+  terminal.info(
+    "pnpm loop runs <project>           — historique des runs terminés (le plus récent d'abord)",
+  );
+  terminal.info(
+    "pnpm loop runs <project> --json [--limit N] — historique des runs en JSON, lecture bornée",
+  );
 
   terminal.section("Principes");
-  terminal.info("Aucun appel IA implicite : execute et le provider sont explicites.");
+  terminal.info(
+    "Aucun appel IA implicite : execute et le provider sont explicites.",
+  );
   terminal.info("Aucun commit ou push automatique en mode execute.");
   terminal.info("Les validations configurées passent après l'agent.");
 }
