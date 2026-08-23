@@ -40,6 +40,8 @@ export function runRagSearch(
   }
 
   console.log(`Results for "${report.query}":`);
+  if (report.generatedAt)
+    console.log(`Index generated at ${report.generatedAt}`);
   for (const result of report.results) {
     const sectionLabel = result.sectionTitle ? ` — ${result.sectionTitle}` : "";
     console.log(

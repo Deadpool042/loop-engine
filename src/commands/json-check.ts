@@ -56,7 +56,13 @@ function assertOneOf(
 }
 
 const AUDIT_SUMMARY_STATUSES = ["pass", "warning", "fail"] as const;
-const AUDIT_CATEGORIES = ["json", "cli", "docs", "architecture"] as const;
+const AUDIT_CATEGORIES = [
+  "json",
+  "cli",
+  "docs",
+  "architecture",
+  "rag",
+] as const;
 const AUDIT_SEVERITIES = ["error", "warning"] as const;
 const AUDIT_FINDING_STATUSES = ["pass", "fail", "skipped"] as const;
 const AUDIT_PRIORITIES = ["low", "medium", "high"] as const;

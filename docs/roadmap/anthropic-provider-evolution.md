@@ -1,6 +1,6 @@
 # Anthropic Provider Evolution Roadmap
 
-Status: R1 done, R2 done, R3 blocked on evidence
+Status: R1 done, R2 done, R3 blocked on evidence, R4 done
 Baseline: state of `main` at `341ed14`
 Scope: Anthropic-specific provider consolidation and telemetry only — not a new macro-lot in the `roadmap-v16.md` V16–V20 sequence, and not a routing/architecture rewrite.
 
@@ -92,7 +92,7 @@ Any durable memory belonging to Loop Engine — existing or extended under R4 �
 
 ## Lots
 
-Global status: **R1 and R2 done**. R3 stays `BLOCKED_ON_EVIDENCE` (see R2 decisions below). R4 and the LATER lots below have not begun.
+Global status: **R1, R2, and R4 done**. R3 stays `BLOCKED_ON_EVIDENCE` (see R2 decisions below, unchanged by R4). The LATER lots below have not begun.
 
 ### R1 — Anthropic Provider Consolidation
 
@@ -154,7 +154,7 @@ Global status: **R1 and R2 done**. R3 stays `BLOCKED_ON_EVIDENCE` (see R2 decisi
 
 ### R4 — Governed Project Memory (Anthropic-relevant scope)
 
-- Status: `PLANNED`
+- Status: `DONE`
 - Prerequisites: audit of existing Loop Engine memory mechanisms (already done above — the local RAG layer is the existing mechanism)
 - Entry criteria: R1/R2 not required as a hard blocker, but should generally follow so that any captured Anthropic telemetry/context has a stable shape before being referenced from governed memory
 - Scope: consolidate/integrate Anthropic-provider-relevant governance context (e.g. decisions, gate reassessments) into the existing governed memory model (RAG layer / docs-as-source-of-truth), preserving scope, provenance, auditability, permissions, isolation, deletion, and explicit retention where relevant; ensure any future Anthropic-hosted memory primitive is never treated as authoritative
@@ -164,6 +164,14 @@ Global status: **R1 and R2 done**. R3 stays `BLOCKED_ON_EVIDENCE` (see R2 decisi
 - Acceptance criteria: no new persistent memory engine introduced; Anthropic-relevant governance context remains traceable to a file/section per the existing memory-layer traceability rule; `pnpm run ci` passes
 - Validations: `pnpm run ci`; manual review confirming no Anthropic primitive is treated as source of truth
 - Indicative AI policy: start with audit/review; Opus Medium only if a genuine memory-architecture decision is required, otherwise Sonnet Medium for implementation
+- Outcome (local consolidation, decision A — no new memory engine/RAG/vector database/embedding was created): closed 9 gaps found in the existing local RAG layer instead of building anything new.
+  - **Isolation** — `generateRagIndex()` now fails closed (explicit error, non-zero exit, no partial write) unless the current working directory is the Loop Engine repository root (`projects.yaml` present), so the index can never be built inside an inspected project. Covered by a dedicated test invoking `rag-index` from a temporary directory outside the repository and asserting no `.loop-engine/` is created there.
+  - **Provenance / freshness** — `RagSearchReport` now exposes `generatedAt` (additive, `schemaVersion` unchanged at `1`), so a search response's staleness relative to the last index build is observable without an extra disk read per query.
+  - **Staleness / lifecycle** — a missing, unreadable, unparsable, or schema-mismatched index degrades soft to the existing `missing_index` error (no new error code, no exception), matching the fail-soft style already used by `src/core/git.ts`.
+  - **Auditability** — one new `rag`-category audit rule (`DOCS-025`) keeps `RAG_SOURCE_PATHS` (`src/core/reports.ts`) exactly aligned with the allowlists documented in `docs/architecture/local-rag-index.md` and `docs/architecture/memory-layer.md`; it runs as part of `pnpm run audit:strict`/`pnpm run ci`.
+  - `AGENTS.md` remains deliberately excluded from the RAG allowlist (documented decision, no code change): canonical doctrine must be read in full, not retrieved through a fuzzy keyword search that could return an out-of-context excerpt on a binding rule.
+  - Docs (`memory-layer.md`, `memory-layer-checklist.md`, `local-rag-index.md`) were brought to present tense, list `docs/releases/`, document `sectionTitle`/`headingLevel`/`generatedAt`, and gained explicit "Portée" (mono-repo scope) and "Fraîcheur" (freshness/lifecycle) sections.
+  - Supporting fix, not itself one of the 9 gaps: the `rag` audit category (already declared in `src/audit/types.ts`/`src/audit/registry.ts` but never used by any rule) required updating three pre-existing validators that hardcoded the prior 4-category list (`AUDIT_RULE_CATEGORY_VALIDITY_RULE`, `JSON_CHECK_ENUM_VALUE_CONSTANTS_RULE`, and `AUDIT_CATEGORIES` in `src/commands/json-check.ts`) to accept `"rag"` — a direct, minimal consequence of DOCS-025 being the first `rag`-category rule, not scope creep.
 
 ### LATER — Batch API
 

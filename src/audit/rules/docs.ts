@@ -1445,3 +1445,82 @@ export const MINIMAL_CONTEXT_BUILDER_DOCUMENTATION_RULE: AuditRule = {
     );
   },
 };
+
+export const RAG_MEMORY_SOURCES_ALIGNMENT_RULE: AuditRule = {
+  id: "DOCS-025",
+  category: "rag",
+  severity: "warning",
+  title: "RAG memory sources match documented allowlists",
+  description:
+    "RAG_SOURCE_PATHS (src/core/reports.ts) should match exactly the allowed sources documented in docs/architecture/local-rag-index.md and docs/architecture/memory-layer.md.",
+  check: () => {
+    const reportsPath = "src/core/reports.ts";
+    const localIndexDocPath = "docs/architecture/local-rag-index.md";
+    const memoryLayerDocPath = "docs/architecture/memory-layer.md";
+
+    const missingFiles = [
+      reportsPath,
+      localIndexDocPath,
+      memoryLayerDocPath,
+    ].filter((file) => !existsSync(file));
+
+    if (missingFiles.length > 0) {
+      return fail(
+        RAG_MEMORY_SOURCES_ALIGNMENT_RULE,
+        "RAG memory source files are missing.",
+        missingFiles,
+        "Restore src/core/reports.ts, docs/architecture/local-rag-index.md, and docs/architecture/memory-layer.md so RAG source allowlists can be verified.",
+      );
+    }
+
+    const reportsContent = readFileSync(reportsPath, "utf8");
+    const sourcesMatch = reportsContent.match(
+      /const RAG_SOURCE_PATHS = \[([\s\S]*?)\] as const;/,
+    );
+
+    if (!sourcesMatch) {
+      return fail(
+        RAG_MEMORY_SOURCES_ALIGNMENT_RULE,
+        "RAG_SOURCE_PATHS could not be parsed from src/core/reports.ts.",
+        [reportsPath],
+        "Keep RAG_SOURCE_PATHS declared as a readonly string array literal in src/core/reports.ts.",
+      );
+    }
+
+    const sourcesBlock = sourcesMatch[1] ?? "";
+    const codeSources = Array.from(sourcesBlock.matchAll(/"([^"]+)"/g))
+      .map((match) => match[1])
+      .filter((source): source is string => Boolean(source));
+
+    const localIndexContent = readFileSync(localIndexDocPath, "utf8");
+    const memoryLayerContent = readFileSync(memoryLayerDocPath, "utf8");
+
+    const isDocumented = (docContent: string, source: string): boolean =>
+      docContent.includes(`\`${source}\``) ||
+      docContent.includes(`\`${source}/\``);
+
+    const missing = [
+      ...codeSources
+        .filter((source) => !isDocumented(localIndexContent, source))
+        .map((source) => `${localIndexDocPath}: missing "${source}"`),
+      ...codeSources
+        .filter((source) => !isDocumented(memoryLayerContent, source))
+        .map((source) => `${memoryLayerDocPath}: missing "${source}"`),
+    ];
+
+    if (missing.length > 0) {
+      return fail(
+        RAG_MEMORY_SOURCES_ALIGNMENT_RULE,
+        "RAG_SOURCE_PATHS is not fully documented in the memory layer docs.",
+        missing,
+        "List every RAG_SOURCE_PATHS entry (src/core/reports.ts) in docs/architecture/local-rag-index.md (\u00a7 Sources) and docs/architecture/memory-layer.md (\u00a7 Sources indexables).",
+      );
+    }
+
+    return pass(
+      RAG_MEMORY_SOURCES_ALIGNMENT_RULE,
+      "RAG_SOURCE_PATHS matches the documented memory layer allowlists.",
+      codeSources,
+    );
+  },
+};

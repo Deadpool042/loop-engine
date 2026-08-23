@@ -619,8 +619,25 @@ function buildRagDocuments(path: string): readonly RagDocument[] {
     }));
 }
 
+/**
+ * Loop Engine's own repository root marker, reused from `loadConfig()`
+ * (`src/core/config.ts`). The RAG index must only ever be written when the
+ * current working directory is the Loop Engine repository itself -- never
+ * inside an inspected project.
+ */
+const REPOSITORY_ROOT_MARKER = "projects.yaml";
+
+function assertRunningFromRepositoryRoot(): void {
+  if (!existsSync(REPOSITORY_ROOT_MARKER)) {
+    throw new Error(
+      `rag-index must be run from the Loop Engine repository root (missing ${REPOSITORY_ROOT_MARKER} in the current working directory).`,
+    );
+  }
+}
+
 /** Builds the local deterministic RAG index and returns its public metadata. */
 export function generateRagIndex() {
+  assertRunningFromRepositoryRoot();
   const documents = RAG_SOURCE_PATHS.flatMap((sourcePath) =>
     collectMarkdownFiles(sourcePath),
   ).flatMap((file) => buildRagDocuments(file));
@@ -639,6 +656,7 @@ export function generateRagIndex() {
 
 type RagIndex = Readonly<{
   schemaVersion: number;
+  generatedAt?: string;
   documents: readonly RagDocument[];
 }>;
 export type RagSearchOptions = Readonly<{
@@ -649,6 +667,8 @@ export type RagSearchReport = Readonly<{
   schemaVersion: 1;
   query: string;
   pathPrefix?: string | null;
+  /** Index build timestamp (`generatedAt` from the RAG index), when readable. Additive, optional. */
+  generatedAt?: string;
   results: readonly Readonly<{
     path: string;
     title: string;
@@ -659,6 +679,27 @@ export type RagSearchReport = Readonly<{
   }>[];
   error?: "missing_query" | "missing_index";
 }>;
+
+/**
+ * Reads and validates the local RAG index. Fails soft (returns `null`) on a
+ * missing, unreadable, unparsable, or schema-mismatched index file, so
+ * `generateRagSearchReport` can degrade to the existing `missing_index`
+ * error without introducing a new error code or changing the contract.
+ */
+function readRagIndex(): RagIndex | null {
+  if (!existsSync(RAG_INDEX_PATH)) return null;
+  try {
+    const parsed = JSON.parse(
+      readFileSync(RAG_INDEX_PATH, "utf8"),
+    ) as Partial<RagIndex>;
+    if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.documents)) {
+      return null;
+    }
+    return parsed as RagIndex;
+  } catch {
+    return null;
+  }
+}
 
 function occurrences(content: string, query: string): number {
   const normalizedQuery = query.toLowerCase();
@@ -687,10 +728,10 @@ export function generateRagSearchReport(
       results: [],
       error: "missing_query",
     };
-  if (!existsSync(RAG_INDEX_PATH))
+  const index = readRagIndex();
+  if (index === null)
     return { schemaVersion: 1, query, results: [], error: "missing_index" };
   const normalizedQuery = query.trim();
-  const index = JSON.parse(readFileSync(RAG_INDEX_PATH, "utf8")) as RagIndex;
   const documents = options.pathPrefix
     ? index.documents.filter((document) =>
         document.path.startsWith(options.pathPrefix ?? ""),
@@ -701,6 +742,9 @@ export function generateRagSearchReport(
     schemaVersion: 1,
     query: normalizedQuery,
     pathPrefix: options.pathPrefix ?? null,
+    ...(index.generatedAt === undefined
+      ? {}
+      : { generatedAt: index.generatedAt }),
     results: documents
       .map((document) => ({
         document,

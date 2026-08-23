@@ -2,9 +2,11 @@
 
 ## Objectif
 
-Définir un futur index local pour rechercher dans la documentation Loop Engine.
+Index local implémenté pour rechercher dans la documentation Loop Engine
+(`src/core/reports.ts`, `generateRagIndex`/`generateRagSearchReport`, commandes
+`src/commands/rag-index.ts`/`src/commands/rag-search.ts`).
 
-L'index doit rester reconstructible, read-only et non critique.
+L'index reste reconstructible, read-only et non critique.
 
 ## Sources V1
 
@@ -21,7 +23,7 @@ Sources autorisées :
 
 ## Format d'index recommandé
 
-Un index JSON local peut contenir :
+L'index JSON local contient :
 
 - `schemaVersion`
 - `generatedAt`
@@ -33,6 +35,8 @@ Chaque document contient :
 - `id`
 - `path`
 - `title`
+- `sectionTitle`
+- `headingLevel`
 - `content`
 - `contentHash`
 
@@ -128,6 +132,8 @@ Le payload contient :
 - `schemaVersion`
 - `query`
 - `results`
+- `generatedAt` (optionnel, additif — horodatage de construction de l'index, absent
+  seulement si l'index ne l'expose pas)
 
 Chaque résultat contient :
 
