@@ -17,6 +17,11 @@
 - [ ] `docs/audits/`
 - [ ] `docs/roadmap/`
 - [ ] `docs/integrations/`
+- [ ] `docs/releases/`
+
+Cette liste est désormais vérifiée automatiquement par une règle d'audit de catégorie `rag`
+(`RAG_SOURCE_PATHS` vs `docs/architecture/local-rag-index.md` et `memory-layer.md`), en plus
+de la vérification manuelle ci-dessus.
 
 ## Sources exclues
 

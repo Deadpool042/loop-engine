@@ -1097,7 +1097,7 @@ export const AUDIT_RULE_CATEGORY_VALIDITY_RULE: AuditRule = {
       "src/audit/rules/docs.ts",
       "src/audit/rules/audit.ts",
     ];
-    const validCategories = ["json", "cli", "docs", "architecture"];
+    const validCategories = ["json", "cli", "docs", "architecture", "rag"];
 
     const missingFiles = ruleFiles.filter((file) => !existsSync(file));
 
