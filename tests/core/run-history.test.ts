@@ -276,4 +276,61 @@ describe("run history evidence store", () => {
       assert.equal(report.corruptedLines, 1);
     });
   });
+
+  it("reads correctly across multiple internal chunk boundaries on a journal far larger than one read chunk", () => {
+    withFixtureProject((project) => {
+      // The reader scans the journal in fixed 64KB chunks and must reassemble
+      // lines split across a chunk boundary. Padding each entry to ~1KB and
+      // writing 300 of them guarantees the on-disk journal (~300KB) spans
+      // many chunk boundaries, at positions that do not line up with any
+      // entry boundary.
+      const padding = "x".repeat(900);
+      const entryCount = 300;
+      const runIds: string[] = [];
+
+      for (let index = 0; index < entryCount; index += 1) {
+        const result = fixtureResult(project, {
+          completedAt: `2026-02-${String((index % 28) + 1).padStart(2, "0")}T${String(index % 24).padStart(2, "0")}:00:00.000Z`,
+          steps: [
+            {
+              name: "pad",
+              status: "completed",
+              startedAt: "2026-02-01T00:00:00.000Z",
+              completedAt: "2026-02-01T00:00:00.000Z",
+              details: [padding],
+            },
+          ],
+        });
+        runIds.push(result.runId);
+        recordLoopRunHistory(result);
+      }
+
+      const journalSize = readFileSync(journalPath(project), "utf8").length;
+      assert.ok(
+        journalSize > 128 * 1024,
+        `fixture journal (${journalSize} bytes) must exceed two 64KB read chunks`,
+      );
+
+      const limit = 50;
+      const report = generateRunHistoryReport(project, { limit });
+      assert.equal(report.entries.length, limit);
+      assert.equal(report.corruptedLines, 0);
+
+      // Most recent `limit` entries, most recent first: the exact reverse of
+      // the last `limit` writes in append order.
+      const expected = runIds.slice(entryCount - limit).reverse();
+      assert.deepEqual(
+        report.entries.map((entry) => entry.runId),
+        expected,
+      );
+
+      // Every returned entry must still be a fully valid, unmangled
+      // LoopRunResult -- confirming no boundary-spanning line was corrupted.
+      for (const entry of report.entries) {
+        assert.equal(entry.schemaVersion, 1);
+        assert.equal(entry.project, project);
+        assert.equal(entry.steps[0]?.details[0], padding);
+      }
+    });
+  });
 });
