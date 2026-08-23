@@ -82,16 +82,34 @@ export function generateWorkspaceReports(config: Config) {
 export function generateWorkspaceSummaryReport(config: Config) {
   return {
     schemaVersion: 1 as const,
-    projects: generateWorkspaceReports(config).map((snapshot) => ({
-      ...snapshot,
-      roadmap: {
-        available: snapshot.roadmap.available,
-        paths: snapshot.roadmap.paths,
-        selectedCandidate: snapshot.roadmap.selectedCandidate,
-        phaseGates: snapshot.roadmap.phaseGates,
-        stats: snapshot.roadmap.stats,
-      },
-    })),
+    projects: generateWorkspaceReports(config).map((snapshot) => {
+      const runHistory = generateRunHistoryReport(snapshot.project.name, {
+        limit: 1,
+      });
+      return {
+        ...snapshot,
+        workAvailability: {
+          actionable: snapshot.roadmap.selectedCandidate !== null,
+          reason: snapshot.planning.recommendation,
+        },
+        lastRun: runHistory.entries[0]
+          ? {
+              status: runHistory.entries[0].status,
+              completedAt: runHistory.entries[0].completedAt,
+            }
+          : null,
+        ...(runHistory.corruptedLines > 0
+          ? { runHistoryCorruptedLines: runHistory.corruptedLines }
+          : {}),
+        roadmap: {
+          available: snapshot.roadmap.available,
+          paths: snapshot.roadmap.paths,
+          selectedCandidate: snapshot.roadmap.selectedCandidate,
+          phaseGates: snapshot.roadmap.phaseGates,
+          stats: snapshot.roadmap.stats,
+        },
+      };
+    }),
   };
 }
 

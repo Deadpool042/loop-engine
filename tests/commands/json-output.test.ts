@@ -25,6 +25,22 @@ describe("json outputs", () => {
     assert.ok(Array.isArray(json.projects));
   });
 
+  it("summary --json projects expose workAvailability and lastRun", () => {
+    const json = runJson("pnpm exec tsx src/cli.ts summary --json") as {
+      projects?: ReadonlyArray<{
+        workAvailability?: { actionable?: unknown; reason?: unknown };
+        lastRun?: unknown;
+      }>;
+    };
+
+    assert.ok(Array.isArray(json.projects) && json.projects.length > 0);
+    for (const project of json.projects ?? []) {
+      assert.equal(typeof project.workAvailability?.actionable, "boolean");
+      assert.equal(typeof project.workAvailability?.reason, "string");
+      assert.ok("lastRun" in project);
+    }
+  });
+
   it("status --json exposes schemaVersion and projects", () => {
     const json = runJson("pnpm exec tsx src/cli.ts status --json") as {
       schemaVersion?: unknown;

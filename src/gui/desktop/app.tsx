@@ -24,6 +24,7 @@ import {
 import {
   parseSummaryResponse,
   type SummaryProject,
+  type SummaryWorkAvailabilityReason,
 } from "./summary-contract.js";
 import {
   parseRoadmapProposalReport,
@@ -67,6 +68,41 @@ export function canCancelExecution(
   session: Pick<DesktopExecutionSession, "result"> | null,
 ): boolean {
   return session !== null && session.result === null;
+}
+
+const WORK_AVAILABILITY_REASON_LABELS: Readonly<
+  Record<SummaryWorkAvailabilityReason, string>
+> = {
+  roadmap_configured: "Candidat admissible disponible",
+  connect_discovered_roadmap: "Roadmap détectée mais non configurée",
+  no_roadmap_present: "Aucune roadmap disponible",
+  maintenance_no_work: "Aucun travail prévu en maintenance",
+  deferred_no_work: "Travail roadmap différé",
+  external_planning_source: "Planning géré par une source externe",
+  no_admissible_candidate: "Aucun candidat roadmap admissible",
+};
+
+export function formatWorkAvailability(project: SummaryProject): string {
+  const availability = project.workAvailability;
+  if (availability === undefined) return "Disponibilité inconnue";
+  return availability.actionable
+    ? "Travail actionnable"
+    : WORK_AVAILABILITY_REASON_LABELS[availability.reason];
+}
+
+export function formatLastRun(project: SummaryProject): string {
+  if (project.lastRun === undefined) return "Historique indisponible";
+  if (project.lastRun === null) return "Aucun run enregistré";
+  const status =
+    {
+      completed: "terminé",
+      blocked: "bloqué",
+      failed: "échec",
+      cancelled: "annulé",
+    }[project.lastRun.status] ?? project.lastRun.status;
+  return project.lastRun.completedAt === null
+    ? `Dernier run : ${status}`
+    : `Dernier run : ${status} · ${project.lastRun.completedAt}`;
 }
 
 const ROADMAP_PROPOSAL_PROFILE_LABELS: Readonly<Record<string, string>> = {
@@ -919,6 +955,17 @@ export function App(): React.JSX.Element {
                   <span className="mt-1 block truncate text-xs text-loop-muted">
                     {project.git.branch}
                   </span>
+                  <span className="mt-2 block text-xs font-medium">
+                    {formatWorkAvailability(project)}
+                  </span>
+                  <span className="mt-1 block text-xs text-loop-muted">
+                    {formatLastRun(project)}
+                  </span>
+                  {(project.runHistoryCorruptedLines ?? 0) > 0 && (
+                    <span className="mt-1 block text-xs text-amber-700">
+                      Historique partiellement illisible ({project.runHistoryCorruptedLines})
+                    </span>
+                  )}
                 </button>
               );
             })}

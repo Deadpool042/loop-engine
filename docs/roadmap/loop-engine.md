@@ -37,6 +37,7 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 - [x] V24.0 — état de planning explicite (`roadmap`, `maintenance`, `deferred`, `external`) et découverte bornée des seuls emplacements conventionnels dans le root d'un projet déjà déclaré. Aucune lecture de contenu, aucun scan global ou récursif et aucune création de travail.
 - [x] V24.1 — `loop roadmap status <project> [--json]` : rapport déterministe, read-only, distinguant roadmap configurée, roadmap détectée non raccordée, absence réelle, maintenance, report et source externe. Le parser, `next`, l'admissibilité et le runner restent inchangés.
 - [x] V24.2 — Run History / Execution Evidence Store : persistance append-only, project-scoped du résultat terminal de chaque cycle `run` (`.loop-engine/runs/<project>.jsonl`) et lecture bornée `loop runs <project> [--json] [--limit N]`, la plus récente d'abord. Observabilité pure — aucun détecteur de stagnation, circuit breaker ou cap de dépense cumulée ; ces capacités restent différées jusqu'à preuve d'usage réel. Voir `docs/architecture/autonomous-loop-runner.md` (section « Run History »).
+- [x] V24.3 — Cockpit work availability overview : le `summary --json` projette, pour chaque projet, l'admissibilité de travail déjà calculée par Project Intelligence et le dernier résultat terminal du Run History ; le cockpit les affiche dans la liste multi-projets sans recalcul de policy, sans lecture directe des journaux JSONL et sans nouvelle écriture.
 
 ## Gel architectural
 
