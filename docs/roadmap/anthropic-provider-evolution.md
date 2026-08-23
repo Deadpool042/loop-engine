@@ -94,6 +94,16 @@ Any durable memory belonging to Loop Engine — existing or extended under R4 �
 
 Global status: **R1, R2, and R4 done**. R3 stays `BLOCKED_ON_EVIDENCE` (see R2 decisions below, unchanged by R4). The LATER lots below have not begun.
 
+### Phase Closure
+
+The active Anthropic provider implementation phase is **complete**. R1 (consolidation), R2 (telemetry), and R4 (governed memory) are delivered and merged into `main`. No further lots are authorized by default.
+
+R3 (prompt caching) remains `BLOCKED_ON_EVIDENCE` — the required evidence (stable/repeated context shown in captured R2 data, AND measurable token/cost benefit from caching, both from the same data set) has not been demonstrated. This roadmap introduced no new persistence, telemetry accumulation loop, or observability platform to measure advancement; the entry gate depends entirely on R2 observations if/when they accumulate through operational use over time. No action is required from this document or its reviewers until external evidence emerges.
+
+Batch API and Files API remain `LATER` (not `PLANNED`). Their gates — recurring volume and demonstrated need for Batch, or a need not covered by existing context mechanisms for Files — are not currently met. No action is authorized until one of those gates becomes explicitly true in a separate, independently-decided effort.
+
+This roadmap remains closed and dormant unless a gate transitions to true.
+
 ### R1 — Anthropic Provider Consolidation
 
 - Status: `DONE`

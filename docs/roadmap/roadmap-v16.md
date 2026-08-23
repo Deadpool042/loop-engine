@@ -420,7 +420,7 @@ This file is the strategic source of truth for V16 through V20. Detailed design 
 
 ## Related Provider-Specific Roadmap
 
-`docs/roadmap/anthropic-provider-evolution.md` tracks Anthropic-specific provider consolidation and telemetry (status: not started) as a parallel, narrowly scoped track outside the V16–V20 macro-lot sequence above.
+`docs/roadmap/anthropic-provider-evolution.md` tracks Anthropic-specific provider consolidation and telemetry (status: complete, gated—R1/R2/R4 delivered, R3/Batch/Files blocked on documented gates) as a parallel, narrowly scoped track outside the V16–V20 macro-lot sequence above.
 
 ## Status Values
 
