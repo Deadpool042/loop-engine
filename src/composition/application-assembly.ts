@@ -21,6 +21,8 @@ import {
   generateRagIndex,
   generateRagSearchReport,
   generateReviewReport,
+  generateRunHistoryReport,
+  recordLoopRunHistory,
   generateWorkspaceReports,
   generateWorkspaceSummaryReport,
   getRequiredProjectName,
@@ -60,7 +62,10 @@ import {
   type LoopProviderId,
   type LoopProviderRegistry,
 } from "./provider-registry.js";
-import { runExecutionDecisionProposal, type ExecutionDecisionProposeInput } from "./execution-decision-proposal.js";
+import {
+  runExecutionDecisionProposal,
+  type ExecutionDecisionProposeInput,
+} from "./execution-decision-proposal.js";
 import { getExecutionDecisionCurrentReport } from "./execution-decision-current.js";
 
 export type LoopApplicationCodexProviderOptions = Omit<
@@ -118,12 +123,18 @@ export type LoopApplicationAssembly = Readonly<{
   generateGateReassessmentEstimateReport: typeof generateGateReassessmentEstimateReport;
   generateGateReassessmentReport: (
     project: LoopApplicationProject,
-    input: Readonly<{ model?: string; effort?: AnthropicEffort; timeoutMs: number }>,
+    input: Readonly<{
+      model?: string;
+      effort?: AnthropicEffort;
+      timeoutMs: number;
+    }>,
   ) => ReturnType<typeof generateGateReassessmentReport>;
   generateProjectValidationReport: typeof generateProjectValidationReport;
   generateRagIndex: typeof generateRagIndex;
   generateRagSearchReport: typeof generateRagSearchReport;
   generateReviewReport: typeof generateReviewReport;
+  generateRunHistoryReport: typeof generateRunHistoryReport;
+  recordLoopRunHistory: typeof recordLoopRunHistory;
   generateWorkspaceReports: typeof generateWorkspaceReports;
   generateWorkspaceSummaryReport: typeof generateWorkspaceSummaryReport;
   getRequiredProjectName: typeof getRequiredProjectName;
@@ -141,7 +152,9 @@ export type LoopApplicationAssembly = Readonly<{
   runLoopCommit: typeof runLoopCommit;
   runLoopExecute: typeof runLoopExecuteWithProviderFailoverEvidence;
   runLoopPlan: typeof runLoopPlan;
-  runExecutionDecisionProposal: (input: ExecutionDecisionProposeInput) => ReturnType<typeof runExecutionDecisionProposal>;
+  runExecutionDecisionProposal: (
+    input: ExecutionDecisionProposeInput,
+  ) => ReturnType<typeof runExecutionDecisionProposal>;
   getExecutionDecisionCurrentReport: typeof getExecutionDecisionCurrentReport;
 }>;
 
@@ -267,6 +280,8 @@ export function createLoopApplicationAssembly(
     generateRagIndex,
     generateRagSearchReport,
     generateReviewReport,
+    generateRunHistoryReport,
+    recordLoopRunHistory,
     generateWorkspaceReports,
     generateWorkspaceSummaryReport,
     getRequiredProjectName,

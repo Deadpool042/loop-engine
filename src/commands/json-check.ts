@@ -11,6 +11,7 @@ const COMMANDS = [
   ["handoff", "loop-engine", "--json"],
   ["rag-search", "roadmap", "--json"],
   ["run", "loop-engine", "--mode", "plan", "--json"],
+  ["runs", "loop-engine", "--json"],
 ] as const;
 
 function assertRecord(
@@ -514,6 +515,33 @@ function validatePayload(command: readonly string[], json: unknown): void {
     }
 
     validateContextPackageField(json.contextPackage);
+  } else if (commandName === "runs") {
+    assertField(json, "project");
+    assertField(json, "limit");
+    assertField(json, "entries");
+    assertField(json, "corruptedLines");
+    assertArray(json.entries);
+    if (json.corruptedLines !== 0) {
+      throw new Error("runs corruptedLines must be 0 for a fresh journal");
+    }
+    if (json.entries.length === 0) {
+      throw new Error(
+        "runs entries must contain at least the plan run recorded earlier in json-check",
+      );
+    }
+    for (let index = 1; index < json.entries.length; index += 1) {
+      const previous = json.entries[index - 1] as Record<string, unknown>;
+      const current = json.entries[index] as Record<string, unknown>;
+      const previousCompletedAt = String(
+        previous.completedAt ?? previous.startedAt,
+      );
+      const currentCompletedAt = String(
+        current.completedAt ?? current.startedAt,
+      );
+      if (previousCompletedAt < currentCompletedAt) {
+        throw new Error("runs entries must be ordered most recent first");
+      }
+    }
   }
 }
 
