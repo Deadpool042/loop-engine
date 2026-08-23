@@ -26,8 +26,12 @@ les lectures de contexte et de review correspondantes. Les états loading,
 empty et erreur sont locaux à la vue ou à la section concernée.
 
 Les champs affichés proviennent des contrats CLI : nom, type, chemin, branche,
-état Git, health, contexte et données structurées de review. React ne recalcule
-ni le statut Git, ni l'impact documentaire, ni la validation.
+état Git, health, contexte et données structurées de review. Le summary projette
+aussi, pour chaque projet, la disponibilité du travail déjà calculée par le
+Core et le dernier résultat terminal du Run History ; la liste des projets les
+rend visibles sans relire directement les journaux JSONL. React ne recalcule
+ni le statut Git, ni l'admissibilité roadmap, ni l'impact documentaire, ni la
+validation.
 
 Quand le candidat recommandé par `Context` expose un identifiant stable, le
 cockpit peut demander un plan explicite pour ce couple projet + candidat. Il
