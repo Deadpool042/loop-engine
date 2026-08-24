@@ -37,7 +37,11 @@ Quand le candidat recommandé par `Context` expose un identifiant stable, le
 cockpit peut demander un plan explicite pour ce couple projet + candidat. Il
 affiche alors le candidat, la politique prévisionnelle, les étapes et le
 contexte borné retournés par le moteur. Cette action prépare uniquement un plan
-et n'appelle aucun provider.
+et n'appelle aucun provider. Le contrat GUI conserve l'identité runtime,
+provider et modèle ainsi que deux notions d'effort distinctes : l'effort
+d'invocation issu de `requirements.minimumEffort`, qui est celui affiché et
+utilisé par l'exécution, et l'effort du profil, conservé séparément comme donnée
+de classement du sélecteur. Le renderer ne recalcule aucune de ces valeurs.
 
 ### Frontière de confiance
 
@@ -95,9 +99,11 @@ stdout/stderr brut, prompt, secrets, termes interdits ni diagnostics internes
 redacted.
 
 Après confirmation, `startExecution` ouvre une unique session observable. La
-vue affiche le projet, candidat, provider, modèle, effort issu du plan,
-statut, historique court et résultat final / export de patch existants. Les
-seuls événements publics sont `session_started`, `preparing`,
+vue affiche le projet, candidat, provider, modèle, effort d'invocation issu du
+plan, statut, historique court et résultat final / export de patch existants.
+L'effort de classement du profil reste disponible séparément dans le contrat de
+plan et ne doit jamais être présenté comme l'effort réellement demandé au
+provider. Les seuls événements publics sont `session_started`, `preparing`,
 `execution_started`, `validation_started`, `completed`, `failed` et
 `cancelled`. Ils sont émis par les transitions effectives du runner (pas par
 temporisation), conservés dans une fenêtre bornée de 24 événements et consultés
