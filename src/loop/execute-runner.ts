@@ -294,6 +294,13 @@ export async function runLoopExecute(
     );
   }
 
+  const policyRepairCeiling =
+    agentPolicy.selectionRequest.budgetCeiling?.maxRepairs;
+  const effectiveMaxRepairs =
+    typeof policyRepairCeiling === "number"
+      ? Math.min(dependencies.maxRepairs, policyRepairCeiling)
+      : dependencies.maxRepairs;
+
   brief =
     cycle.brief === undefined
       ? null
@@ -313,7 +320,9 @@ export async function runLoopExecute(
       candidate: cycle.candidate,
       agentPolicy,
       contextPackage,
-      ...(cycle.allowedPaths === undefined ? {} : { allowedPaths: cycle.allowedPaths }),
+      ...(cycle.allowedPaths === undefined
+        ? {}
+        : { allowedPaths: cycle.allowedPaths }),
       ...(cycle.brief === undefined ? {} : { brief: cycle.brief }),
     }),
   );
@@ -323,6 +332,7 @@ export async function runLoopExecute(
     `Selected candidate: ${cycle.candidate.text}`,
     `Selected executor profile: ${executionPlan.profileId}`,
     `Execution plan: ${executionPlan.provider}/${executionPlan.runtime}/${executionPlan.model}`,
+    `Repair budget: requested=${dependencies.maxRepairs}, effective=${effectiveMaxRepairs}`,
   ]);
   transition("executing", "executing", "completed", [
     "Calling the injected LoopExecutor once with the immutable execution plan.",
@@ -349,13 +359,17 @@ export async function runLoopExecute(
     if (writableFileScope === null) return null;
     const rejected = findOutOfScopeFiles([...modifiedFiles], writableFileScope);
     if (rejected.length === 0) return null;
-    transition("failed", "failed", "failed", ["Modified files fall outside the authorized writable file scope."]);
+    transition("failed", "failed", "failed", [
+      "Modified files fall outside the authorized writable file scope.",
+    ]);
     return finalize(
       cycle.candidate,
       Object.freeze({
         code: "scope_violation",
         message: "Modified files fall outside the authorized writable file scope.",
-        details: Object.freeze(rejected.map((path) => `Out of scope: ${path}`)),
+        details: Object.freeze(
+          rejected.map((path) => `Out of scope: ${path}`),
+        ),
       }),
     );
   }
@@ -483,7 +497,7 @@ export async function runLoopExecute(
       return finalize(cycle.candidate, null);
     }
 
-    if (repairAttempts >= dependencies.maxRepairs) {
+    if (repairAttempts >= effectiveMaxRepairs) {
       transition("failed", "failed", "failed", [
         "Validation failed and the repair budget is exhausted.",
       ]);
@@ -513,7 +527,7 @@ export async function runLoopExecute(
         internalFailure(
           "repairer_unavailable",
           "Validation failed but no LoopRepairer is configured.",
-          `Repair budget: ${dependencies.maxRepairs}`,
+          `Repair budget: ${effectiveMaxRepairs}`,
         ),
       );
     }
@@ -538,7 +552,7 @@ export async function runLoopExecute(
           modifiedFiles: Object.freeze([...modifiedFiles].sort()),
           validation: validationAttempt,
           attempt: repairAttempts,
-          maxRepairs: dependencies.maxRepairs,
+          maxRepairs: effectiveMaxRepairs,
         }),
       );
     } catch {
