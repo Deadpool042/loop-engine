@@ -34,13 +34,19 @@
   [class~="lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]"]
     > div:first-child
     > ol {
-    max-height: min(32rem, 48vh);
+    max-height: min(24rem, 36vh);
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
   }
 
   @media (min-width: 1024px) {
+    [class~="lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]"]
+      > div:first-child
+      > ol {
+      max-height: min(32rem, 48vh);
+    }
+
     [class~="lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]"]
       > section {
       position: sticky;
