@@ -16,4 +16,20 @@ if [ "$soft_limit" -lt "$target_limit" ]; then
   fi
 fi
 
+if [ -z "${PORT:-}" ]; then
+  PORT=$(
+    node -e '
+      const net = require("node:net");
+      const server = net.createServer();
+      server.listen(0, "127.0.0.1", () => {
+        const address = server.address();
+        if (!address || typeof address === "string") process.exit(1);
+        process.stdout.write(String(address.port));
+        server.close();
+      });
+    '
+  )
+  export PORT
+fi
+
 exec ./node_modules/.bin/electron-forge start "$@"

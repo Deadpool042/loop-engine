@@ -27,7 +27,7 @@ Loop Engine now also targets autonomous orchestration by small lots — see `doc
 - No automatic AI calls by default — Loop Engine only prepares context for a human to paste into an assistant.
 - No automatic commit, no automatic push.
 - Commit and push only happen under an explicitly selected mode (`commit`, `publish`); the default mode (`plan`) never commits or pushes.
-- No modification of watched projects (Creatyss, lp-infra, n8n) — read-only.
+- Watched projects are read-only by default. The only current write exception is the explicitly configured `execution_decision` governance artifact: after human approval, Loop Engine may publish that single file at the configured in-project path using the bounded transactional/validated publication path. This does not authorize general writes or business-logic changes in the watched project.
 - Zero token consumption by default.
 - Local validations always come before any AI review, and always before any commit or publication.
 - Human stays in control of decisions; the roadmap reader is deliberately naive/conservative rather than clever.

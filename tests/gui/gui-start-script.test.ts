@@ -11,6 +11,8 @@ test("gui:start raises and preserves its NOFILE limit for the direct Forge child
   assert.match(script, /ulimit -Sn/);
   assert.match(script, /ulimit -Hn/);
   assert.match(script, /ulimit -n "\$target_limit"/);
+  assert.match(script, /server\.listen\(0, "127\.0\.0\.1"/);
+  assert.match(script, /export PORT/);
   assert.match(script, /exec \.\/node_modules\/\.bin\/electron-forge start "\$@"/);
   assert.doesNotMatch(script, /sudo|launchctl|kill -9/);
 
