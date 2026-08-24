@@ -24,3 +24,28 @@
     font: inherit;
   }
 }
+
+@layer components {
+  /*
+   * V28 run history: keep the bounded list independently scrollable so the
+   * selected-run detail stays close even when all 20 entries are present.
+   * This grid utility is unique to the run-history panel in app.tsx.
+   */
+  [class~="lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]"]
+    > div:first-child
+    > ol {
+    max-height: min(32rem, 48vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  @media (min-width: 1024px) {
+    [class~="lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]"]
+      > section {
+      position: sticky;
+      top: 1rem;
+      align-self: start;
+    }
+  }
+}
