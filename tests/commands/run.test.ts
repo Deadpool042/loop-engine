@@ -8,6 +8,7 @@ import type {
   LoopApplicationProject,
 } from "../../src/composition/index.js";
 import type { LoopRunResult } from "../../src/loop/types.js";
+import type { AgentPolicyResolution } from "../../src/policy/types.js";
 
 const FIXTURE_PROJECT: LoopApplicationProject = {
   name: "run-history-write-failure-fixture",
@@ -17,7 +18,78 @@ const FIXTURE_PROJECT: LoopApplicationProject = {
   validation: [],
 };
 
-function fixtureCompletedResult(): LoopRunResult {
+function fixtureAgentPolicyResolution(): AgentPolicyResolution {
+  return {
+    policyId: "fixture-policy",
+    mode: "plan",
+    status: "resolved",
+    requirements: {
+      category: "architecture",
+      mode: "plan",
+      requiredCapabilities: ["code_edit", "long_context"],
+      requiredPermissions: ["read_only"],
+      minimumEffort: "medium",
+      maximumEffort: "high",
+      preferredCapabilityTier: "high_reasoning",
+      contextBudget: {
+        maxFiles: 8,
+        maxCharacters: 80_000,
+        maxEstimatedTokens: 20_000,
+        includeFullFiles: false,
+      },
+      executionBudget: {
+        maxTokens: null,
+        maxCostUsd: null,
+        maxDurationMs: null,
+        maxCalls: 0,
+        maxRepairs: 0,
+      },
+      rationale: ["fixture architecture policy"],
+    },
+    selectionRequest: {
+      requiredCapabilities: ["code_edit", "long_context"],
+      requiredPermissions: ["read_only"],
+      minEffort: "medium",
+      maxEffort: "high",
+      budgetCeiling: {
+        maxTokens: 150_000,
+        maxCostUsd: 4,
+        maxDurationMs: 300_000,
+        maxCalls: 1,
+        maxRepairs: 1,
+      },
+    },
+    selection: {
+      outcome: "selected",
+      profile: {
+        id: "fixture.low",
+        runtime: "claude_code",
+        provider: "anthropic",
+        model: "claude-sonnet-5",
+        effort: "low",
+        capabilities: ["code_edit", "long_context"],
+        permissions: ["read_only"],
+        budget: {
+          maxTokens: 100_000,
+          maxCostUsd: 3,
+          maxDurationMs: 240_000,
+          maxCalls: 1,
+          maxRepairs: 1,
+        },
+      },
+      rejected: [],
+    },
+    reasons: ["fixture decision reason"],
+    fallback: {
+      active: true,
+      reason: "preferred_capability_tier_unavailable",
+    },
+  };
+}
+
+function fixtureCompletedResult(
+  agentPolicy: AgentPolicyResolution | null = null,
+): LoopRunResult {
   const timestamp = new Date().toISOString();
   return {
     schemaVersion: 1,
@@ -34,7 +106,7 @@ function fixtureCompletedResult(): LoopRunResult {
     commit: null,
     publication: null,
     failure: null,
-    agentPolicy: null,
+    agentPolicy,
     contextPackage: null,
   };
 }
@@ -48,11 +120,12 @@ function fixtureCompletedResult(): LoopRunResult {
  */
 function fakeApplication(
   recordLoopRunHistory: LoopApplicationAssembly["recordLoopRunHistory"],
+  result: LoopRunResult = fixtureCompletedResult(),
 ): LoopApplicationAssembly {
   return {
-    runLoopPlan: () => fixtureCompletedResult(),
+    runLoopPlan: () => result,
     recordLoopRunHistory,
-    generateExecutionReport: (result: LoopRunResult) => result,
+    generateExecutionReport: (runResult: LoopRunResult) => runResult,
   } as unknown as LoopApplicationAssembly;
 }
 
@@ -87,6 +160,69 @@ function captureStderrWrites(): {
     },
   };
 }
+
+describe("run command — agent decision observability", () => {
+  it("shows the executable provider/model decision and distinguishes invocation effort from profile ranking effort", async () => {
+    const result = fixtureCompletedResult(fixtureAgentPolicyResolution());
+    const application = fakeApplication(
+      () => ({ written: true, ok: true }),
+      result,
+    );
+
+    const log = captureConsoleLog();
+    let exitCode: number;
+    try {
+      exitCode = await runLoopRunCommand(
+        application,
+        FIXTURE_PROJECT,
+        "plan",
+        false,
+      );
+    } finally {
+      log.restore();
+    }
+
+    assert.equal(exitCode, 0);
+    assert.ok(log.lines.some((line) => line.includes("Status: resolved")));
+    assert.ok(
+      log.lines.some((line) => line.includes("Task category: architecture")),
+    );
+    assert.ok(
+      log.lines.some((line) => line.includes("Invocation effort: medium")),
+    );
+    assert.ok(log.lines.some((line) => line.includes("Selected: fixture.low")));
+    assert.ok(log.lines.some((line) => line.includes("Runtime: claude_code")));
+    assert.ok(log.lines.some((line) => line.includes("Provider: anthropic")));
+    assert.ok(
+      log.lines.some((line) => line.includes("Model: claude-sonnet-5")),
+    );
+    assert.ok(
+      log.lines.some((line) => line.includes("Profile ranking effort: low")),
+    );
+    assert.ok(
+      log.lines.some((line) =>
+        line.includes(
+          "Budget ceiling: tokens=150000, costUsd=4, durationMs=300000, calls=1, repairs=1",
+        ),
+      ),
+    );
+    assert.ok(
+      log.lines.some((line) =>
+        line.includes(
+          "Fallback: preferred_capability_tier_unavailable",
+        ),
+      ),
+    );
+    assert.ok(
+      log.lines.some((line) => line.includes("Reason: fixture decision reason")),
+    );
+    assert.ok(
+      log.lines.some((line) =>
+        line.includes("Execution: forecast only; no agent was called."),
+      ),
+    );
+  });
+});
 
 describe("run command — non-silent run history write failure", () => {
   it("text mode: warns without turning a successful run into a failure", async () => {

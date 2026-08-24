@@ -15,10 +15,13 @@ const REQUIRED_RUNNER_TOKENS = Object.freeze([
   'mode: "execute"',
   'mode: "execute",',
   'agentPolicy.status !== "resolved"',
+  "agentPolicy.selectionRequest.budgetCeiling?.maxRepairs",
+  "Math.min(dependencies.maxRepairs, policyRepairCeiling)",
   "await dependencies.executor(",
   'transition("validating"',
   'transition("repairing"',
-  "repairAttempts >= dependencies.maxRepairs",
+  "repairAttempts >= effectiveMaxRepairs",
+  "maxRepairs: effectiveMaxRepairs",
   "commit: null",
   "publication: null",
 ]);
@@ -113,7 +116,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
     title:
       "LoopRunner execute mode validates and repairs within a finite budget",
     description:
-      "The V14.4 execute runner must require policy admission, call one injected executor, validate after execution, repair only within a finite budget, revalidate after repair, report modified files, and never commit or publish itself.",
+      "The V14.4 execute runner must require policy admission, call one injected executor, validate after execution, clamp the caller repair request to the resolved policy ceiling, repair only within that effective finite budget, revalidate after repair, report modified files, and never commit or publish itself.",
     metadata: {
       introducedIn: "V14.4",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -163,7 +166,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Keep V14.4 as one fail-closed execute/validate/repair boundary: admit policy before execution, invoke one injected executor, revalidate after each bounded repair, and leave commit/publication null inside the execute runner.",
+            "Keep V14.4 as one fail-closed execute/validate/repair boundary: admit policy before execution, clamp the requested repair count to the resolved policy ceiling, invoke one injected executor, revalidate after each bounded repair, and leave commit/publication null inside the execute runner.",
           )
         : pass(
             rule,

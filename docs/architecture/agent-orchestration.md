@@ -79,6 +79,10 @@ Combinaison concrète et sélectionnable : `id`, `runtime`, `provider`, `model`,
 
 Collection locale et déclarative de profils, construite en mémoire (pas de lecture réseau, pas d'appel SDK). `createAgentRegistry` refuse les identifiants dupliqués. Les profils par défaut fournis (`DEFAULT_AGENT_PROFILES`) sont **explicitement illustratifs** : ils couvrent plusieurs runtimes/providers/niveaux d'effort pour permettre de tester le sélecteur et l'escalade, mais leurs capacités/permissions/budgets sont des exemples de configuration, pas des affirmations vérifiées sur ce que chaque outil tiers sait réellement faire. Toute intégration réelle doit remplacer ou compléter ces profils avec des données vérifiées.
 
+Depuis V26, les providers réellement configurés pour `execute` respectent cette séparation : `src/composition/provider-registry.ts` construit un profil `configured.<provider>` directement depuis la registration et la configuration du provider concret, sans copier `DEFAULT_AGENT_PROFILES` ni `defaultAgentRegistry`. Cette enveloppe exécutable reste volontairement conservatrice : elle ne revendique que les capacités et permissions garanties par l'intégration Loop Engine, ne fabrique aucun plafond token/coût non contrôlé par l'exécuteur et ne déduit jamais une capacité (`long_context`, `multi_file_refactor`, etc.) du seul nom du modèle. Un alias de modèle inconnu reste donc utilisable sans acquérir implicitement les propriétés d'un profil illustratif portant un nom proche.
+
+L'`effort` d'un `AgentProfile` reste l'axe de classement du sélecteur ; l'effort réellement demandé à une invocation est `AgentPolicyResolution.requirements.minimumEffort` et est projeté tel quel dans `LoopExecutionPlan.effort`. Les deux valeurs peuvent légitimement différer et doivent rester distinguées dans les surfaces d'observabilité.
+
 Aucun profil par défaut n'a de priorité fixe sur un autre : le registry ne trie pas, ne classe pas — c'est au sélecteur de décider, uniquement à partir de capacités/permissions/budget/effort.
 
 ## `AgentSelector`
