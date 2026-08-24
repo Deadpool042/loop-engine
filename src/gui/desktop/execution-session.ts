@@ -165,15 +165,28 @@ export function createObservableExecuteCliInvoker(options: {
         let terminationFinalGrace: ReturnType<typeof setTimeout> | undefined;
         let terminationRootFinalGrace: ReturnType<typeof setTimeout> | undefined;
 
+        const failIfRootStillRunning = (): void => {
+          if (settled) return;
+          finish(failure("CLI process termination could not be confirmed."));
+        };
+
         const forceRootTermination = (): void => {
           if (settled) return;
           forcedRootTermination = true;
           child.kill("SIGKILL");
-          terminationRootFinalGrace = setTimeout(() => {
-            finish(
-              failure("CLI process termination could not be confirmed."),
-            );
-          }, terminationFinalGraceMs);
+          terminationRootFinalGrace = setTimeout(
+            failIfRootStillRunning,
+            terminationFinalGraceMs,
+          );
+        };
+
+        const forceDirectChildFallback = (): void => {
+          if (settled) return;
+          child.kill("SIGKILL");
+          terminationFinalGrace = setTimeout(
+            failIfRootStillRunning,
+            terminationFinalGraceMs,
+          );
         };
 
         const terminate = (
@@ -188,7 +201,10 @@ export function createObservableExecuteCliInvoker(options: {
           terminationGrace = setTimeout(() => {
             if (settled) return;
             if (processGroupId === null || child.pid === undefined) {
-              forceRootTermination();
+              // Unit-test seams and unsupported platforms retain the legacy
+              // bounded direct-child SIGKILL path. Only the POSIX group path can
+              // make the stronger descendant-cleanup guarantee.
+              forceDirectChildFallback();
               return;
             }
 
