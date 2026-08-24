@@ -150,19 +150,32 @@ export async function runLoopRunCommand(
         : { candidateId: options.candidateId }),
     });
   } else if (mode === "execute") {
-    result = await runLoopExecute(project.name, {
-      ...(options.candidateId === undefined
-        ? {}
-        : { candidateId: options.candidateId }),
-      maxRepairs: options.maxRepairs ?? 0,
-      ...(options.exportPatchPath === undefined
-        ? {}
-        : { exportPatchPath: options.exportPatchPath }),
-      ...(options.onProgress === undefined
-        ? {}
-        : { onProgress: options.onProgress }),
-      ...executionDependencies,
-    });
+    const retainUntilCleanup = (): void => undefined;
+    const retainOnSigterm =
+      options.onProgress !== undefined && process.platform !== "win32";
+    if (retainOnSigterm) {
+      // The desktop invoker signals the dedicated execution process group.
+      // Handling SIGTERM here lets provider descendants terminate while this
+      // Loop Engine process remains alive for workspace/lock finally cleanup.
+      process.on("SIGTERM", retainUntilCleanup);
+    }
+    try {
+      result = await runLoopExecute(project.name, {
+        ...(options.candidateId === undefined
+          ? {}
+          : { candidateId: options.candidateId }),
+        maxRepairs: options.maxRepairs ?? 0,
+        ...(options.exportPatchPath === undefined
+          ? {}
+          : { exportPatchPath: options.exportPatchPath }),
+        ...(options.onProgress === undefined
+          ? {}
+          : { onProgress: options.onProgress }),
+        ...executionDependencies,
+      });
+    } finally {
+      if (retainOnSigterm) process.off("SIGTERM", retainUntilCleanup);
+    }
   } else {
     if (!options.commitMessage) {
       return printCommandError(

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawn } from "node:child_process";
 import { appendFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -35,6 +36,25 @@ const cwd = process.cwd();
 const captureCwdPath = process.env.FAKE_CLAUDE_CAPTURE_CWD;
 if (captureCwdPath) {
   writeFileSync(captureCwdPath, cwd);
+}
+
+const descendantPidPath = process.env.FAKE_CLAUDE_DESCENDANT_PID_PATH;
+if (descendantPidPath) {
+  // Dedicated V25.0 adversarial seam. The presence of the unique PID-file
+  // destination is the trigger so this test cannot race with other suites that
+  // temporarily change FAKE_CLAUDE_MODE on the shared process environment.
+  const descendant = spawn(
+    process.execPath,
+    [
+      "-e",
+      "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);",
+    ],
+    { stdio: "ignore" },
+  );
+  if (descendant.pid !== undefined) {
+    writeFileSync(descendantPidPath, String(descendant.pid));
+  }
+  await new Promise(() => {});
 }
 
 function write(payload) {

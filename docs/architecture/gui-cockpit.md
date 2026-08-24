@@ -84,44 +84,49 @@ Le process principal invoque exclusivement :
 | `loop:context` | `pnpm loop context <project> --json`                                                                     |
 | `loop:review`  | `pnpm loop review <project> --json`                                                                      |
 | `loop:plan`    | `pnpm loop run <project> --candidate <id> --mode plan --json`                                            |
-| `loop:execute` | `pnpm loop run <project> --candidate <id> --mode execute ... --export-patch <native destination> --json` |
+| `loop:execute` | `loop run <project> --candidate <id> --mode execute ... --export-patch <native destination> --json`      |
 
 Le `CliInvoker` des lectures reste limité au lancement, au délai d'expiration
 et au parsing JSON. L'exécution longue dispose d'une frontière dédiée : le
-main process lance le CLI avec un canal auxiliaire de transitions structurées.
-Le JSON final reste sur stdout et conserve son contrat existant ; le renderer
-ne reçoit jamais stdout/stderr brut, prompt, secrets, termes interdits ni
-diagnostics internes redacted.
+main process lance directement le runtime Node/tsx de Loop Engine, sans wrapper
+`pnpm`, avec un canal auxiliaire de transitions structurées. Le JSON final reste
+sur stdout et conserve son contrat existant ; le renderer ne reçoit jamais
+stdout/stderr brut, prompt, secrets, termes interdits ni diagnostics internes
+redacted.
 
 Après confirmation, `startExecution` ouvre une unique session observable. La
 vue affiche le projet, candidat, provider, modèle, effort issu du plan,
 statut, historique court et résultat final / export de patch existants. Les
 seuls événements publics sont `session_started`, `preparing`,
-`execution_started`, `validation_started`, `completed` et `failed`. Ils sont
-émis par les transitions effectives du runner (pas par temporisation), conservés
-dans une fenêtre bornée de 24 événements et consultés par identifiant de
-session. Un second démarrage pendant une session non terminale est refusé
-déterministiquement. La fermeture normale de la fenêtre reste bloquée jusqu'au
-résultat terminal.
+`execution_started`, `validation_started`, `completed`, `failed` et
+`cancelled`. Ils sont émis par les transitions effectives du runner (pas par
+temporisation), conservés dans une fenêtre bornée de 24 événements et consultés
+par identifiant de session. Un second démarrage pendant une session non
+terminale est refusé déterministiquement. La fermeture normale de la fenêtre
+reste bloquée jusqu'au résultat terminal.
 
 Il n'y a ni terminal/shell générique, ni pseudo-terminal, ni commande ou cwd
 contrôlable par React, ni exécution parallèle, queue, commit, push, merge ou
-application du patch. L'annulation est exposée via `loop:execution-cancel` :
-elle réutilise le chemin SIGTERM puis SIGKILL déjà borné du timeout et termine
-le process CLI direct de la session active. Elle ne prétend pas terminer ni
-nettoyer les processus descendants éventuels du provider, ni garantir le
-nettoyage du worktree isolé au-delà de ce que le runner effectue déjà en sortie
-d'exécution.
+application du patch. L'annulation est exposée via `loop:execution-cancel` sans
+nouveau contrat IPC. Sur les plateformes POSIX utilisées par le cockpit, le
+runtime d'exécution est leader d'un groupe de processus dédié : l'annulation
+envoie d'abord `SIGTERM` au groupe, conserve le runtime Loop Engine vivant le
+temps que ses `finally` libèrent le worktree isolé et le lock projet, puis tue
+par `SIGKILL` les descendants qui résistent et vérifie leur disparition. Le
+résultat `cancelled` n'est publié qu'après fermeture du runtime et confirmation
+de l'absence de descendants ; une impossibilité de confirmer la terminaison ou
+le nettoyage échoue fermé. Le fallback hors POSIX reste borné au process direct
+et ne revendique pas cette garantie de groupe.
 
 Les lectures conservent leur délai court. `loop:execute` utilise un invoker
 distinct borné à 15 minutes : il couvre au plus 10 minutes de Claude Code,
 les validations, le nettoyage et une marge, sans délai infini ni réglage
 contrôlable par le renderer. Une fermeture normale de la fenêtre est bloquée
-pendant cette invocation. Au timeout, le process CLI reçoit `SIGTERM`, puis
-`SIGKILL` après une grâce bornée si nécessaire. Une seconde grâce bornée attend
-la fermeture : à défaut, la session échoue publiquement sans prétendre que le
-process est arrêté. Cette frontière ne prétend pas nettoyer ni contrôler les
-descendants du provider.
+pendant cette invocation. Le timeout et l'annulation partagent le même chemin
+de terminaison borné : grâce `SIGTERM`, terminaison des descendants résistants,
+puis grâce finale pour laisser le runtime terminer le nettoyage. Si le runtime
+ne se ferme pas après ce nettoyage borné, il est lui-même terminé et la session
+échoue publiquement plutôt que de prétendre une libération non démontrée.
 
 ## Cible et lots futurs
 
