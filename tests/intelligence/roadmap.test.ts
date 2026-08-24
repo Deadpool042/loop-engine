@@ -625,8 +625,8 @@ describe("execution projection contract", () => {
   });
 });
 
-describe("loop-engine burn-in candidate", () => {
-  it("selects V25.0 once V23.0 and V23.1 are qualified and the V16-V20 reconciliation lot adds an active candidate", () => {
+describe("loop-engine completed roadmap", () => {
+  it("keeps delivered burn-ins, V23 and V25.0 done and selects no fictitious next lot", () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
     const repoRoot = resolve(currentDir, "..", "..");
     const project: ProjectConfig = {
@@ -645,6 +645,9 @@ describe("loop-engine burn-in candidate", () => {
     const v23Candidates = candidates.filter((candidate) =>
       /Lot V23\.[01]/.test(candidate.text),
     );
+    const v25Candidates = candidates.filter((candidate) =>
+      /V25\.0/.test(candidate.text),
+    );
 
     assert.ok(
       burnInCandidates.every((candidate) => candidate.status === "done"),
@@ -653,13 +656,14 @@ describe("loop-engine burn-in candidate", () => {
     assert.equal(v23Candidates.length, 2);
     assert.ok(
       v23Candidates.every((candidate) => candidate.status === "done"),
-      "expected V23.0 and V23.1 to be marked done after real burn-in qualification",
+      "expected V23.0 and V23.1 to remain done after real burn-in qualification",
+    );
+    assert.ok(v25Candidates.length >= 1);
+    assert.ok(
+      v25Candidates.every((candidate) => candidate.status === "done"),
+      "expected every parsed V25.0 candidate marker to be completed",
     );
 
-    const selected = selectRoadmapCandidate(candidates);
-    assert.equal(selected?.id, undefined);
-    assert.equal(selected?.status, "todo");
-    assert.equal(selected?.kind, "safe");
-    assert.match(selected?.text ?? "", /V25\.0/);
+    assert.equal(selectRoadmapCandidate(candidates), null);
   });
 });
