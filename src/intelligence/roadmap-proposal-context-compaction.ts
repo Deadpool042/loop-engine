@@ -5,9 +5,12 @@ import type { RoadmapProposalContextReport } from "../core/reports.js";
  * prose (punctuation-heavy), so this ratio is a documented approximation, not a
  * calibrated tokenizer. Recalibrate against a real `usage.inputTokens` value from a
  * burn-in call whenever one is available, and update this comment with the observed
- * ratio.
+ * ratio. Last recalibrated 2026-08-24 against a real Anthropic API call
+ * (`claude-sonnet-5`, `balanced` profile) on the `loop-engine` project itself:
+ * observed `usage.inputTokens = 3518` against 7986 transmitted bytes
+ * (system prompt + compact context + transmitted schema), implying ~2.56 bytes/token.
  */
-const ESTIMATED_BYTES_PER_TOKEN = 3.5;
+const ESTIMATED_BYTES_PER_TOKEN = 2.56;
 
 export function estimateTokenCount(text: string): number {
   return Math.ceil(Buffer.byteLength(text, "utf8") / ESTIMATED_BYTES_PER_TOKEN);

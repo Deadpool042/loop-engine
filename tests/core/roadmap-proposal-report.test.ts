@@ -251,9 +251,18 @@ test("28/29. estimatedInputTokens includes the real, sanitized Structured Output
   }
 });
 
-test("30. the estimate for the real loop-engine repository (the burn-in's own project) is within 15% of the observed 2058-token burn-in", () => {
+test("30. the estimate for the real loop-engine repository (the burn-in's own project) is within 15% of the observed 3518-token burn-in", () => {
   // Mirrors the `loop-engine` entry in projects.yaml (path: .) — the exact
-  // project the real Haiku burn-in ran against, not a synthetic fixture.
+  // project the real burn-in ran against, not a synthetic fixture.
+  //
+  // Re-observed 2026-08-24 after the strategic roadmap reconciliation grew the
+  // real roadmap/context content: the deterministic router
+  // (`selectRoadmapProposalProfile`) now legitimately resolves this project to
+  // the `balanced` profile (`claude-sonnet-5`, effort `low`, reason
+  // `bounded_open_work`) instead of the earlier `economy`/Haiku routing — this
+  // is current, correct routing behavior, not a regression to mask. The prior
+  // 2058-token Haiku observation is stale for this project's current roadmap
+  // state and is superseded by this real Sonnet 5 measurement.
   const loopEngineProject: ProjectConfig = {
     name: "loop-engine",
     path: process.cwd(),
@@ -273,13 +282,20 @@ test("30. the estimate for the real loop-engine repository (the burn-in's own pr
   const estimate = generateRoadmapProposalEstimateReport(loopEngineProject);
   assert.equal(estimate.estimate.status, "available");
   if (estimate.estimate.status !== "available") return;
-  const REAL_OBSERVED_INPUT_TOKENS = 2058;
+  assert.equal(estimate.estimate.profile, "balanced");
+  assert.equal(estimate.estimate.model, "claude-sonnet-5");
+  // Real Anthropic API observation, `roadmap propose loop-engine --provider
+  // anthropic_api`, 2026-08-24, after removing the invalid `strict: true`
+  // field from `output_config.format` (see anthropic-api-provider.ts fix):
+  // model claude-sonnet-5, profile balanced, effort low,
+  // usage.inputTokens = 3518, usage.outputTokens = 841.
+  const REAL_OBSERVED_INPUT_TOKENS = 3518;
   const deviation =
     Math.abs(estimate.estimate.estimatedInputTokens - REAL_OBSERVED_INPUT_TOKENS) /
     REAL_OBSERVED_INPUT_TOKENS;
   assert.ok(
     deviation <= 0.15,
-    `estimatedInputTokens=${estimate.estimate.estimatedInputTokens} deviates ${(deviation * 100).toFixed(1)}% from the real 2058-token burn-in`,
+    `estimatedInputTokens=${estimate.estimate.estimatedInputTokens} deviates ${(deviation * 100).toFixed(1)}% from the real 3518-token burn-in`,
   );
 });
 
