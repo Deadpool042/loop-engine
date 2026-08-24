@@ -88,25 +88,6 @@ function printCommandError(
   return 1;
 }
 
-async function runExecuteWithCancellationGrace<Result>(
-  enabled: boolean,
-  operation: () => Promise<Result>,
-): Promise<Result> {
-  if (!enabled || process.platform === "win32") return operation();
-
-  // The observable desktop invoker terminates the dedicated execution process
-  // group. Keeping SIGTERM handled here lets provider descendants receive the
-  // signal while this Loop Engine process remains alive long enough for the
-  // isolated worker's workspace/lock finally blocks to run.
-  const retainUntilCleanup = (): void => undefined;
-  process.on("SIGTERM", retainUntilCleanup);
-  try {
-    return await operation();
-  } finally {
-    process.off("SIGTERM", retainUntilCleanup);
-  }
-}
-
 export async function runLoopRunCommand(
   application: LoopApplicationAssembly,
   project: LoopApplicationProject,
@@ -169,23 +150,32 @@ export async function runLoopRunCommand(
         : { candidateId: options.candidateId }),
     });
   } else if (mode === "execute") {
-    result = await runExecuteWithCancellationGrace(
-      options.onProgress !== undefined,
-      () =>
-        runLoopExecute(project.name, {
-          ...(options.candidateId === undefined
-            ? {}
-            : { candidateId: options.candidateId }),
-          maxRepairs: options.maxRepairs ?? 0,
-          ...(options.exportPatchPath === undefined
-            ? {}
-            : { exportPatchPath: options.exportPatchPath }),
-          ...(options.onProgress === undefined
-            ? {}
-            : { onProgress: options.onProgress }),
-          ...executionDependencies,
-        }),
-    );
+    const retainUntilCleanup = (): void => undefined;
+    const retainOnSigterm =
+      options.onProgress !== undefined && process.platform !== "win32";
+    if (retainOnSigterm) {
+      // The desktop invoker signals the dedicated execution process group.
+      // Handling SIGTERM here lets provider descendants terminate while this
+      // Loop Engine process remains alive for workspace/lock finally cleanup.
+      process.on("SIGTERM", retainUntilCleanup);
+    }
+    try {
+      result = await runLoopExecute(project.name, {
+        ...(options.candidateId === undefined
+          ? {}
+          : { candidateId: options.candidateId }),
+        maxRepairs: options.maxRepairs ?? 0,
+        ...(options.exportPatchPath === undefined
+          ? {}
+          : { exportPatchPath: options.exportPatchPath }),
+        ...(options.onProgress === undefined
+          ? {}
+          : { onProgress: options.onProgress }),
+        ...executionDependencies,
+      });
+    } finally {
+      if (retainOnSigterm) process.off("SIGTERM", retainUntilCleanup);
+    }
   } else {
     if (!options.commitMessage) {
       return printCommandError(
