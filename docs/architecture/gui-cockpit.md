@@ -111,6 +111,30 @@ par identifiant de session. Un second démarrage pendant une session non
 terminale est refusé déterministiquement. La fermeture normale de la fenêtre
 reste bloquée jusqu'au résultat terminal.
 
+### Revue structurée du résultat d'exécution (V27)
+
+Le résultat terminal d'une session (`executionSession.result.json`, un
+`LoopRunResult` — voir `src/loop/types.ts`) n'est jamais projeté brut dans le
+renderer. `src/gui/desktop/execution-result-contract.ts` expose
+`parseExecutionResultDetail(value: unknown)`, un parseur déterministe et
+fail-closed qui accepte uniquement un statut terminal (`completed`, `blocked`
+ou `failed`) cohérent avec la présence ou l'absence d'un échec structuré, et
+projette seulement les champs affichés par le cockpit : `status`,
+`modifiedFiles`, `validation` (statut, tentatives, réparations, commande
+échouée et code de sortie), `patchExport` (chemin, nombre de fichiers,
+SHA-256) et `failure` (code, message, détails déjà redacted par le moteur).
+Toute forme non reconnue, y compris une combinaison statut/échec ambiguë,
+retourne `null` plutôt qu'un résultat partiel.
+
+`app.tsx` consomme exclusivement cette projection : la section « Exécution
+isolée confirmée » affiche le statut, les fichiers modifiés, le résultat de
+validation, l'état de l'export du patch et, en cas d'échec, le code et le
+message d'erreur — sans jamais appeler `JSON.stringify` sur le résultat brut
+ni exposer de stack trace, de stderr ou de diagnostic interne. Ce lot ne
+change pas `LoopRunResult`, n'ajoute aucun contrat IPC et n'ajoute aucune
+action d'application du patch, de commit, de push ou de merge : l'export de
+patch reste la seule frontière de sortie.
+
 Il n'y a ni terminal/shell générique, ni pseudo-terminal, ni commande ou cwd
 contrôlable par React, ni exécution parallèle, queue, commit, push, merge ou
 application du patch. L'annulation est exposée via `loop:execution-cancel` sans
@@ -138,8 +162,11 @@ ne se ferme pas après ce nettoyage borné, il est lui-même terminé et la sess
 
 Les éléments suivants sont des pistes historiques ou des évolutions possibles,
 pas des capacités du cockpit livré : `status`, `next`, `prompt`, `validate`,
-les réglages exposés à l'utilisateur, l'exécution provider, les actions sur le
-système de fichiers et toute commande d'écriture.
+les réglages exposés à l'utilisateur, les actions sur le système de fichiers
+et toute commande d'écriture. L'exécution provider observable (session
+isolée, export de patch, revue structurée du résultat) est livrée depuis V23
+et affinée en V27 ; elle ne figure plus dans cette liste depuis la
+réconciliation documentaire du présent lot.
 
 Toute évolution devra conserver les principes ci-dessus : contrat JSON public,
 IPC explicite et minimal, résolution du repository côté main process, et

@@ -37,6 +37,12 @@ import {
   type RoadmapProposalEstimateReport,
 } from "./roadmap-proposal-estimate-contract.js";
 import type { CliInvocationResult } from "../cli-invoker.js";
+import {
+  formatExecutionResultStatus,
+  formatExecutionValidationStatus,
+  parseExecutionResultDetail,
+  type ExecutionResultDetail,
+} from "./execution-result-contract.js";
 import { parseGateReassessmentReport, type GateReassessmentReport } from "./gate-reassessment-contract.js";
 import type { DesktopExecutionDecisionDraft, DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
 
@@ -320,10 +326,8 @@ export function App(): React.JSX.Element {
     useState<DesktopExecuteProvider>("claude_code");
   const [executeLoading, setExecuteLoading] = useState(false);
   const [executeMessage, setExecuteMessage] = useState<string | null>(null);
-  const [executeResult, setExecuteResult] = useState<Record<
-    string,
-    unknown
-  > | null>(null);
+  const [executeResult, setExecuteResult] =
+    useState<ExecutionResultDetail | null>(null);
   const [executionSession, setExecutionSession] =
     useState<DesktopExecutionSession | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -766,20 +770,20 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     if (executionSession?.result !== null && executionSession !== null) {
       setCancelLoading(false);
-      if (!executionSession.result.ok)
+      if (!executionSession.result.ok) {
         setExecuteMessage(executionSession.result.raw);
-      else if (
-        typeof executionSession.result.json === "object" &&
-        executionSession.result.json !== null &&
-        !Array.isArray(executionSession.result.json)
-      )
-        setExecuteResult(
-          executionSession.result.json as Record<string, unknown>,
-        );
-      else
+        return;
+      }
+
+      const detail = parseExecutionResultDetail(executionSession.result.json);
+      if (detail === null) {
         setExecuteMessage(
           "La réponse execute ne respecte pas le contrat JSON attendu.",
         );
+        return;
+      }
+
+      setExecuteResult(detail);
     }
   }, [executionSession]);
 
@@ -1793,36 +1797,115 @@ export function App(): React.JSX.Element {
                             </p>
                           )}
                           {executeResult && (
-                            <div className="mt-3 text-sm">
-                              <p>
-                                Résultat :{" "}
-                                {String(executeResult.status ?? "inconnu")}
-                              </p>
-                              <p>
-                                Patch exporté :{" "}
-                                {executeResult.patchExport ? "oui" : "non"}
-                              </p>
-                              <p>Dépôt source non modifié.</p>
-                              {typeof executeResult.patchExport === "object" &&
-                                executeResult.patchExport !== null && (
-                                  <pre className="mt-2 overflow-auto rounded bg-neutral-100 p-3 text-xs">
-                                    {JSON.stringify(
-                                      executeResult.patchExport,
-                                      null,
-                                      2,
+                            <div className="mt-4 space-y-4 text-sm">
+                              <section>
+                                <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                                  Résultat
+                                </h4>
+                                <p className="mt-2 font-medium">
+                                  {formatExecutionResultStatus(
+                                    executeResult.status,
+                                  )}
+                                </p>
+                              </section>
+                              <section>
+                                <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                                  Fichiers modifiés
+                                </h4>
+                                {executeResult.modifiedFiles.length === 0 ? (
+                                  <p className="mt-2 text-loop-muted">
+                                    Aucun fichier modifié.
+                                  </p>
+                                ) : (
+                                  <ul className="mt-2 space-y-1 font-mono text-xs text-loop-muted">
+                                    {executeResult.modifiedFiles.map(
+                                      (path) => (
+                                        <li key={path}>{path}</li>
+                                      ),
                                     )}
-                                  </pre>
+                                  </ul>
                                 )}
-                              {typeof executeResult.failure === "object" &&
-                                executeResult.failure !== null && (
-                                  <pre className="mt-2 overflow-auto rounded bg-rose-50 p-3 text-xs text-rose-900">
-                                    {JSON.stringify(
-                                      executeResult.failure,
-                                      null,
-                                      2,
+                              </section>
+                              {executeResult.validation && (
+                                <section>
+                                  <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                                    Validation
+                                  </h4>
+                                  <p className="mt-2">
+                                    {formatExecutionValidationStatus(
+                                      executeResult.validation.status,
                                     )}
-                                  </pre>
+                                  </p>
+                                  <p className="mt-1 text-loop-muted">
+                                    {executeResult.validation.attempts}{" "}
+                                    tentative(s) ·{" "}
+                                    {executeResult.validation.repairAttempts}{" "}
+                                    réparation(s)
+                                  </p>
+                                  {executeResult.validation.failedCommand !==
+                                    null && (
+                                    <p className="mt-1 text-loop-muted">
+                                      Commande échouée :{" "}
+                                      {executeResult.validation.failedCommand}{" "}
+                                      (code {executeResult.validation.exitCode}
+                                      )
+                                    </p>
+                                  )}
+                                </section>
+                              )}
+                              <section>
+                                <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
+                                  Patch
+                                </h4>
+                                {executeResult.patchExport ? (
+                                  <>
+                                    <p className="mt-2">Exporté</p>
+                                    <p className="mt-1 text-loop-muted">
+                                      {executeResult.patchExport.fileCount}{" "}
+                                      fichier(s)
+                                    </p>
+                                    <p className="mt-1 font-mono text-xs text-loop-muted">
+                                      {executeResult.patchExport.path}
+                                    </p>
+                                    <p className="mt-1 font-mono text-xs text-loop-muted">
+                                      SHA-256 :{" "}
+                                      {executeResult.patchExport.sha256}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p className="mt-2 text-loop-muted">
+                                    Non exporté
+                                  </p>
                                 )}
+                                <p className="mt-2 text-xs text-loop-muted">
+                                  Dépôt source non modifié.
+                                </p>
+                              </section>
+                              {executeResult.failure && (
+                                <section className="rounded-md border border-rose-200 bg-rose-50 p-3">
+                                  <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-rose-700">
+                                    Échec
+                                  </h4>
+                                  <p className="mt-2 font-medium text-rose-900">
+                                    {executeResult.failure.code}
+                                  </p>
+                                  <p className="mt-1 text-rose-900">
+                                    {executeResult.failure.message}
+                                  </p>
+                                  {executeResult.failure.details.length >
+                                    0 && (
+                                    <ul className="mt-2 space-y-1 text-xs text-rose-900">
+                                      {executeResult.failure.details.map(
+                                        (detail, index) => (
+                                          <li key={`${index}:${detail}`}>
+                                            {detail}
+                                          </li>
+                                        ),
+                                      )}
+                                    </ul>
+                                  )}
+                                </section>
+                              )}
                             </div>
                           )}
                         </section>
