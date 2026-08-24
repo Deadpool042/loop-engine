@@ -40,6 +40,20 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 - [x] V24.3 — Cockpit work availability overview : le `summary --json` projette, pour chaque projet, l'admissibilité de travail déjà calculée par Project Intelligence et le dernier résultat terminal du Run History ; le cockpit les affiche dans la liste multi-projets sans recalcul de policy, sans lecture directe des journaux JSONL et sans nouvelle écriture.
 - [x] V24.4 — Frontière d'écriture gouvernée des projets observés : lecture seule par défaut, avec l'unique exception actuellement configurée `execution_decision` bornée à l'artefact déclaré, soumise à approbation humaine, confinement de chemin, publication transactionnelle, validation post-écriture et récupération ; `DOCS-026` protège l'alignement doctrine/configuration/implémentation sans autoriser d'écriture générale ni déplacer la logique métier du projet observé.
 
+## Réconciliation stratégique (2026-08-24)
+
+`docs/roadmap/roadmap-v16.md` recommandait encore "V16.1 — Isolated Execution Workspace and Project Lock" comme prochain travail alors que cette capacité est déjà livrée ici sous V23.1. Un audit factuel (code, tests, docs) a reconstruit le statut réel des macro-lots V16 à V20 et ce document en tient désormais lieu de source pour le prochain candidat exécutable ; voir `docs/roadmap/roadmap-v16.md` pour le bilan détaillé et les preuves.
+
+Trois candidats ont été comparés pour la suite de ce dépôt.
+
+Premier candidat : ajouter un heartbeat de renouvellement de bail aux locks de projet (`src/execution/project-lock-manager.ts`), qui reposent aujourd'hui sur une vérification statique de PID sans renouvellement périodique. Valeur réelle mais gap non reconnu par le projet lui-même ; conception d'un mécanisme de liveness non triviale ; risque de sur-ingénierie sans preuve d'un blocage réel observé en usage.
+
+Deuxième candidat : statuer sur le devenir de `src/service/**` et `src/automation/**`, du code de production non consommé en dehors de ses propres tests (transport HTTP, auth store persistant, forge GitHub). Décision de gouvernance légitime à terme, mais ce n'est pas une capacité observable et ce lot l'exclut explicitement de son périmètre (`src/**` hors périmètre sauf preuve démontrée).
+
+Troisième candidat, retenu : borner le nettoyage à l'annulation d'une exécution GUI. `docs/architecture/gui-cockpit.md` et `src/gui/desktop/execution-session.ts` documentent et démontrent que l'annulation termine uniquement le process CLI direct (SIGTERM puis SIGKILL) sans garantir la terminaison des processus descendants effectivement lancés par le provider, ni un nettoyage explicitement vérifié du worktree isolé et du lock projet associés au-delà de ce que le chemin normal de fin d'exécution effectue déjà. C'est un gap explicitement reconnu par la documentation livrée elle-même (contrairement au premier candidat), borné au chemin d'annulation déjà existant, vérifiable par un test adversarial avec un provider factice qui engendre un processus descendant, et ne duplique aucun outil mature.
+
+- [ ] V25.0 — Nettoyage borné à l'annulation d'une exécution GUI : garantir qu'une annulation termine effectivement tout processus descendant lancé par le provider dans le worktree isolé (pas seulement le process CLI direct), et vérifier explicitement que le worktree isolé et le lock projet associés à la session annulée sont bien libérés à l'issue de l'annulation. Couverture adversariale avec un provider factice engendrant un descendant. Aucune nouvelle abstraction de préparation, dispatch ou publication ; aucun changement de contrat IPC public au-delà de ce qui existe déjà (`loop:execution-cancel`).
+
 ## Gel architectural
 
 - Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).

@@ -56,12 +56,14 @@ window.loopDesktop.startExecution({
   model,
 });
 window.loopDesktop.executionSession(sessionId);
+window.loopDesktop.cancelExecution(sessionId);
 ```
 
 Elles correspondent uniquement aux canaux `loop:summary`, `loop:context` et
-`loop:review`, `loop:plan`, `loop:execute`, `loop:execution-start` et
-`loop:execution-session`. Il n'existe aucun IPC générique de la forme commande +
-arguments, et `ipcRenderer` n'est pas exposé au renderer.
+`loop:review`, `loop:plan`, `loop:execute`, `loop:execution-start`,
+`loop:execution-session` et `loop:execution-cancel`. Il n'existe aucun IPC
+générique de la forme commande + arguments, et `ipcRenderer` n'est pas exposé
+au renderer.
 
 Le renderer ne peut jamais fournir le `cwd`. Le process principal résout le
 repository Loop Engine de confiance, à partir de sa configuration locale ou de
@@ -104,8 +106,12 @@ résultat terminal.
 
 Il n'y a ni terminal/shell générique, ni pseudo-terminal, ni commande ou cwd
 contrôlable par React, ni exécution parallèle, queue, commit, push, merge ou
-application du patch. L'annulation n'est pas exposée : le runtime courant ne
-démontre pas encore l'arrêt et le nettoyage bornés du provider et du worktree.
+application du patch. L'annulation est exposée via `loop:execution-cancel` :
+elle réutilise le chemin SIGTERM puis SIGKILL déjà borné du timeout et termine
+le process CLI direct de la session active. Elle ne prétend pas terminer ni
+nettoyer les processus descendants éventuels du provider, ni garantir le
+nettoyage du worktree isolé au-delà de ce que le runner effectue déjà en sortie
+d'exécution.
 
 Les lectures conservent leur délai court. `loop:execute` utilise un invoker
 distinct borné à 15 minutes : il couvre au plus 10 minutes de Claude Code,
