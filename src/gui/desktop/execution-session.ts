@@ -2,6 +2,10 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 import type { CliInvocationResult, CliInvoker } from "../cli-invoker.js";
 import type { DesktopExecuteRequest } from "./execute-handler.js";
+import {
+  signalProcessGroup,
+  terminateRemainingProcessGroupMembers,
+} from "./process-group.js";
 
 const MAX_PUBLIC_EVENTS = 24;
 const MAX_JSON_BYTES = 20 * 1024 * 1024;
@@ -79,10 +83,15 @@ export function createObservableExecuteCliInvoker(options: {
   spawnProcess?: (
     executable: string,
     args: readonly string[],
-    options: { cwd: string; shell: false; stdio: ["ignore", "pipe", "pipe"] },
+    options: {
+      cwd: string;
+      shell: false;
+      detached: boolean;
+      stdio: ["ignore", "pipe", "pipe"];
+    },
   ) => ChildProcessWithoutNullStreams;
 }): CliInvoker & { cancel: () => boolean } {
-  const executable = options.executable ?? "pnpm";
+  const executable = options.executable ?? "node";
   const maxJsonBytes = options.maxJsonBytes ?? MAX_JSON_BYTES;
   const maxStderrRemainderBytes =
     options.maxStderrRemainderBytes ?? MAX_STDERR_REMAINDER_BYTES;
@@ -107,14 +116,16 @@ export function createObservableExecuteCliInvoker(options: {
   if (!Number.isInteger(terminationFinalGraceMs) || terminationFinalGraceMs <= 0) {
     throw new Error("GUI execution final termination grace must be a positive integer.");
   }
-  // Cancellation reuses the same SIGTERM/SIGKILL path as the timeout: it just
-  // requests termination of whichever invocation is currently in flight.
+  // The execution CLI is launched directly as a detached Node process on POSIX
+  // so it owns a dedicated process group. Cancellation can then signal provider
+  // descendants without relying on pnpm forwarding semantics.
   let requestActiveCancellation: (() => void) | null = null;
   return Object.freeze({
     invoke(command, args, cwd) {
       const invocationArgs = [
-        "--silent",
-        "loop",
+        "--import",
+        "tsx",
+        "src/cli.ts",
         command,
         ...args,
         "--progress-events",
@@ -129,37 +140,72 @@ export function createObservableExecuteCliInvoker(options: {
         let discardStderrUntilNewline = false;
         let terminationReason:
           "timeout" | "oversized-json" | "cancelled" | null = null;
+        let forcedRootTermination = false;
         const finish = (result: CliInvocationResult): void => {
           if (settled) return;
           settled = true;
           clearTimeout(timeout);
           clearTimeout(terminationGrace);
           clearTimeout(terminationFinalGrace);
+          clearTimeout(terminationRootFinalGrace);
           if (requestActiveCancellation === cancelThisInvocation) {
             requestActiveCancellation = null;
           }
           resolve(result);
         };
+        const detached = process.platform !== "win32";
         const child = spawnProcess(executable, invocationArgs, {
           cwd,
           shell: false,
+          detached,
           stdio: ["ignore", "pipe", "pipe"],
         });
+        const processGroupId = detached ? (child.pid ?? null) : null;
         let terminationGrace: ReturnType<typeof setTimeout> | undefined;
         let terminationFinalGrace: ReturnType<typeof setTimeout> | undefined;
+        let terminationRootFinalGrace: ReturnType<typeof setTimeout> | undefined;
+
+        const forceRootTermination = (): void => {
+          if (settled) return;
+          forcedRootTermination = true;
+          child.kill("SIGKILL");
+          terminationRootFinalGrace = setTimeout(() => {
+            finish(
+              failure("CLI process termination could not be confirmed."),
+            );
+          }, terminationFinalGraceMs);
+        };
+
         const terminate = (
           reason: "timeout" | "oversized-json" | "cancelled",
         ): void => {
           if (terminationReason !== null || settled) return;
           terminationReason = reason;
-          child.kill("SIGTERM");
+          const groupSignalled =
+            processGroupId !== null && signalProcessGroup(processGroupId, "SIGTERM");
+          if (!groupSignalled) child.kill("SIGTERM");
+
           terminationGrace = setTimeout(() => {
-            child.kill("SIGKILL");
-            terminationFinalGrace = setTimeout(() => {
-              finish(
-                failure("CLI process termination could not be confirmed."),
+            if (settled) return;
+            if (processGroupId === null || child.pid === undefined) {
+              forceRootTermination();
+              return;
+            }
+
+            void terminateRemainingProcessGroupMembers(
+              processGroupId,
+              child.pid,
+            ).then((descendantsTerminated) => {
+              if (settled) return;
+              if (!descendantsTerminated) {
+                forceRootTermination();
+                return;
+              }
+              terminationFinalGrace = setTimeout(
+                forceRootTermination,
+                terminationFinalGraceMs,
               );
-            }, terminationFinalGraceMs);
+            });
           }, terminationGraceMs);
         };
         const cancelThisInvocation = (): void => terminate("cancelled");
@@ -226,8 +272,31 @@ export function createObservableExecuteCliInvoker(options: {
             offset = newline + 1;
           }
         });
-        child.once("close", (exitCode) => {
+        child.once("close", async (exitCode) => {
           if (settled) return;
+
+          if (
+            terminationReason !== null &&
+            processGroupId !== null &&
+            child.pid !== undefined
+          ) {
+            const descendantsTerminated =
+              await terminateRemainingProcessGroupMembers(
+                processGroupId,
+                child.pid,
+              );
+            if (!descendantsTerminated) {
+              finish(
+                failure("CLI descendant process termination could not be confirmed."),
+              );
+              return;
+            }
+          }
+
+          if (forcedRootTermination) {
+            finish(failure("CLI cleanup after termination could not be confirmed."));
+            return;
+          }
           if (terminationReason === "timeout") {
             finish(failure("CLI invocation timed out."));
             return;
