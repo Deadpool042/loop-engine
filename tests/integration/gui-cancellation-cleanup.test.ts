@@ -76,8 +76,6 @@ describe("GUI cancellation cleanup", () => {
           "run",
           [
             "loop-engine",
-            "--candidate",
-            "V25.0",
             "--mode",
             "execute",
             "--provider",
