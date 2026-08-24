@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
-import { access, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { execFileSync, spawn } from "node:child_process";
+import {
+  access,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -9,6 +18,7 @@ import { createObservableExecuteCliInvoker } from "../../src/gui/desktop/executi
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(currentDir, "..", "..");
+const cliPath = resolve(repoRoot, "src", "cli.ts");
 const FAKE_CLAUDE = resolve(
   currentDir,
   "..",
@@ -16,6 +26,45 @@ const FAKE_CLAUDE = resolve(
   "fake-claude",
   "claude",
 );
+
+async function createExecutionFixture(root: string): Promise<string> {
+  const projectRoot = join(root, "project");
+  await mkdir(projectRoot);
+  await writeFile(
+    join(projectRoot, "projects.yaml"),
+    [
+      "projects:",
+      "  - name: fixture",
+      "    path: .",
+      "    type: test",
+      "    required_docs: []",
+      "    validation: []",
+      "    planning:",
+      "      mode: roadmap",
+      "    roadmap:",
+      "      - roadmap.md",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    join(projectRoot, "roadmap.md"),
+    "- [ ] V25.0 cancellation cleanup integration fixture\n",
+  );
+  execFileSync("git", ["init", "-q"], { cwd: projectRoot });
+  execFileSync("git", ["config", "user.email", "test@example.com"], {
+    cwd: projectRoot,
+  });
+  execFileSync("git", ["config", "user.name", "Test"], {
+    cwd: projectRoot,
+  });
+  execFileSync("git", ["add", "projects.yaml", "roadmap.md"], {
+    cwd: projectRoot,
+  });
+  execFileSync("git", ["commit", "-q", "-m", "test: baseline"], {
+    cwd: projectRoot,
+  });
+  return projectRoot;
+}
 
 async function waitForFile(path: string): Promise<void> {
   for (let attempt = 0; attempt < 200; attempt += 1) {
@@ -58,6 +107,7 @@ describe("GUI cancellation cleanup", () => {
     { skip: process.platform === "win32" },
     async () => {
       const root = await mkdtemp(join(tmpdir(), "loop-gui-cancel-"));
+      const projectRoot = await createExecutionFixture(root);
       const descendantPidPath = join(root, "descendant.pid");
       const previousTmpdir = process.env.TMPDIR;
       const previousPidPath = process.env.FAKE_CLAUDE_DESCENDANT_PID_PATH;
@@ -67,15 +117,27 @@ describe("GUI cancellation cleanup", () => {
 
       try {
         const invoker = createObservableExecuteCliInvoker({
+          executable: process.execPath,
           timeoutMs: 30_000,
           terminationGraceMs: 1_000,
           terminationFinalGraceMs: 2_000,
           onProgress: () => {},
+          spawnProcess: (executable, args, options) =>
+            spawn(
+              executable,
+              [
+                "--import",
+                import.meta.resolve("tsx"),
+                cliPath,
+                ...args.slice(3),
+              ],
+              options,
+            ),
         });
         const pending = invoker.invoke(
           "run",
           [
-            "loop-engine",
+            "fixture",
             "--mode",
             "execute",
             "--provider",
@@ -87,7 +149,7 @@ describe("GUI cancellation cleanup", () => {
             "--provider-timeout-ms",
             "20000",
           ],
-          repoRoot,
+          projectRoot,
         );
 
         const reachedProvider = await Promise.race([
