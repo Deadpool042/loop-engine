@@ -12,9 +12,11 @@ export type PlanDetail = Readonly<{
   }>[];
   profile: Readonly<{
     id: string;
+    runtime: string;
     provider: string;
     model: string;
-    effort: string;
+    invocationEffort: string;
+    profileRankingEffort: string;
     category: string;
     reasons: readonly string[];
     contextBudgetTokens: number;
@@ -128,10 +130,12 @@ function parseProfile(
   const requirements = value.requirements;
   if (
     typeof profile.id !== "string" ||
+    typeof profile.runtime !== "string" ||
     typeof profile.provider !== "string" ||
     typeof profile.model !== "string" ||
     typeof profile.effort !== "string" ||
     !isRecord(requirements) ||
+    typeof requirements.minimumEffort !== "string" ||
     typeof requirements.category !== "string" ||
     !isStringArray(value.reasons) ||
     !isRecord(requirements.contextBudget) ||
@@ -150,9 +154,11 @@ function parseProfile(
 
   return Object.freeze({
     id: profile.id,
+    runtime: profile.runtime,
     provider: profile.provider,
     model: profile.model,
-    effort: profile.effort,
+    invocationEffort: requirements.minimumEffort,
+    profileRankingEffort: profile.effort,
     category: requirements.category,
     reasons: Object.freeze([...value.reasons]),
     contextBudgetTokens: requirements.contextBudget.maxEstimatedTokens,
