@@ -421,7 +421,6 @@ export function createAnthropicApiProvider(
               format: {
                 type: "json_schema" as const,
                 schema: toAnthropicOutputSchema(input.outputSchema.schema),
-                strict: true as const,
               },
             }),
         ...(input.effort === undefined ? {} : { effort: input.effort }),
