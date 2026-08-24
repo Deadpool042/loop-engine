@@ -17,7 +17,7 @@ describe("GUI explicit plan contract", () => {
     assert.equal(isPlanForSelectedProject("lp-infra", "loop-engine"), false);
   });
 
-  it("accepts only the successful plan fields rendered by the desktop cockpit", () => {
+  it("accepts the executable routing fields rendered by the desktop cockpit without confusing invocation effort and profile ranking", () => {
     assert.deepEqual(
       parsePlanDetail({
         schemaVersion: 1,
@@ -43,12 +43,14 @@ describe("GUI explicit plan contract", () => {
             outcome: "selected",
             profile: {
               id: "claude_code.low",
+              runtime: "claude_code",
               provider: "anthropic",
-              model: "claude-haiku-4-5",
+              model: "claude-sonnet-5",
               effort: "low",
             },
           },
           requirements: {
+            minimumEffort: "medium",
             category: "documentation",
             contextBudget: { maxEstimatedTokens: 5000 },
           },
@@ -85,9 +87,11 @@ describe("GUI explicit plan contract", () => {
         ],
         profile: {
           id: "claude_code.low",
+          runtime: "claude_code",
           provider: "anthropic",
-          model: "claude-haiku-4-5",
-          effort: "low",
+          model: "claude-sonnet-5",
+          invocationEffort: "medium",
+          profileRankingEffort: "low",
           category: "documentation",
           reasons: ["small bounded documentation lot"],
           contextBudgetTokens: 5000,
@@ -106,6 +110,74 @@ describe("GUI explicit plan contract", () => {
           outOfScope: ["Déploiement en production"],
         },
       },
+    );
+  });
+
+  it("rejects a selected profile that omits runtime or invocation effort", () => {
+    const base = {
+      schemaVersion: 1,
+      project: "lp-infra",
+      mode: "plan",
+      status: "completed",
+      candidate: {
+        id: "H1-L4",
+        text: "Runbook rollback",
+        kind: "safe",
+        status: "todo",
+      },
+      steps: [],
+      contextPackage: null,
+      writableFileScope: null,
+      brief: null,
+      failure: null,
+    } as const;
+
+    assert.equal(
+      parsePlanDetail({
+        ...base,
+        agentPolicy: {
+          selection: {
+            outcome: "selected",
+            profile: {
+              id: "claude_code.low",
+              provider: "anthropic",
+              model: "claude-sonnet-5",
+              effort: "low",
+            },
+          },
+          requirements: {
+            minimumEffort: "medium",
+            category: "documentation",
+            contextBudget: { maxEstimatedTokens: 5000 },
+          },
+          reasons: [],
+        },
+      }),
+      null,
+    );
+
+    assert.equal(
+      parsePlanDetail({
+        ...base,
+        agentPolicy: {
+          selection: {
+            outcome: "selected",
+            profile: {
+              id: "claude_code.low",
+              runtime: "claude_code",
+              provider: "anthropic",
+              model: "claude-sonnet-5",
+              effort: "low",
+            },
+          },
+          requirements: {
+            category: "documentation",
+            contextBudget: { maxEstimatedTokens: 5000 },
+          },
+          reasons: [],
+        },
+      }),
+      null,
     );
   });
 
