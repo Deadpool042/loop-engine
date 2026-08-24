@@ -43,6 +43,7 @@ import {
   parseExecutionResultDetail,
   type ExecutionResultDetail,
 } from "./execution-result-contract.js";
+import { formatRunHistoryStatus, parseRunHistoryDetail, type RunHistoryDetail, type RunHistoryEntry } from "./run-history-contract.js";
 import { parseGateReassessmentReport, type GateReassessmentReport } from "./gate-reassessment-contract.js";
 import type { DesktopExecutionDecisionDraft, DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
 
@@ -312,6 +313,11 @@ export function App(): React.JSX.Element {
   const [reviewDetail, setReviewDetail] = useState<ReviewDetail | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [runHistory, setRunHistory] = useState<RunHistoryDetail | null>(null);
+  const [runHistoryProjectName, setRunHistoryProjectName] = useState<string | null>(null);
+  const [runHistoryError, setRunHistoryError] = useState<string | null>(null);
+  const [runHistoryLoading, setRunHistoryLoading] = useState(false);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [planDetail, setPlanDetail] = useState<PlanDetail | null>(null);
   const [planProjectName, setPlanProjectName] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
@@ -356,6 +362,7 @@ export function App(): React.JSX.Element {
     projects.find((project) => project.project.name === selectedProjectName) ??
     null;
   const selectedCandidate = contextDetail?.roadmap.selectedCandidate ?? null;
+  const selectedRun = runHistoryProjectName === selectedProjectName ? (runHistory?.entries.find((entry) => entry.runId === selectedRunId) ?? null) : null;
   const planningDisplay =
     contextDetail === null ? null : getPlanningDisplay(contextDetail);
   const availableProposalEstimate =
@@ -429,6 +436,24 @@ export function App(): React.JSX.Element {
     return () => {
       active = false;
     };
+  }, [selectedProjectName]);
+
+  useEffect(() => {
+    if (selectedProjectName === null) {
+      setRunHistory(null); setRunHistoryProjectName(null); setRunHistoryError(null); setRunHistoryLoading(false); setSelectedRunId(null);
+      return;
+    }
+    const projectName = selectedProjectName;
+    let active = true;
+    setRunHistory(null); setRunHistoryProjectName(null); setRunHistoryError(null); setRunHistoryLoading(true); setSelectedRunId(null);
+    void window.loopDesktop.runs(projectName).then((result) => {
+      if (!active) return;
+      if (!result.ok) { setRunHistoryError(result.raw); return; }
+      const detail = parseRunHistoryDetail(result.json);
+      if (detail === null || detail.project !== projectName) { setRunHistoryError("La réponse runs ne respecte pas le contrat JSON attendu."); return; }
+      setRunHistory(detail); setRunHistoryProjectName(projectName); setSelectedRunId(detail.entries[0]?.runId ?? null);
+    }).finally(() => { if (active) setRunHistoryLoading(false); });
+    return () => { active = false; };
   }, [selectedProjectName]);
 
   const selectedProjectNameRef = useRef<string | null>(selectedProjectName);
@@ -784,6 +809,16 @@ export function App(): React.JSX.Element {
       }
 
       setExecuteResult(detail);
+      const historyProjectName = executionSession.request.projectName;
+      void window.loopDesktop.runs(historyProjectName).then((result) => {
+        if (!result.ok || selectedProjectNameRef.current !== historyProjectName) return;
+        const history = parseRunHistoryDetail(result.json);
+        if (history !== null && history.project === historyProjectName) {
+          setRunHistory(history);
+          setRunHistoryProjectName(historyProjectName);
+          setSelectedRunId((current) => current ?? history.entries[0]?.runId ?? null);
+        }
+      });
     }
   }, [executionSession]);
 
@@ -2022,6 +2057,20 @@ export function App(): React.JSX.Element {
                   )}
                 </section>
               )}
+              <section className="mt-8 border-t border-loop-line pt-6">
+                <h3 className="m-0 text-base font-semibold">Historique</h3>
+                {runHistoryLoading && <p className="mt-3 text-sm text-loop-muted">Chargement de l’historique…</p>}
+                {runHistoryError && <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{runHistoryError}</p>}
+                {runHistory && runHistoryProjectName === selectedProjectName && (
+                  <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
+                    <div>
+                      {runHistory.corruptedLines > 0 && <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Historique partiellement illisible : {runHistory.corruptedLines} entrée(s) ignorée(s).</p>}
+                      {runHistory.entries.length === 0 ? <p className="text-sm text-loop-muted">Aucun run enregistré pour ce projet.</p> : <ol className="divide-y divide-loop-line rounded-lg border border-loop-line bg-white">{runHistory.entries.map((entry) => <li key={entry.runId}><button type="button" onClick={() => setSelectedRunId(entry.runId)} className={`w-full px-4 py-3 text-left text-sm hover:bg-loop-paper ${selectedRun?.runId === entry.runId ? "bg-loop-paper" : ""}`}><span className="block font-medium">{entry.completedAt ?? entry.startedAt}</span><span className="mt-1 block text-loop-muted">{entry.mode} · {formatRunHistoryStatus(entry.status)} · run {entry.runId}{entry.candidateId ? ` · ${entry.candidateId}` : ""}</span></button></li>)}</ol>}
+                    </div>
+                    {selectedRun && <section className="rounded-lg border border-loop-line bg-white p-4"><p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Run {selectedRun.runId}</p><dl className="mt-4 grid gap-4 text-sm"><div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Mode</dt><dd className="mt-1">{selectedRun.mode}</dd></div><div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Statut</dt><dd className="mt-1">{formatRunHistoryStatus(selectedRun.status)}</dd></div><div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Candidat</dt><dd className="mt-1 font-mono text-xs">{selectedRun.candidateId ?? "Non renseigné"}</dd></div>{selectedRun.executionResult?.modifiedFiles.length ? <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Fichiers modifiés</dt><dd className="mt-1"><ul className="space-y-1 font-mono text-xs text-loop-muted">{selectedRun.executionResult.modifiedFiles.slice(0, 8).map((path) => <li key={path}>{path}</li>)}</ul></dd></div> : null}{selectedRun.executionResult?.validation && <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Validation</dt><dd className="mt-1">{formatExecutionValidationStatus(selectedRun.executionResult.validation.status)} · {selectedRun.executionResult.validation.attempts} tentative(s)</dd></div>}</dl></section>}
+                  </div>
+                )}
+              </section>
             </article>
           )}
         </section>

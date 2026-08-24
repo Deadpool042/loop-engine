@@ -23,6 +23,7 @@ import { createRoadmapProposalEstimateHandler } from "./roadmap-proposal-estimat
 import { createGateReassessmentHandler, DESKTOP_GATE_REASSESSMENT_TIMEOUT_MS } from "./gate-reassessment-handler.js";
 import { createGateReassessmentEstimateHandler } from "./gate-reassessment-estimate-handler.js";
 import { createReviewHandler } from "./review-handler.js";
+import { createRunHistoryHandler } from "./run-history-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 import { createDesktopExecutionDecisionController } from "./execution-decision-controller.js";
 import { DESKTOP_EXECUTION_DECISION_TIMEOUT_MS } from "./execution-decision-cli-proposer.js";
@@ -97,6 +98,14 @@ const reviewHandler = createReviewHandler({
 });
 ipcMain.handle("loop:review", (_event, projectName) =>
   reviewHandler(projectName),
+);
+
+const runHistoryHandler = createRunHistoryHandler({
+  cliInvoker,
+  resolveRepositoryPath,
+});
+ipcMain.handle("loop:runs", (_event, projectName) =>
+  runHistoryHandler(projectName),
 );
 
 const planHandler = createPlanHandler({

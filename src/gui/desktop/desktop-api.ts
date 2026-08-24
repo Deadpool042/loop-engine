@@ -11,6 +11,7 @@ export type LoopDesktopApi = Readonly<{
   summary: () => Promise<CliInvocationResult>;
   context: (projectName: string) => Promise<CliInvocationResult>;
   review: (projectName: string) => Promise<CliInvocationResult>;
+  runs: (projectName: string) => Promise<CliInvocationResult>;
   plan: (
     projectName: string,
     candidateId: string,
@@ -42,6 +43,7 @@ export function createLoopDesktopApi(
       | "loop:summary"
       | "loop:context"
       | "loop:review"
+      | "loop:runs"
       | "loop:plan"
       | "loop:execute"
       | "loop:execution-start"
@@ -65,6 +67,9 @@ export function createLoopDesktopApi(
     },
     review(projectName) {
       return invoke("loop:review", projectName);
+    },
+    runs(projectName) {
+      return invoke("loop:runs", projectName);
     },
     plan(projectName, candidateId) {
       return invoke("loop:plan", projectName, candidateId);

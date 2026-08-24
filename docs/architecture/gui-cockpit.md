@@ -51,6 +51,7 @@ Le preload expose seulement les API explicites suivantes :
 window.loopDesktop.summary();
 window.loopDesktop.context(projectName);
 window.loopDesktop.review(projectName);
+window.loopDesktop.runs(projectName);
 window.loopDesktop.plan(projectName, candidateId);
 window.loopDesktop.execute({ projectName, candidateId, provider, model });
 window.loopDesktop.startExecution({
@@ -64,7 +65,7 @@ window.loopDesktop.cancelExecution(sessionId);
 ```
 
 Elles correspondent uniquement aux canaux `loop:summary`, `loop:context` et
-`loop:review`, `loop:plan`, `loop:execute`, `loop:execution-start`,
+`loop:review`, `loop:runs`, `loop:plan`, `loop:execute`, `loop:execution-start`,
 `loop:execution-session` et `loop:execution-cancel`. Il n'existe aucun IPC
 générique de la forme commande + arguments, et `ipcRenderer` n'est pas exposé
 au renderer.
@@ -82,13 +83,14 @@ validation ou exécution provider, sauf l'exécution isolée explicitement confi
 
 Le process principal invoque exclusivement :
 
-| IPC            | Commande CLI                                                                                             |
-| -------------- | -------------------------------------------------------------------------------------------------------- |
-| `loop:summary` | `pnpm loop summary --json`                                                                               |
-| `loop:context` | `pnpm loop context <project> --json`                                                                     |
-| `loop:review`  | `pnpm loop review <project> --json`                                                                      |
-| `loop:plan`    | `pnpm loop run <project> --candidate <id> --mode plan --json`                                            |
-| `loop:execute` | `loop run <project> --candidate <id> --mode execute ... --export-patch <native destination> --json`      |
+| IPC            | Commande CLI                                                                                        |
+| -------------- | --------------------------------------------------------------------------------------------------- |
+| `loop:summary` | `pnpm loop summary --json`                                                                          |
+| `loop:context` | `pnpm loop context <project> --json`                                                                |
+| `loop:review`  | `pnpm loop review <project> --json`                                                                 |
+| `loop:runs`    | `pnpm loop runs <project> --json --limit 20`                                                        |
+| `loop:plan`    | `pnpm loop run <project> --candidate <id> --mode plan --json`                                       |
+| `loop:execute` | `loop run <project> --candidate <id> --mode execute ... --export-patch <native destination> --json` |
 
 Le `CliInvoker` des lectures reste limité au lancement, au délai d'expiration
 et au parsing JSON. L'exécution longue dispose d'une frontière dédiée : le
@@ -110,6 +112,30 @@ temporisation), conservés dans une fenêtre bornée de 24 événements et consu
 par identifiant de session. Un second démarrage pendant une session non
 terminale est refusé déterministiquement. La fermeture normale de la fenêtre
 reste bloquée jusqu'au résultat terminal.
+
+### Historique borné des runs (V28)
+
+`loop:runs` est un consumer explicitement read-only de `loop runs <project>
+--json --limit 20`. La limite est imposée par le handler du process principal,
+jamais fournie par React. Le renderer ne reçoit que le nom du projet et ne lit
+jamais `.loop-engine/runs/*.jsonl` ni le filesystem directement.
+
+`run-history-contract.ts` valide fail-closed le rapport public (`schemaVersion`,
+projet, limite, `entries` et `corruptedLines`) puis ne projette que les données
+utiles au cockpit : identifiant du run, mode, statut terminal, dates et
+identifiant de candidat. Les statuts `completed`, `blocked`, `failed` et
+`cancelled` sont tous représentables ; `cancelled` reste un résultat historique
+valide et ne force pas le contrat de revue V27, dont la responsabilité est la
+session d'exécution structurée. Pour un `execute` compatible, la projection
+réutilise `ExecutionResultDetail` de V27.
+
+L'historique est de l'observabilité seulement : il n'influe ni sur la sélection,
+ni sur la policy, ni sur les budgets. `corruptedLines > 0` avertit que certaines
+entrées JSONL ont été ignorées par le Core, tout en affichant les entrées valides.
+Une réponse IPC ou JSON invalide est affichée comme erreur locale ; le changement
+de projet invalide toute réponse en vol. Un rafraîchissement unique suit le
+résultat terminal d'une exécution de la session concernée, sans polling,
+websocket, observer filesystem ni bus global.
 
 ### Revue structurée du résultat d'exécution (V27)
 

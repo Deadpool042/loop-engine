@@ -7,6 +7,7 @@ import { createLoopDesktopApi } from "../../src/gui/desktop/desktop-api.js";
 import { createContextHandler } from "../../src/gui/desktop/context-handler.js";
 import { createPlanHandler } from "../../src/gui/desktop/plan-handler.js";
 import { createReviewHandler } from "../../src/gui/desktop/review-handler.js";
+import { createRunHistoryHandler, DESKTOP_RUN_HISTORY_LIMIT } from "../../src/gui/desktop/run-history-handler.js";
 import { createSummaryHandler } from "../../src/gui/desktop/summary-handler.js";
 import { resolveLoopEngineRepositoryPath } from "../../src/gui/repo-path-resolver.js";
 
@@ -205,6 +206,18 @@ describe("GUI desktop execution boundary", () => {
     await handler("creatyss");
 
     assert.deepEqual(cwdValues, ["/trusted/loop-engine"]);
+  });
+
+  it("uses a fixed bounded runs invocation and trusted cwd", async () => {
+    const cliInvoker = createCliInvoker({
+      execute: async (_executable, args, cwd) => {
+        assert.deepEqual(args, ["--silent", "loop", "runs", "creatyss", "--limit", String(DESKTOP_RUN_HISTORY_LIMIT), "--json"]);
+        assert.equal(cwd, "/trusted/loop-engine");
+        return { stdout: "{}", stderr: "", exitCode: 0 };
+      },
+    });
+    const handler = createRunHistoryHandler({ cliInvoker, resolveRepositoryPath: () => "/trusted/loop-engine" });
+    await handler("creatyss");
   });
 
   it("passes the renderer project name to context while retaining the trusted cwd", async () => {
