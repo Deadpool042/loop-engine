@@ -21,7 +21,7 @@ plan candidate
 -> enforce the governed writable file scope
 -> run configured validations and audit commands
 -> optionally call one injected LoopRepairer per failed validation
--> stop after maxRepairs
+-> stop after the effective policy-capped repair budget
 -> completed OR failed
 ```
 
@@ -33,7 +33,8 @@ itself, infer authority, commit, push, publish, or discover credentials.
 - `runLoopPlan(projectName, options?)` remains synchronous and effect-free.
 - `runLoopExecute(projectName, options?)` implements the V14.4 cycle.
 - `pnpm loop run <project> --mode execute [--max-repairs <n>]` routes to the
-  execute cycle.
+  execute cycle; the requested repair count can restrict, but never widen, the
+  repair ceiling resolved by policy.
 
 Without an explicitly configured provider, the CLI returns a stable failed
 `LoopRunResult` with `failure.code = "executor_unavailable"`. With an explicit
@@ -66,8 +67,10 @@ repository validation and strict audit through its configured validation command
 ### LoopRepairer
 
 Receives the admitted execution context, current modified files, failed
-validation result, current repair attempt and finite maximum. It returns either a
-completed repair with additional modified files or a structured failure.
+validation result, current repair attempt and effective finite maximum. The
+maximum passed to the port is the same policy-capped value enforced by the
+runner's repair loop. It returns either a completed repair with additional
+modified files or a structured failure.
 
 No repairer is inferred. A failed validation with remaining budget but no
 injected repairer fails closed with `repairer_unavailable`.
@@ -106,6 +109,11 @@ unless:
 
 A denial returns `agent_policy_rejected` with zero executor, validator and
 repairer calls.
+
+The resolved `selectionRequest.budgetCeiling` is also an execution ceiling where
+the runner has a matching local control. In particular,
+`selectionRequest.budgetCeiling.maxRepairs` bounds the repair cycle after
+admission; the caller cannot widen it with `--max-repairs`.
 
 ## Validation result
 
@@ -149,10 +157,19 @@ it remains explicit follow-up debt rather than widening this micro-lot.
 
 ## Repair budget
 
-`maxRepairs` must be a non-negative integer. The default is `0`. Each failed
-validation may consume at most one repair attempt. When `repairAttempts >=
-maxRepairs`, the cycle fails with `validation_failed`. Infinite repair loops are
-impossible.
+The caller's `maxRepairs` request must be a non-negative integer and defaults to
+`0`. After policy admission, the runner derives the effective maximum as the
+most restrictive value: when the resolved policy exposes a numeric
+`selectionRequest.budgetCeiling.maxRepairs`, the effective value is
+`min(requestedMaxRepairs, policyMaxRepairs)`; otherwise the caller's already
+validated request remains the ceiling.
+
+The same `effectiveMaxRepairs` is used for both the loop exhaustion check and
+the `LoopRepairer.maxRepairs` input. A caller can therefore request fewer
+repairs (including zero) but can never widen the policy ceiling. When
+`repairAttempts >= effectiveMaxRepairs`, the cycle fails with
+`validation_failed`. Infinite repair loops and policy/runtime budget divergence
+are impossible by construction and are guarded by `AUDIT-495`.
 
 ## Failure handling
 
@@ -196,7 +213,7 @@ V14.4 does not add:
 2. The executor is called at most once.
 3. Validation runs only after a completed executor result.
 4. Each repair is followed by validation, never by commit.
-5. The finite repair budget is enforced exactly.
+5. The finite repair budget is the most restrictive of caller request and resolved policy ceiling, and the same effective value reaches the repairer.
 6. Modified files include executor and repairer reports without duplicates.
 7. Exceptions fail closed without exposing raw stack traces.
 8. `commit` and `publication` remain `null` for every result.
