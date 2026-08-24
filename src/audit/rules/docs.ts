@@ -1524,3 +1524,75 @@ export const RAG_MEMORY_SOURCES_ALIGNMENT_RULE: AuditRule = {
     );
   },
 };
+
+export const OBSERVED_PROJECT_WRITE_BOUNDARY_DOCUMENTATION_RULE: AuditRule = {
+  id: "DOCS-026",
+  category: "docs",
+  severity: "error",
+  title: "Observed-project write exception is explicit and bounded",
+  description:
+    "The product doctrine, governance architecture, project configuration, and production publisher must agree that watched projects are read-only by default and that execution_decision is the only explicitly configured bounded write exception.",
+  check: () => {
+    const finalObjectivePath = "docs/architecture/final-objective.md";
+    const agentsPath = "AGENTS.md";
+    const governancePath = "docs/architecture/governance.md";
+    const configPath = "projects.yaml";
+    const publisherPath = "src/governance/execution-decision-production.ts";
+
+    const requiredFiles = [
+      finalObjectivePath,
+      agentsPath,
+      governancePath,
+      configPath,
+      publisherPath,
+    ];
+    const missingFiles = requiredFiles.filter((file) => !existsSync(file));
+    if (missingFiles.length > 0) {
+      return fail(
+        OBSERVED_PROJECT_WRITE_BOUNDARY_DOCUMENTATION_RULE,
+        "Observed-project write-boundary sources are missing.",
+        missingFiles,
+        "Restore the product doctrine, governance documentation, projects.yaml, and execution-decision production publisher before allowing inter-project governance writes.",
+      );
+    }
+
+    const finalObjective = readFileSync(finalObjectivePath, "utf8");
+    const agents = readFileSync(agentsPath, "utf8");
+    const governance = readFileSync(governancePath, "utf8");
+    const config = readFileSync(configPath, "utf8");
+    const publisher = readFileSync(publisherPath, "utf8");
+
+    const expectations = [
+      [finalObjectivePath, finalObjective, "execution_decision"],
+      [finalObjectivePath, finalObjective, "approbation humaine"],
+      [agentsPath, agents, "read-only by default"],
+      [agentsPath, agents, "execution_decision"],
+      [governancePath, governance, "Frontière d'écriture dans les projets observés"],
+      [governancePath, governance, "createTransactionalDecisionPublisher"],
+      [governancePath, governance, "validatePublishedExecutionDecision"],
+      [configPath, config, "execution_decision: .governance/execution-decision.yaml"],
+      [publisherPath, publisher, "resolveContextPath"],
+      [publisherPath, publisher, "createTransactionalDecisionPublisher"],
+      [publisherPath, publisher, "validatePublishedExecutionDecision"],
+    ] as const;
+
+    const missing = expectations
+      .filter(([, content, token]) => !content.includes(token))
+      .map(([path, , token]) => `${path}: missing \"${token}\"`);
+
+    if (missing.length > 0) {
+      return fail(
+        OBSERVED_PROJECT_WRITE_BOUNDARY_DOCUMENTATION_RULE,
+        "Observed-project write exception is not consistently documented or implemented.",
+        missing,
+        "Keep the read-only-by-default doctrine aligned with the explicit execution_decision configuration, path confinement, transactional publication, human approval, and post-publication validation boundary.",
+      );
+    }
+
+    return pass(
+      OBSERVED_PROJECT_WRITE_BOUNDARY_DOCUMENTATION_RULE,
+      "Observed-project writes remain read-only by default with one explicit bounded execution_decision governance exception.",
+      expectations.map(([path, , token]) => `${path}: ${token}`),
+    );
+  },
+};
