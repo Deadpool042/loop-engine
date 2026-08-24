@@ -15,6 +15,8 @@ export type PlanDetail = Readonly<{
     runtime: string;
     provider: string;
     model: string;
+    /** Compatibility display field: always the invocation effort, never ranking effort. */
+    effort: string;
     invocationEffort: string;
     profileRankingEffort: string;
     category: string;
@@ -157,6 +159,7 @@ function parseProfile(
     runtime: profile.runtime,
     provider: profile.provider,
     model: profile.model,
+    effort: requirements.minimumEffort,
     invocationEffort: requirements.minimumEffort,
     profileRankingEffort: profile.effort,
     category: requirements.category,
