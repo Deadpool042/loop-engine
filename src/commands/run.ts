@@ -14,6 +14,10 @@ export function isLoopRunMode(
   return (application.loopRunModes as readonly string[]).includes(value);
 }
 
+function formatBudgetValue(value: number | null | undefined): string {
+  return value == null ? "unbounded" : String(value);
+}
+
 function printLoopRunResult(
   result: Awaited<ReturnType<LoopApplicationAssembly["runLoopExecute"]>>,
 ): void {
@@ -36,11 +40,50 @@ function printLoopRunResult(
   terminal.section(
     result.mode === "plan" ? "Agent policy (forecast)" : "Agent policy",
   );
-  if (result.agentPolicy?.selection?.outcome === "selected") {
-    terminal.info(
-      `Selected: ${result.agentPolicy.selection.profile.id} (effort ${result.agentPolicy.selection.profile.effort})`,
-    );
-  } else if (result.mode === "plan") terminal.info("No agent was called.");
+  if (result.agentPolicy) {
+    const policy = result.agentPolicy;
+    terminal.info(`Status: ${policy.status}`);
+    terminal.info(`Task category: ${policy.requirements.category}`);
+    terminal.info(`Invocation effort: ${policy.requirements.minimumEffort}`);
+
+    if (policy.selection?.outcome === "selected") {
+      const profile = policy.selection.profile;
+      terminal.info(`Selected: ${profile.id}`);
+      terminal.info(`Runtime: ${profile.runtime}`);
+      terminal.info(`Provider: ${profile.provider}`);
+      terminal.info(`Model: ${profile.model}`);
+      terminal.info(`Profile ranking effort: ${profile.effort}`);
+    } else if (policy.selection?.outcome === "no_match") {
+      terminal.warning("Selection: no compatible agent.");
+    } else {
+      terminal.info("Selection: not attempted.");
+    }
+
+    const budget = policy.selectionRequest.budgetCeiling;
+    if (budget) {
+      terminal.info(
+        `Budget ceiling: tokens=${formatBudgetValue(budget.maxTokens)}, costUsd=${formatBudgetValue(budget.maxCostUsd)}, durationMs=${formatBudgetValue(budget.maxDurationMs)}, calls=${formatBudgetValue(budget.maxCalls)}, repairs=${formatBudgetValue(budget.maxRepairs)}`,
+      );
+    }
+
+    if (policy.fallback.active) {
+      terminal.warning(
+        `Fallback: ${policy.fallback.reason ?? "active without a declared reason"}`,
+      );
+    }
+
+    for (const reason of policy.reasons) {
+      terminal.info(`Reason: ${reason}`);
+    }
+
+    if (result.mode === "plan") {
+      terminal.info("Execution: forecast only; no agent was called.");
+    }
+  } else if (result.mode === "plan") {
+    terminal.info("No agent was called.");
+  } else {
+    terminal.info("No agent policy resolution available.");
+  }
 
   terminal.section("Validation");
   if (result.validation) {
