@@ -90,6 +90,7 @@ describe("GUI explicit plan contract", () => {
           runtime: "claude_code",
           provider: "anthropic",
           model: "claude-sonnet-5",
+          effort: "medium",
           invocationEffort: "medium",
           profileRankingEffort: "low",
           category: "documentation",
