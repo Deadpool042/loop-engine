@@ -54,7 +54,7 @@ if (descendantPidPath) {
   if (descendant.pid !== undefined) {
     writeFileSync(descendantPidPath, String(descendant.pid));
   }
-  setInterval(() => {}, 1000);
+  await new Promise(() => {});
 }
 
 function write(payload) {
