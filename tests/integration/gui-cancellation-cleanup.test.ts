@@ -18,7 +18,7 @@ const FAKE_CLAUDE = resolve(
 );
 
 async function waitForFile(path: string): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
     try {
       await access(path);
       return;
@@ -60,11 +60,9 @@ describe("GUI cancellation cleanup", () => {
       const root = await mkdtemp(join(tmpdir(), "loop-gui-cancel-"));
       const descendantPidPath = join(root, "descendant.pid");
       const previousTmpdir = process.env.TMPDIR;
-      const previousMode = process.env.FAKE_CLAUDE_MODE;
       const previousPidPath = process.env.FAKE_CLAUDE_DESCENDANT_PID_PATH;
 
       process.env.TMPDIR = root;
-      process.env.FAKE_CLAUDE_MODE = "hang_with_descendant";
       process.env.FAKE_CLAUDE_DESCENDANT_PID_PATH = descendantPidPath;
 
       try {
@@ -94,7 +92,16 @@ describe("GUI cancellation cleanup", () => {
           repoRoot,
         );
 
-        await waitForFile(descendantPidPath);
+        const reachedProvider = await Promise.race([
+          waitForFile(descendantPidPath).then(() => true),
+          pending.then((result) => {
+            throw new Error(
+              `Execution completed before adversarial provider start: ${JSON.stringify(result)}`,
+            );
+          }),
+        ]);
+        assert.equal(reachedProvider, true);
+
         const descendantPid = Number(
           (await readFile(descendantPidPath, "utf8")).trim(),
         );
@@ -113,8 +120,6 @@ describe("GUI cancellation cleanup", () => {
       } finally {
         if (previousTmpdir === undefined) delete process.env.TMPDIR;
         else process.env.TMPDIR = previousTmpdir;
-        if (previousMode === undefined) delete process.env.FAKE_CLAUDE_MODE;
-        else process.env.FAKE_CLAUDE_MODE = previousMode;
         if (previousPidPath === undefined)
           delete process.env.FAKE_CLAUDE_DESCENDANT_PID_PATH;
         else process.env.FAKE_CLAUDE_DESCENDANT_PID_PATH = previousPidPath;
