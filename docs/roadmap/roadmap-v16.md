@@ -1,10 +1,42 @@
-# Loop Engine Roadmap — Post-V15 Strategic Plan
+# Loop Engine Roadmap — Post-V15 Strategic Plan (V16–V20 bilan)
 
-Status: ACTIVE
+Status: SUPERSEDED as an active planning document — kept as historical
+strategic reference and reconciled bilan.
 Baseline: state of `main` after V15.1
-Planning horizon: V16 through V20
+Planning horizon at authoring time: V16 through V20
+Reconciliation review: 2026-08-24, against `main` at V24.4
+(`docs/roadmap/loop-engine.md` is now the authoritative source for the next
+executable lot; see `docs/roadmap/loop-engine.md` for the current candidate.)
 
-## Purpose
+## Real status as of 2026-08-24 (evidence-based reconciliation)
+
+The self-hosted roadmap (`docs/roadmap/loop-engine.md`) advanced through
+V22–V24 without following the V16–V20 macro-lot sequence below literally.
+Several capabilities described here were delivered under different lot
+numbers and names, several remain genuinely undelivered, and one recommended
+next step in this document was already superseded before this reconciliation.
+This section records what evidence in the repository actually shows; it does
+not replace the detailed macro-lot text further below, which remains as
+directional strategic context.
+
+| Macro-lot | Real status | Evidence | Remaining gap |
+| --- | --- | --- | --- |
+| V16 — Isolated Durable Worker Platform | PARTIAL | Isolated worktrees and workspace allocation: `src/execution/workspace-manager.ts`, `src/execution/isolated-worker-platform.ts`. Recoverable per-project locks with a real burn-in on `lp-infra`: `src/execution/project-lock-manager.ts`, `src/execution/adapters/local-project-lock-manager.ts`, documented as V23.1 in `docs/roadmap/loop-engine.md`. Bounded cancellation (SIGTERM/SIGKILL of the direct CLI process): `src/gui/desktop/execution-session.ts`, `loop:execution-cancel` IPC. | No lease heartbeat/renewal (locks rely on static PID liveness, not periodic renewal); cancellation does not terminate or account for provider descendant processes; the GUI intentionally allows only one active session at a time rather than real concurrent unrelated jobs. |
+| V17 — Secure Orchestration Service | PARTIAL, mostly undelivered | Auth/ACL/anti-replay primitives are real and wired into the V14.5 inbound pilot: `src/inbound-security/*`. The HTTP/stdio service transport and persistent auth store exist as code (`src/service/node-http-service-adapter.ts`, `src/service/orchestration-service-persistent-auth-store.ts`) but are not imported outside `src/service` itself — no CLI command, no composition wiring, no consumer. No migrations, no SQLite/PostgreSQL persistence, no n8n-invocable service exists; the only real n8n integration is read-only JSON consumption. | Everything needed to turn `src/service/**` into an actually invoked service (routing, composition wiring, a CLI entrypoint or equivalent), or an explicit decision to remove/retire that code. |
+| V18 — Economic Intelligence Engine | NOT_IMPLEMENTED (beyond static pricing) | `src/text-only-provider/pricing.ts` is a static cost calculator used only for roadmap-propose display, not a ledger. Run History (V24.2) persists terminal run outcomes but is explicitly documented as pure observability — "aucun détecteur de stagnation, circuit breaker ou cap de dépense cumulée" (`docs/architecture/autonomous-loop-runner.md`). No budget reservation/consumption/release, no adaptive provider selection from historical outcomes. | Everything; deliberately deferred pending demonstrated need per existing doctrine. |
+| V19 — Durable End-to-End Delivery Lifecycle | PARTIAL, narrow scope delivered | Bounded explicit commit exists and was burned in on a real project: V14.6, `docs/audits/real-controlled-commit-pilot.md`. `src/automation/adapters/github/github-automation-forge.ts` exists but `src/automation/**` is not imported outside itself except by an audit rule checking its internal dependency direction — no CLI command, no composition wiring, no real branch/PR/CI/review/merge lifecycle. | The entire durable branch→PR→CI→review→merge lifecycle remains undelivered; `src/automation/**` is currently unconsumed code. |
+| V20 — Production Hardening and Provider Ecosystem | NOT_IMPLEMENTED, except provider abstraction | No structured logs/metrics/traces, no backup/restore, no multi-host persistence found. A real multi-provider abstraction exists and is used (`src/providers/{claude-code,codex,openclaw}.ts`, `mapping/`, `registry.ts`, `selector.ts`), but no formal provider conformance suite was found. | Everything except the provider abstraction itself. |
+
+### Recommended-next-lot correction
+
+The "Recommended Next Lot" section below (V16.1 — Isolated Execution Workspace
+and Project Lock) is superseded: isolated worktrees, per-project locks with
+recoverable ownership, and a real burn-in were already delivered as V23.1 in
+`docs/roadmap/loop-engine.md`, which also documents cancellation delivered
+after that. This document must not be read as still recommending that work.
+It is kept below only as a record of the original planning rationale.
+
+## Purpose (original, at authoring time)
 
 This roadmap is the authoritative strategic reference for the next phase of Loop Engine.
 
@@ -121,7 +153,9 @@ Each PR must be reviewable, independently validated, and protected by targeted t
 
 # Macro-Lot V16 — Isolated Durable Worker Platform
 
-Status: PLANNED
+Status: PARTIAL (see reconciliation table above — worktrees and recoverable
+locks delivered as V23.1; heartbeat, descendant-process cancellation and real
+multi-job concurrency remain undelivered)
 Priority: P0
 Depends on: V15 durable execution and orchestration contracts
 
@@ -178,7 +212,9 @@ Loop Engine can safely operate as a durable, concurrent, single-host worker plat
 
 # Macro-Lot V17 — Secure Orchestration Service
 
-Status: PLANNED
+Status: PARTIAL, mostly undelivered (see reconciliation table above — auth/ACL/
+replay primitives are real and wired into the V14.5 pilot; the HTTP/stdio
+service transport and persistent auth store exist but are unconsumed code)
 Priority: P0/P1
 Depends on: V16 worker platform
 
@@ -236,7 +272,9 @@ Loop Engine is deployable as a secure single-host orchestration service with a c
 
 # Macro-Lot V18 — Economic Intelligence Engine
 
-Status: PLANNED
+Status: NOT_IMPLEMENTED beyond static pricing display (see reconciliation
+table above — deliberately deferred pending demonstrated need per existing
+doctrine; Run History V24.2 is observability only, not this)
 Priority: P1/P2
 Depends on: V17 service telemetry and durable persistence
 
@@ -290,7 +328,10 @@ Loop Engine can enforce budgets and make explainable, adaptive, economically inf
 
 # Macro-Lot V19 — Durable End-to-End Delivery Lifecycle
 
-Status: PLANNED
+Status: PARTIAL, narrow scope delivered (see reconciliation table above —
+bounded explicit commit delivered as V14.6; `src/automation/**` GitHub/PR/CI
+lifecycle code exists but is unconsumed — no CLI command, no composition
+wiring)
 Priority: P3
 Depends on: V16 worker durability and V18 economic controls
 
@@ -343,7 +384,9 @@ Loop Engine can autonomously and durably deliver a bounded software change from 
 
 # Macro-Lot V20 — Production Hardening and Provider Ecosystem
 
-Status: PLANNED
+Status: NOT_IMPLEMENTED except provider abstraction (see reconciliation table
+above — a real multi-provider abstraction exists and is used; no
+observability, backup/restore, multi-host or conformance suite found)
 Priority: P1/P2
 Depends on: V16 through V19
 
@@ -453,7 +496,11 @@ The following are explicitly discouraged until required by an active acceptance 
 - audit growth that does not protect a meaningful architectural or operational invariant;
 - multi-host complexity before single-host durability is proven.
 
-# Recommended Next Lot
+# Recommended Next Lot (original, superseded — see reconciliation above)
+
+This section is kept only as a historical record. It is superseded: the work
+it recommends was delivered as V23.1 in `docs/roadmap/loop-engine.md`. Do not
+treat it as an actionable recommendation.
 
 Begin V16 with a concrete vertical slice rather than another contract-only phase:
 

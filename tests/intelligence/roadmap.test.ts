@@ -626,7 +626,7 @@ describe("execution projection contract", () => {
 });
 
 describe("loop-engine burn-in candidate", () => {
-  it("has no active candidate once V23.0 and V23.1 are qualified", () => {
+  it("selects V25.0 once V23.0 and V23.1 are qualified and the V16-V20 reconciliation lot adds an active candidate", () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
     const repoRoot = resolve(currentDir, "..", "..");
     const project: ProjectConfig = {
@@ -657,6 +657,9 @@ describe("loop-engine burn-in candidate", () => {
     );
 
     const selected = selectRoadmapCandidate(candidates);
-    assert.equal(selected, null);
+    assert.equal(selected?.id, undefined);
+    assert.equal(selected?.status, "todo");
+    assert.equal(selected?.kind, "safe");
+    assert.match(selected?.text ?? "", /V25\.0/);
   });
 });

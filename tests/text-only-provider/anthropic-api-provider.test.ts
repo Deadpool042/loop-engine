@@ -278,7 +278,6 @@ describe("Anthropic API text-only provider", () => {
       format: {
         type: "json_schema",
         schema: { type: "object", additionalProperties: false },
-        strict: true,
       },
     });
   });
@@ -328,7 +327,6 @@ describe("Anthropic API text-only provider", () => {
             },
           },
         },
-        strict: true,
       },
     });
   });
