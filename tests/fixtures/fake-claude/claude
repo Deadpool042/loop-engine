@@ -38,6 +38,25 @@ if (captureCwdPath) {
   writeFileSync(captureCwdPath, cwd);
 }
 
+const descendantPidPath = process.env.FAKE_CLAUDE_DESCENDANT_PID_PATH;
+if (descendantPidPath) {
+  // Dedicated V25.0 adversarial seam. The presence of the unique PID-file
+  // destination is the trigger so this test cannot race with other suites that
+  // temporarily change FAKE_CLAUDE_MODE on the shared process environment.
+  const descendant = spawn(
+    process.execPath,
+    [
+      "-e",
+      "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);",
+    ],
+    { stdio: "ignore" },
+  );
+  if (descendant.pid !== undefined) {
+    writeFileSync(descendantPidPath, String(descendant.pid));
+  }
+  setInterval(() => {}, 1000);
+}
+
 function write(payload) {
   process.stdout.write(JSON.stringify(payload));
 }
@@ -81,22 +100,6 @@ switch (mode) {
     break;
   }
   case "hang": {
-    setInterval(() => {}, 1000);
-    break;
-  }
-  case "hang_with_descendant": {
-    const descendant = spawn(
-      process.execPath,
-      [
-        "-e",
-        "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);",
-      ],
-      { stdio: "ignore" },
-    );
-    const pidPath = process.env.FAKE_CLAUDE_DESCENDANT_PID_PATH;
-    if (pidPath && descendant.pid !== undefined) {
-      writeFileSync(pidPath, String(descendant.pid));
-    }
     setInterval(() => {}, 1000);
     break;
   }
