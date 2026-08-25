@@ -9,6 +9,7 @@ import {
 } from "./run-history.js";
 
 const RUN_HISTORY_LOOKUP_CHUNK_BYTES = 64 * 1024;
+const MAX_RUN_HISTORY_LOOKUP_LINE_CHARS = 1024 * 1024;
 
 export type LoopRunHistoryLookupResult =
   | Readonly<{
@@ -49,7 +50,8 @@ function isKnownRunHistoryEntry(
 /**
  * Finds one exact persisted run without applying the bounded recent-history
  * report window. The journal is scanned once in fixed-size chunks and only a
- * single matching entry is retained in memory. Duplicate run ids fail closed.
+ * single matching entry plus one bounded line buffer are retained in memory.
+ * Duplicate run ids fail closed.
  */
 export function lookupRunHistoryEntry(
   projectName: string,
@@ -77,9 +79,9 @@ export function lookupRunHistoryEntry(
     });
   }
 
-  let fd: number;
+  let descriptor: number | null = null;
   try {
-    fd = openSync(filePath, "r");
+    descriptor = openSync(filePath, "r");
   } catch {
     return Object.freeze({
       found: false,
@@ -92,6 +94,7 @@ export function lookupRunHistoryEntry(
   let matched: LoopRunResult | null = null;
   let duplicate = false;
   let leftover = "";
+  let discardingOversizedLine = false;
   const decoder = new StringDecoder("utf8");
 
   function processLine(rawLine: string): void {
@@ -116,25 +119,56 @@ export function lookupRunHistoryEntry(
     matched = parsed;
   }
 
+  function consumeText(text: string): void {
+    let remaining = text;
+    if (discardingOversizedLine) {
+      const newline = remaining.indexOf("\n");
+      if (newline === -1) return;
+      corruptedLines += 1;
+      discardingOversizedLine = false;
+      remaining = remaining.slice(newline + 1);
+    }
+
+    leftover += remaining;
+    while (true) {
+      const newline = leftover.indexOf("\n");
+      if (newline === -1) {
+        if (leftover.length > MAX_RUN_HISTORY_LOOKUP_LINE_CHARS) {
+          leftover = "";
+          discardingOversizedLine = true;
+        }
+        return;
+      }
+      const line = leftover.slice(0, newline);
+      leftover = leftover.slice(newline + 1);
+      if (line.length > MAX_RUN_HISTORY_LOOKUP_LINE_CHARS) {
+        corruptedLines += 1;
+      } else {
+        processLine(line);
+      }
+    }
+  }
+
   try {
     const buffer = Buffer.alloc(RUN_HISTORY_LOOKUP_CHUNK_BYTES);
     let bytesRead: number;
     while (
       (bytesRead = readSync(
-        fd,
+        descriptor,
         buffer,
         0,
         RUN_HISTORY_LOOKUP_CHUNK_BYTES,
         null,
       )) > 0
     ) {
-      leftover += decoder.write(buffer.subarray(0, bytesRead));
-      const lines = leftover.split("\n");
-      leftover = lines.pop() ?? "";
-      for (const line of lines) processLine(line);
+      consumeText(decoder.write(buffer.subarray(0, bytesRead)));
     }
-    leftover += decoder.end();
-    if (leftover.length > 0) processLine(leftover);
+    consumeText(decoder.end());
+    if (discardingOversizedLine) {
+      corruptedLines += 1;
+    } else if (leftover.length > 0) {
+      processLine(leftover);
+    }
   } catch {
     return Object.freeze({
       found: false,
@@ -142,7 +176,7 @@ export function lookupRunHistoryEntry(
       corruptedLines,
     });
   } finally {
-    closeSync(fd);
+    closeSync(descriptor);
   }
 
   if (duplicate) {
