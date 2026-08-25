@@ -481,6 +481,7 @@ describe("isolated provider execution", () => {
         path: patchPath,
         sha256: createHash("sha256").update(patch).digest("hex"),
         fileCount: 2,
+        baseSha: sourceHead,
       });
       assert.equal(
         await readFile(join(project.path, "README.md"), "utf8"),

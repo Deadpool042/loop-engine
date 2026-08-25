@@ -1049,11 +1049,11 @@ describe("Core public API", () => {
     assert.deepEqual(
       generateExecutionReport({
         ...result,
-        patchExport: { path: "/tmp/validated.patch", sha256: "a".repeat(64), fileCount: 2 },
+        patchExport: { path: "/tmp/validated.patch", sha256: "a".repeat(64), fileCount: 2, baseSha: "b".repeat(40) },
       }),
       {
         ...result,
-        patchExport: { path: "/tmp/validated.patch", sha256: "a".repeat(64), fileCount: 2 },
+        patchExport: { path: "/tmp/validated.patch", sha256: "a".repeat(64), fileCount: 2, baseSha: "b".repeat(40) },
       },
     );
   });

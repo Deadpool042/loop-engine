@@ -40,6 +40,8 @@ export type LoopRunPatchExport = Readonly<{
   path: string;
   sha256: string;
   fileCount: number;
+  /** Full Git SHA of the isolated worktree before this patch was generated. */
+  baseSha: string;
 }>;
 export type LoopRunResult = Readonly<{
   schemaVersion: 1;

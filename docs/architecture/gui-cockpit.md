@@ -129,7 +129,7 @@ valide et ne force pas le contrat de revue V27, dont la responsabilité est la
 session d'exécution structurée. Pour un `execute` compatible, la projection
 réutilise `ExecutionResultDetail` de V27.
 
-### Patch Review (V30)
+### Patch Review (V30) et prérequis d'identité (V31)
 
 V30 ajoute une revue du patch exporté pour la session d'exécution courante
 uniquement. L'historique ne garantit pas la durée de vie d'un export externe :
@@ -138,6 +138,14 @@ il ne peut donc pas rouvrir un patch ancien. La source de vérité reste le
 isolé exécute `git diff --binary HEAD`, vérifie que les chemins correspondent
 au delta validé, puis écrit atomiquement le fichier choisi par le dialogue
 natif. Le SHA-256 et `fileCount` retournés appartiennent à cette preuve.
+
+V31 est un **NO-GO** pour une governed patch application. Il ajoute seulement
+le `baseSha` Git complet du worktree isolé à `patchExport`, puis le transporte
+jusqu'à la projection Patch Review ; toute forme absente ou invalide est
+refusée fail-closed. Aucune primitive existante ne garantit aujourd'hui une
+publication multi-fichiers atomique et récupérable dans le dépôt source. Par
+conséquent, V31 ne livre aucun apply, IPC d'écriture ni bouton Apply : la
+governed patch application reste un travail futur et différé.
 
 `window.loopDesktop.patchReview(sessionId)` est le seul IPC ajouté. React ne
 transmet ni chemin, ni cwd, ni option filesystem. Le main process retrouve la
