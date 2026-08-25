@@ -176,7 +176,7 @@ export function lookupRunHistoryEntry(
       corruptedLines,
     });
   } finally {
-    closeSync(descriptor);
+    if (descriptor !== null) closeSync(descriptor);
   }
 
   if (duplicate) {
