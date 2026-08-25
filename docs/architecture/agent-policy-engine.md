@@ -74,7 +74,7 @@ interface LoopTaskRequirements {
 
 `requiredCapabilities` dépend uniquement de la catégorie. `requiredPermissions` dépend du **plafond du mode** (`getAllowedPermissionsForMode`) filtré par les besoins de la catégorie — jamais l'inverse : c'est ce qui garantit qu'aucune capacité d'écriture n'est jamais requise en mode `plan`, quelle que soit la catégorie du lot.
 
-`preferredCapabilityTier` (`CATEGORY_PREFERRED_CAPABILITY_TIER` dans `src/policy/resolver.ts`) exprime une préférence doctrinale abstraite et indépendante du fournisseur. Elle ne contraint jamais la sélection : `selectAgentProfile` reste un lookup pur sur les seules `requiredCapabilities`/`requiredPermissions`/effort/budget (voir "Cible de politique vs profil résolu" ci-dessous).
+`preferredCapabilityTier` (`CATEGORY_PREFERRED_CAPABILITY_TIER` dans `src/policy/resolver.ts`) exprime une préférence doctrinale abstraite et indépendante du fournisseur. Elle ne contraint jamais la sélection : `selectAgentProfile` reste un lookup pur sur les exigences hard `requiredCapabilities`/`requiredPermissions`/provider/runtime/effort/budget (voir "Cible de politique vs profil résolu" ci-dessous).
 
 ### `AgentPolicy`
 
@@ -198,6 +198,14 @@ La résolution distingue explicitement deux échecs de nature différente :
 - `no_compatible_agent` — un candidat existe, mais aucun profil de l'`AgentRegistry` ne satisfait les exigences dérivées.
 
 `resolvePolicy` n'appelle jamais un agent réel : `selectAgentProfile` (`src/agents/selector.ts`) est un lookup pur sur un registre local, jamais une invocation. Aucun réseau, aucun processus, aucune écriture.
+
+## Décision de sélection observable
+
+La `selectionRequest` d'une `AgentPolicyResolution` contient les contraintes effectives, après fusion restrictive : capacités, permissions, plafond d'effort, budget et, lorsqu'elles sont déclarées, `allowedProviders` et `allowedRuntimes`. Ces deux dernières contraintes sont transmises au sélecteur ; elles ne sont pas de simples diagnostics de policy.
+
+Une sélection résolue conserve le profil effectivement choisi (`id`, runtime, provider, modèle, effort de classement) et deux listes compactes : `rejected` pour les profils qui échouent une exigence hard, puis `notSelected` pour les profils admissibles qui perdent uniquement le classement (`higher_effort_than_selected` ou `deterministic_tiebreak`). Les listes sont triées par identifiant ; le résultat ne dépend donc ni de l'ordre du registry ni de l'ordre de déclaration d'un ensemble de capacités.
+
+L'effort d'invocation reste `requirements.minimumEffort`, distinct de l'effort de classement du profil. L'exécution consomme le profil effectivement sélectionné, conservant ainsi le binding runtime/provider/modèle V26 ; aucun fallback de modèle ou de provider n'est introduit. Une absence de profil compatible reste `no_compatible_agent`, sans choisir un profil partiellement compatible.
 
 ## Consommation par l'admission Runtime V13.16
 

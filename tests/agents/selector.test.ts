@@ -41,7 +41,10 @@ describe("selectAgentProfile", () => {
     });
 
     assert.equal(result.outcome, "selected");
-    assert.equal(result.outcome === "selected" ? result.profile.id : null, "low");
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "low",
+    );
   });
 
   it("breaks ties deterministically by id", () => {
@@ -55,7 +58,64 @@ describe("selectAgentProfile", () => {
       requiredPermissions: [],
     });
 
-    assert.equal(result.outcome === "selected" ? result.profile.id : null, "alpha");
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "alpha",
+    );
+    assert.deepEqual(
+      result.outcome === "selected" ? result.notSelected : null,
+      [{ profileId: "zeta", reason: "deterministic_tiebreak" }],
+    );
+  });
+
+  it("explains why an otherwise compatible higher-effort profile did not win", () => {
+    const registry = createAgentRegistry([
+      profile({ id: "medium", effort: "medium", capabilities: ["code_edit"] }),
+      profile({ id: "low", effort: "low", capabilities: ["code_edit"] }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit"],
+      requiredPermissions: [],
+    });
+
+    assert.deepEqual(
+      result.outcome === "selected" ? result.notSelected : null,
+      [{ profileId: "medium", reason: "higher_effort_than_selected" }],
+    );
+  });
+
+  it("enforces provider and runtime allow-lists as hard constraints", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "codex",
+        runtime: "codex",
+        provider: "openai",
+        capabilities: ["code_edit"],
+      }),
+      profile({
+        id: "claude",
+        runtime: "claude_code",
+        provider: "anthropic",
+        capabilities: ["code_edit"],
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit"],
+      requiredPermissions: [],
+      allowedProviders: ["openai"],
+      allowedRuntimes: ["codex"],
+    });
+
+    assert.equal(result.outcome, "selected");
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "codex",
+    );
+    assert.deepEqual(result.rejected, [
+      { profileId: "claude", reason: "provider anthropic is not allowed" },
+    ]);
   });
 
   it("does not reject a compatible runtime because its preferred effort is below the requested invocation effort", () => {
@@ -77,7 +137,10 @@ describe("selectAgentProfile", () => {
     });
 
     assert.equal(result.outcome, "selected");
-    assert.equal(result.outcome === "selected" ? result.profile.id : null, "claude");
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "claude",
+    );
   });
 
   it("rejects profiles missing a required capability with an explainable reason", () => {
@@ -91,7 +154,10 @@ describe("selectAgentProfile", () => {
     });
 
     assert.equal(result.outcome, "no_match");
-    assert.match(result.rejected[0]!.reason, /missing capabilities: shell_exec/);
+    assert.match(
+      result.rejected[0]!.reason,
+      /missing capabilities: shell_exec/,
+    );
   });
 
   it("rejects profiles missing a required permission", () => {
@@ -109,7 +175,10 @@ describe("selectAgentProfile", () => {
     });
 
     assert.equal(result.outcome, "no_match");
-    assert.match(result.rejected[0]!.reason, /missing permissions: write_worktree/);
+    assert.match(
+      result.rejected[0]!.reason,
+      /missing permissions: write_worktree/,
+    );
   });
 
   it("rejects a profile whose declared budget exceeds an explicit ceiling", () => {
@@ -174,6 +243,41 @@ describe("selectAgentProfile", () => {
       result.rejected.map((rejection) => rejection.profileId),
       ["missing-cap"],
     );
+  });
+
+  it("is stable across equivalent registry and capability-set orderings", () => {
+    const profiles = [
+      profile({
+        id: "beta",
+        effort: "medium",
+        capabilities: ["test_execution", "code_edit"],
+      }),
+      profile({
+        id: "alpha",
+        effort: "low",
+        capabilities: ["code_edit", "test_execution"],
+      }),
+    ];
+    const request = {
+      requiredCapabilities: ["test_execution", "code_edit"] as const,
+      requiredPermissions: [] as const,
+    };
+
+    const first = selectAgentProfile(createAgentRegistry(profiles), request);
+    const second = selectAgentProfile(
+      createAgentRegistry(
+        [...profiles].reverse().map((candidate) => ({
+          ...candidate,
+          capabilities: [...candidate.capabilities].reverse(),
+        })),
+      ),
+      {
+        ...request,
+        requiredCapabilities: [...request.requiredCapabilities].reverse(),
+      },
+    );
+
+    assert.deepEqual(first, second);
   });
 });
 

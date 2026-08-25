@@ -6,6 +6,8 @@ import {
   type AgentEffort,
   type AgentPermission,
   type AgentProfile,
+  type AgentProvider,
+  type AgentRuntime,
 } from "./types.js";
 
 export type AgentBudgetCeiling = Partial<
@@ -21,6 +23,8 @@ export type AgentSelectionRequest = Readonly<{
   minEffort?: AgentEffort;
   maxEffort?: AgentEffort;
   budgetCeiling?: AgentBudgetCeiling;
+  allowedProviders?: readonly AgentProvider[];
+  allowedRuntimes?: readonly AgentRuntime[];
 }>;
 
 export type AgentRejection = Readonly<{
@@ -28,11 +32,20 @@ export type AgentRejection = Readonly<{
   reason: string;
 }>;
 
+// Compact audit evidence for profiles that passed every hard gate but lost
+// deterministic ranking. It deliberately repeats no profile configuration.
+export type AgentNonSelection = Readonly<{
+  profileId: string;
+  reason: "higher_effort_than_selected" | "deterministic_tiebreak";
+}>;
+
 export type AgentSelectionResult =
   | Readonly<{
       outcome: "selected";
       profile: AgentProfile;
       rejected: readonly AgentRejection[];
+      // Additive so historical serialized resolutions remain consumable.
+      notSelected?: readonly AgentNonSelection[];
     }>
   | Readonly<{ outcome: "no_match"; rejected: readonly AgentRejection[] }>;
 
@@ -66,6 +79,26 @@ export function evaluateAgentProfile(
   profile: AgentProfile,
   request: AgentSelectionRequest,
 ): Readonly<{ ok: true } | { ok: false; reason: string }> {
+  if (
+    request.allowedProviders !== undefined &&
+    !request.allowedProviders.includes(profile.provider)
+  ) {
+    return {
+      ok: false,
+      reason: `provider ${profile.provider} is not allowed`,
+    };
+  }
+
+  if (
+    request.allowedRuntimes !== undefined &&
+    !request.allowedRuntimes.includes(profile.runtime)
+  ) {
+    return {
+      ok: false,
+      reason: `runtime ${profile.runtime} is not allowed`,
+    };
+  }
+
   const missingCapabilities = request.requiredCapabilities.filter(
     (capability) => !profile.capabilities.includes(capability),
   );
@@ -103,7 +136,10 @@ export function evaluateAgentProfile(
   }
 
   if (request.budgetCeiling) {
-    const violation = findBudgetViolation(profile.budget, request.budgetCeiling);
+    const violation = findBudgetViolation(
+      profile.budget,
+      request.budgetCeiling,
+    );
     if (violation) return { ok: false, reason: violation };
   }
 
@@ -123,6 +159,18 @@ export function pickSmallestCapable(
   );
 }
 
+function canonicalizeSelectedProfile(profile: AgentProfile): AgentProfile {
+  return Object.freeze({
+    ...profile,
+    capabilities: Object.freeze([...new Set(profile.capabilities)].sort()),
+    permissions: Object.freeze([...new Set(profile.permissions)].sort()),
+    ...(profile.tiers === undefined
+      ? {}
+      : { tiers: Object.freeze([...new Set(profile.tiers)].sort()) }),
+    budget: Object.freeze({ ...profile.budget }),
+  });
+}
+
 export function selectAgentProfile(
   registry: AgentRegistry,
   request: AgentSelectionRequest,
@@ -130,7 +178,12 @@ export function selectAgentProfile(
   const rejected: AgentRejection[] = [];
   const eligible: AgentProfile[] = [];
 
-  for (const profile of registry.profiles) {
+  // Registry declaration order is not a selection input. Sorting first keeps
+  // rejection evidence and the observable decision stable across equivalent
+  // registry serializations.
+  for (const profile of [...registry.profiles].sort((a, b) =>
+    a.id.localeCompare(b.id),
+  )) {
     const evaluation = evaluateAgentProfile(profile, request);
 
     if (evaluation.ok) eligible.push(profile);
@@ -140,5 +193,21 @@ export function selectAgentProfile(
   const selected = pickSmallestCapable(eligible);
   if (!selected) return { outcome: "no_match", rejected };
 
-  return { outcome: "selected", profile: selected, rejected };
+  const notSelected: AgentNonSelection[] = eligible
+    .filter((profile) => profile.id !== selected.id)
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((profile) => ({
+      profileId: profile.id,
+      reason:
+        compareAgentEffort(profile.effort, selected.effort) > 0
+          ? "higher_effort_than_selected"
+          : "deterministic_tiebreak",
+    }));
+
+  return {
+    outcome: "selected",
+    profile: canonicalizeSelectedProfile(selected),
+    rejected,
+    notSelected,
+  };
 }

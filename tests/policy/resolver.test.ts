@@ -71,7 +71,9 @@ describe("classifyLoopTaskCategory — deterministic keyword deduction", () => {
   it("deduces a documentation standard lot", () => {
     assert.equal(
       classifyLoopTaskCategory(
-        candidate({ text: "| H3-L2 | Standard logging (format, niveaux, rétention) | ⬜ À faire |" }),
+        candidate({
+          text: "| H3-L2 | Standard logging (format, niveaux, rétention) | ⬜ À faire |",
+        }),
       ),
       "documentation",
     );
@@ -118,7 +120,9 @@ describe("classifyLoopTaskCategory — deterministic keyword deduction", () => {
   it("classifies an ADR strategy as architecture, not generic code", () => {
     assert.equal(
       classifyLoopTaskCategory(
-        candidate({ text: "| H3-L1 | ADR stratégie d'observabilité | ⬜ À faire |" }),
+        candidate({
+          text: "| H3-L1 | ADR stratégie d'observabilité | ⬜ À faire |",
+        }),
       ),
       "architecture",
     );
@@ -293,6 +297,66 @@ describe("resolvePolicy — gates, in order", () => {
     });
 
     assert.equal(result.status, "runtime_not_allowed");
+  });
+
+  it("passes resolved provider and runtime restrictions to the selector", () => {
+    const result = resolvePolicy({
+      policy: policy({
+        allowedProviders: ["openai"],
+        allowedRuntimes: ["codex"],
+      }),
+      registry: createAgentRegistry([
+        profile({
+          id: "anthropic-low",
+          provider: "anthropic",
+          runtime: "claude_code",
+        }),
+        profile({ id: "openai-medium", provider: "openai", runtime: "codex" }),
+      ]),
+      candidate: candidate(),
+      mode: "plan",
+    });
+
+    assert.equal(result.status, "resolved");
+    assert.equal(
+      result.selection?.outcome === "selected"
+        ? result.selection.profile.id
+        : null,
+      "openai-medium",
+    );
+    assert.deepEqual(result.selectionRequest.allowedProviders, ["openai"]);
+    assert.deepEqual(result.selectionRequest.allowedRuntimes, ["codex"]);
+    assert.deepEqual(
+      result.selection?.outcome === "selected"
+        ? result.selection.rejected
+        : null,
+      [
+        {
+          profileId: "anthropic-low",
+          reason: "provider anthropic is not allowed",
+        },
+      ],
+    );
+  });
+
+  it("keeps observable policy resolution stable across equivalent registry ordering", () => {
+    const profiles = [
+      profile({ id: "zeta", effort: "medium" }),
+      profile({ id: "alpha", effort: "low" }),
+    ];
+    const input = {
+      policy: policy(),
+      candidate: candidate(),
+      mode: "plan" as const,
+    };
+
+    assert.deepEqual(
+      resolvePolicy({ ...input, registry: createAgentRegistry(profiles) }),
+      resolvePolicy({
+        ...input,
+        registry: createAgentRegistry([...profiles].reverse()),
+      }),
+    );
   });
 
   it("permission_denied when the policy explicitly denies a required permission, even though a capable profile exists", () => {

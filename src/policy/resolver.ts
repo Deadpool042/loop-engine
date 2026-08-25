@@ -42,6 +42,10 @@ const NO_FALLBACK: AgentPolicyFallback = Object.freeze({
   reason: null,
 });
 
+function sortedUnique<T extends string>(values: readonly T[]): readonly T[] {
+  return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+}
+
 // Keyword matching is deterministic and favors precision over recall (same
 // philosophy as src/intelligence/roadmap.ts): an unmatched lot defaults to
 // "code" rather than being mis-tagged as something narrower. Checked in this
@@ -369,10 +373,16 @@ export function resolvePolicy(
   }
 
   const selectionRequest = {
-    requiredCapabilities: requirements.requiredCapabilities,
-    requiredPermissions: requirements.requiredPermissions,
+    requiredCapabilities: sortedUnique(requirements.requiredCapabilities),
+    requiredPermissions: sortedUnique(requirements.requiredPermissions),
     minEffort: requirements.minimumEffort,
     maxEffort: maximumEffort,
+    ...(allowedProviders === undefined
+      ? {}
+      : { allowedProviders: sortedUnique(allowedProviders) }),
+    ...(allowedRuntimes === undefined
+      ? {}
+      : { allowedRuntimes: sortedUnique(allowedRuntimes) }),
     budgetCeiling: {
       maxTokens: budget.maxTokens,
       maxCostUsd: budget.maxCostUsd,
@@ -413,6 +423,10 @@ export function resolvePolicy(
           `fallback: preferred capability tier "${requirements.preferredCapabilityTier}" is unavailable; resolved to the best compatible profile "${selection.profile.id}" instead`,
         ]
       : []),
+    ...(selection.notSelected ?? []).map(
+      (candidate) =>
+        `eligible profile "${candidate.profileId}" not selected: ${candidate.reason}`,
+    ),
   ];
 
   return resolution(
