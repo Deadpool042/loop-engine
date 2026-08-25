@@ -129,6 +129,32 @@ valide et ne force pas le contrat de revue V27, dont la responsabilité est la
 session d'exécution structurée. Pour un `execute` compatible, la projection
 réutilise `ExecutionResultDetail` de V27.
 
+### Patch Review (V30)
+
+V30 ajoute une revue du patch exporté pour la session d'exécution courante
+uniquement. L'historique ne garantit pas la durée de vie d'un export externe :
+il ne peut donc pas rouvrir un patch ancien. La source de vérité reste le
+`patchExport` terminal produit par `exportValidatedGitPatch` : le worktree
+isolé exécute `git diff --binary HEAD`, vérifie que les chemins correspondent
+au delta validé, puis écrit atomiquement le fichier choisi par le dialogue
+natif. Le SHA-256 et `fileCount` retournés appartiennent à cette preuve.
+
+`window.loopDesktop.patchReview(sessionId)` est le seul IPC ajouté. React ne
+transmet ni chemin, ni cwd, ni option filesystem. Le main process retrouve la
+session, revalide son résultat V27, puis refuse tout fichier absent, symlink,
+non régulier, supérieur à 2 MiB, non UTF-8, binaire, SHA-256 incohérent,
+`fileCount` incohérent ou diff invalide. Il retourne seulement une projection
+de unified diff (fichiers, statuts déterministes, hunks, lignes et compteurs),
+jamais le chemin librement choisi ni une API de lecture générique. Un échec est
+structuré (`no_patch`, `missing_patch`, `integrity_mismatch`, `too_large`,
+`unsupported_binary`, `invalid_patch` ou `internal_read_failure`) et aucun
+contenu brut n'est affiché en repli.
+
+La vue affiche liste de fichiers, sélection, compteurs et lignes numérotées
+dans un panneau à scroll indépendant. Cette capacité reste intégralement en
+lecture seule : elle n'applique, n'édite, ne valide à nouveau et ne relance
+jamais un patch ou un provider.
+
 L'historique est de l'observabilité seulement : il n'influe ni sur la sélection,
 ni sur la policy, ni sur les budgets. `corruptedLines > 0` avertit que certaines
 entrées JSONL ont été ignorées par le Core, tout en affichant les entrées valides.

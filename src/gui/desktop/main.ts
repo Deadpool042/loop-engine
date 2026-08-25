@@ -26,6 +26,7 @@ import { createReviewHandler } from "./review-handler.js";
 import { createRunHistoryHandler } from "./run-history-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 import { createDesktopExecutionDecisionController } from "./execution-decision-controller.js";
+import { createPatchReviewHandler } from "./patch-review-handler.js";
 import { DESKTOP_EXECUTION_DECISION_TIMEOUT_MS } from "./execution-decision-cli-proposer.js";
 import { DESKTOP_EXECUTION_DECISION_CURRENT_TIMEOUT_MS } from "./execution-decision-cli-current.js";
 
@@ -184,6 +185,8 @@ ipcMain.handle("loop:execution-session", (_event, sessionId) =>
 ipcMain.handle("loop:execution-cancel", (_event, sessionId) =>
   executionSessions.cancel(sessionId),
 );
+const patchReviewHandler = createPatchReviewHandler({ getSession: (sessionId) => executionSessions.get(sessionId) });
+ipcMain.handle("loop:patch-review", (_event, sessionId) => patchReviewHandler(sessionId));
 ipcMain.handle("loop:execute", async (_event, request) => {
   const started = await startExecutionSession(request);
   if (!started.ok) return started;

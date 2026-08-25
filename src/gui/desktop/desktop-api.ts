@@ -6,6 +6,7 @@ import type {
   DesktopExecutionSessionStart,
 } from "./execution-session.js";
 import type { DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
+import type { PatchReviewResult } from "./patch-review.js";
 
 export type LoopDesktopApi = Readonly<{
   summary: () => Promise<CliInvocationResult>;
@@ -24,6 +25,7 @@ export type LoopDesktopApi = Readonly<{
     sessionId: string,
   ) => Promise<DesktopExecutionSession | null>;
   cancelExecution: (sessionId: string) => Promise<boolean>;
+  patchReview: (sessionId: string) => Promise<PatchReviewResult>;
   roadmapProposal: (
     projectName: string,
     profileOverride: RoadmapProposalProfileOverride,
@@ -49,6 +51,7 @@ export function createLoopDesktopApi(
       | "loop:execution-start"
       | "loop:execution-session"
       | "loop:execution-cancel"
+      | "loop:patch-review"
       | "loop:roadmap-proposal"
       | "loop:roadmap-proposal-estimate"
       | "loop:gate-reassessment"
@@ -94,6 +97,9 @@ export function createLoopDesktopApi(
         "loop:execution-cancel",
         sessionId,
       ) as unknown as Promise<boolean>;
+    },
+    patchReview(sessionId) {
+      return invoke("loop:patch-review", sessionId) as unknown as Promise<PatchReviewResult>;
     },
     roadmapProposal(projectName, profileOverride) {
       return invoke("loop:roadmap-proposal", projectName, profileOverride);

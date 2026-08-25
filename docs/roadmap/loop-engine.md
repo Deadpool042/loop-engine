@@ -31,6 +31,7 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 
 - [x] Lot V23.0 — Observable GUI execution session : session unique observable validée en burn-in réel LP-INFRA H3-L2, avec progression `préparation -> provider -> validation -> terminé/échec`, garde-fous de scope effectifs, résultat final inchangé et export de patch sans modification du dépôt source.
 - [x] Lot V23.1 — Recoverable isolated project locks : verrous locaux par projet publiés atomiquement avec metadata propriétaire, récupération uniquement lorsque le PID local est démontré mort, état ambigu fail-closed, quarantaine générationnelle anti-race et release protégée par identité de lock. Burn-in réel validé le 2026-08-18 sur `lp-infra` : un lock canonique valide avec PID réellement mort a été récupéré automatiquement, déplacé en quarantaine, remplacé puis relâché ; l’exécution s’est ensuite bloquée sur `sha_stale` avant tout appel provider. Aucun parallélisme multi-projet, aucune queue, aucun terminal, aucun contrôle distant/mobile ajouté.
+- [x] Lot V30 — Cockpit Patch Review : revue read-only du patch exporté de la session courante par IPC spécialisé. Le main process vérifie fichier régulier non symlinké, borne 2 MiB, UTF-8, SHA-256 et `fileCount`, puis projette un unified diff sans exposer de lecture filesystem générique. Aucune application, édition ou persistance de patch ajoutée.
 
 ## Lot V24 — Planning state & deterministic roadmap discovery
 

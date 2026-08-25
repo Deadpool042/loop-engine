@@ -47,11 +47,22 @@
       max-height: min(32rem, 48vh);
     }
 
-    [class~="lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]"]
-      > section {
+    [class~="lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]"] > section {
       position: sticky;
       top: 1rem;
       align-self: start;
     }
+  }
+
+  .patch-diff {
+    max-height: min(32rem, 48vh);
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .patch-review-grid > ol {
+    max-height: min(20rem, 36vh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 }
