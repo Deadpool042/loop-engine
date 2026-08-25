@@ -94,4 +94,38 @@ describe("isolated provider candidate publication", () => {
     assert.equal(result.mode, "publish");
     assert.equal(result.publication, null);
   });
+
+  it("clarifies agent policy rejection as a publish prerequisite failure", async () => {
+    let publisherCalled = false;
+    const publish = createIsolatedProviderRunPublish({
+      runExecute: async () => ({
+        ...execution,
+        status: "failed",
+        validation: null,
+        patchExport: null,
+        failure: {
+          code: "agent_policy_rejected",
+          message: "Agent policy did not admit execute mode.",
+          details: ["configured.claude_code: missing capabilities: long_context"],
+        },
+      }),
+      candidatePublisher: async () => {
+        publisherCalled = true;
+        throw new Error("must not run");
+      },
+    });
+
+    const result = await publish("project-a");
+    assert.equal(publisherCalled, false);
+    assert.equal(result.mode, "publish");
+    assert.equal(result.publication, null);
+    assert.equal(result.failure?.code, "agent_policy_rejected");
+    assert.equal(
+      result.failure?.message,
+      "Candidate publication was not attempted because its prerequisite execution phase was rejected by agent policy.",
+    );
+    assert.deepEqual(result.failure?.details, [
+      "configured.claude_code: missing capabilities: long_context",
+    ]);
+  });
 });
