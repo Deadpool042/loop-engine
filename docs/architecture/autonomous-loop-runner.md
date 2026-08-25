@@ -365,13 +365,15 @@ fichier, ni modèle, ni cycle de vie.
   réordonné sur disque. Cette vue scanne le journal en blocs de taille fixe et
   ne conserve jamais en mémoire plus que la fenêtre demandée (`limit`, défaut
   20, plafond 100), quelle que soit la taille du fichier sur disque.
-- **Lookup exact V35.** `lookupRunHistoryEntry(project, runId)`
+- **Lookup exact V35 / surface V37.** `lookupRunHistoryEntry(project, runId)`
   (`src/core/run-history-lookup.ts`) adresse une preuve précise indépendamment
   de la fenêtre récente. Il scanne uniquement le journal du projet demandé en
   blocs fixes, conserve au plus une entrée correspondante et une ligne bornée,
   compte les lignes corrompues, et rejette fail-closed tout `runId` dupliqué.
   Aucun index secondaire, scan multi-projets ni chargement intégral du journal
-  n'est introduit. La Candidate Review V34 utilise ce chemin exact.
+  n'est introduit. La Candidate Review V34 utilise ce chemin exact ; V37
+  l'expose également via `pnpm loop runs <project> --run-id <runId> [--json]`
+  pour une consultation explicite sans modifier la fenêtre récente.
 - **Corruption.** Un journal absent n'est pas une corruption : c'est
   simplement l'absence de run enregistré. Une ligne invalide (JSON
   imparsable, `schemaVersion` inconnu, entrée rattachée à un autre projet)

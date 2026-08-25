@@ -52,6 +52,7 @@ window.loopDesktop.summary();
 window.loopDesktop.context(projectName);
 window.loopDesktop.review(projectName);
 window.loopDesktop.runs(projectName);
+window.loopDesktop.runLookup(projectName, runId);
 window.loopDesktop.candidateReview(projectName, runId);
 window.loopDesktop.plan(projectName, candidateId);
 window.loopDesktop.execute({ projectName, candidateId, provider, model });
@@ -66,7 +67,7 @@ window.loopDesktop.cancelExecution(sessionId);
 ```
 
 Elles correspondent uniquement aux canaux `loop:summary`, `loop:context` et
-`loop:review`, `loop:runs`, `loop:candidate-review`, `loop:plan`, `loop:execute`, `loop:execution-start`,
+`loop:review`, `loop:runs`, `loop:run-lookup`, `loop:candidate-review`, `loop:plan`, `loop:execute`, `loop:execution-start`,
 `loop:execution-session` et `loop:execution-cancel`. Il n'existe aucun IPC
 générique de la forme commande + arguments, et `ipcRenderer` n'est pas exposé
 au renderer.
@@ -130,6 +131,17 @@ identifiant de candidat. Les statuts `completed`, `blocked`, `failed` et
 valide et ne force pas le contrat de revue V27, dont la responsabilité est la
 session d'exécution structurée. Pour un `execute` compatible, la projection
 réutilise `ExecutionResultDetail` de V27.
+
+### Addressable Run History cockpit lookup (V37)
+
+V37 ne relève pas la fenêtre récente V28. Le cockpit peut fournir un `runId`
+explicite pour le projet déjà sélectionné ; le main process invoque uniquement
+`runs <project> --run-id <runId> --json` via `loop:run-lookup`. Cette commande
+réutilise le scan exact V35, sans construire de chemin depuis `runId`, sans index
+secondaire et sans scan multi-projets. La réponse est reparsée fail-closed puis
+le run exact réutilise le même panneau de détail que les entrées récentes. Un
+run `publish` terminé ainsi adressé peut donc utiliser Candidate Review V36 sans
+nouvelle identité ni accès Git renderer. Le flux reste strictement read-only.
 
 ### Candidate Review cockpit (V36)
 

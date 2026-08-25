@@ -100,6 +100,7 @@ export * from "./boundary.js";
 export * from "./transports.js";
 export * from "./reports.js";
 export * from "./run-history.js";
+export * from "./run-history-lookup.js";
 export * from "./types.js";
 export {
   generateRoadmapProposalFromContext,

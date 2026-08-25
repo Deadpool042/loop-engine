@@ -64,6 +64,7 @@ import {
 } from "./commands/audit.js";
 import { isLoopRunMode, runLoopRunCommand } from "./commands/run.js";
 import { printRunHistory } from "./commands/runs.js";
+import { printRunHistoryLookup } from "./commands/run-history-lookup.js";
 import { printCandidatePublicationReview } from "./commands/candidate-review.js";
 import {
   createLoopApplicationAssembly,
@@ -577,11 +578,22 @@ else if (command === "review") {
   const project = resolveProjectOrExit("runs");
   const json = process.argv.includes("--json");
   const limitValue = optionValue("--limit");
+  const runId = optionValue("--run-id");
   if (hasOption("--limit") && limitValue === undefined) {
     failOption(
       json,
       "missing_run_history_limit_value",
       "Missing value for --limit",
+    );
+  }
+  if (hasOption("--run-id") && runId === undefined) {
+    failOption(json, "missing_run_history_run_id", "Missing value for --run-id");
+  }
+  if (runId !== undefined && limitValue !== undefined) {
+    failOption(
+      json,
+      "run_history_lookup_with_limit",
+      "--run-id cannot be combined with --limit.",
     );
   }
   const limit =
@@ -593,10 +605,15 @@ else if (command === "review") {
       `Invalid --limit value: ${limitValue}`,
     );
   }
-  printRunHistory(application, project.name, {
-    ...(json ? { json } : {}),
-    ...(limit !== undefined ? { limit } : {}),
-  });
+  if (runId !== undefined) {
+    const exitCode = printRunHistoryLookup(application, project.name, runId, json);
+    if (exitCode !== 0) process.exitCode = exitCode;
+  } else {
+    printRunHistory(application, project.name, {
+      ...(json ? { json } : {}),
+      ...(limit !== undefined ? { limit } : {}),
+    });
+  }
 } else if (command === "candidate" && process.argv[3] === "review") {
   const project = resolveProjectOrExit("candidate review", 4);
   const json = process.argv.includes("--json");
@@ -620,7 +637,7 @@ else if (command === "review") {
   if (exitCode !== 0) process.exitCode = exitCode;
 } else {
   terminal.error(
-    "Usage: pnpm loop help|summary|status|doctor|roadmap status|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>|runs <project>|candidate review <project> --run-id <runId>",
+    "Usage: pnpm loop help|summary|status|doctor|roadmap status|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>|runs <project> [--limit N | --run-id <runId>]|candidate review <project> --run-id <runId>",
   );
   process.exit(1);
 }

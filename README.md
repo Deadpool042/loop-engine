@@ -64,6 +64,7 @@ Le mode d'inspection et le mode `plan` ne modifient pas les dépôts pilotés. L
 - `pnpm loop run creatyss --mode execute --provider codex --provider-executable codex --export-patch ./artifacts/creatyss.patch --json` : après une exécution et validation réussies, exporte le diff Git binaire du worktree isolé vers le chemin explicite, sans l'appliquer au dépôt source.
 - `pnpm loop run creatyss --mode commit --provider codex --provider-executable codex --commit-message "..."` : effectue le commit Git borné existant après validation.
 - `pnpm loop run creatyss --mode publish --provider codex --provider-executable codex --json` : exécute et valide dans un worktree isolé, puis crée au plus `refs/loop-engine/candidates/<project>/<runId>` pointant vers un commit candidat parenté par le `baseSha` validé. Aucun apply, checkout, push, PR, merge ou branche utilisateur.
+- `pnpm loop runs creatyss --run-id <runId> --json` : adresse un run exact dans le journal append-only, même hors de la fenêtre récente bornée, sans index secondaire ni lecture multi-projets.
 - `pnpm loop candidate review creatyss --run-id <runId> --json` : relit une candidate V33 déjà enregistrée dans Run History, vérifie sa ref et son parent Git, puis projette son diff `baseSha..candidateCommitSha`. Cette revue ne pousse pas, ne crée pas de PR et ne modifie aucune ref utilisateur.
 
 ## Configuration
