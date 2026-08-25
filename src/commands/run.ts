@@ -113,7 +113,11 @@ function printLoopRunResult(
       `Patch export: ${result.patchExport.path} (${result.patchExport.fileCount} files, sha256 ${result.patchExport.sha256})`,
     );
   }
-  terminal.info("Publication: not performed.");
+  terminal.info(
+    result.publication
+      ? `Publication: ${result.publication.kind} ${result.publication.ref} (${result.publication.commitSha})`
+      : "Publication: not performed.",
+  );
 
   if (result.failure) {
     terminal.section("Failure");
@@ -147,23 +151,24 @@ export async function runLoopRunCommand(
   json: boolean,
   options: RunLoopRunCommandOptions = {},
 ): Promise<number> {
-  if (mode === "publish") {
-    return printCommandError(
-      json,
-      "mode_not_implemented",
-      "Loop run mode not implemented: publish",
-    );
-  }
-
   if (
     options.candidateId !== undefined &&
     mode !== "plan" &&
-    mode !== "execute"
+    mode !== "execute" &&
+    mode !== "publish"
   ) {
     return printCommandError(
       json,
       "candidate_plan_or_execute_only",
-      "--candidate is only supported in plan or execute mode.",
+      "--candidate is only supported in plan, execute or publish mode.",
+    );
+  }
+
+  if (mode === "publish" && options.provider === undefined) {
+    return printCommandError(
+      json,
+      "publish_requires_provider",
+      "Publish mode requires an explicit provider.",
     );
   }
 
@@ -193,7 +198,8 @@ export async function runLoopRunCommand(
       ? { agentRegistry: application.loopAgentRegistry }
       : {}),
   };
-  const { runLoopCommit, runLoopExecute, runLoopPlan } = application;
+  const { runLoopCommit, runLoopExecute, runLoopPlan, runLoopPublish } =
+    application;
   let result: Awaited<ReturnType<typeof runLoopExecute>>;
   if (mode === "plan") {
     result = runLoopPlan(project.name, {
@@ -228,7 +234,7 @@ export async function runLoopRunCommand(
     } finally {
       if (retainOnSigterm) process.off("SIGTERM", retainUntilCleanup);
     }
-  } else {
+  } else if (mode === "commit") {
     if (!options.commitMessage) {
       return printCommandError(
         json,
@@ -239,6 +245,14 @@ export async function runLoopRunCommand(
     result = await runLoopCommit(project.name, {
       maxRepairs: options.maxRepairs ?? 0,
       commitMessage: options.commitMessage,
+      ...executionDependencies,
+    });
+  } else {
+    result = await runLoopPublish(project.name, {
+      ...(options.candidateId === undefined
+        ? {}
+        : { candidateId: options.candidateId }),
+      maxRepairs: options.maxRepairs ?? 0,
       ...executionDependencies,
     });
   }

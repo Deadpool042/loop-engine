@@ -471,11 +471,16 @@ else if (command === "review") {
       "Missing value for --candidate",
     );
   }
-  if (candidateId !== undefined && mode !== "plan" && mode !== "execute") {
+  if (
+    candidateId !== undefined &&
+    mode !== "plan" &&
+    mode !== "execute" &&
+    mode !== "publish"
+  ) {
     failOption(
       json,
       "candidate_plan_or_execute_only",
-      "--candidate is only supported in plan or execute mode.",
+      "--candidate is only supported in plan, execute or publish mode.",
     );
   }
 
@@ -508,11 +513,7 @@ else if (command === "review") {
     );
   }
 
-  if (
-    mode !== "publish" &&
-    providerId !== undefined &&
-    providerExecutable === undefined
-  ) {
+  if (providerId !== undefined && providerExecutable === undefined) {
     failOption(
       json,
       "missing_provider_executable",
@@ -521,11 +522,7 @@ else if (command === "review") {
   }
 
   let runApplication: LoopApplicationAssembly = application;
-  if (
-    mode !== "publish" &&
-    providerId !== undefined &&
-    providerExecutable !== undefined
-  ) {
+  if (providerId !== undefined && providerExecutable !== undefined) {
     const provider: LoopProviderConfiguration =
       providerId === "codex"
         ? {

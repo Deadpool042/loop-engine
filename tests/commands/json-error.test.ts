@@ -140,7 +140,11 @@ describe("json errors", () => {
           "plan",
           "--json",
         ],
-        { cwd: fixture.cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+        {
+          cwd: fixture.cwd,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+        },
       );
       const json = JSON.parse(output) as {
         candidate?: { id?: unknown; text?: unknown } | null;
@@ -206,7 +210,11 @@ describe("json errors", () => {
         status?: unknown;
         candidate?: {
           status?: unknown;
-          admissibility?: { state?: unknown; reason?: unknown; blockedBy?: unknown };
+          admissibility?: {
+            state?: unknown;
+            reason?: unknown;
+            blockedBy?: unknown;
+          };
         } | null;
         failure?: { code?: unknown; message?: unknown };
       };
@@ -266,7 +274,7 @@ describe("json errors", () => {
     assert.equal(json.error?.code, "missing_commit_message");
   });
 
-  it("rejects mode publish for the run command", () => {
+  it("requires an explicit provider for publish mode", () => {
     const output = runFailingCommand([
       "run",
       "loop-engine",
@@ -275,10 +283,10 @@ describe("json errors", () => {
       "--json",
     ]);
     const json = JSON.parse(output) as { error?: { code?: unknown } };
-    assert.equal(json.error?.code, "mode_not_implemented");
+    assert.equal(json.error?.code, "publish_requires_provider");
   });
 
-  it("rejects publish before attempting provider assembly", () => {
+  it("validates the explicit publish provider executable", () => {
     const output = runFailingCommand([
       "run",
       "loop-engine",
@@ -291,7 +299,7 @@ describe("json errors", () => {
       "--json",
     ]);
     const json = JSON.parse(output) as { error?: { code?: unknown } };
-    assert.equal(json.error?.code, "mode_not_implemented");
+    assert.equal(json.error?.code, "invalid_provider_executable");
   });
 
   it("rejects an unrecognized --mode value distinctly from a known but unimplemented mode", () => {

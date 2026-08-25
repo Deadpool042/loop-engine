@@ -67,6 +67,10 @@ import {
   type ExecutionDecisionProposeInput,
 } from "./execution-decision-proposal.js";
 import { getExecutionDecisionCurrentReport } from "./execution-decision-current.js";
+import {
+  createIsolatedProviderRunPublish,
+  type IsolatedProviderRunPublish,
+} from "./isolated-provider-publication.js";
 
 export type LoopApplicationCodexProviderOptions = Omit<
   CodexProviderConfiguration,
@@ -151,6 +155,7 @@ export type LoopApplicationAssembly = Readonly<{
   runConfiguredValidations: typeof runConfiguredValidations;
   runLoopCommit: typeof runLoopCommit;
   runLoopExecute: typeof runLoopExecuteWithProviderFailoverEvidence;
+  runLoopPublish: IsolatedProviderRunPublish;
   runLoopPlan: typeof runLoopPlan;
   runExecutionDecisionProposal: (
     input: ExecutionDecisionProposeInput,
@@ -247,6 +252,10 @@ export function createLoopApplicationAssembly(
   const textOnlyProviderCredentialAvailable =
     options.textOnlyProviderCredentialAvailable ??
     (() => hasAnthropicApiCredential());
+  const isolatedRunPublish = createIsolatedProviderRunPublish({
+    runExecute:
+      isolatedRunExecute ?? runLoopExecuteWithProviderFailoverEvidence,
+  });
 
   return Object.freeze({
     findProject,
@@ -304,6 +313,7 @@ export function createLoopApplicationAssembly(
     runLoopCommit,
     runLoopExecute:
       isolatedRunExecute ?? runLoopExecuteWithProviderFailoverEvidence,
+    runLoopPublish: isolatedRunPublish,
     runLoopPlan,
     runExecutionDecisionProposal,
     getExecutionDecisionCurrentReport,
