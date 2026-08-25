@@ -71,6 +71,10 @@ import {
   createIsolatedProviderRunPublish,
   type IsolatedProviderRunPublish,
 } from "./isolated-provider-publication.js";
+import {
+  createCandidatePublicationReview,
+  type CandidatePublicationReview,
+} from "./candidate-publication-review.js";
 
 export type LoopApplicationCodexProviderOptions = Omit<
   CodexProviderConfiguration,
@@ -138,6 +142,7 @@ export type LoopApplicationAssembly = Readonly<{
   generateRagSearchReport: typeof generateRagSearchReport;
   generateReviewReport: typeof generateReviewReport;
   generateRunHistoryReport: typeof generateRunHistoryReport;
+  reviewCandidatePublication: CandidatePublicationReview;
   recordLoopRunHistory: typeof recordLoopRunHistory;
   generateWorkspaceReports: typeof generateWorkspaceReports;
   generateWorkspaceSummaryReport: typeof generateWorkspaceSummaryReport;
@@ -290,6 +295,7 @@ export function createLoopApplicationAssembly(
     generateRagSearchReport,
     generateReviewReport,
     generateRunHistoryReport,
+    reviewCandidatePublication: createCandidatePublicationReview(),
     recordLoopRunHistory,
     generateWorkspaceReports,
     generateWorkspaceSummaryReport,
