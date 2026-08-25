@@ -43,51 +43,27 @@ import {
   parseExecutionResultDetail,
   type ExecutionResultDetail,
 } from "./execution-result-contract.js";
-import {
-  formatRunHistoryStatus,
-  parseRunHistoryDetail,
-  type RunHistoryDetail,
-  type RunHistoryEntry,
-} from "./run-history-contract.js";
-import {
-  parseGateReassessmentReport,
-  type GateReassessmentReport,
-} from "./gate-reassessment-contract.js";
-import type {
-  DesktopExecutionDecisionDraft,
-  DesktopExecutionDecisionResult,
-} from "./execution-decision-contract.js";
+import { formatRunHistoryStatus, parseRunHistoryDetail, type RunHistoryDetail, type RunHistoryEntry } from "./run-history-contract.js";
+import { parseGateReassessmentReport, type GateReassessmentReport } from "./gate-reassessment-contract.js";
+import type { DesktopExecutionDecisionDraft, DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
 import type { PatchReviewFile, PatchReviewResult } from "./patch-review.js";
 
 const RENEWABLE_DECISION_MESSAGES: Readonly<Record<string, string>> = {
-  decision_missing:
-    "Aucune décision d’exécution valide n’est disponible pour ce travail.",
+  decision_missing: "Aucune décision d’exécution valide n’est disponible pour ce travail.",
   sha_stale: "Le projet a changé depuis la dernière autorisation.",
-  decision_revalidation_required:
-    "Cette décision doit être revue avant toute exécution.",
-  candidate_authorization_mismatch:
-    "Le candidat ne correspond plus à la décision autorisée.",
-  decision_draft_serialize_failed:
-    "Ce brouillon ne peut pas être sérialisé. Préparez une nouvelle décision.",
+  decision_revalidation_required: "Cette décision doit être revue avant toute exécution.",
+  candidate_authorization_mismatch: "Le candidat ne correspond plus à la décision autorisée.",
+  decision_draft_serialize_failed: "Ce brouillon ne peut pas être sérialisé. Préparez une nouvelle décision.",
 };
 export function executionDecisionRenewalMessage(code: unknown): string | null {
-  return typeof code === "string"
-    ? (RENEWABLE_DECISION_MESSAGES[code] ?? null)
-    : null;
+  return typeof code === "string" ? RENEWABLE_DECISION_MESSAGES[code] ?? null : null;
 }
-export function clearResolvedShaStalePlanError(
-  error: string | null,
-): string | null {
+export function clearResolvedShaStalePlanError(error: string | null): string | null {
   return error?.startsWith("sha_stale:") ? null : error;
 }
-const DRAFT_CLEARING_APPROVE_FAILURE_CODES = new Set([
-  "decision_draft_stale",
-  "decision_draft_serialize_failed",
-]);
+const DRAFT_CLEARING_APPROVE_FAILURE_CODES = new Set(["decision_draft_stale", "decision_draft_serialize_failed"]);
 export function shouldClearDraftOnApproveFailure(code: unknown): boolean {
-  return (
-    typeof code === "string" && DRAFT_CLEARING_APPROVE_FAILURE_CODES.has(code)
-  );
+  return typeof code === "string" && DRAFT_CLEARING_APPROVE_FAILURE_CODES.has(code);
 }
 
 export function getDisplayedAgentRoutingReasons(
@@ -324,43 +300,7 @@ export function createRoadmapProposalEstimateRunner(options: {
 }
 
 function PatchDiff({ file }: { file: PatchReviewFile }): React.JSX.Element {
-  return (
-    <div
-      className="patch-diff rounded border border-loop-line font-mono text-xs"
-      tabIndex={0}
-    >
-      {file.hunks.length === 0 ? (
-        <p className="p-3 text-loop-muted">Aucun contenu textuel à afficher.</p>
-      ) : (
-        file.hunks.map((hunk) => (
-          <div key={hunk.header}>
-            <p className="m-0 border-y border-loop-line bg-loop-paper px-3 py-1 text-loop-muted">
-              {hunk.header}
-            </p>
-            {hunk.lines.map((line, index) => (
-              <div
-                key={`${index}:${line.content}`}
-                className={`grid grid-cols-[3rem_3rem_1.25rem_minmax(0,1fr)] px-2 ${line.type === "addition" ? "bg-emerald-50" : line.type === "deletion" ? "bg-rose-50" : ""}`}
-              >
-                <span>{line.oldLineNumber ?? ""}</span>
-                <span>{line.newLineNumber ?? ""}</span>
-                <span>
-                  {line.type === "addition"
-                    ? "+"
-                    : line.type === "deletion"
-                      ? "-"
-                      : line.type === "no_newline"
-                        ? "\\"
-                        : " "}
-                </span>
-                <span className="whitespace-pre">{line.content}</span>
-              </div>
-            ))}
-          </div>
-        ))
-      )}
-    </div>
-  );
+  return <div className="patch-diff rounded border border-loop-line font-mono text-xs" tabIndex={0}>{file.hunks.length === 0 ? <p className="p-3 text-loop-muted">Aucun contenu textuel à afficher.</p> : file.hunks.map((hunk) => <div key={hunk.header}><p className="m-0 border-y border-loop-line bg-loop-paper px-3 py-1 text-loop-muted">{hunk.header}</p>{hunk.lines.map((line, index) => <div key={`${index}:${line.content}`} className={`grid grid-cols-[3rem_3rem_1.25rem_minmax(0,1fr)] px-2 ${line.type === "addition" ? "bg-emerald-50" : line.type === "deletion" ? "bg-rose-50" : ""}`}><span>{line.oldLineNumber ?? ""}</span><span>{line.newLineNumber ?? ""}</span><span>{line.type === "addition" ? "+" : line.type === "deletion" ? "-" : line.type === "no_newline" ? "\\" : " "}</span><span className="whitespace-pre">{line.content}</span></div>)}</div>)}</div>;
 }
 
 export function App(): React.JSX.Element {
@@ -379,9 +319,7 @@ export function App(): React.JSX.Element {
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [runHistory, setRunHistory] = useState<RunHistoryDetail | null>(null);
-  const [runHistoryProjectName, setRunHistoryProjectName] = useState<
-    string | null
-  >(null);
+  const [runHistoryProjectName, setRunHistoryProjectName] = useState<string | null>(null);
   const [runHistoryError, setRunHistoryError] = useState<string | null>(null);
   const [runHistoryLoading, setRunHistoryLoading] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -389,18 +327,12 @@ export function App(): React.JSX.Element {
   const [planProjectName, setPlanProjectName] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
-  const [decisionRenewalCode, setDecisionRenewalCode] = useState<string | null>(
-    null,
-  );
-  const [decisionDraft, setDecisionDraft] =
-    useState<DesktopExecutionDecisionDraft | null>(null);
+  const [decisionRenewalCode, setDecisionRenewalCode] = useState<string | null>(null);
+  const [decisionDraft, setDecisionDraft] = useState<DesktopExecutionDecisionDraft | null>(null);
   const [decisionPrepareLoading, setDecisionPrepareLoading] = useState(false);
   const [decisionApproveLoading, setDecisionApproveLoading] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
-  const [decisionProviderDetails, setDecisionProviderDetails] =
-    useState<
-      Extract<DesktopExecutionDecisionResult, { ok: false }>["provider"]
-    >();
+  const [decisionProviderDetails, setDecisionProviderDetails] = useState<Extract<DesktopExecutionDecisionResult, { ok: false }>["provider"]>();
   const [executeProvider, setExecuteProvider] =
     useState<DesktopExecuteProvider>("claude_code");
   const [executeLoading, setExecuteLoading] = useState(false);
@@ -410,9 +342,7 @@ export function App(): React.JSX.Element {
   const [executionSession, setExecutionSession] =
     useState<DesktopExecutionSession | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
-  const [patchReview, setPatchReview] = useState<PatchReviewResult | null>(
-    null,
-  );
+  const [patchReview, setPatchReview] = useState<PatchReviewResult | null>(null);
   const [patchReviewLoading, setPatchReviewLoading] = useState(false);
   const [selectedPatchFile, setSelectedPatchFile] = useState(0);
   const [proposalLoading, setProposalLoading] = useState(false);
@@ -431,10 +361,8 @@ export function App(): React.JSX.Element {
   const [proposalEstimateError, setProposalEstimateError] = useState<
     string | null
   >(null);
-  const [gateReassessmentReport, setGateReassessmentReport] =
-    useState<GateReassessmentReport | null>(null);
-  const [gateReassessmentProjectName, setGateReassessmentProjectName] =
-    useState<string | null>(null);
+  const [gateReassessmentReport, setGateReassessmentReport] = useState<GateReassessmentReport | null>(null);
+  const [gateReassessmentProjectName, setGateReassessmentProjectName] = useState<string | null>(null);
   const [gateReassessmentLoading, setGateReassessmentLoading] = useState(false);
   const planRequestId = useRef(0);
   const decisionRequestId = useRef(0);
@@ -442,11 +370,7 @@ export function App(): React.JSX.Element {
     projects.find((project) => project.project.name === selectedProjectName) ??
     null;
   const selectedCandidate = contextDetail?.roadmap.selectedCandidate ?? null;
-  const selectedRun =
-    runHistoryProjectName === selectedProjectName
-      ? (runHistory?.entries.find((entry) => entry.runId === selectedRunId) ??
-        null)
-      : null;
+  const selectedRun = runHistoryProjectName === selectedProjectName ? (runHistory?.entries.find((entry) => entry.runId === selectedRunId) ?? null) : null;
   const planningDisplay =
     contextDetail === null ? null : getPlanningDisplay(contextDetail);
   const availableProposalEstimate =
@@ -473,14 +397,10 @@ export function App(): React.JSX.Element {
       isPlanForSelectedProject(planProjectName, selectedProjectName),
     hasPlanError: planError !== null,
     hasExecutionOutcome: executeResult !== null || executeMessage !== null,
-    hasExecutionDecisionInProgress:
-      decisionDraft !== null || decisionRenewalCode !== null,
+    hasExecutionDecisionInProgress: decisionDraft !== null || decisionRenewalCode !== null,
   });
   const focusedStepId = getFocusedGuidedFlowStepId(guidedFlowSteps);
-  const selectedPatchReviewFile =
-    patchReview?.status === "ready"
-      ? (patchReview.files[selectedPatchFile] ?? null)
-      : null;
+  const selectedPatchReviewFile = patchReview?.status === "ready" ? patchReview.files[selectedPatchFile] ?? null : null;
 
   useEffect(() => {
     void refreshSummary();
@@ -529,45 +449,20 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     if (selectedProjectName === null) {
-      setRunHistory(null);
-      setRunHistoryProjectName(null);
-      setRunHistoryError(null);
-      setRunHistoryLoading(false);
-      setSelectedRunId(null);
+      setRunHistory(null); setRunHistoryProjectName(null); setRunHistoryError(null); setRunHistoryLoading(false); setSelectedRunId(null);
       return;
     }
     const projectName = selectedProjectName;
     let active = true;
-    setRunHistory(null);
-    setRunHistoryProjectName(null);
-    setRunHistoryError(null);
-    setRunHistoryLoading(true);
-    setSelectedRunId(null);
-    void window.loopDesktop
-      .runs(projectName)
-      .then((result) => {
-        if (!active) return;
-        if (!result.ok) {
-          setRunHistoryError(result.raw);
-          return;
-        }
-        const detail = parseRunHistoryDetail(result.json);
-        if (detail === null || detail.project !== projectName) {
-          setRunHistoryError(
-            "La réponse runs ne respecte pas le contrat JSON attendu.",
-          );
-          return;
-        }
-        setRunHistory(detail);
-        setRunHistoryProjectName(projectName);
-        setSelectedRunId(detail.entries[0]?.runId ?? null);
-      })
-      .finally(() => {
-        if (active) setRunHistoryLoading(false);
-      });
-    return () => {
-      active = false;
-    };
+    setRunHistory(null); setRunHistoryProjectName(null); setRunHistoryError(null); setRunHistoryLoading(true); setSelectedRunId(null);
+    void window.loopDesktop.runs(projectName).then((result) => {
+      if (!active) return;
+      if (!result.ok) { setRunHistoryError(result.raw); return; }
+      const detail = parseRunHistoryDetail(result.json);
+      if (detail === null || detail.project !== projectName) { setRunHistoryError("La réponse runs ne respecte pas le contrat JSON attendu."); return; }
+      setRunHistory(detail); setRunHistoryProjectName(projectName); setSelectedRunId(detail.entries[0]?.runId ?? null);
+    }).finally(() => { if (active) setRunHistoryLoading(false); });
+    return () => { active = false; };
   }, [selectedProjectName]);
 
   const selectedProjectNameRef = useRef<string | null>(selectedProjectName);
@@ -680,40 +575,15 @@ export function App(): React.JSX.Element {
   ]);
 
   useEffect(() => {
-    if (
-      selectedProjectName === null ||
-      !planningDisplay?.showGateReassessmentAction
-    )
-      return;
-    if (
-      proposalEstimateProjectName === selectedProjectName ||
-      proposalEstimateError !== null
-    )
-      return;
+    if (selectedProjectName === null || !planningDisplay?.showGateReassessmentAction) return;
+    if (proposalEstimateProjectName === selectedProjectName || proposalEstimateError !== null) return;
     const projectName = selectedProjectName;
-    void window.loopDesktop
-      .gateReassessmentEstimate(projectName)
-      .then((result) => {
-        if (
-          !result.ok ||
-          !shouldDisplayRoadmapProposalResult(
-            projectName,
-            selectedProjectNameRef.current,
-          )
-        )
-          return;
-        const report = parseRoadmapProposalEstimateReport(result.json);
-        if (report !== null) {
-          setProposalEstimateReport(report);
-          setProposalEstimateProjectName(projectName);
-        }
-      });
-  }, [
-    selectedProjectName,
-    planningDisplay?.showGateReassessmentAction,
-    proposalEstimateProjectName,
-    proposalEstimateError,
-  ]);
+    void window.loopDesktop.gateReassessmentEstimate(projectName).then((result) => {
+      if (!result.ok || !shouldDisplayRoadmapProposalResult(projectName, selectedProjectNameRef.current)) return;
+      const report = parseRoadmapProposalEstimateReport(result.json);
+      if (report !== null) { setProposalEstimateReport(report); setProposalEstimateProjectName(projectName); }
+    });
+  }, [selectedProjectName, planningDisplay?.showGateReassessmentAction, proposalEstimateProjectName, proposalEstimateError]);
 
   function selectProject(projectName: string): void {
     planRequestId.current += 1;
@@ -741,28 +611,11 @@ export function App(): React.JSX.Element {
   }
   function reassessGates(): void {
     if (selectedProjectName === null || gateReassessmentLoading) return;
-    const projectName = selectedProjectName;
-    setGateReassessmentLoading(true);
-    setGateReassessmentReport(null);
-    setGateReassessmentProjectName(null);
-    void window.loopDesktop
-      .gateReassessment(projectName, proposalProfileSelection)
-      .then((result) => {
-        if (
-          !shouldDisplayRoadmapProposalResult(
-            projectName,
-            selectedProjectNameRef.current,
-          ) ||
-          !result.ok
-        )
-          return;
-        const report = parseGateReassessmentReport(result.json);
-        if (report !== null) {
-          setGateReassessmentReport(report);
-          setGateReassessmentProjectName(projectName);
-        }
-      })
-      .finally(() => setGateReassessmentLoading(false));
+    const projectName = selectedProjectName; setGateReassessmentLoading(true); setGateReassessmentReport(null); setGateReassessmentProjectName(null);
+    void window.loopDesktop.gateReassessment(projectName, proposalProfileSelection).then((result) => {
+      if (!shouldDisplayRoadmapProposalResult(projectName, selectedProjectNameRef.current) || !result.ok) return;
+      const report = parseGateReassessmentReport(result.json); if (report !== null) { setGateReassessmentReport(report); setGateReassessmentProjectName(projectName); }
+    }).finally(() => setGateReassessmentLoading(false));
   }
 
   function selectProposalProfile(value: string): void {
@@ -802,9 +655,7 @@ export function App(): React.JSX.Element {
       const failure = parsePlanFailure(result.json);
       if (failure) {
         setPlanError(`${failure.code}: ${failure.message}`);
-        setDecisionRenewalCode(
-          executionDecisionRenewalMessage(failure.code) ? failure.code : null,
-        );
+        setDecisionRenewalCode(executionDecisionRenewalMessage(failure.code) ? failure.code : null);
         return;
       }
 
@@ -840,109 +691,49 @@ export function App(): React.JSX.Element {
     const candidateId = selectedCandidate?.id ?? null;
     const requestId = decisionRequestId.current + 1;
     decisionRequestId.current = requestId;
-    setDecisionPrepareLoading(true);
-    setDecisionError(null);
-    setDecisionProviderDetails(undefined);
-    setDecisionDraft(null);
+    setDecisionPrepareLoading(true); setDecisionError(null); setDecisionProviderDetails(undefined); setDecisionDraft(null);
     try {
-      const result =
-        await window.loopDesktop.prepareExecutionDecision(projectName);
-      if (
-        requestId !== decisionRequestId.current ||
-        selectedProjectNameRef.current !== projectName ||
-        (selectedCandidate?.id ?? null) !== candidateId
-      )
-        return;
-      if (!result.ok || !("draftId" in result)) {
-        setDecisionError(
-          !result.ok ? result.message : "Le brouillon est invalide.",
-        );
-        if (!result.ok) setDecisionProviderDetails(result.provider);
-        return;
-      }
+      const result = await window.loopDesktop.prepareExecutionDecision(projectName);
+      if (requestId !== decisionRequestId.current || selectedProjectNameRef.current !== projectName || (selectedCandidate?.id ?? null) !== candidateId) return;
+      if (!result.ok || !("draftId" in result)) { setDecisionError(!result.ok ? result.message : "Le brouillon est invalide."); if (!result.ok) setDecisionProviderDetails(result.provider); return; }
       const { ok: _ok, ...draft } = result;
       setPlanError((error) => clearResolvedShaStalePlanError(error));
       setDecisionRenewalCode(null);
       setDecisionDraft(draft);
-    } catch {
-      if (requestId === decisionRequestId.current)
-        setDecisionError("Impossible de préparer la décision.");
-    } finally {
-      if (requestId === decisionRequestId.current)
-        setDecisionPrepareLoading(false);
-    }
+    } catch { if (requestId === decisionRequestId.current) setDecisionError("Impossible de préparer la décision."); }
+    finally { if (requestId === decisionRequestId.current) setDecisionPrepareLoading(false); }
   }
 
-  async function refreshApprovedProjectContext(
-    projectName: string,
-    candidateId: string | null,
-  ): Promise<boolean> {
+  async function refreshApprovedProjectContext(projectName: string, candidateId: string | null): Promise<boolean> {
     try {
       const result = await window.loopDesktop.context(projectName);
       if (!result.ok) return false;
       const detail = parseContextDetail(result.json);
-      if (
-        detail === null ||
-        detail.roadmap.selectedCandidate?.id !== candidateId
-      )
-        return false;
+      if (detail === null || detail.roadmap.selectedCandidate?.id !== candidateId) return false;
       setContextDetail(detail);
       return true;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   }
 
   async function approveExecutionDecision(): Promise<void> {
     if (decisionDraft === null || decisionApproveLoading) return;
-    const projectName = selectedProjectName;
-    const candidateId = selectedCandidate?.id ?? null;
-    const draftId = decisionDraft.draftId;
-    const requestId = decisionRequestId.current + 1;
-    decisionRequestId.current = requestId;
-    setDecisionApproveLoading(true);
-    setDecisionError(null);
+    const projectName = selectedProjectName; const candidateId = selectedCandidate?.id ?? null; const draftId = decisionDraft.draftId;
+    const requestId = decisionRequestId.current + 1; decisionRequestId.current = requestId;
+    setDecisionApproveLoading(true); setDecisionError(null);
     try {
       const result = await window.loopDesktop.approveExecutionDecision(draftId);
-      if (
-        requestId !== decisionRequestId.current ||
-        selectedProjectNameRef.current !== projectName ||
-        (selectedCandidate?.id ?? null) !== candidateId
-      )
-        return;
+      if (requestId !== decisionRequestId.current || selectedProjectNameRef.current !== projectName || (selectedCandidate?.id ?? null) !== candidateId) return;
       if (!result.ok) {
         setDecisionError(result.message);
-        if (shouldClearDraftOnApproveFailure(result.code)) {
-          setDecisionDraft(null);
-          setDecisionRenewalCode(
-            result.code === "decision_draft_stale" ? "sha_stale" : result.code,
-          );
-        }
+        if (shouldClearDraftOnApproveFailure(result.code)) { setDecisionDraft(null); setDecisionRenewalCode(result.code === "decision_draft_stale" ? "sha_stale" : result.code); }
         return;
       }
-      setDecisionDraft(null);
-      setDecisionRenewalCode(null);
-      setDecisionError(null);
-      if (!(await refreshApprovedProjectContext(projectName!, candidateId))) {
-        setDecisionRenewalCode("sha_stale");
-        setDecisionError(
-          "Le contexte a changé. Préparez une nouvelle décision.",
-        );
-        return;
-      }
-      if (
-        requestId !== decisionRequestId.current ||
-        selectedProjectNameRef.current !== projectName
-      )
-        return;
+      setDecisionDraft(null); setDecisionRenewalCode(null); setDecisionError(null);
+      if (!(await refreshApprovedProjectContext(projectName!, candidateId))) { setDecisionRenewalCode("sha_stale"); setDecisionError("Le contexte a changé. Préparez une nouvelle décision."); return; }
+      if (requestId !== decisionRequestId.current || selectedProjectNameRef.current !== projectName) return;
       await preparePlan();
-    } catch {
-      if (requestId === decisionRequestId.current)
-        setDecisionError("Impossible d’approuver la décision.");
-    } finally {
-      if (requestId === decisionRequestId.current)
-        setDecisionApproveLoading(false);
-    }
+    } catch { if (requestId === decisionRequestId.current) setDecisionError("Impossible d’approuver la décision."); }
+    finally { if (requestId === decisionRequestId.current) setDecisionApproveLoading(false); }
   }
 
   async function executePlan(): Promise<void> {
@@ -1004,14 +795,9 @@ export function App(): React.JSX.Element {
   async function loadPatchReview(): Promise<void> {
     if (executionSession === null) return;
     setPatchReviewLoading(true);
-    try {
-      setPatchReview(await window.loopDesktop.patchReview(executionSession.id));
-      setSelectedPatchFile(0);
-    } catch {
-      setPatchReview({ status: "internal_read_failure" });
-    } finally {
-      setPatchReviewLoading(false);
-    }
+    try { setPatchReview(await window.loopDesktop.patchReview(executionSession.id)); setSelectedPatchFile(0); }
+    catch { setPatchReview({ status: "internal_read_failure" }); }
+    finally { setPatchReviewLoading(false); }
   }
 
   useEffect(() => {
@@ -1044,15 +830,12 @@ export function App(): React.JSX.Element {
       setExecuteResult(detail);
       const historyProjectName = executionSession.request.projectName;
       void window.loopDesktop.runs(historyProjectName).then((result) => {
-        if (!result.ok || selectedProjectNameRef.current !== historyProjectName)
-          return;
+        if (!result.ok || selectedProjectNameRef.current !== historyProjectName) return;
         const history = parseRunHistoryDetail(result.json);
         if (history !== null && history.project === historyProjectName) {
           setRunHistory(history);
           setRunHistoryProjectName(historyProjectName);
-          setSelectedRunId(
-            (current) => current ?? history.entries[0]?.runId ?? null,
-          );
+          setSelectedRunId((current) => current ?? history.entries[0]?.runId ?? null);
         }
       });
     }
@@ -1238,8 +1021,7 @@ export function App(): React.JSX.Element {
                   </span>
                   {(project.runHistoryCorruptedLines ?? 0) > 0 && (
                     <span className="mt-1 block text-xs text-amber-700">
-                      Historique partiellement illisible (
-                      {project.runHistoryCorruptedLines})
+                      Historique partiellement illisible ({project.runHistoryCorruptedLines})
                     </span>
                   )}
                 </button>
@@ -1428,18 +1210,10 @@ export function App(): React.JSX.Element {
                                           }
                                           className="rounded-md border border-loop-line bg-white px-3 py-2 text-sm font-medium text-loop-ink"
                                         >
-                                          <option value="auto">
-                                            Automatique
-                                          </option>
-                                          <option value="economy">
-                                            Économique
-                                          </option>
-                                          <option value="balanced">
-                                            Équilibré
-                                          </option>
-                                          <option value="deep">
-                                            Approfondi
-                                          </option>
+                                          <option value="auto">Automatique</option>
+                                          <option value="economy">Économique</option>
+                                          <option value="balanced">Équilibré</option>
+                                          <option value="deep">Approfondi</option>
                                         </select>
                                       </label>
                                       <div className="flex items-center justify-between gap-3 text-xs text-loop-muted">
@@ -1448,8 +1222,7 @@ export function App(): React.JSX.Element {
                                           <span className="font-medium text-loop-ink">
                                             {ROADMAP_PROPOSAL_PROFILE_LABELS[
                                               availableProposalEstimate.profile
-                                            ] ??
-                                              availableProposalEstimate.profile}
+                                            ] ?? availableProposalEstimate.profile}
                                           </span>
                                         </span>
                                       </div>
@@ -1460,23 +1233,16 @@ export function App(): React.JSX.Element {
                                         </dd>
                                         <dt>Effort</dt>
                                         <dd className="text-right font-medium text-loop-ink">
-                                          {selectedProposalEstimate.effort ??
-                                            "—"}
+                                          {selectedProposalEstimate.effort ?? "—"}
                                         </dd>
                                         <dt>Entrée estimée</dt>
                                         <dd className="text-right font-medium text-loop-ink">
-                                          ~
-                                          {
-                                            selectedProposalEstimate.estimatedInputTokens
-                                          }{" "}
+                                          ~{selectedProposalEstimate.estimatedInputTokens}{" "}
                                           tokens
                                         </dd>
                                         <dt>Sortie estimée</dt>
                                         <dd className="text-right font-medium text-loop-ink">
-                                          ~
-                                          {
-                                            selectedProposalEstimate.estimatedOutputTokens
-                                          }{" "}
+                                          ~{selectedProposalEstimate.estimatedOutputTokens}{" "}
                                           tokens
                                         </dd>
                                         {selectedProposalEstimate.estimatedCostUsd !==
@@ -1559,7 +1325,8 @@ export function App(): React.JSX.Element {
                                         proposalReport.result
                                           .normalizationWarnings &&
                                         proposalReport.result
-                                          .normalizationWarnings.length > 0 && (
+                                          .normalizationWarnings.length >
+                                          0 && (
                                           <p className="m-0 text-xs text-amber-700">
                                             Réponse normalisée :{" "}
                                             {proposalReport.result.normalizationWarnings.join(
@@ -1649,143 +1416,11 @@ export function App(): React.JSX.Element {
                             )}
                             {planningDisplay.showGateReassessmentAction && (
                               <div className="mt-5">
-                                {availableProposalEstimate &&
-                                  selectedProposalEstimate && (
-                                    <div className="mb-4 grid gap-2 text-xs text-loop-muted">
-                                      <label className="grid max-w-xs gap-1">
-                                        <span>Profil utilisé</span>
-                                        <select
-                                          value={proposalProfileSelection}
-                                          onChange={(event) =>
-                                            selectProposalProfile(
-                                              event.currentTarget.value,
-                                            )
-                                          }
-                                          className="rounded-md border border-loop-line bg-white px-3 py-2 text-sm font-medium text-loop-ink"
-                                        >
-                                          <option value="auto">
-                                            Automatique
-                                          </option>
-                                          <option value="economy">
-                                            Économique
-                                          </option>
-                                          <option value="balanced">
-                                            Équilibré
-                                          </option>
-                                          <option value="deep">
-                                            Approfondi
-                                          </option>
-                                        </select>
-                                      </label>
-                                      <span>
-                                        Profil recommandé :{" "}
-                                        <b>
-                                          {
-                                            ROADMAP_PROPOSAL_PROFILE_LABELS[
-                                              availableProposalEstimate.profile
-                                            ]
-                                          }
-                                        </b>
-                                      </span>
-                                      <span>
-                                        Modèle :{" "}
-                                        {selectedProposalEstimate.model}
-                                      </span>
-                                      <span>
-                                        Effort :{" "}
-                                        {selectedProposalEstimate.effort ?? "—"}
-                                      </span>
-                                      <span>
-                                        Entrée estimée : ~
-                                        {
-                                          selectedProposalEstimate.estimatedInputTokens
-                                        }{" "}
-                                        tokens
-                                      </span>
-                                      <span>
-                                        Sortie estimée : ~
-                                        {
-                                          selectedProposalEstimate.estimatedOutputTokens
-                                        }{" "}
-                                        tokens
-                                      </span>
-                                      {selectedProposalEstimate.estimatedCostUsd !==
-                                        undefined && (
-                                        <span>
-                                          Coût estimé : ~$
-                                          {selectedProposalEstimate.estimatedCostUsd.toFixed(
-                                            4,
-                                          )}
-                                        </span>
-                                      )}
-                                    </div>
-                                  )}
-                                <Button
-                                  type="button"
-                                  disabled={gateReassessmentLoading}
-                                  onClick={reassessGates}
-                                >
-                                  {gateReassessmentLoading
-                                    ? "Réévaluation…"
-                                    : "Réévaluer les conditions"}
-                                </Button>
-                                {gateReassessmentReport &&
-                                  gateReassessmentProjectName ===
-                                    selectedProjectName &&
-                                  gateReassessmentReport.result.status ===
-                                    "completed" &&
-                                  gateReassessmentReport.assessment && (
-                                    <div className="mt-4 rounded-lg border border-loop-line bg-white p-5 text-sm">
-                                      <p className="m-0 font-semibold">
-                                        {gateReassessmentReport.assessment
-                                          .status === "no_new_signal"
-                                          ? "Aucun signal nouveau"
-                                          : "Revue manuelle recommandée"}
-                                      </p>
-                                      <p className="mt-2 text-loop-muted">
-                                        {
-                                          gateReassessmentReport.assessment
-                                            .reason
-                                        }
-                                      </p>
-                                      <p className="mt-2 text-xs text-loop-muted">
-                                        {gateReassessmentReport.result.provider}{" "}
-                                        · {gateReassessmentReport.result.model}{" "}
-                                        · effort{" "}
-                                        {gateReassessmentReport.result.effort ??
-                                          "—"}{" "}
-                                        ·{" "}
-                                        {
-                                          gateReassessmentReport.result
-                                            .durationMs
-                                        }{" "}
-                                        ms
-                                        {gateReassessmentReport.result.usage &&
-                                          ` · ${gateReassessmentReport.result.usage.inputTokens} entrée / ${gateReassessmentReport.result.usage.outputTokens} sortie`}
-                                        {gateReassessmentReport.result
-                                          .actualCalculatedCostUsd !==
-                                          undefined &&
-                                          ` · coût réel calculé $${gateReassessmentReport.result.actualCalculatedCostUsd.toFixed(4)}`}
-                                      </p>
-                                      {gateReassessmentReport.assessment
-                                        .status === "review_recommended" && (
-                                        <ul className="mt-2 space-y-2 text-loop-muted">
-                                          {gateReassessmentReport.assessment.gates.map(
-                                            (gate) => (
-                                              <li
-                                                key={`${gate.phase}:${gate.blockedBy}`}
-                                              >
-                                                {gate.phase} · {gate.blockedBy}{" "}
-                                                — {gate.observedSignal}
-                                                <br />
-                                                {gate.recommendation}
-                                              </li>
-                                            ),
-                                          )}
-                                        </ul>
-                                      )}
-                                    </div>
-                                  )}
+                                {availableProposalEstimate && selectedProposalEstimate && <div className="mb-4 grid gap-2 text-xs text-loop-muted"><label className="grid max-w-xs gap-1"><span>Profil utilisé</span><select value={proposalProfileSelection} onChange={(event) => selectProposalProfile(event.currentTarget.value)} className="rounded-md border border-loop-line bg-white px-3 py-2 text-sm font-medium text-loop-ink"><option value="auto">Automatique</option><option value="economy">Économique</option><option value="balanced">Équilibré</option><option value="deep">Approfondi</option></select></label><span>Profil recommandé : <b>{ROADMAP_PROPOSAL_PROFILE_LABELS[availableProposalEstimate.profile]}</b></span><span>Modèle : {selectedProposalEstimate.model}</span><span>Effort : {selectedProposalEstimate.effort ?? "—"}</span><span>Entrée estimée : ~{selectedProposalEstimate.estimatedInputTokens} tokens</span><span>Sortie estimée : ~{selectedProposalEstimate.estimatedOutputTokens} tokens</span>{selectedProposalEstimate.estimatedCostUsd !== undefined && <span>Coût estimé : ~${selectedProposalEstimate.estimatedCostUsd.toFixed(4)}</span>}</div>}
+                                <Button type="button" disabled={gateReassessmentLoading} onClick={reassessGates}>{gateReassessmentLoading ? "Réévaluation…" : "Réévaluer les conditions"}</Button>
+                                {gateReassessmentReport && gateReassessmentProjectName === selectedProjectName && gateReassessmentReport.result.status === "completed" && gateReassessmentReport.assessment && (
+                                  <div className="mt-4 rounded-lg border border-loop-line bg-white p-5 text-sm"><p className="m-0 font-semibold">{gateReassessmentReport.assessment.status === "no_new_signal" ? "Aucun signal nouveau" : "Revue manuelle recommandée"}</p><p className="mt-2 text-loop-muted">{gateReassessmentReport.assessment.reason}</p><p className="mt-2 text-xs text-loop-muted">{gateReassessmentReport.result.provider} · {gateReassessmentReport.result.model} · effort {gateReassessmentReport.result.effort ?? "—"} · {gateReassessmentReport.result.durationMs} ms{gateReassessmentReport.result.usage && ` · ${gateReassessmentReport.result.usage.inputTokens} entrée / ${gateReassessmentReport.result.usage.outputTokens} sortie`}{gateReassessmentReport.result.actualCalculatedCostUsd !== undefined && ` · coût réel calculé $${gateReassessmentReport.result.actualCalculatedCostUsd.toFixed(4)}`}</p>{gateReassessmentReport.assessment.status === "review_recommended" && <ul className="mt-2 space-y-2 text-loop-muted">{gateReassessmentReport.assessment.gates.map((gate) => <li key={`${gate.phase}:${gate.blockedBy}`}>{gate.phase} · {gate.blockedBy} — {gate.observedSignal}<br />{gate.recommendation}</li>)}</ul>}</div>
+                                )}
                               </div>
                             )}
                           </section>
@@ -1891,97 +1526,22 @@ export function App(): React.JSX.Element {
                   )}
                   {decisionRenewalCode && decisionDraft === null && (
                     <section className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-5">
-                      <h4 className="m-0 text-base font-semibold text-amber-950">
-                        Décision d’exécution à renouveler
-                      </h4>
-                      <p className="mt-2 text-sm text-amber-900">
-                        {executionDecisionRenewalMessage(decisionRenewalCode)}
-                      </p>
-                      {decisionError && (
-                        <p className="mt-3 text-sm text-rose-700">
-                          {decisionError}
-                        </p>
-                      )}
-                      {decisionProviderDetails && (
-                        <p className="mt-2 text-xs text-loop-muted">
-                          Code : {decisionProviderDetails.failureCode ?? "—"}
-                          {decisionProviderDetails.httpStatus !== undefined &&
-                            ` · HTTP : ${decisionProviderDetails.httpStatus}`}
-                          {decisionProviderDetails.model &&
-                            ` · Modèle : ${decisionProviderDetails.model}`}
-                          {decisionProviderDetails.durationMs !== undefined &&
-                            ` · Durée : ${decisionProviderDetails.durationMs} ms`}
-                        </p>
-                      )}
-                      <Button
-                        type="button"
-                        className="mt-4"
-                        disabled={
-                          decisionPrepareLoading || decisionApproveLoading
-                        }
-                        onClick={prepareExecutionDecision}
-                      >
-                        {decisionPrepareLoading
-                          ? "Préparation du brouillon…"
-                          : "Préparer une nouvelle décision"}
+                      <h4 className="m-0 text-base font-semibold text-amber-950">Décision d’exécution à renouveler</h4>
+                      <p className="mt-2 text-sm text-amber-900">{executionDecisionRenewalMessage(decisionRenewalCode)}</p>
+                      {decisionError && <p className="mt-3 text-sm text-rose-700">{decisionError}</p>}
+                      {decisionProviderDetails && <p className="mt-2 text-xs text-loop-muted">Code : {decisionProviderDetails.failureCode ?? "—"}{decisionProviderDetails.httpStatus !== undefined && ` · HTTP : ${decisionProviderDetails.httpStatus}`}{decisionProviderDetails.model && ` · Modèle : ${decisionProviderDetails.model}`}{decisionProviderDetails.durationMs !== undefined && ` · Durée : ${decisionProviderDetails.durationMs} ms`}</p>}
+                      <Button type="button" className="mt-4" disabled={decisionPrepareLoading || decisionApproveLoading} onClick={prepareExecutionDecision}>
+                        {decisionPrepareLoading ? "Préparation du brouillon…" : "Préparer une nouvelle décision"}
                       </Button>
                     </section>
                   )}
                   {decisionDraft !== null && (
                     <div className="mt-4 rounded-md border border-amber-200 bg-white p-4">
-                      <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-amber-900">
-                        Brouillon de décision
-                      </p>
-                      <dl className="mt-3 grid gap-3 text-sm">
-                        <div>
-                          <dt className="font-medium">Candidat</dt>
-                          <dd>{decisionDraft.candidateId}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-medium">Objectif</dt>
-                          <dd>{decisionDraft.objective}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-medium">Livrables</dt>
-                          <dd>{decisionDraft.deliverables.join(" · ")}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-medium">Hors périmètre</dt>
-                          <dd>{decisionDraft.outOfScope.join(" · ")}</dd>
-                        </div>
-                        <div>
-                          <dt className="font-medium">Fichiers autorisés</dt>
-                          <dd className="font-mono text-xs">
-                            {decisionDraft.allowedPaths.join("\n")}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="font-medium">HEAD cible</dt>
-                          <dd className="font-mono text-xs">
-                            {decisionDraft.gitHead}
-                          </dd>
-                        </div>
-                      </dl>
-                      <p className="mt-4 text-sm font-medium text-amber-900">
-                        Ce brouillon n’autorise encore aucune exécution.
-                      </p>
-                      {decisionError && (
-                        <p className="mt-3 text-sm text-rose-700">
-                          {decisionError}
-                        </p>
-                      )}
-                      <Button
-                        type="button"
-                        className="mt-4"
-                        disabled={
-                          decisionApproveLoading || decisionPrepareLoading
-                        }
-                        onClick={approveExecutionDecision}
-                      >
-                        {decisionApproveLoading
-                          ? "Approbation…"
-                          : "Approuver cette décision"}
-                      </Button>
+                      <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-amber-900">Brouillon de décision</p>
+                      <dl className="mt-3 grid gap-3 text-sm"><div><dt className="font-medium">Candidat</dt><dd>{decisionDraft.candidateId}</dd></div><div><dt className="font-medium">Objectif</dt><dd>{decisionDraft.objective}</dd></div><div><dt className="font-medium">Livrables</dt><dd>{decisionDraft.deliverables.join(" · ")}</dd></div><div><dt className="font-medium">Hors périmètre</dt><dd>{decisionDraft.outOfScope.join(" · ")}</dd></div><div><dt className="font-medium">Fichiers autorisés</dt><dd className="font-mono text-xs">{decisionDraft.allowedPaths.join("\n")}</dd></div><div><dt className="font-medium">HEAD cible</dt><dd className="font-mono text-xs">{decisionDraft.gitHead}</dd></div></dl>
+                      <p className="mt-4 text-sm font-medium text-amber-900">Ce brouillon n’autorise encore aucune exécution.</p>
+                      {decisionError && <p className="mt-3 text-sm text-rose-700">{decisionError}</p>}
+                      <Button type="button" className="mt-4" disabled={decisionApproveLoading || decisionPrepareLoading} onClick={approveExecutionDecision}>{decisionApproveLoading ? "Approbation…" : "Approuver cette décision"}</Button>
                     </div>
                   )}
                   {planDetail &&
@@ -2090,9 +1650,7 @@ export function App(): React.JSX.Element {
                               </p>
                               {planDetail.profile.fallbackActive && (
                                 <p className="mt-2 text-xs text-amber-800">
-                                  Fallback policy : préférence de capacité
-                                  indisponible — résolution compatible utilisée
-                                  à la place.
+                                  Fallback policy : préférence de capacité indisponible — résolution compatible utilisée à la place.
                                 </p>
                               )}
                               {planDetail.profile.reasons.length > 0 && (
@@ -2314,9 +1872,11 @@ export function App(): React.JSX.Element {
                                   </p>
                                 ) : (
                                   <ul className="mt-2 space-y-1 font-mono text-xs text-loop-muted">
-                                    {executeResult.modifiedFiles.map((path) => (
-                                      <li key={path}>{path}</li>
-                                    ))}
+                                    {executeResult.modifiedFiles.map(
+                                      (path) => (
+                                        <li key={path}>{path}</li>
+                                      ),
+                                    )}
                                   </ul>
                                 )}
                               </section>
@@ -2341,7 +1901,8 @@ export function App(): React.JSX.Element {
                                     <p className="mt-1 text-loop-muted">
                                       Commande échouée :{" "}
                                       {executeResult.validation.failedCommand}{" "}
-                                      (code {executeResult.validation.exitCode})
+                                      (code {executeResult.validation.exitCode}
+                                      )
                                     </p>
                                   )}
                                 </section>
@@ -2368,18 +1929,7 @@ export function App(): React.JSX.Element {
                                       Base Git :{" "}
                                       {executeResult.patchExport.baseSha}
                                     </p>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      className="mt-3"
-                                      disabled={patchReviewLoading}
-                                      onClick={loadPatchReview}
-                                    >
-                                      {patchReviewLoading
-                                        ? "Lecture du patch…"
-                                        : "Relire le patch"}
-                                    </Button>
+                                    <Button type="button" size="sm" variant="outline" className="mt-3" disabled={patchReviewLoading} onClick={loadPatchReview}>{patchReviewLoading ? "Lecture du patch…" : "Relire le patch"}</Button>
                                   </>
                                 ) : (
                                   <p className="mt-2 text-loop-muted">
@@ -2390,75 +1940,7 @@ export function App(): React.JSX.Element {
                                   Dépôt source non modifié.
                                 </p>
                               </section>
-                              {patchReview && (
-                                <section
-                                  className="patch-review rounded-lg border border-loop-line bg-white p-4"
-                                  aria-label="Revue du patch exporté"
-                                >
-                                  <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
-                                    Patch Review
-                                  </h4>
-                                  {patchReview.status !== "ready" ? (
-                                    <p className="mt-2 text-sm text-amber-800">
-                                      Le patch ne peut pas être inspecté :{" "}
-                                      {patchReview.status}.
-                                    </p>
-                                  ) : (
-                                    <>
-                                      <p className="mt-2 text-sm">
-                                        {patchReview.fileCount} fichier(s) ·{" "}
-                                        <span className="text-emerald-700">
-                                          +{patchReview.additions}
-                                        </span>{" "}
-                                        ·{" "}
-                                        <span className="text-rose-700">
-                                          -{patchReview.deletions}
-                                        </span>
-                                      </p>
-                                      <p className="mt-1 font-mono text-xs text-loop-muted">
-                                        SHA-256 : {patchReview.sha256}
-                                      </p>
-                                      <p className="mt-1 font-mono text-xs text-loop-muted">
-                                        Base Git : {patchReview.baseSha}
-                                      </p>
-                                      <div className="patch-review-grid mt-4 grid gap-4 lg:grid-cols-[minmax(180px,0.35fr)_minmax(0,1fr)]">
-                                        <ol className="divide-y divide-loop-line rounded border border-loop-line">
-                                          {patchReview.files.map(
-                                            (file, index) => (
-                                              <li
-                                                key={`${file.oldPath}:${file.newPath}`}
-                                              >
-                                                <button
-                                                  type="button"
-                                                  aria-pressed={
-                                                    selectedPatchFile === index
-                                                  }
-                                                  onClick={() =>
-                                                    setSelectedPatchFile(index)
-                                                  }
-                                                  className={`w-full px-3 py-2 text-left font-mono text-xs ${selectedPatchFile === index ? "bg-loop-paper" : ""}`}
-                                                >
-                                                  {file.newPath ?? file.oldPath}{" "}
-                                                  <span className="font-sans text-loop-muted">
-                                                    {file.status} +
-                                                    {file.additions} -
-                                                    {file.deletions}
-                                                  </span>
-                                                </button>
-                                              </li>
-                                            ),
-                                          )}
-                                        </ol>
-                                        {selectedPatchReviewFile && (
-                                          <PatchDiff
-                                            file={selectedPatchReviewFile}
-                                          />
-                                        )}
-                                      </div>
-                                    </>
-                                  )}
-                                </section>
-                              )}
+                              {patchReview && <section className="patch-review rounded-lg border border-loop-line bg-white p-4" aria-label="Revue du patch exporté"><h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Patch Review</h4>{patchReview.status !== "ready" ? <p className="mt-2 text-sm text-amber-800">Le patch ne peut pas être inspecté : {patchReview.status}.</p> : <><p className="mt-2 text-sm">{patchReview.fileCount} fichier(s) · <span className="text-emerald-700">+{patchReview.additions}</span> · <span className="text-rose-700">-{patchReview.deletions}</span></p><p className="mt-1 font-mono text-xs text-loop-muted">SHA-256 : {patchReview.sha256}</p><p className="mt-1 font-mono text-xs text-loop-muted">Base Git : {patchReview.baseSha}</p><div className="patch-review-grid mt-4 grid gap-4 lg:grid-cols-[minmax(180px,0.35fr)_minmax(0,1fr)]"><ol className="divide-y divide-loop-line rounded border border-loop-line">{patchReview.files.map((file, index) => <li key={`${file.oldPath}:${file.newPath}`}><button type="button" aria-pressed={selectedPatchFile === index} onClick={() => setSelectedPatchFile(index)} className={`w-full px-3 py-2 text-left font-mono text-xs ${selectedPatchFile === index ? "bg-loop-paper" : ""}`}>{file.newPath ?? file.oldPath} <span className="font-sans text-loop-muted">{file.status} +{file.additions} -{file.deletions}</span></button></li>)}</ol>{selectedPatchReviewFile && <PatchDiff file={selectedPatchReviewFile} />}</div></>}</section>}
                               {executeResult.failure && (
                                 <section className="rounded-md border border-rose-200 bg-rose-50 p-3">
                                   <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-rose-700">
@@ -2470,7 +1952,8 @@ export function App(): React.JSX.Element {
                                   <p className="mt-1 text-rose-900">
                                     {executeResult.failure.message}
                                   </p>
-                                  {executeResult.failure.details.length > 0 && (
+                                  {executeResult.failure.details.length >
+                                    0 && (
                                     <ul className="mt-2 space-y-1 text-xs text-rose-900">
                                       {executeResult.failure.details.map(
                                         (detail, index) => (
@@ -2601,125 +2084,17 @@ export function App(): React.JSX.Element {
               )}
               <section className="mt-8 border-t border-loop-line pt-6">
                 <h3 className="m-0 text-base font-semibold">Historique</h3>
-                {runHistoryLoading && (
-                  <p className="mt-3 text-sm text-loop-muted">
-                    Chargement de l’historique…
-                  </p>
-                )}
-                {runHistoryError && (
-                  <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
-                    {runHistoryError}
-                  </p>
-                )}
-                {runHistory &&
-                  runHistoryProjectName === selectedProjectName && (
-                    <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
-                      <div>
-                        {runHistory.corruptedLines > 0 && (
-                          <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                            Historique partiellement illisible :{" "}
-                            {runHistory.corruptedLines} entrée(s) ignorée(s).
-                          </p>
-                        )}
-                        {runHistory.entries.length === 0 ? (
-                          <p className="text-sm text-loop-muted">
-                            Aucun run enregistré pour ce projet.
-                          </p>
-                        ) : (
-                          <ol className="divide-y divide-loop-line rounded-lg border border-loop-line bg-white">
-                            {runHistory.entries.map((entry) => (
-                              <li key={entry.runId}>
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedRunId(entry.runId)}
-                                  className={`w-full px-4 py-3 text-left text-sm hover:bg-loop-paper ${selectedRun?.runId === entry.runId ? "bg-loop-paper" : ""}`}
-                                >
-                                  <span className="block font-medium">
-                                    {entry.completedAt ?? entry.startedAt}
-                                  </span>
-                                  <span className="mt-1 block text-loop-muted">
-                                    {entry.mode} ·{" "}
-                                    {formatRunHistoryStatus(entry.status)} · run{" "}
-                                    {entry.runId}
-                                    {entry.candidateId
-                                      ? ` · ${entry.candidateId}`
-                                      : ""}
-                                  </span>
-                                </button>
-                              </li>
-                            ))}
-                          </ol>
-                        )}
-                      </div>
-                      {selectedRun && (
-                        <section className="rounded-lg border border-loop-line bg-white p-4">
-                          <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
-                            Run {selectedRun.runId}
-                          </p>
-                          <dl className="mt-4 grid gap-4 text-sm">
-                            <div>
-                              <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
-                                Mode
-                              </dt>
-                              <dd className="mt-1">{selectedRun.mode}</dd>
-                            </div>
-                            <div>
-                              <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
-                                Statut
-                              </dt>
-                              <dd className="mt-1">
-                                {formatRunHistoryStatus(selectedRun.status)}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
-                                Candidat
-                              </dt>
-                              <dd className="mt-1 font-mono text-xs">
-                                {selectedRun.candidateId ?? "Non renseigné"}
-                              </dd>
-                            </div>
-                            {selectedRun.executionResult?.modifiedFiles
-                              .length ? (
-                              <div>
-                                <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
-                                  Fichiers modifiés
-                                </dt>
-                                <dd className="mt-1">
-                                  <ul className="space-y-1 font-mono text-xs text-loop-muted">
-                                    {selectedRun.executionResult.modifiedFiles
-                                      .slice(0, 8)
-                                      .map((path) => (
-                                        <li key={path}>{path}</li>
-                                      ))}
-                                  </ul>
-                                </dd>
-                              </div>
-                            ) : null}
-                            {selectedRun.executionResult?.validation && (
-                              <div>
-                                <dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">
-                                  Validation
-                                </dt>
-                                <dd className="mt-1">
-                                  {formatExecutionValidationStatus(
-                                    selectedRun.executionResult.validation
-                                      .status,
-                                  )}{" "}
-                                  ·{" "}
-                                  {
-                                    selectedRun.executionResult.validation
-                                      .attempts
-                                  }{" "}
-                                  tentative(s)
-                                </dd>
-                              </div>
-                            )}
-                          </dl>
-                        </section>
-                      )}
+                {runHistoryLoading && <p className="mt-3 text-sm text-loop-muted">Chargement de l’historique…</p>}
+                {runHistoryError && <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{runHistoryError}</p>}
+                {runHistory && runHistoryProjectName === selectedProjectName && (
+                  <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
+                    <div>
+                      {runHistory.corruptedLines > 0 && <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Historique partiellement illisible : {runHistory.corruptedLines} entrée(s) ignorée(s).</p>}
+                      {runHistory.entries.length === 0 ? <p className="text-sm text-loop-muted">Aucun run enregistré pour ce projet.</p> : <ol className="divide-y divide-loop-line rounded-lg border border-loop-line bg-white">{runHistory.entries.map((entry) => <li key={entry.runId}><button type="button" onClick={() => setSelectedRunId(entry.runId)} className={`w-full px-4 py-3 text-left text-sm hover:bg-loop-paper ${selectedRun?.runId === entry.runId ? "bg-loop-paper" : ""}`}><span className="block font-medium">{entry.completedAt ?? entry.startedAt}</span><span className="mt-1 block text-loop-muted">{entry.mode} · {formatRunHistoryStatus(entry.status)} · run {entry.runId}{entry.candidateId ? ` · ${entry.candidateId}` : ""}</span></button></li>)}</ol>}
                     </div>
-                  )}
+                    {selectedRun && <section className="rounded-lg border border-loop-line bg-white p-4"><p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Run {selectedRun.runId}</p><dl className="mt-4 grid gap-4 text-sm"><div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Mode</dt><dd className="mt-1">{selectedRun.mode}</dd></div><div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Statut</dt><dd className="mt-1">{formatRunHistoryStatus(selectedRun.status)}</dd></div><div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Candidat</dt><dd className="mt-1 font-mono text-xs">{selectedRun.candidateId ?? "Non renseigné"}</dd></div>{selectedRun.executionResult?.modifiedFiles.length ? <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Fichiers modifiés</dt><dd className="mt-1"><ul className="space-y-1 font-mono text-xs text-loop-muted">{selectedRun.executionResult.modifiedFiles.slice(0, 8).map((path) => <li key={path}>{path}</li>)}</ul></dd></div> : null}{selectedRun.executionResult?.validation && <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Validation</dt><dd className="mt-1">{formatExecutionValidationStatus(selectedRun.executionResult.validation.status)} · {selectedRun.executionResult.validation.attempts} tentative(s)</dd></div>}</dl></section>}
+                  </div>
+                )}
               </section>
             </article>
           )}

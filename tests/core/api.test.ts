@@ -136,23 +136,20 @@ describe("Core public API", () => {
       "function",
     );
     assert.equal(typeof executePolicyAwareDeclarativeRuntime, "function");
-    assert.equal(
-      typeof executePolicyAwareDeclarativeRuntimeWithReceipt,
-      "function",
-    );
+    assert.equal(typeof executePolicyAwareDeclarativeRuntimeWithReceipt, "function");
     assert.equal(typeof createRuntimeExecutionPlan, "function");
     assert.equal(typeof createRuntimeExecutionReceipt, "function");
-    assert.equal(
-      typeof dryRunPolicyAwareDeclarativeRuntimeExecution,
-      "function",
-    );
+    assert.equal(typeof dryRunPolicyAwareDeclarativeRuntimeExecution, "function");
     assert.equal(typeof createSimulatedRuntimeAdapter, "function");
     assert.equal(typeof createRuntimeRequest, "function");
     assert.equal(
       typeof mapLoopRuntimeExecutionPlanToRequestOptions,
       "function",
     );
-    assert.equal(typeof createLoopRuntimeRequestFromPublicOptions, "function");
+    assert.equal(
+      typeof createLoopRuntimeRequestFromPublicOptions,
+      "function",
+    );
     assert.equal(typeof prepareLoopRuntimePublicRequest, "function");
     assert.equal(
       typeof prepareLoopPolicyBoundLocalProcessExecution,
@@ -170,14 +167,35 @@ describe("Core public API", () => {
       typeof executeLoopPolicyBoundLocalProcessAndDeliverEscalationProjection,
       "function",
     );
-    assert.equal(typeof projectLoopRuntimeEscalationResult, "function");
-    assert.equal(typeof serializeLoopRuntimeEscalationProjection, "function");
-    assert.equal(typeof deliverLoopRuntimeEscalationProjection, "function");
-    assert.equal(LOOP_RUNTIME_ESCALATION_PUBLIC_SCHEMA_VERSION, 1);
-    assert.equal(LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION, 1);
-    assert.equal(typeof classifyLoopRuntimeExecutionOutcome, "function");
+    assert.equal(
+      typeof projectLoopRuntimeEscalationResult,
+      "function",
+    );
+    assert.equal(
+      typeof serializeLoopRuntimeEscalationProjection,
+      "function",
+    );
+    assert.equal(
+      typeof deliverLoopRuntimeEscalationProjection,
+      "function",
+    );
+    assert.equal(
+      LOOP_RUNTIME_ESCALATION_PUBLIC_SCHEMA_VERSION,
+      1,
+    );
+    assert.equal(
+      LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
+      1,
+    );
+    assert.equal(
+      typeof classifyLoopRuntimeExecutionOutcome,
+      "function",
+    );
     assert.equal(typeof classifyLoopRuntimeFailure, "function");
-    assert.equal(typeof evaluateLoopRuntimeAgentEscalation, "function");
+    assert.equal(
+      typeof evaluateLoopRuntimeAgentEscalation,
+      "function",
+    );
     assert.equal(
       typeof evaluatePolicyBoundRuntimeExecutionEscalation,
       "function",
@@ -186,9 +204,15 @@ describe("Core public API", () => {
       typeof createAgentEscalationRequestFromRuntimeDecision,
       "function",
     );
-    assert.equal(typeof validateLoopRuntimePublicRequest, "function");
+    assert.equal(
+      typeof validateLoopRuntimePublicRequest,
+      "function",
+    );
     assert.equal(typeof decodeLoopRuntimePublicRequest, "function");
-    assert.equal(typeof decodeAndAuthorizeLoopRuntimePublicRequest, "function");
+    assert.equal(
+      typeof decodeAndAuthorizeLoopRuntimePublicRequest,
+      "function",
+    );
     assert.equal(
       typeof createLoopRuntimeAuthorizedEngineAssemblyRequest,
       "function",
@@ -207,8 +231,14 @@ describe("Core public API", () => {
       "function",
     );
     assert.equal(typeof authorizeLoopRuntimePublicRequest, "function");
-    assert.equal(typeof decodeAndPrepareLoopRuntimePublicRequest, "function");
-    assert.equal(typeof resolveLoopRuntimePublicRequestReferences, "function");
+    assert.equal(
+      typeof decodeAndPrepareLoopRuntimePublicRequest,
+      "function",
+    );
+    assert.equal(
+      typeof resolveLoopRuntimePublicRequestReferences,
+      "function",
+    );
     assert.equal(
       typeof createLoopRuntimeResolvedRequestConfiguration,
       "function",
@@ -353,12 +383,13 @@ describe("Core public API", () => {
         maxRepairs: 0,
       },
     };
-    const assemblyRequest = createLoopRuntimeAuthorizedEngineAssemblyRequest(
-      {
-        principalId: "principal.api",
-      },
-      request,
-    );
+    const assemblyRequest =
+      createLoopRuntimeAuthorizedEngineAssemblyRequest(
+        {
+          principalId: "principal.api",
+        },
+        request,
+      );
 
     assert.equal(assemblyRequest.created, true);
     if (assemblyRequest.created) {
@@ -609,10 +640,7 @@ describe("Core public API", () => {
 
   it("exports the resolved public runtime request configuration contract", () => {
     const policy = { policyId: "policy-sentinel" };
-    const profile = {
-      profileId: "profile-sentinel",
-      maxEffort: "medium" as const,
-    };
+    const profile = { profileId: "profile-sentinel", maxEffort: "medium" as const };
     const request: LoopRuntimePublicRequest = {
       schemaVersion: LOOP_RUNTIME_PUBLIC_REQUEST_SCHEMA_VERSION,
       project: "loop-engine",
@@ -697,8 +725,9 @@ describe("Core public API", () => {
         maxEffort: "high",
       },
     };
-    const configuration =
-      createLoopRuntimeResolvedRequestConfiguration(resolution);
+    const configuration = createLoopRuntimeResolvedRequestConfiguration(
+      resolution,
+    );
 
     assert.equal(typeof applyLoopRuntimeInternalLimits, "function");
     assert.equal(configuration.configured, true);
@@ -713,8 +742,10 @@ describe("Core public API", () => {
           maxRepairs: 25,
         },
       };
-      const limited: LoopRuntimeRequestLimitResult =
-        applyLoopRuntimeInternalLimits(configuration.configuration, limits);
+      const limited: LoopRuntimeRequestLimitResult = applyLoopRuntimeInternalLimits(
+        configuration.configuration,
+        limits,
+      );
 
       assert.equal(limited.limited, true);
       if (limited.limited) {
@@ -1018,21 +1049,11 @@ describe("Core public API", () => {
     assert.deepEqual(
       generateExecutionReport({
         ...result,
-        patchExport: {
-          path: "/tmp/validated.patch",
-          sha256: "a".repeat(64),
-          fileCount: 2,
-          baseSha: "b".repeat(40),
-        },
+        patchExport: { path: "/tmp/validated.patch", sha256: "a".repeat(64), fileCount: 2, baseSha: "b".repeat(40) },
       }),
       {
         ...result,
-        patchExport: {
-          path: "/tmp/validated.patch",
-          sha256: "a".repeat(64),
-          fileCount: 2,
-          baseSha: "b".repeat(40),
-        },
+        patchExport: { path: "/tmp/validated.patch", sha256: "a".repeat(64), fileCount: 2, baseSha: "b".repeat(40) },
       },
     );
   });
