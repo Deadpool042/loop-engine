@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { appendFileSync, rmSync } from "node:fs";
+import { appendFileSync, mkdirSync, rmSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -49,6 +49,7 @@ function fixtureResult(
 
 function withFixtureProject(run: (project: string) => void): void {
   const project = fixtureProjectName();
+  mkdirSync(RUN_HISTORY_DIRECTORY, { recursive: true });
   try {
     run(project);
   } finally {
