@@ -115,6 +115,20 @@ describe("exact run history evidence lookup", () => {
     });
   });
 
+  it("bounds an oversized corrupt line and resumes at the next journal entry", () => {
+    withFixtureProject((project) => {
+      appendFileSync(journalPath(project), `${"x".repeat(1_100_000)}\n`, "utf8");
+      const target = fixtureResult(project, { runId: "after-oversized-line" });
+      assert.equal(recordLoopRunHistory(target).ok, true);
+
+      const lookup = lookupRunHistoryEntry(project, target.runId);
+      assert.equal(lookup.found, true);
+      if (!lookup.found) return;
+      assert.equal(lookup.entry.runId, target.runId);
+      assert.equal(lookup.corruptedLines, 1);
+    });
+  });
+
   it("fails closed when the same run id occurs more than once", () => {
     withFixtureProject((project) => {
       const first = fixtureResult(project, { runId: "duplicate-run" });
