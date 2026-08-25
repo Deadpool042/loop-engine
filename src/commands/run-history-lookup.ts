@@ -1,6 +1,13 @@
 import type { LoopApplicationAssembly } from "../composition/index.js";
-import type { LoopRunResult } from "../loop/types.js";
 import { terminal } from "../ui/terminal.js";
+
+type RunHistoryLookupResult = ReturnType<
+  LoopApplicationAssembly["lookupRunHistoryEntry"]
+>;
+type RunHistoryLookupEntry = Extract<
+  RunHistoryLookupResult,
+  { found: true }
+>["entry"];
 
 export type RunHistoryLookupReport =
   | Readonly<{
@@ -8,7 +15,7 @@ export type RunHistoryLookupReport =
       project: string;
       runId: string;
       found: true;
-      entry: LoopRunResult;
+      entry: RunHistoryLookupEntry;
       corruptedLines: number;
     }>
   | Readonly<{
