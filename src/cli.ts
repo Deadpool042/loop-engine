@@ -64,6 +64,7 @@ import {
 } from "./commands/audit.js";
 import { isLoopRunMode, runLoopRunCommand } from "./commands/run.js";
 import { printRunHistory } from "./commands/runs.js";
+import { printCandidatePublicationReview } from "./commands/candidate-review.js";
 import {
   createLoopApplicationAssembly,
   LOOP_PROVIDER_IDS,
@@ -596,9 +597,30 @@ else if (command === "review") {
     ...(json ? { json } : {}),
     ...(limit !== undefined ? { limit } : {}),
   });
+} else if (command === "candidate" && process.argv[3] === "review") {
+  const project = resolveProjectOrExit("candidate review", 4);
+  const json = process.argv.includes("--json");
+  const runId = optionValue("--run-id");
+  if (hasOption("--run-id") && runId === undefined) {
+    failOption(json, "missing_candidate_run_id", "Missing value for --run-id");
+  }
+  if (runId === undefined) {
+    failOption(
+      json,
+      "missing_candidate_run_id",
+      "Candidate review requires --run-id.",
+    );
+  }
+  const exitCode = await printCandidatePublicationReview(
+    application,
+    project.name,
+    runId,
+    json,
+  );
+  if (exitCode !== 0) process.exitCode = exitCode;
 } else {
   terminal.error(
-    "Usage: pnpm loop help|summary|status|doctor|roadmap status|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>|runs <project>",
+    "Usage: pnpm loop help|summary|status|doctor|roadmap status|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>|runs <project>|candidate review <project> --run-id <runId>",
   );
   process.exit(1);
 }

@@ -106,6 +106,31 @@ Cette capacité est une exception Git interne, bornée et explicitement demandé
 elle ne change pas l'exception `execution_decision`, ne crée pas de nouvel
 Approval Engine et ne rend jamais la publication implicite après `execute`.
 
+### Candidate Review et promotion distante
+
+La **Candidate Publication** V33 crée l'artefact Git local
+`refs/loop-engine/candidates/<project>/<runId>` ; elle ne constitue ni une
+revue, ni une promotion. V34 ajoute une **Candidate Review** strictement en
+lecture seule : `loop candidate review <project> --run-id <runId>` résout
+d'abord l'identité déjà journalisée du run `publish` terminé dans Run History,
+puis vérifie que la ref pointe encore vers le commit attendu et que son unique
+parent est exactement `baseSha`. Il calcule ensuite les fichiers et compteurs
+depuis les objets Git canoniques `baseSha..candidateCommitSha`.
+
+Le lecteur n'accepte ni ref, SHA, chemin, cwd ni argument Git fournis par
+l'appelant. Une entrée d'historique absente, une ref absente ou déplacée, un
+parent différent ou un diff incohérent échouent fermés. La revue ne modifie ni
+worktree, ni index, ni HEAD, ni aucune ref.
+
+**Promotion distante : NO-GO en V34.** Une branche/ref distante, un push et une
+PR GitHub nécessitent une destination trusted explicite, une action humaine
+explicite, une protection contre les courses et des preuves d'état conservées.
+Loop Engine ne déplace donc aucune `refs/heads/*`, n'appelle pas `git push` et
+ne crée pas de PR. Git reste responsable des opérations de ref/push ; GitHub
+(CLI, API ou connecteur) reste responsable de la PR, de la review, des
+protections de branche, de la CI et du merge. La promotion reste distincte de
+toute Governed Patch Application vers le worktree source.
+
 ### Publication multi-fichiers vers le dépôt source
 
 V32 a qualifié les primitives Git disponibles sur des dépôts temporaires. Un

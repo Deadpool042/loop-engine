@@ -118,6 +118,23 @@ sinon il reste `null`. Une collision de ref ou un HEAD devenu stale est un éche
 terminal fail-closed. Governed Patch Application demeure une capacité distincte
 et différée.
 
+### Candidate review (V34)
+
+`loop candidate review <project> --run-id <runId> [--json]` est une lecture
+locale de la candidate V33. Le `runId` identifie d'abord une entrée existante de
+Run History en mode `publish`, terminée avec succès ; la commande n'accepte pas
+une ref ou un SHA libre. Elle revalide `candidateRef -> candidateCommitSha`, le
+parent unique `candidateCommitSha -> baseSha`, puis projette le diff Git
+`baseSha..candidateCommitSha` (fichiers ajoutés/modifiés/supprimés, numstat et
+métadonnées minimales du commit). Tous les échecs d'identité ou d'inspection
+sont fail-closed.
+
+Candidate Publication ≠ Candidate Review ≠ Remote Promotion ≠ Governed Patch
+Application. V34 est review-only : aucune mutation de worktree/index/HEAD/ref,
+aucun push, aucune PR et aucun merge. Une éventuelle promotion distante reste
+une décision ultérieure, explicitement intégrée à Git et GitHub plutôt que
+réimplémentée par le LoopRunner.
+
 ## États
 
 `LoopRunStatus` contient :
