@@ -123,11 +123,13 @@ et différée.
 `loop candidate review <project> --run-id <runId> [--json]` est une lecture
 locale de la candidate V33. Le `runId` identifie d'abord une entrée existante de
 Run History en mode `publish`, terminée avec succès ; la commande n'accepte pas
-une ref ou un SHA libre. Elle revalide `candidateRef -> candidateCommitSha`, le
-parent unique `candidateCommitSha -> baseSha`, puis projette le diff Git
+une ref ou un SHA libre. V35 résout désormais ce `runId` par un lookup exact du
+journal append-only, indépendant de la fenêtre récente bornée des rapports
+`runs`. Elle revalide ensuite `candidateRef -> candidateCommitSha`, le parent
+unique `candidateCommitSha -> baseSha`, puis projette le diff Git
 `baseSha..candidateCommitSha` (fichiers ajoutés/modifiés/supprimés, numstat et
 métadonnées minimales du commit). Tous les échecs d'identité ou d'inspection
-sont fail-closed.
+sont fail-closed ; un `runId` dupliqué dans le journal est ambigu et refusé.
 
 Candidate Publication ≠ Candidate Review ≠ Remote Promotion ≠ Governed Patch
 Application. V34 est review-only : aucune mutation de worktree/index/HEAD/ref,
@@ -327,17 +329,15 @@ partir de la documentation du dépôt. Les deux mécanismes ne partagent ni
 fichier, ni modèle, ni cycle de vie.
 
 - **Écriture.** `recordLoopRunHistory` (`src/core/run-history.ts`) est appelé
-  une seule fois par invocation `run`, juste après que `runLoopPlan`,
-  `runLoopExecute` ou `runLoopCommit` a résolu un `LoopRunResult`
-  (`src/commands/run.ts`). Seul un statut **terminal**
+  une seule fois par invocation `run`, juste après que le mode sélectionné a
+  résolu un `LoopRunResult` (`src/commands/run.ts`). Seul un statut **terminal**
   (`completed`, `blocked`, `failed`, `cancelled`) est écrit ; un état
   intermédiaire (`idle`, `planning`, `ready`, `executing`, `validating`,
   `repairing`) ne produit jamais d'entrée. Un run produit au maximum une
-  entrée d'historique. Les trois modes (`plan`, `execute`, `commit`) sont
-  journalisés uniformément : un cycle `plan` bloqué ou échoué (candidat
-  refusé, aucun candidat sûr, etc.) est déjà un fait d'exécution réel et utile
-  à l'analyse ultérieure (répétition d'échecs, stagnation) ; en exclure un
-  mode par défaut serait un jugement métier que ce lot n'introduit pas.
+  entrée d'historique. Les modes `plan`, `execute`, `commit` et `publish` sont
+  journalisés uniformément : un cycle bloqué ou échoué est déjà un fait
+  d'exécution réel et utile à l'analyse ultérieure ; en exclure un mode par
+  défaut serait un jugement métier que ce mécanisme n'introduit pas.
 - **Contrat persisté.** Chaque ligne du journal est le `LoopRunResult`
   lui-même, sérialisé tel quel : il porte déjà `schemaVersion`, `project`
   (identité canonique du projet, la même clé `name` que `projects.yaml`) et
@@ -358,23 +358,31 @@ fichier, ni modèle, ni cycle de vie.
   sortie humaine, `LOOP_RUN_HISTORY_WRITE_FAILED:` sur `stderr` en JSON, à
   l'image du canal `LOOP_EXECUTION_EVENT:` déjà utilisé par
   `--progress-events`).
-- **Lecture.** `pnpm loop runs <project> [--json] [--limit N]`
+- **Vue récente bornée.** `pnpm loop runs <project> [--json] [--limit N]`
   (`src/commands/runs.ts`, `generateRunHistoryReport` dans
-  `src/core/reports.ts`) expose une vue bornée, en lecture seule, la plus
-  récente d'abord — c'est-à-dire l'exact inverse de l'ordre d'ajout physique
-  du journal, qui n'est jamais réordonné sur disque. La lecture scanne le
-  journal en blocs de taille fixe et ne conserve jamais en mémoire plus que
-  la fenêtre demandée (`limit`, défaut 20, plafond 100), quelle que soit la
-  taille du fichier sur disque.
+  `src/core/reports.ts`) expose les entrées les plus récentes d'abord —
+  l'exact inverse de l'ordre d'ajout physique du journal, qui n'est jamais
+  réordonné sur disque. Cette vue scanne le journal en blocs de taille fixe et
+  ne conserve jamais en mémoire plus que la fenêtre demandée (`limit`, défaut
+  20, plafond 100), quelle que soit la taille du fichier sur disque.
+- **Lookup exact V35.** `lookupRunHistoryEntry(project, runId)`
+  (`src/core/run-history-lookup.ts`) adresse une preuve précise indépendamment
+  de la fenêtre récente. Il scanne uniquement le journal du projet demandé en
+  blocs fixes, conserve au plus une entrée correspondante et une ligne bornée,
+  compte les lignes corrompues, et rejette fail-closed tout `runId` dupliqué.
+  Aucun index secondaire, scan multi-projets ni chargement intégral du journal
+  n'est introduit. La Candidate Review V34 utilise ce chemin exact.
 - **Corruption.** Un journal absent n'est pas une corruption : c'est
   simplement l'absence de run enregistré. Une ligne invalide (JSON
   imparsable, `schemaVersion` inconnu, entrée rattachée à un autre projet)
-  est ignorée mais jamais masquée : elle est comptée dans `corruptedLines`,
-  toujours exposé dans le rapport.
-- **Rétention.** Aucun moteur de rétention n'est implémenté dans ce lot : le
-  journal reste append-only sans limite physique. Seule la lecture est
-  bornée. Une politique de rétention sera décidée ultérieurement, sur preuve
-  d'un volume réel observé en usage.
+  est ignorée mais jamais masquée : elle est comptée dans `corruptedLines`.
+  Une ligne anormalement surdimensionnée est également rejetée par le lookup
+  exact afin que sa mémoire reste bornée.
+- **Rétention.** Aucun moteur de rétention n'est implémenté : le journal reste
+  append-only sans limite physique. Les vues de liste restent bornées ; le
+  lookup exact parcourt séquentiellement un seul journal avec mémoire bornée.
+  Une politique de rétention sera décidée ultérieurement, sur preuve d'un
+  volume réel observé en usage.
 - **Hors périmètre (explicitement).** Le Run History observe ; il ne
   gouverne rien. Aucun détecteur de stagnation, aucun circuit breaker, aucune
   politique de retry basée sur l'historique, aucun cap de dépense cumulée,
