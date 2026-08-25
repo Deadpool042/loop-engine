@@ -71,6 +71,22 @@ explicitement dans la configuration, documentée ici, bornée à un artefact
 précis, soumise à une décision humaine et protégée par une validation/audit
 avant d'être considérée comme autorisée.
 
+### Publication multi-fichiers vers le dépôt source
+
+V32 a qualifié les primitives Git disponibles sur des dépôts temporaires. Un
+index alternatif (`read-tree` → `apply --cached` → `write-tree`) prépare et
+compare un delta multi-fichiers exact sans écrire dans le worktree source. Un
+worktree temporaire permet la même validation isolée. Ces deux préparations ne
+fournissent toutefois aucune bascule atomique et récupérable de plusieurs
+fichiers vers le worktree source : `git apply` et les opérations de checkout
+restent des mutations de fichiers, sans journal de reprise qualifié ici.
+
+La seule publication inter-projet autorisée demeure donc l'artefact unique
+`execution_decision`. Toute publication multi-fichiers reste refusée tant
+qu'une primitive de bascule atomique, avec préflight complet, seconde
+vérification de `baseSha`, protection d'un worktree source propre et
+récupération démontrée, n'existe pas.
+
 ### ADR
 
 Une ADR est créée lorsqu'une décision architecturale durable est prise.

@@ -147,6 +147,13 @@ publication multi-fichiers atomique et récupérable dans le dépôt source. Par
 conséquent, V31 ne livre aucun apply, IPC d'écriture ni bouton Apply : la
 governed patch application reste un travail futur et différé.
 
+V32 confirme ce **NO-GO** par probes Git ciblées : un index temporaire peut
+préparer une tree candidate exacte, et un worktree temporaire peut valider le
+patch hors source, mais aucune primitive qualifiée ne réalise ensuite une
+bascule atomique et récupérable de cette tree vers les fichiers du dépôt
+source. Aucun IPC, bouton Apply, commit, push, PR ou merge cockpit n'est donc
+ajouté.
+
 `window.loopDesktop.patchReview(sessionId)` est le seul IPC ajouté. React ne
 transmet ni chemin, ni cwd, ni option filesystem. Le main process retrouve la
 session, revalide son résultat V27, puis refuse tout fichier absent, symlink,
