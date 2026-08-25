@@ -22,6 +22,7 @@ import {
   generateRagSearchReport,
   generateReviewReport,
   generateRunHistoryReport,
+  lookupRunHistoryEntry,
   recordLoopRunHistory,
   generateWorkspaceReports,
   generateWorkspaceSummaryReport,
@@ -142,6 +143,7 @@ export type LoopApplicationAssembly = Readonly<{
   generateRagSearchReport: typeof generateRagSearchReport;
   generateReviewReport: typeof generateReviewReport;
   generateRunHistoryReport: typeof generateRunHistoryReport;
+  lookupRunHistoryEntry: typeof lookupRunHistoryEntry;
   reviewCandidatePublication: CandidatePublicationReview;
   recordLoopRunHistory: typeof recordLoopRunHistory;
   generateWorkspaceReports: typeof generateWorkspaceReports;
@@ -295,6 +297,7 @@ export function createLoopApplicationAssembly(
     generateRagSearchReport,
     generateReviewReport,
     generateRunHistoryReport,
+    lookupRunHistoryEntry,
     reviewCandidatePublication: createCandidatePublicationReview(),
     recordLoopRunHistory,
     generateWorkspaceReports,

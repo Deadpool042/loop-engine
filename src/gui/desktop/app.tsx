@@ -48,6 +48,7 @@ import { parseGateReassessmentReport, type GateReassessmentReport } from "./gate
 import type { DesktopExecutionDecisionDraft, DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
 import type { PatchReviewFile, PatchReviewResult } from "./patch-review.js";
 import { parseCandidateReviewResponse, type CandidateReviewDetail } from "./candidate-review-contract.js";
+import { formatRunHistoryLookupFailure, parseRunHistoryLookupResponse } from "./run-history-lookup-contract.js";
 
 const RENEWABLE_DECISION_MESSAGES: Readonly<Record<string, string>> = {
   decision_missing: "Aucune décision d’exécution valide n’est disponible pour ce travail.",
@@ -324,6 +325,10 @@ export function App(): React.JSX.Element {
   const [runHistoryError, setRunHistoryError] = useState<string | null>(null);
   const [runHistoryLoading, setRunHistoryLoading] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [runLookupInput, setRunLookupInput] = useState("");
+  const [addressedRun, setAddressedRun] = useState<Readonly<{ project: string; entry: RunHistoryEntry }> | null>(null);
+  const [runLookupError, setRunLookupError] = useState<string | null>(null);
+  const [runLookupLoading, setRunLookupLoading] = useState(false);
   const [candidateReview, setCandidateReview] = useState<CandidateReviewDetail | null>(null);
   const [candidateReviewError, setCandidateReviewError] = useState<string | null>(null);
   const [candidateReviewLoading, setCandidateReviewLoading] = useState(false);
@@ -368,6 +373,7 @@ export function App(): React.JSX.Element {
   const [gateReassessmentReport, setGateReassessmentReport] = useState<GateReassessmentReport | null>(null);
   const [gateReassessmentProjectName, setGateReassessmentProjectName] = useState<string | null>(null);
   const [gateReassessmentLoading, setGateReassessmentLoading] = useState(false);
+  const runLookupRequestId = useRef(0);
   const candidateReviewRequestId = useRef(0);
   const planRequestId = useRef(0);
   const decisionRequestId = useRef(0);
@@ -375,7 +381,11 @@ export function App(): React.JSX.Element {
     projects.find((project) => project.project.name === selectedProjectName) ??
     null;
   const selectedCandidate = contextDetail?.roadmap.selectedCandidate ?? null;
-  const selectedRun = runHistoryProjectName === selectedProjectName ? (runHistory?.entries.find((entry) => entry.runId === selectedRunId) ?? null) : null;
+  const selectedRun = addressedRun?.project === selectedProjectName && addressedRun.entry.runId === selectedRunId
+    ? addressedRun.entry
+    : runHistoryProjectName === selectedProjectName
+      ? (runHistory?.entries.find((entry) => entry.runId === selectedRunId) ?? null)
+      : null;
   const planningDisplay =
     contextDetail === null ? null : getPlanningDisplay(contextDetail);
   const availableProposalEstimate =
@@ -453,6 +463,8 @@ export function App(): React.JSX.Element {
   }, [selectedProjectName]);
 
   useEffect(() => {
+    runLookupRequestId.current += 1;
+    setAddressedRun(null); setRunLookupInput(""); setRunLookupError(null); setRunLookupLoading(false);
     if (selectedProjectName === null) {
       setRunHistory(null); setRunHistoryProjectName(null); setRunHistoryError(null); setRunHistoryLoading(false); setSelectedRunId(null);
       return;
@@ -746,6 +758,52 @@ export function App(): React.JSX.Element {
       await preparePlan();
     } catch { if (requestId === decisionRequestId.current) setDecisionError("Impossible d’approuver la décision."); }
     finally { if (requestId === decisionRequestId.current) setDecisionApproveLoading(false); }
+  }
+
+  async function loadRunById(): Promise<void> {
+    if (selectedProjectName === null || runLookupLoading) return;
+    const projectName = selectedProjectName;
+    const runId = runLookupInput.trim();
+    if (runId.length === 0) {
+      setRunLookupError("Saisissez un identifiant de run.");
+      return;
+    }
+    const requestId = runLookupRequestId.current + 1;
+    runLookupRequestId.current = requestId;
+    setRunLookupError(null);
+    setRunLookupLoading(true);
+    try {
+      const result = await window.loopDesktop.runLookup(projectName, runId);
+      if (
+        requestId !== runLookupRequestId.current ||
+        selectedProjectNameRef.current !== projectName
+      ) return;
+      if (!result.ok) {
+        setRunLookupError(result.raw);
+        return;
+      }
+      const parsed = parseRunHistoryLookupResponse(result.json);
+      if (
+        parsed === null ||
+        parsed.project !== projectName ||
+        parsed.runId !== runId
+      ) {
+        setRunLookupError("La réponse de lookup Run History ne respecte pas le contrat JSON attendu.");
+        return;
+      }
+      if (!parsed.found) {
+        setRunLookupError(formatRunHistoryLookupFailure(parsed.code));
+        return;
+      }
+      setAddressedRun(Object.freeze({ project: projectName, entry: parsed.entry }));
+      setSelectedRunId(parsed.entry.runId);
+    } catch {
+      if (requestId === runLookupRequestId.current) {
+        setRunLookupError("Impossible de relire ce run.");
+      }
+    } finally {
+      if (requestId === runLookupRequestId.current) setRunLookupLoading(false);
+    }
   }
 
   async function loadCandidateReview(): Promise<void> {
@@ -2149,13 +2207,21 @@ export function App(): React.JSX.Element {
               )}
               <section className="mt-8 border-t border-loop-line pt-6">
                 <h3 className="m-0 text-base font-semibold">Historique</h3>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input aria-label="Identifiant de run exact" value={runLookupInput} onChange={(event) => setRunLookupInput(event.target.value)} placeholder="runId exact" className="min-w-0 flex-1 rounded-md border border-loop-line bg-white px-3 py-2 font-mono text-xs" />
+                  <Button type="button" size="sm" variant="outline" disabled={runLookupLoading || selectedProjectName === null} onClick={() => void loadRunById()}>
+                    {runLookupLoading ? "Recherche…" : "Ouvrir par ID"}
+                  </Button>
+                </div>
+                {runLookupError && <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{runLookupError}</p>}
+                {addressedRun?.project === selectedProjectName && addressedRun.entry.runId === selectedRunId && <p className="mt-2 text-xs text-loop-muted">Run chargé par identifiant exact, indépendamment de la fenêtre récente.</p>}
                 {runHistoryLoading && <p className="mt-3 text-sm text-loop-muted">Chargement de l’historique…</p>}
                 {runHistoryError && <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">{runHistoryError}</p>}
                 {runHistory && runHistoryProjectName === selectedProjectName && (
                   <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
                     <div>
                       {runHistory.corruptedLines > 0 && <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Historique partiellement illisible : {runHistory.corruptedLines} entrée(s) ignorée(s).</p>}
-                      {runHistory.entries.length === 0 ? <p className="text-sm text-loop-muted">Aucun run enregistré pour ce projet.</p> : <ol className="divide-y divide-loop-line rounded-lg border border-loop-line bg-white">{runHistory.entries.map((entry) => <li key={entry.runId}><button type="button" onClick={() => setSelectedRunId(entry.runId)} className={`w-full px-4 py-3 text-left text-sm hover:bg-loop-paper ${selectedRun?.runId === entry.runId ? "bg-loop-paper" : ""}`}><span className="block font-medium">{entry.completedAt ?? entry.startedAt}</span><span className="mt-1 block text-loop-muted">{entry.mode} · {formatRunHistoryStatus(entry.status)} · run {entry.runId}{entry.candidateId ? ` · ${entry.candidateId}` : ""}</span></button></li>)}</ol>}
+                      {runHistory.entries.length === 0 ? <p className="text-sm text-loop-muted">Aucun run enregistré pour ce projet.</p> : <ol className="divide-y divide-loop-line rounded-lg border border-loop-line bg-white">{runHistory.entries.map((entry) => <li key={entry.runId}><button type="button" onClick={() => { setAddressedRun(null); setRunLookupError(null); setSelectedRunId(entry.runId); }} className={`w-full px-4 py-3 text-left text-sm hover:bg-loop-paper ${selectedRun?.runId === entry.runId ? "bg-loop-paper" : ""}`}><span className="block font-medium">{entry.completedAt ?? entry.startedAt}</span><span className="mt-1 block text-loop-muted">{entry.mode} · {formatRunHistoryStatus(entry.status)} · run {entry.runId}{entry.candidateId ? ` · ${entry.candidateId}` : ""}</span></button></li>)}</ol>}
                     </div>
                     {selectedRun && (
                       <section className="rounded-lg border border-loop-line bg-white p-4">

@@ -26,6 +26,8 @@ export type JsonErrorCode =
   | "provider_effort_requires_provider_model"
   | "missing_run_history_limit_value"
   | "invalid_run_history_limit"
+  | "missing_run_history_run_id"
+  | "run_history_lookup_with_limit"
   | "missing_candidate_run_id";
 
 export function printJsonError(code: JsonErrorCode, message: string): void {

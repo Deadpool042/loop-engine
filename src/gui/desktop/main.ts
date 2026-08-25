@@ -24,6 +24,7 @@ import { createGateReassessmentHandler, DESKTOP_GATE_REASSESSMENT_TIMEOUT_MS } f
 import { createGateReassessmentEstimateHandler } from "./gate-reassessment-estimate-handler.js";
 import { createReviewHandler } from "./review-handler.js";
 import { createRunHistoryHandler } from "./run-history-handler.js";
+import { createRunHistoryLookupHandler } from "./run-history-lookup-handler.js";
 import { createCandidateReviewHandler } from "./candidate-review-handler.js";
 import { createSummaryHandler } from "./summary-handler.js";
 import { createDesktopExecutionDecisionController } from "./execution-decision-controller.js";
@@ -108,6 +109,14 @@ const runHistoryHandler = createRunHistoryHandler({
 });
 ipcMain.handle("loop:runs", (_event, projectName) =>
   runHistoryHandler(projectName),
+);
+
+const runHistoryLookupHandler = createRunHistoryLookupHandler({
+  cliInvoker,
+  resolveRepositoryPath,
+});
+ipcMain.handle("loop:run-lookup", (_event, projectName, runId) =>
+  runHistoryLookupHandler(projectName, runId),
 );
 
 const candidateReviewHandler = createCandidateReviewHandler({

@@ -51,7 +51,7 @@ function parseCandidateId(value: unknown): string | null | undefined {
   return typeof value.id === "string" ? value.id : null;
 }
 
-function parseEntry(value: unknown, project: string): RunHistoryEntry | null {
+export function parseRunHistoryEntry(value: unknown, project: string): RunHistoryEntry | null {
   if (
     !isRecord(value) ||
     value.schemaVersion !== 1 ||
@@ -115,7 +115,7 @@ export function parseRunHistoryDetail(value: unknown): RunHistoryDetail | null {
   }
 
   const project = value.project;
-  const entries = value.entries.map((entry) => parseEntry(entry, project));
+  const entries = value.entries.map((entry) => parseRunHistoryEntry(entry, project));
   if (entries.some((entry) => entry === null)) return null;
 
   return Object.freeze({

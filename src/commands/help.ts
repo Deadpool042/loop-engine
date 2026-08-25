@@ -82,6 +82,9 @@ export function printHelp(): void {
     "pnpm loop runs <project> --json [--limit N] — historique des runs en JSON, lecture bornée",
   );
   terminal.info(
+    "pnpm loop runs <project> --run-id <id> [--json] — ouvre un run exact hors fenêtre récente",
+  );
+  terminal.info(
     "pnpm loop candidate review <project> --run-id <id> [--json] — relit une candidate V33 depuis Git",
   );
 

@@ -13,6 +13,7 @@ export type LoopDesktopApi = Readonly<{
   context: (projectName: string) => Promise<CliInvocationResult>;
   review: (projectName: string) => Promise<CliInvocationResult>;
   runs: (projectName: string) => Promise<CliInvocationResult>;
+  runLookup: (projectName: string, runId: string) => Promise<CliInvocationResult>;
   candidateReview: (
     projectName: string,
     runId: string,
@@ -50,6 +51,7 @@ export function createLoopDesktopApi(
       | "loop:context"
       | "loop:review"
       | "loop:runs"
+      | "loop:run-lookup"
       | "loop:candidate-review"
       | "loop:plan"
       | "loop:execute"
@@ -78,6 +80,9 @@ export function createLoopDesktopApi(
     },
     runs(projectName) {
       return invoke("loop:runs", projectName);
+    },
+    runLookup(projectName, runId) {
+      return invoke("loop:run-lookup", projectName, runId);
     },
     candidateReview(projectName, runId) {
       return invoke("loop:candidate-review", projectName, runId);
