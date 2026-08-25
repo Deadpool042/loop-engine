@@ -10,7 +10,10 @@ import type {
 import type { LoopExecutor } from "../core/index.js";
 import { createClaudeCodeCliLoopExecutor } from "../loop/claude-code-cli-executor.js";
 import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";
-import { ANTHROPIC_HAIKU_4_5_MODEL } from "../text-only-provider/pricing.js";
+import {
+  ANTHROPIC_HAIKU_4_5_MODEL,
+  ANTHROPIC_SONNET_5_MODEL,
+} from "../text-only-provider/pricing.js";
 
 export const LOOP_PROVIDER_IDS = ["codex", "claude_code"] as const;
 export type LoopProviderId = (typeof LOOP_PROVIDER_IDS)[number];
@@ -21,8 +24,8 @@ const DEFAULT_CODEX_MODEL = "gpt-5.6-luna";
 // CLI integrations, not a model/provider capability catalog. It deliberately
 // contains only capabilities required by the normal code/test execution path
 // that both concrete executors expose through an isolated writable worktree.
-// Richer capabilities must be declared explicitly by a future verified
-// integration instead of being inferred from an illustrative model profile.
+// Richer capabilities must be declared explicitly by a verified integration
+// contract instead of being inferred from an illustrative model profile.
 const EXECUTABLE_PROVIDER_CAPABILITIES: readonly AgentCapability[] =
   Object.freeze(["code_edit", "shell_exec", "test_execution"]);
 
@@ -63,10 +66,38 @@ export type LoopProviderRegistry = Readonly<{
   registrations: readonly LoopProviderRegistration[];
 }>;
 
+function configuredModel(configuration: LoopProviderConfiguration): string {
+  if (configuration.model) return configuration.model;
+  return configuration.id === "codex"
+    ? DEFAULT_CODEX_MODEL
+    : ANTHROPIC_HAIKU_4_5_MODEL;
+}
+
+function configuredCapabilities(
+  configuration: LoopProviderConfiguration,
+  model: string,
+): readonly AgentCapability[] {
+  // Only exact model ids whose capability has been verified against the
+  // provider's current public contract may extend the executable envelope.
+  // Unknown/custom aliases deliberately remain conservative.
+  if (
+    configuration.id === "claude_code" &&
+    model === ANTHROPIC_SONNET_5_MODEL
+  ) {
+    return Object.freeze([
+      ...EXECUTABLE_PROVIDER_CAPABILITIES,
+      "long_context",
+    ]);
+  }
+
+  return EXECUTABLE_PROVIDER_CAPABILITIES;
+}
+
 function configuredProfile(
   configuration: LoopProviderConfiguration,
 ): AgentProfile {
   const isCodex = configuration.id === "codex";
+  const model = configuredModel(configuration);
 
   // A configured execution profile is derived only from the concrete provider
   // registration and its explicit configuration. In particular, it never
@@ -76,14 +107,12 @@ function configuredProfile(
     id: `configured.${configuration.id}`,
     runtime: isCodex ? "codex" : "claude_code",
     provider: isCodex ? "openai" : "anthropic",
-    model:
-      configuration.model ??
-      (isCodex ? DEFAULT_CODEX_MODEL : ANTHROPIC_HAIKU_4_5_MODEL),
+    model,
     // A provider-bound registry contains one executable profile per configured
     // provider. Profile effort is therefore only a deterministic ranking
     // baseline; invocation effort remains policy.requirements.minimumEffort.
     effort: "low",
-    capabilities: EXECUTABLE_PROVIDER_CAPABILITIES,
+    capabilities: configuredCapabilities(configuration, model),
     permissions: EXECUTABLE_PROVIDER_PERMISSIONS,
     budget: Object.freeze({
       // The CLI executors do not enforce token or monetary ceilings. Reporting
