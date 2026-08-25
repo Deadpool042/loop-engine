@@ -6,7 +6,8 @@
 - Lot V7.2 — `runLoopPlan(...)` et mode `plan` implémentés.
 - Lots V7.4–V7.5 — prévision de politique et contexte borné intégrés au plan.
 - Lot V14.4 — `runLoopExecute(...)`, validation et réparation bornée implémentés.
-- le mode `commit` contrôlé est implémenté ; `publish` reste non implémenté.
+- le mode `commit` contrôlé est implémenté ; V33 publie uniquement une ref Git
+  candidate isolée, jamais un patch dans le worktree source.
 - `--resume` reste futur.
 
 Le contrat détaillé du cycle V14.4 est dans
@@ -33,7 +34,9 @@ contexte ou la validation configurée.
 - **LoopRepairer** — port injecté appelé après une validation échouée et seulement
   tant que le budget le permet.
 - **LoopCommitter** — frontière Git contrôlée, appelée uniquement par le mode `commit` explicite après validation réussie.
-- **LoopPublisher** — futur ; absent de V14.4.
+- **LoopPublisher** — frontière V33 spécialisée: après une exécution isolée
+  validée, elle publie au plus une ref candidate interne; elle n'applique pas
+  de patch et ne modifie pas une branche utilisateur.
 - **LoopRunner** — orchestration et machine à états uniquement.
 
 Les **Execution agents** Claude Code et Codex sont disponibles uniquement par
@@ -102,8 +105,18 @@ promotion explicite depuis un worktree isolé n'a été conçue.
 
 ### `publish`
 
-Futur. `publish` devra être explicitement demandé après validation et commit. Il
-ne pourra jamais être implicite. V14.4 laisse toujours `publication: null`.
+Mode explicitement demandé, jamais déclenché après `execute`. V33 réutilise
+l'exécution isolée et sa validation, exporte le patch validé dans un emplacement
+temporaire puis produit un commit candidat parenté exactement par `baseSha`.
+La publication finale est une création compare-and-create de
+`refs/loop-engine/candidates/<project>/<runId>`. Aucun `refs/heads/*`, HEAD,
+index ou fichier du worktree source ne change; aucun push, PR, merge, checkout
+ou application de patch n'est effectué.
+
+`publication` vaut alors `{ kind: "candidate_ref", ref, commitSha, baseSha }`;
+sinon il reste `null`. Une collision de ref ou un HEAD devenu stale est un échec
+terminal fail-closed. Governed Patch Application demeure une capacité distincte
+et différée.
 
 ## États
 
@@ -189,15 +202,13 @@ pnpm loop run <project> --candidate H1-L4 --mode plan --json
 pnpm loop run <project> --mode execute
 pnpm loop run <project> --mode execute --max-repairs 1 --json
 pnpm loop run <project> --mode execute --export-patch ./validated.patch --json
+pnpm loop run <project> --mode publish --provider codex --provider-executable codex --json
 ```
 
 La commande `execute` échoue avec `executor_unavailable` sans provider concret.
-Le mode `commit` requiert `--commit-message`. Seule la commande suivante reste
-reconnue puis rejetée :
-
-```bash
-pnpm loop run <project> --mode publish
-```
+Le mode `commit` requiert `--commit-message`. `publish` requiert un provider
+explicite comme `execute`; il n'accepte ni nom de ref ni destination contrôlés
+par l'utilisateur.
 
 Options futures non implémentées :
 

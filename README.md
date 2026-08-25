@@ -31,7 +31,10 @@ Le mode d'inspection et le mode `plan` ne modifient pas les dépôts pilotés. L
 - Pas de push automatique.
 - Le mode par défaut (`plan`) ne modifie rien.
 - `execute` doit être demandé explicitement et nécessite un provider CLI concret explicitement configuré ; il s'exécute dans un Git worktree isolé et temporaire, jamais dans le dépôt source.
-- `commit` exige un message explicite et reste contrôlé ; `publish` reste non implémenté.
+- `commit` exige un message explicite et reste contrôlé ; `publish` est une
+  action CLI explicite qui crée seulement une ref Git candidate interne après
+  validation isolée, sans modifier le worktree, l'index, HEAD ou une branche
+  utilisateur.
 - Les validations locales passent après l'exécution et avant toute future revue, réparation, commit ou publication.
 - Les projets pilotés restent indépendants.
 
@@ -59,7 +62,8 @@ Le mode d'inspection et le mode `plan` ne modifient pas les dépôts pilotés. L
 - `pnpm loop run lp-infra --candidate H1-L4 --mode plan --json` : planifie exactement un lot de roadmap structuré adressable ; un identifiant invalide ou devenu non admissible est refusé sans repli sur `next`.
 - `pnpm loop run creatyss --mode execute --provider claude_code --provider-executable claude --json` : exécute le cycle provider → validation dans un Git worktree isolé et temporaire ; le dépôt source reste inchangé et aucun commit ni publication n'est produit.
 - `pnpm loop run creatyss --mode execute --provider codex --provider-executable codex --export-patch ./artifacts/creatyss.patch --json` : après une exécution et validation réussies, exporte le diff Git binaire du worktree isolé vers le chemin explicite, sans l'appliquer au dépôt source.
-- `pnpm loop run creatyss --mode commit --provider codex --provider-executable codex --commit-message "..."` : effectue le commit Git borné existant après validation. `publish` reste rejeté explicitement.
+- `pnpm loop run creatyss --mode commit --provider codex --provider-executable codex --commit-message "..."` : effectue le commit Git borné existant après validation.
+- `pnpm loop run creatyss --mode publish --provider codex --provider-executable codex --json` : exécute et valide dans un worktree isolé, puis crée au plus `refs/loop-engine/candidates/<project>/<runId>` pointant vers un commit candidat parenté par le `baseSha` validé. Aucun apply, checkout, push, PR, merge ou branche utilisateur.
 
 ## Configuration
 
@@ -152,7 +156,8 @@ Depuis V14.4, `runLoopExecute(...)` orchestre un `LoopExecutor`, un
 `LoopValidator` et un `LoopRepairer` injectés. La sélection de politique devient
 une admission réelle pour le cycle, les validations configurées sont exécutées
 après l'exécuteur, chaque réparation est bornée par `maxRepairs` et suivie d'une
-nouvelle validation. `commit` et `publication` restent toujours `null`.
+nouvelle validation. `execute` conserve `commit` et `publication` à `null`; le
+mode `publish` V33 peut retourner une publication `candidate_ref` compacte.
 
 Voir aussi :
 

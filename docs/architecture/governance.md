@@ -71,6 +71,41 @@ explicitement dans la configuration, documentée ici, bornée à un artefact
 précis, soumise à une décision humaine et protégée par une validation/audit
 avant d'être considérée comme autorisée.
 
+### Candidate Ref Publication Git
+
+V33 ajoute une sortie Git distincte de toute publication vers le worktree
+source. `loop run <project> --mode publish` reste une action CLI humaine et
+explicite, et ne peut suivre qu'une exécution isolée dont les validations ont
+réussi. Elle ne réutilise pas `runLoopCommit` et ne demande ni push, ni PR, ni
+merge, ni checkout.
+
+Le patch validé est ré-identifié par SHA-256, appliqué seulement dans un index
+temporaire (`GIT_INDEX_FILE`) chargé depuis son `baseSha`, puis comparé au
+fileset validé. Git écrit ensuite la tree et un commit candidat avec ce seul
+parent `baseSha`; l'identité author/committer est celle déjà configurée dans le
+dépôt Git, jamais une identité humaine fabriquée par Loop Engine. Le commit ne
+devient pas `HEAD`.
+
+La seule mutation finale observable est la création compare-and-create de
+`refs/loop-engine/candidates/<project>/<runId>` par `git update-ref` avec
+l'ancien OID nul. Les composants `project` et `runId` sont validés avant de
+former la ref; aucune ref fournie par un renderer ou l'utilisateur n'est
+acceptée. Une ref existante, y compris une collision de course, échoue sans
+remplacement. Avant cette opération, aucun ref candidat n'est publié; après,
+la ref pointe entièrement vers le commit déjà préparé.
+
+La source doit toujours avoir `HEAD === baseSha`, vérifié avant la préparation
+et juste avant `update-ref`. Un worktree source dirty est admis: son contenu et
+son index ne participent pas à la candidate tree, qui est exclusivement dérivée
+de `baseSha` et du patch validé. V33 vérifie que `HEAD`, `git status`, `git
+diff`, `git diff --cached`, la branche courante et `refs/heads/*` restent
+inchangés. La rétention et le nettoyage des refs candidates restent hors
+périmètre; aucun GC manager n'est introduit.
+
+Cette capacité est une exception Git interne, bornée et explicitement demandée;
+elle ne change pas l'exception `execution_decision`, ne crée pas de nouvel
+Approval Engine et ne rend jamais la publication implicite après `execute`.
+
 ### Publication multi-fichiers vers le dépôt source
 
 V32 a qualifié les primitives Git disponibles sur des dépôts temporaires. Un
@@ -81,8 +116,9 @@ fournissent toutefois aucune bascule atomique et récupérable de plusieurs
 fichiers vers le worktree source : `git apply` et les opérations de checkout
 restent des mutations de fichiers, sans journal de reprise qualifié ici.
 
-La seule publication inter-projet autorisée demeure donc l'artefact unique
-`execution_decision`. Toute publication multi-fichiers reste refusée tant
+La seule publication inter-projet vers le **worktree source** autorisée demeure
+donc l'artefact unique `execution_decision`. Toute publication multi-fichiers
+vers ce worktree reste refusée tant
 qu'une primitive de bascule atomique, avec préflight complet, seconde
 vérification de `baseSha`, protection d'un worktree source propre et
 récupération démontrée, n'existe pas.
