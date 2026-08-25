@@ -253,6 +253,9 @@ export async function runLoopRunCommand(
         ? {}
         : { candidateId: options.candidateId }),
       maxRepairs: options.maxRepairs ?? 0,
+      ...(options.onProgress === undefined
+        ? {}
+        : { onProgress: options.onProgress }),
       ...executionDependencies,
     });
   }

@@ -20,11 +20,20 @@ export const APPROVED_DESKTOP_EXECUTE_PROVIDERS = Object.freeze({
 
 export type DesktopExecuteProvider = keyof typeof APPROVED_DESKTOP_EXECUTE_PROVIDERS;
 
+export type DesktopExecuteMode = "execute" | "publish";
+
 export type DesktopExecuteRequest = Readonly<{
   projectName: string;
   candidateId: string;
   provider: DesktopExecuteProvider;
   model: string;
+  /**
+   * Defaults to "execute" when omitted, preserving the pre-V38 contract.
+   * "publish" reuses the identical isolated execute/validate pipeline and
+   * then requests the bounded V33 candidate ref publication — no second
+   * execution pipeline exists. The renderer never supplies ref/SHA/path.
+   */
+  mode?: DesktopExecuteMode;
 }>;
 
 function patchFileSegment(value: string, fallback: string): string {
@@ -51,7 +60,10 @@ function isDesktopExecuteRequest(value: unknown): value is DesktopExecuteRequest
     typeof request.candidateId === "string" &&
     typeof request.model === "string" &&
     (request.provider === "codex" || request.provider === "claude_code") &&
-    APPROVED_DESKTOP_EXECUTE_PROVIDERS[request.provider].models.includes(request.model)
+    APPROVED_DESKTOP_EXECUTE_PROVIDERS[request.provider].models.includes(request.model) &&
+    (request.mode === undefined ||
+      request.mode === "execute" ||
+      request.mode === "publish")
   );
 }
 
@@ -79,6 +91,35 @@ export function createExecuteHandler(options: {
       return failure("spawn-error", "Loop Engine repository could not be resolved.");
     }
 
+    const provider = APPROVED_DESKTOP_EXECUTE_PROVIDERS[request.provider];
+    const mode = request.mode ?? "execute";
+
+    if (mode === "publish") {
+      // Publish reuses the identical isolated execute/validate pipeline and
+      // then requests the V33 bounded candidate ref publication. It never
+      // exports a patch to a renderer-chosen destination and never asks the
+      // renderer for a ref, SHA, path or cwd — the CLI/Core resolve those.
+      return options.cliInvoker.invoke(
+        "run",
+        [
+          request.projectName,
+          "--candidate",
+          request.candidateId,
+          "--mode",
+          "publish",
+          "--provider",
+          request.provider,
+          "--provider-executable",
+          provider.executable,
+          "--provider-model",
+          request.model,
+          "--provider-timeout-ms",
+          String(provider.timeoutMs),
+        ],
+        repositoryPath,
+      );
+    }
+
     const destinationPath = await options.choosePatchDestination(
       defaultPatchFilename(request.projectName, request.candidateId),
     );
@@ -92,7 +133,6 @@ export function createExecuteHandler(options: {
       return failure("spawn-error", "Patch destination already exists.");
     }
 
-    const provider = APPROVED_DESKTOP_EXECUTE_PROVIDERS[request.provider];
     return options.cliInvoker.invoke(
       "run",
       [

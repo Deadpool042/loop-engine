@@ -65,6 +65,9 @@ describe("GUI execution result contract", () => {
     const detail = parseExecutionResultDetail(completedResult());
     assert.deepEqual(detail, {
       status: "completed",
+      mode: "execute",
+      runId: "run-1",
+      project: "lp-infra",
       modifiedFiles: ["src/foo.ts", "tests/foo.test.ts"],
       validation: {
         status: "passed",
@@ -79,6 +82,7 @@ describe("GUI execution result contract", () => {
         fileCount: 2,
         baseSha: "b".repeat(40),
       },
+      publication: null,
       failure: null,
     });
   });
@@ -87,6 +91,9 @@ describe("GUI execution result contract", () => {
     const detail = parseExecutionResultDetail(failedResult());
     assert.deepEqual(detail, {
       status: "failed",
+      mode: "execute",
+      runId: "run-1",
+      project: "lp-infra",
       modifiedFiles: ["src/foo.ts", "tests/foo.test.ts"],
       validation: {
         status: "failed",
@@ -96,6 +103,7 @@ describe("GUI execution result contract", () => {
         exitCode: 1,
       },
       patchExport: null,
+      publication: null,
       failure: {
         code: "validation_failed",
         message: "Validation failed after bounded repair attempts.",
@@ -206,6 +214,83 @@ describe("GUI execution result contract", () => {
       parseExecutionResultDetail(
         failedResult({ failure: { code: "x", message: "y" } }),
       ),
+      null,
+    );
+  });
+
+  it("parses a successful publish result with its candidate ref publication", () => {
+    const detail = parseExecutionResultDetail(
+      completedResult({
+        mode: "publish",
+        patchExport: null,
+        publication: {
+          kind: "candidate_ref",
+          ref: "refs/loop-engine/candidates/lp-infra/run-1",
+          commitSha: "c".repeat(40),
+          baseSha: "b".repeat(40),
+        },
+      }),
+    );
+    assert.ok(detail !== null);
+    assert.equal(detail.mode, "publish");
+    assert.equal(detail.runId, "run-1");
+    assert.equal(detail.project, "lp-infra");
+    assert.equal(detail.publication?.ref, "refs/loop-engine/candidates/lp-infra/run-1");
+  });
+
+  it("rejects a publish result missing schemaVersion/mode discriminants", () => {
+    assert.equal(
+      parseExecutionResultDetail(completedResult({ mode: "commit" })),
+      null,
+    );
+  });
+
+  it("rejects a completed publish result without a publication", () => {
+    assert.equal(
+      parseExecutionResultDetail(
+        completedResult({ mode: "publish", patchExport: null, publication: null }),
+      ),
+      null,
+    );
+  });
+
+  it("rejects an execute result that carries a publication (no second publication primitive)", () => {
+    assert.equal(
+      parseExecutionResultDetail(
+        completedResult({
+          publication: {
+            kind: "candidate_ref",
+            ref: "refs/loop-engine/candidates/lp-infra/run-1",
+            commitSha: "c".repeat(40),
+            baseSha: "b".repeat(40),
+          },
+        }),
+      ),
+      null,
+    );
+  });
+
+  it("rejects a publication ref outside the governed candidate namespace", () => {
+    assert.equal(
+      parseExecutionResultDetail(
+        completedResult({
+          mode: "publish",
+          patchExport: null,
+          publication: {
+            kind: "candidate_ref",
+            ref: "refs/heads/main",
+            commitSha: "c".repeat(40),
+            baseSha: "b".repeat(40),
+          },
+        }),
+      ),
+      null,
+    );
+  });
+
+  it("rejects a publish result that still carries a patch export", () => {
+    assert.equal(
+      parseExecutionResultDetail(completedResult({ mode: "publish" })),
       null,
     );
   });

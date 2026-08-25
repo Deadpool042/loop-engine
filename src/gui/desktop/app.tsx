@@ -859,7 +859,7 @@ export function App(): React.JSX.Element {
     }
   }
 
-  async function executePlan(): Promise<void> {
+  async function executePlan(mode: "execute" | "publish" = "execute"): Promise<void> {
     const candidate = planDetail?.candidate;
     if (selectedProjectName === null || !candidate || !planDetail?.profile)
       return;
@@ -886,11 +886,16 @@ export function App(): React.JSX.Element {
     setSelectedPatchFile(0);
     setCancelLoading(false);
     try {
+      // The renderer only ever selects an intent (project, candidate,
+      // provider, model, mode). It never constructs or transmits a ref,
+      // SHA, path or Git command — main/Core resolve those when mode is
+      // "publish" (reusing the V33 bounded candidate publication).
       const started = await window.loopDesktop.startExecution({
         projectName: selectedProjectName,
         candidateId: candidate.id,
         provider: executeProvider,
         model: planDetail.profile.model,
+        mode,
       });
       if (!started.ok) {
         setExecuteMessage(started.raw);
@@ -898,7 +903,11 @@ export function App(): React.JSX.Element {
       }
       setExecutionSession(started.session);
     } catch {
-      setExecuteMessage("Impossible de lancer l’exécution isolée.");
+      setExecuteMessage(
+        mode === "publish"
+          ? "Impossible de lancer la publication de la candidate."
+          : "Impossible de lancer l’exécution isolée.",
+      );
     } finally {
       setExecuteLoading(false);
     }
@@ -958,7 +967,14 @@ export function App(): React.JSX.Element {
         if (history !== null && history.project === historyProjectName) {
           setRunHistory(history);
           setRunHistoryProjectName(historyProjectName);
-          setSelectedRunId((current) => current ?? history.entries[0]?.runId ?? null);
+          // A freshly published candidate is always addressed by its own
+          // run id, so its Candidate Review (V36) is reachable immediately
+          // without reimplementing candidate review here.
+          setSelectedRunId((current) =>
+            detail.mode === "publish" && detail.runId !== null
+              ? detail.runId
+              : (current ?? history.entries[0]?.runId ?? null),
+          );
         }
       });
     }
@@ -1886,11 +1902,26 @@ export function App(): React.JSX.Element {
                               executeLoading ||
                               executionSession?.result === null
                             }
-                            onClick={executePlan}
+                            onClick={() => void executePlan("execute")}
                           >
                             {executeLoading
                               ? "Exécution isolée en cours…"
                               : "Confirmer et choisir la destination du patch"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="mt-3 ml-2"
+                            disabled={
+                              executeLoading ||
+                              executionSession?.result === null
+                            }
+                            onClick={() => void executePlan("publish")}
+                          >
+                            {executeLoading
+                              ? "Publication en cours…"
+                              : "Publier une candidate"}
                           </Button>
                           {canCancelExecution(executionSession) && (
                             <Button
@@ -2063,6 +2094,33 @@ export function App(): React.JSX.Element {
                                   Dépôt source non modifié.
                                 </p>
                               </section>
+                              {executeResult.mode === "publish" && executeResult.publication && (
+                                <section className="rounded-md border border-emerald-200 bg-emerald-50 p-3" aria-label="Candidate publiée">
+                                  <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-emerald-800">
+                                    Candidate publiée
+                                  </h4>
+                                  <p className="mt-2 break-all font-mono text-xs text-loop-muted">
+                                    {executeResult.publication.ref}
+                                  </p>
+                                  <p className="mt-1 font-mono text-xs text-loop-muted">
+                                    Commit candidat : {executeResult.publication.commitSha}
+                                  </p>
+                                  <p className="mt-2 text-xs text-loop-muted">
+                                    Aucun push, aucune Pull Request, aucun merge : seule une référence Git
+                                    sous refs/loop-engine/candidates/** a été créée. Le dépôt source n’a pas
+                                    été modifié.
+                                  </p>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="mt-3"
+                                    onClick={loadCandidateReview}
+                                  >
+                                    Revoir la candidate
+                                  </Button>
+                                </section>
+                              )}
                               {patchReview && <section className="patch-review rounded-lg border border-loop-line bg-white p-4" aria-label="Revue du patch exporté"><h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Patch Review</h4>{patchReview.status !== "ready" ? <p className="mt-2 text-sm text-amber-800">Le patch ne peut pas être inspecté : {patchReview.status}.</p> : <><p className="mt-2 text-sm">{patchReview.fileCount} fichier(s) · <span className="text-emerald-700">+{patchReview.additions}</span> · <span className="text-rose-700">-{patchReview.deletions}</span></p><p className="mt-1 font-mono text-xs text-loop-muted">SHA-256 : {patchReview.sha256}</p><p className="mt-1 font-mono text-xs text-loop-muted">Base Git : {patchReview.baseSha}</p><div className="patch-review-grid mt-4 grid gap-4 lg:grid-cols-[minmax(180px,0.35fr)_minmax(0,1fr)]"><ol className="divide-y divide-loop-line rounded border border-loop-line">{patchReview.files.map((file, index) => <li key={`${file.oldPath}:${file.newPath}`}><button type="button" aria-pressed={selectedPatchFile === index} onClick={() => setSelectedPatchFile(index)} className={`w-full px-3 py-2 text-left font-mono text-xs ${selectedPatchFile === index ? "bg-loop-paper" : ""}`}>{file.newPath ?? file.oldPath} <span className="font-sans text-loop-muted">{file.status} +{file.additions} -{file.deletions}</span></button></li>)}</ol>{selectedPatchReviewFile && <PatchDiff file={selectedPatchReviewFile} />}</div></>}</section>}
                               {executeResult.failure && (
                                 <section className="rounded-md border border-rose-200 bg-rose-50 p-3">

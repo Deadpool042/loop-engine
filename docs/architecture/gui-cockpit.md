@@ -159,6 +159,50 @@ Tout changement de projet ou de run invalide la réponse en vol. Cette capacité
 reste strictement read-only : aucun Apply, push, PR, merge, checkout, switch ou
 écriture de ref n’est exposé par le cockpit.
 
+### Governed Candidate Publication cockpit (V38)
+
+V38 expose le mode `publish` déjà livré par V33 depuis l'action candidate
+sélectionnée du cockpit, en réutilisant intégralement la session d'exécution
+observable V23/V27 et l'IPC `loop:execution-start` existant : le contrat
+`DesktopExecuteRequest` gagne un champ additif `mode?: "execute" | "publish"`
+(par défaut `"execute"`), jamais un second canal IPC ni une seconde session.
+Le renderer transmet toujours uniquement `projectName`, `candidateId`,
+`provider` et `model`, plus ce `mode` explicite — jamais de ref, de SHA, de
+chemin, de `cwd` ou d'argument Git. Quand `mode === "publish"`, le handler
+principal invoque `pnpm loop run <project> --candidate <id> --mode publish
+--provider ... --provider-executable ... --provider-model ...` : ni dialogue
+de destination de patch, ni `--export-patch` ne sont utilisés (`--export-patch`
+reste réservé au mode `execute`).
+
+`runLoopPublish` reste l'unique primitive de publication (V33) : il réutilise
+l'exécution/validation isolée existante en interne, puis crée par
+compare-and-create une ref candidate sous `refs/loop-engine/candidates/**`
+sans jamais toucher `refs/heads/**`, HEAD, l'index ou le worktree source.
+Aucune seconde pipeline d'exécution ou de publication n'a été introduite.
+
+Le résultat `publish` est reparsé fail-closed par une extension additive de
+`execution-result-contract.ts` (`mode`, `runId`, `project`, `publication`
+avec `kind: "candidate_ref"`, `ref` contraint au préfixe
+`refs/loop-engine/candidates/`, `commitSha` et `baseSha` en SHA hexadécimal) :
+un résultat `execute` ne peut jamais porter de `publication`, et un `publish`
+terminé avec succès doit en porter une, sinon le contrat rejette la réponse
+entière plutôt que d'en afficher une projection partielle.
+
+Le mode `publish` continue d'être enregistré par le mécanisme d'historique
+existant (aucune nouvelle persistance) : le run publié apparaît dans la
+fenêtre récente V28, reste adressable par `runId` via le lookup exact V37, et
+sa Candidate Review réutilise directement V36 (aucune réimplémentation, aucun
+nouveau contrat Git renderer). Après un publish réussi, le panneau de résultat
+affiche la ref et le commit candidat puis propose « Revoir la candidate », qui
+délègue à la Candidate Review V36 existante.
+
+Publier une candidate n'est jamais déclenché automatiquement après un
+`execute` : le cockpit distingue explicitement le bouton « Exécuter » et le
+bouton « Publier une candidate », tous deux déclenchant la même session
+observable et le même mécanisme d'annulation V25 (SIGTERM puis SIGKILL sur le
+groupe de processus détaché). Aucun bouton Push, Create PR, Merge ou Apply
+n'existe dans le cockpit — ces capacités différées restent hors périmètre.
+
 ### Patch Review (V30) et prérequis d'identité (V31)
 
 V30 ajoute une revue du patch exporté pour la session d'exécution courante

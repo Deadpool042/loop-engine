@@ -129,4 +129,77 @@ describe("GUI execute handler", () => {
     assert.equal(result.ok, false);
     assert.equal(chooserCalls, 0);
   });
+
+  it("publish mode invokes --mode publish without opening the patch dialog or requesting --export-patch", async () => {
+    const calls: Array<readonly string[]> = [];
+    let chooserCalls = 0;
+    const handler = createExecuteHandler({
+      cliInvoker: createCliInvoker({
+        timeoutMs: 900_000,
+        execute: async (_executable, args) => {
+          calls.push(args);
+          return { stdout: '{"schemaVersion":1,"mode":"publish","status":"completed"}', stderr: "", exitCode: 0 };
+        },
+      }),
+      resolveRepositoryPath: () => "/trusted/loop-engine",
+      choosePatchDestination: async () => {
+        chooserCalls += 1;
+        return "/chosen/validated.patch";
+      },
+      destinationExists: () => false,
+      parentDirectoryExists: () => true,
+    });
+
+    const result = await handler({
+      projectName: "lp-infra",
+      candidateId: "H1-L4",
+      provider: "claude_code",
+      model: "claude-sonnet-5",
+      mode: "publish",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(chooserCalls, 0);
+    assert.deepEqual(calls, [
+      [
+        "--silent",
+        "loop",
+        "run",
+        "lp-infra",
+        "--candidate",
+        "H1-L4",
+        "--mode",
+        "publish",
+        "--provider",
+        "claude_code",
+        "--provider-executable",
+        "claude",
+        "--provider-model",
+        "claude-sonnet-5",
+        "--provider-timeout-ms",
+        "600000",
+        "--json",
+      ],
+    ]);
+  });
+
+  it("rejects an unrecognized mode value", async () => {
+    const handler = createExecuteHandler({
+      cliInvoker: createCliInvoker({ execute: async () => ({ stdout: "{}", stderr: "", exitCode: 0 }) }),
+      resolveRepositoryPath: () => "/trusted/loop-engine",
+      choosePatchDestination: async () => "/chosen/validated.patch",
+      destinationExists: () => false,
+      parentDirectoryExists: () => true,
+    });
+
+    const result = await handler({
+      projectName: "lp-infra",
+      candidateId: "H1-L4",
+      provider: "claude_code",
+      model: "claude-sonnet-5",
+      mode: "commit",
+    });
+
+    assert.equal(result.ok, false);
+  });
 });
