@@ -10,8 +10,16 @@ export const LOOP_RUN_MODES = ["plan", "execute", "commit", "publish"] as const;
 export type LoopRunMode = (typeof LOOP_RUN_MODES)[number];
 
 export const LOOP_RUN_STATUSES = [
-  "idle", "planning", "ready", "executing", "validating", "repairing",
-  "completed", "blocked", "failed", "cancelled",
+  "idle",
+  "planning",
+  "ready",
+  "executing",
+  "validating",
+  "repairing",
+  "completed",
+  "blocked",
+  "failed",
+  "cancelled",
 ] as const;
 export type LoopRunStatus = (typeof LOOP_RUN_STATUSES)[number];
 export type LoopRunStepStatus = "completed" | "blocked" | "failed";
@@ -40,6 +48,8 @@ export type LoopRunPatchExport = Readonly<{
   path: string;
   sha256: string;
   fileCount: number;
+  /** Full Git SHA of the isolated worktree before this patch was generated. */
+  baseSha: string;
 }>;
 export type LoopRunResult = Readonly<{
   schemaVersion: 1;

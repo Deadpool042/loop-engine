@@ -28,6 +28,7 @@ function completedResult(overrides: Record<string, unknown> = {}) {
       path: "/tmp/change.patch",
       sha256: "a".repeat(64),
       fileCount: 2,
+      baseSha: "b".repeat(40),
     },
     publication: null,
     failure: null,
@@ -76,6 +77,7 @@ describe("GUI execution result contract", () => {
         path: "/tmp/change.patch",
         sha256: "a".repeat(64),
         fileCount: 2,
+        baseSha: "b".repeat(40),
       },
       failure: null,
     });
@@ -183,6 +185,19 @@ describe("GUI execution result contract", () => {
     assert.equal(
       parseExecutionResultDetail(
         completedResult({ patchExport: { path: "/tmp/x.patch" } }),
+      ),
+      null,
+    );
+    assert.equal(
+      parseExecutionResultDetail(
+        completedResult({
+          patchExport: {
+            path: "/tmp/change.patch",
+            sha256: "a".repeat(64),
+            fileCount: 2,
+            baseSha: "not-a-sha",
+          },
+        }),
       ),
       null,
     );

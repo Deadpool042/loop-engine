@@ -12,6 +12,7 @@ const exported = {
   path: "/governed/result.patch",
   sha256: createHash("sha256").update(patch).digest("hex"),
   fileCount: 3,
+  baseSha: "a".repeat(40),
 };
 
 describe("GUI governed patch review", () => {
@@ -78,6 +79,10 @@ describe("GUI governed patch review", () => {
       readFile: async () => Buffer.from(patch) as never,
     });
     assert.equal(result.status, "ready");
+    assert.equal(
+      result.status === "ready" ? result.baseSha : null,
+      "a".repeat(40),
+    );
   });
 
   it("fails closed for missing, symlinked, oversized, altered, invalid and binary patches", async () => {

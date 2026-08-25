@@ -57,6 +57,11 @@ function hasSamePaths(
   );
 }
 
+function fullGitSha(output: Buffer): string | null {
+  const value = output.toString("utf8").trim();
+  return /^[0-9a-f]{40}$/i.test(value) ? value : null;
+}
+
 /**
  * Exports the exact validated worktree delta using Git's native binary patch
  * format. Intent-to-add entries are local to the disposable worktree and make
@@ -76,6 +81,15 @@ export async function exportValidatedGitPatch(
   );
 
   try {
+    const baseSha = fullGitSha(
+      await runGit(input.worktreePath, ["rev-parse", "--verify", "HEAD"]),
+    );
+    if (baseSha === null) {
+      throw new ValidatedGitPatchExportError(
+        "patch_export_failed",
+        "Unable to determine the isolated worktree base revision.",
+      );
+    }
     await runGit(input.worktreePath, ["add", "--intent-to-add", "--", "."]);
     const [patch, changedPathsOutput] = await Promise.all([
       runGit(input.worktreePath, ["diff", "--binary", "HEAD"]),
@@ -120,6 +134,7 @@ export async function exportValidatedGitPatch(
       path: destinationPath,
       sha256: createHash("sha256").update(patch).digest("hex"),
       fileCount: changedPaths.length,
+      baseSha,
     });
   } finally {
     await rm(temporaryPath, { force: true });

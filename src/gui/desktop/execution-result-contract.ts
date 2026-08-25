@@ -14,6 +14,7 @@ export type ExecutionResultDetail = Readonly<{
     path: string;
     sha256: string;
     fileCount: number;
+    baseSha: string;
   }> | null;
   failure: Readonly<{
     code: string;
@@ -70,7 +71,9 @@ function parsePatchExport(
     !isRecord(value) ||
     typeof value.path !== "string" ||
     typeof value.sha256 !== "string" ||
-    typeof value.fileCount !== "number"
+    typeof value.fileCount !== "number" ||
+    typeof value.baseSha !== "string" ||
+    !/^[0-9a-f]{40}$/i.test(value.baseSha)
   ) {
     return undefined;
   }
@@ -79,6 +82,7 @@ function parsePatchExport(
     path: value.path,
     sha256: value.sha256,
     fileCount: value.fileCount,
+    baseSha: value.baseSha,
   });
 }
 

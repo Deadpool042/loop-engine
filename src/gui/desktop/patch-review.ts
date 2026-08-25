@@ -26,6 +26,7 @@ export type PatchReviewDetail = Readonly<{
   status: "ready";
   sha256: string;
   fileCount: number;
+  baseSha: string;
   additions: number;
   deletions: number;
   files: readonly PatchReviewFile[];
@@ -171,7 +172,10 @@ function parseGitFileMarkerPath(value: string): string | null | undefined {
 /** Parses only the canonical unified diff emitted by the Git exporter. */
 export function parseUnifiedPatch(
   content: string,
-): Omit<PatchReviewDetail, "status" | "sha256" | "fileCount"> | null {
+): Omit<
+  PatchReviewDetail,
+  "status" | "sha256" | "fileCount" | "baseSha"
+> | null {
   if (content.includes("GIT binary patch") || content.includes("Binary files "))
     return null;
   const files: MutableFile[] = [];
@@ -330,6 +334,7 @@ export async function readPatchReview(
       status: "ready",
       sha256: patchExport.sha256,
       fileCount: patchExport.fileCount,
+      baseSha: patchExport.baseSha,
       ...parsed,
     });
   } catch (error) {

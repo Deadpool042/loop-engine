@@ -259,7 +259,12 @@ describe("isolated provider execution", () => {
         }),
         validator: async () => {
           validatorCalls += 1;
-          return { status: "passed" as const, failedCommand: null, exitCode: 0, details: [] };
+          return {
+            status: "passed" as const,
+            failedCommand: null,
+            exitCode: 0,
+            details: [],
+          };
         },
       });
 
@@ -329,7 +334,12 @@ describe("isolated provider execution", () => {
         exportPatchPath: patchPath,
         validator: async () => {
           validatorCalls += 1;
-          return { status: "passed" as const, failedCommand: null, exitCode: 0, details: [] };
+          return {
+            status: "passed" as const,
+            failedCommand: null,
+            exitCode: 0,
+            details: [],
+          };
         },
       });
 
@@ -368,7 +378,10 @@ describe("isolated provider execution", () => {
 
       assert.equal(result.status, "completed");
       assert.deepEqual(result.modifiedFiles, ["README.md"]);
-      assert.equal(await readFile(join(project.path, "README.md"), "utf8"), "source\n");
+      assert.equal(
+        await readFile(join(project.path, "README.md"), "utf8"),
+        "source\n",
+      );
       assert.equal(
         execFileSync("git", ["status", "--porcelain=v1"], {
           cwd: project.path,
@@ -481,6 +494,7 @@ describe("isolated provider execution", () => {
         path: patchPath,
         sha256: createHash("sha256").update(patch).digest("hex"),
         fileCount: 2,
+        baseSha: sourceHead,
       });
       assert.equal(
         await readFile(join(project.path, "README.md"), "utf8"),
