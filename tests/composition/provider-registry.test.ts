@@ -84,6 +84,23 @@ describe("LoopProviderRegistry", () => {
     );
   });
 
+  it("adds verified long-context capability for the exact Claude Sonnet 5 model", () => {
+    const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
+      id: "claude_code",
+      executable: "/usr/local/bin/claude",
+      model: "claude-sonnet-5",
+    });
+
+    const [profile] = assembly.agentRegistry.profiles;
+    assert.ok(profile);
+    assert.deepEqual(profile.capabilities, [
+      "code_edit",
+      "shell_exec",
+      "test_execution",
+      "long_context",
+    ]);
+  });
+
   it("keeps an unknown enterprise model alias inside the same conservative provider-bound envelope", () => {
     const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
       id: "claude_code",
