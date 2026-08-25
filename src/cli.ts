@@ -507,11 +507,14 @@ else if (command === "review") {
       "--export-patch requires an explicit provider.",
     );
   }
-  if (progressEvents && (mode !== "execute" || !json)) {
+  if (
+    progressEvents &&
+    ((mode !== "execute" && mode !== "publish") || !json)
+  ) {
     failOption(
       json,
       "progress_events_execute_json_only",
-      "--progress-events requires execute mode with --json.",
+      "--progress-events requires execute or publish mode with --json.",
     );
   }
 

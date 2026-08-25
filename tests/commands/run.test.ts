@@ -322,3 +322,63 @@ describe("run command — non-silent run history write failure", () => {
     );
   });
 });
+
+describe("run command — publish mode", () => {
+  it("forwards onProgress to runLoopPublish exactly like execute", async () => {
+    const publishResult: LoopRunResult = {
+      ...fixtureCompletedResult(),
+      mode: "publish",
+      publication: {
+        kind: "candidate_ref",
+        ref: "refs/loop-engine/candidates/run-history-write-failure-fixture/run-1",
+        commitSha: "c".repeat(40),
+        baseSha: "b".repeat(40),
+      },
+    };
+    const observedStatuses: string[] = [];
+    let receivedProvider: unknown;
+    const application = {
+      loopExecutor: () => Promise.resolve({ modifiedFiles: [] }),
+      loopAgentRegistry: {},
+      runLoopPublish: (
+        _projectName: string,
+        options?: { onProgress?: (event: { status: string }) => void; provider?: unknown },
+      ) => {
+        receivedProvider = options;
+        options?.onProgress?.({ status: "executing" });
+        options?.onProgress?.({ status: "completed" });
+        return Promise.resolve(publishResult);
+      },
+      recordLoopRunHistory: () => ({ written: true, ok: true }),
+      generateExecutionReport: (runResult: LoopRunResult) => runResult,
+    } as unknown as LoopApplicationAssembly;
+
+    const log = captureConsoleLog();
+    let exitCode: number;
+    try {
+      exitCode = await runLoopRunCommand(
+        application,
+        FIXTURE_PROJECT,
+        "publish",
+        false,
+        {
+          provider: "claude_code",
+          onProgress: (event) => observedStatuses.push(event.status),
+        },
+      );
+    } finally {
+      log.restore();
+    }
+
+    assert.equal(exitCode, 0);
+    assert.deepEqual(observedStatuses, ["executing", "completed"]);
+    assert.ok(receivedProvider !== undefined);
+    assert.ok(
+      log.lines.some((line) =>
+        line.includes(
+          "Publication: candidate_ref refs/loop-engine/candidates/run-history-write-failure-fixture/run-1",
+        ),
+      ),
+    );
+  });
+});
