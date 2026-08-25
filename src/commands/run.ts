@@ -53,6 +53,15 @@ function printLoopRunResult(
       terminal.info(`Provider: ${profile.provider}`);
       terminal.info(`Model: ${profile.model}`);
       terminal.info(`Profile ranking effort: ${profile.effort}`);
+      const alternatives = policy.selection.notSelected ?? [];
+      if (alternatives.length > 0) {
+        terminal.info(
+          `Other eligible profiles: ${alternatives
+            .slice(0, 3)
+            .map((candidate) => `${candidate.profileId} (${candidate.reason})`)
+            .join(", ")}${alternatives.length > 3 ? " …" : ""}`,
+        );
+      }
     } else if (policy.selection?.outcome === "no_match") {
       terminal.warning("Selection: no compatible agent.");
     } else {

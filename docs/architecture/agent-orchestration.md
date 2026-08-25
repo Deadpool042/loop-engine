@@ -14,7 +14,7 @@ Donner à Loop Engine un vocabulaire typé pour raisonner sur "quel agent d'exé
 
 - **Local first** — toute décision de sélection se prend à partir de données locales (`AgentRegistry`), jamais d'un appel réseau.
 - **Retrieval first** — avant d'escalader vers un agent plus coûteux, préférer réduire le contexte nécessaire (ex. `rag-search`) plutôt que d'augmenter l'effort. Ce lot documente le principe ; son application concrète appartient à un futur `LoopExecutor`, pas au code de ce lot.
-- **Smallest capable agent first** — parmi les profils satisfaisant les capacités et permissions requises, le sélecteur retient toujours le profil dont l'effort est le plus faible.
+- **Smallest capable agent first** — parmi les profils satisfaisant les capacités, permissions, contraintes provider/runtime et plafonds requis, le sélecteur retient toujours le profil dont l'effort est le plus faible.
 - **Escalation only on failure** — l'escalade n'est jamais automatique ni implicite : `escalateAgentProfile` exige en entrée une raison d'échec explicite fournie par l'appelant. Sans échec signalé, il n'y a pas d'escalade.
 
 Ces principes s'ajoutent à ceux de `CLAUDE.md` (aucun appel IA automatique par défaut, zéro consommation de tokens par défaut) ; ils ne les remplacent pas.
@@ -89,12 +89,15 @@ Aucun profil par défaut n'a de priorité fixe sur un autre : le registry ne tri
 
 `selectAgentProfile(registry, request)` est une fonction pure et déterministe :
 
-1. filtre les profils du registry qui couvrent toutes les capacités et permissions requises par `request`, et respectent le plafond d'effort et de budget éventuellement fournis ;
+1. filtre les profils du registry qui couvrent toutes les capacités et permissions requises par `request`, respectent les allow-lists provider/runtime et le plafond d'effort et de budget éventuellement fournis ;
 2. parmi les profils restants, retient celui dont l'`effort` est le plus faible (« smallest capable agent first ») ;
 3. départage les ex æquo de façon déterministe (ordre d'`id` croissant) — jamais aléatoire ;
-4. retourne aussi la liste des profils rejetés avec leur raison (**explicabilité**), qu'un profil ait été sélectionné ou non.
+4. retourne aussi la liste des profils rejetés avec leur raison (**explicabilité**), qu'un profil ait été sélectionné ou non ;
+5. lorsque plusieurs profils passent les gates, retourne une projection compacte `notSelected` (`profileId`, `higher_effort_than_selected` ou `deterministic_tiebreak`) sans dupliquer le registry.
 
-Aucune notion de hiérarchie entre runtimes ou providers n'intervient dans cet algorithme : deux profils de même effort couvrant les mêmes capacités sont interchangeables du point de vue du sélecteur.
+Les allow-lists provider/runtime sont des contraintes hard issues de la policy, jamais une préférence implicite. Hors de ces contraintes, aucune hiérarchie entre runtimes ou providers n'intervient : deux profils de même effort couvrant les mêmes exigences sont départagés uniquement par leur `id`.
+
+L'ordre de déclaration du registry n'est pas une entrée de décision : les rejets et les alternatives non retenues sont ordonnés par `profileId`. Un même registry sémantique, même sérialisé dans un ordre différent, produit donc la même décision observable.
 
 ## Stratégie d'escalade
 
