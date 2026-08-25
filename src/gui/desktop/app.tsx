@@ -46,6 +46,7 @@ import {
 import { formatRunHistoryStatus, parseRunHistoryDetail, type RunHistoryDetail, type RunHistoryEntry } from "./run-history-contract.js";
 import { parseGateReassessmentReport, type GateReassessmentReport } from "./gate-reassessment-contract.js";
 import type { DesktopExecutionDecisionDraft, DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
+import type { PatchReviewFile, PatchReviewResult } from "./patch-review.js";
 
 const RENEWABLE_DECISION_MESSAGES: Readonly<Record<string, string>> = {
   decision_missing: "Aucune décision d’exécution valide n’est disponible pour ce travail.",
@@ -298,6 +299,10 @@ export function createRoadmapProposalEstimateRunner(options: {
   });
 }
 
+function PatchDiff({ file }: { file: PatchReviewFile }): React.JSX.Element {
+  return <div className="patch-diff rounded border border-loop-line font-mono text-xs" tabIndex={0}>{file.hunks.length === 0 ? <p className="p-3 text-loop-muted">Aucun contenu textuel à afficher.</p> : file.hunks.map((hunk) => <div key={hunk.header}><p className="m-0 border-y border-loop-line bg-loop-paper px-3 py-1 text-loop-muted">{hunk.header}</p>{hunk.lines.map((line, index) => <div key={`${index}:${line.content}`} className={`grid grid-cols-[3rem_3rem_1.25rem_minmax(0,1fr)] px-2 ${line.type === "addition" ? "bg-emerald-50" : line.type === "deletion" ? "bg-rose-50" : ""}`}><span>{line.oldLineNumber ?? ""}</span><span>{line.newLineNumber ?? ""}</span><span>{line.type === "addition" ? "+" : line.type === "deletion" ? "-" : line.type === "no_newline" ? "\\" : " "}</span><span className="whitespace-pre">{line.content}</span></div>)}</div>)}</div>;
+}
+
 export function App(): React.JSX.Element {
   const [projects, setProjects] = useState<readonly SummaryProject[]>([]);
   const [selectedProjectName, setSelectedProjectName] = useState<string | null>(
@@ -337,6 +342,9 @@ export function App(): React.JSX.Element {
   const [executionSession, setExecutionSession] =
     useState<DesktopExecutionSession | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [patchReview, setPatchReview] = useState<PatchReviewResult | null>(null);
+  const [patchReviewLoading, setPatchReviewLoading] = useState(false);
+  const [selectedPatchFile, setSelectedPatchFile] = useState(0);
   const [proposalLoading, setProposalLoading] = useState(false);
   const [proposalProfileSelection, setProposalProfileSelection] =
     useState<RoadmapProposalProfileOverride>("auto");
@@ -392,6 +400,7 @@ export function App(): React.JSX.Element {
     hasExecutionDecisionInProgress: decisionDraft !== null || decisionRenewalCode !== null,
   });
   const focusedStepId = getFocusedGuidedFlowStepId(guidedFlowSteps);
+  const selectedPatchReviewFile = patchReview?.status === "ready" ? patchReview.files[selectedPatchFile] ?? null : null;
 
   useEffect(() => {
     void refreshSummary();
@@ -750,6 +759,8 @@ export function App(): React.JSX.Element {
     setExecuteMessage(null);
     setExecuteResult(null);
     setExecutionSession(null);
+    setPatchReview(null);
+    setSelectedPatchFile(0);
     setCancelLoading(false);
     try {
       const started = await window.loopDesktop.startExecution({
@@ -779,6 +790,14 @@ export function App(): React.JSX.Element {
     } catch {
       // Best-effort cancellation request; polling reflects the real outcome.
     }
+  }
+
+  async function loadPatchReview(): Promise<void> {
+    if (executionSession === null) return;
+    setPatchReviewLoading(true);
+    try { setPatchReview(await window.loopDesktop.patchReview(executionSession.id)); setSelectedPatchFile(0); }
+    catch { setPatchReview({ status: "internal_read_failure" }); }
+    finally { setPatchReviewLoading(false); }
   }
 
   useEffect(() => {
@@ -1906,6 +1925,7 @@ export function App(): React.JSX.Element {
                                       SHA-256 :{" "}
                                       {executeResult.patchExport.sha256}
                                     </p>
+                                    <Button type="button" size="sm" variant="outline" className="mt-3" disabled={patchReviewLoading} onClick={loadPatchReview}>{patchReviewLoading ? "Lecture du patch…" : "Relire le patch"}</Button>
                                   </>
                                 ) : (
                                   <p className="mt-2 text-loop-muted">
@@ -1916,6 +1936,7 @@ export function App(): React.JSX.Element {
                                   Dépôt source non modifié.
                                 </p>
                               </section>
+                              {patchReview && <section className="patch-review rounded-lg border border-loop-line bg-white p-4" aria-label="Revue du patch exporté"><h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Patch Review</h4>{patchReview.status !== "ready" ? <p className="mt-2 text-sm text-amber-800">Le patch ne peut pas être inspecté : {patchReview.status}.</p> : <><p className="mt-2 text-sm">{patchReview.fileCount} fichier(s) · <span className="text-emerald-700">+{patchReview.additions}</span> · <span className="text-rose-700">-{patchReview.deletions}</span></p><p className="mt-1 font-mono text-xs text-loop-muted">SHA-256 : {patchReview.sha256}</p><div className="patch-review-grid mt-4 grid gap-4 lg:grid-cols-[minmax(180px,0.35fr)_minmax(0,1fr)]"><ol className="divide-y divide-loop-line rounded border border-loop-line">{patchReview.files.map((file, index) => <li key={`${file.oldPath}:${file.newPath}`}><button type="button" aria-pressed={selectedPatchFile === index} onClick={() => setSelectedPatchFile(index)} className={`w-full px-3 py-2 text-left font-mono text-xs ${selectedPatchFile === index ? "bg-loop-paper" : ""}`}>{file.newPath ?? file.oldPath} <span className="font-sans text-loop-muted">{file.status} +{file.additions} -{file.deletions}</span></button></li>)}</ol>{selectedPatchReviewFile && <PatchDiff file={selectedPatchReviewFile} />}</div></>}</section>}
                               {executeResult.failure && (
                                 <section className="rounded-md border border-rose-200 bg-rose-50 p-3">
                                   <h4 className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-rose-700">

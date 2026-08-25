@@ -10,6 +10,7 @@ import { createReviewHandler } from "../../src/gui/desktop/review-handler.js";
 import { createRunHistoryHandler, DESKTOP_RUN_HISTORY_LIMIT } from "../../src/gui/desktop/run-history-handler.js";
 import { createSummaryHandler } from "../../src/gui/desktop/summary-handler.js";
 import { resolveLoopEngineRepositoryPath } from "../../src/gui/repo-path-resolver.js";
+import { createPatchReviewHandler } from "../../src/gui/desktop/patch-review-handler.js";
 
 describe("GUI desktop execution boundary", () => {
   it("exposes only explicit renderer APIs", async () => {
@@ -25,6 +26,7 @@ describe("GUI desktop execution boundary", () => {
     assert.equal(api.startExecution.length, 1);
     assert.equal(api.executionSession.length, 1);
     assert.equal(api.cancelExecution.length, 1);
+    assert.equal(api.patchReview.length, 1);
     assert.equal(api.roadmapProposal.length, 2);
     assert.equal(api.roadmapProposalEstimate.length, 1);
     assert.equal(api.gateReassessment.length, 2);
@@ -49,6 +51,7 @@ describe("GUI desktop execution boundary", () => {
     });
     await api.executionSession("session-1");
     await api.cancelExecution("session-1");
+    await api.patchReview("session-1");
     await api.roadmapProposal("loop-engine", "auto");
     await api.roadmapProposalEstimate("loop-engine");
     await api.gateReassessment("lp-infra", "auto");
@@ -80,6 +83,7 @@ describe("GUI desktop execution boundary", () => {
       ],
       ["loop:execution-session", "session-1"],
       ["loop:execution-cancel", "session-1"],
+      ["loop:patch-review", "session-1"],
       ["loop:roadmap-proposal", "loop-engine", "auto"],
       ["loop:roadmap-proposal-estimate", "loop-engine"],
       ["loop:gate-reassessment", "lp-infra", "auto"],
@@ -181,6 +185,11 @@ describe("GUI desktop execution boundary", () => {
       mainSource,
       /keychainReader: createProviderKeychainReader\(\)/,
     );
+  });
+
+  it("accepts only a known session identity for patch review, never a path", async () => {
+    const handler = createPatchReviewHandler({ getSession: () => null });
+    assert.deepEqual(await handler("/arbitrary/path.patch"), { status: "no_patch" });
   });
 
   it("passes the renderer project name to review while retaining the trusted cwd", async () => {
