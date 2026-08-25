@@ -74,7 +74,7 @@ export function inspectLoopRunnerExecuteInvariant(
     ...(!sourceIncludesToken(commandSource, "await runLoopExecute(")
       ? [`${COMMAND_FILE} -> execute mode is not routed`]
       : []),
-    ...(!sourceIncludesToken(commandSource, 'mode === "publish"')
+    ...(!sourceIncludesToken(commandSource, "await runLoopPublish(")
       ? [`${COMMAND_FILE} -> publish boundary is not explicit`]
       : []),
     ...(!sourceIncludesToken(
@@ -166,7 +166,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Keep V14.4 as one fail-closed execute/validate/repair boundary: admit policy before execution, clamp the requested repair count to the resolved policy ceiling, invoke one injected executor, revalidate after each bounded repair, and leave commit/publication null inside the execute runner.",
+            "Keep V14.4 as one fail-closed execute/validate/repair boundary: admit policy before execution, clamp the requested repair count to the resolved policy ceiling, invoke one injected executor, revalidate after each bounded repair, and leave commit/publication null inside the execute runner; route explicit candidate publication outside it.",
           )
         : pass(
             rule,

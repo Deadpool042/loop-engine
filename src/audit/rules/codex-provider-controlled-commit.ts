@@ -41,7 +41,7 @@ const REQUIRED_COMMAND_TOKENS = Object.freeze([
   '"missing_provider_executable"',
   '"missing_commit_message"',
   "await runLoopCommit(",
-  'mode === "publish"',
+  "await runLoopPublish(",
 ]);
 const FORBIDDEN_TOKENS = Object.freeze([
   "--full-auto",
@@ -102,7 +102,7 @@ export const CODEX_PROVIDER_CONTROLLED_COMMIT_RULE: AuditRule = (() => {
     severity: "error",
     title: "Codex provider and controlled commit remain bounded and explicit",
     description:
-      "The Codex pilot must consume one prebuilt execution plan directly, select only an explicit Codex CLI executable, start from a clean worktree, bound and redact provider execution, validate before commit, commit only exact safe files, and never push or publish.",
+      "The Codex pilot must consume one prebuilt execution plan directly, select only an explicit Codex CLI executable, start from a clean worktree, bound and redact provider execution, validate before commit, commit only exact safe files, never push, and keep candidate publication outside controlled commit.",
     metadata: {
       introducedIn: "V14.6",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -130,7 +130,7 @@ export const CODEX_PROVIDER_CONTROLLED_COMMIT_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Keep the Codex provider bound to one prebuilt execution plan and one validation-gated exact-file Git commit; retain clean-worktree, shell-false, limits, redaction and no-publish guarantees.",
+            "Keep the Codex provider bound to one prebuilt execution plan and one validation-gated exact-file Git commit; retain clean-worktree, shell-false, limits, redaction, no-push and separate-publication guarantees.",
           )
         : pass(
             rule,

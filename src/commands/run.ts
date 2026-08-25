@@ -164,6 +164,14 @@ export async function runLoopRunCommand(
     );
   }
 
+  if (mode === "publish" && options.provider === undefined) {
+    return printCommandError(
+      json,
+      "publish_requires_provider",
+      "Publish mode requires an explicit provider.",
+    );
+  }
+
   if (options.provider !== undefined && !application.loopExecutor) {
     const label = options.provider === "claude_code" ? "Claude Code" : "Codex";
     return printCommandError(
