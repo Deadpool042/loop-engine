@@ -37,6 +37,25 @@ function publicationFailure(
   });
 }
 
+function publishPrerequisiteFailure(execution: LoopRunResult): LoopRunResult {
+  const failure =
+    execution.failure?.code === "agent_policy_rejected"
+      ? Object.freeze({
+          ...execution.failure,
+          message:
+            "Candidate publication was not attempted because its prerequisite execution phase was rejected by agent policy.",
+        })
+      : execution.failure;
+
+  return Object.freeze({
+    ...execution,
+    mode: "publish" as const,
+    patchExport: null,
+    publication: null,
+    failure,
+  });
+}
+
 /**
  * Extends the existing isolated execute boundary: provider changes are first
  * validated and exported from its temporary worktree, then a private Git ref
@@ -66,12 +85,7 @@ export function createIsolatedProviderRunPublish(
         execution.validation?.status !== "passed" ||
         !execution.patchExport
       ) {
-        return Object.freeze({
-          ...execution,
-          mode: "publish" as const,
-          patchExport: null,
-          publication: null,
-        });
+        return publishPrerequisiteFailure(execution);
       }
       const project = (options.findProject ?? findProject)(
         (options.loadConfig ?? loadConfig)(),
