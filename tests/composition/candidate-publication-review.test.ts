@@ -31,21 +31,17 @@ const run = {
 } as const satisfies LoopRunResult;
 
 describe("candidate publication review composition", () => {
-  it("derives the only Git identity from the matching completed publish run in bounded Run History", async () => {
-    let requestedLimit: number | undefined;
+  it("derives the only Git identity from one exact persisted run evidence", async () => {
+    let requestedProject: string | undefined;
+    let requestedRunId: string | undefined;
     const review = createCandidatePublicationReview({
       loadConfig: () => ({ projects: [] }) as never,
       findProject: () =>
         ({ name: "project-a", path: "/trusted/project-a" }) as never,
-      generateRunHistoryReport: (_project, options) => {
-        requestedLimit = options?.limit;
-        return {
-          schemaVersion: 1,
-          project: "project-a",
-          limit: 100,
-          entries: [run],
-          corruptedLines: 0,
-        };
+      lookupRunHistoryEntry: (project, runId) => {
+        requestedProject = project;
+        requestedRunId = runId;
+        return { found: true, entry: run, corruptedLines: 0 };
       },
       candidateReviewer: async (input) => {
         assert.equal(input.project.path, "/trusted/project-a");
@@ -61,7 +57,8 @@ describe("candidate publication review composition", () => {
       code: "expected",
       message: "expected",
     });
-    assert.equal(requestedLimit, 100);
+    assert.equal(requestedProject, "project-a");
+    assert.equal(requestedRunId, "run-123");
   });
 
   it("does not call Git review without an exact completed publish identity", async () => {
@@ -69,11 +66,9 @@ describe("candidate publication review composition", () => {
     const review = createCandidatePublicationReview({
       loadConfig: () => ({ projects: [] }) as never,
       findProject: () => ({ name: "project-a", path: "/trusted" }) as never,
-      generateRunHistoryReport: () => ({
-        schemaVersion: 1,
-        project: "project-a",
-        limit: 100,
-        entries: [{ ...run, mode: "execute", publication: null }],
+      lookupRunHistoryEntry: () => ({
+        found: true,
+        entry: { ...run, mode: "execute", publication: null },
         corruptedLines: 0,
       }),
       candidateReviewer: async () => {
@@ -91,11 +86,12 @@ describe("candidate publication review composition", () => {
     assert.equal(reviewerCalled, false);
   });
 
-  it("fails closed for an unknown run and for a completed run without a candidate ref publication", async () => {
-    for (const entries of [
-      [],
-      [
-        {
+  it("fails closed for an unknown run and a completed run without a candidate publication", async () => {
+    const lookups = [
+      { found: false as const, code: "not_found" as const, corruptedLines: 0 },
+      {
+        found: true as const,
+        entry: {
           ...run,
           publication: {
             kind: "other" as never,
@@ -104,19 +100,15 @@ describe("candidate publication review composition", () => {
             baseSha: "b".repeat(40),
           },
         },
-      ],
-    ]) {
+        corruptedLines: 0,
+      },
+    ];
+    for (const lookup of lookups) {
       let reviewerCalled = false;
       const review = createCandidatePublicationReview({
         loadConfig: () => ({ projects: [] }) as never,
         findProject: () => ({ name: "project-a", path: "/trusted" }) as never,
-        generateRunHistoryReport: () => ({
-          schemaVersion: 1,
-          project: "project-a",
-          limit: 100,
-          entries,
-          corruptedLines: 0,
-        }),
+        lookupRunHistoryEntry: () => lookup,
         candidateReviewer: async () => {
           reviewerCalled = true;
           throw new Error("must not be called");
@@ -129,6 +121,38 @@ describe("candidate publication review composition", () => {
         message: "No completed candidate publication was found for this run.",
       });
       assert.equal(reviewerCalled, false);
+    }
+  });
+
+  it("distinguishes ambiguous history from an unreadable evidence journal", async () => {
+    for (const [lookupCode, expected] of [
+      [
+        "duplicate_run_id",
+        {
+          reviewed: false,
+          code: "candidate_run_ambiguous",
+          message: "Multiple Run History entries share this candidate run id.",
+        },
+      ],
+      [
+        "read_failed",
+        {
+          reviewed: false,
+          code: "candidate_run_lookup_failed",
+          message: "Candidate Run History evidence could not be inspected.",
+        },
+      ],
+    ] as const) {
+      const review = createCandidatePublicationReview({
+        loadConfig: () => ({ projects: [] }) as never,
+        findProject: () => ({ name: "project-a", path: "/trusted" }) as never,
+        lookupRunHistoryEntry: () => ({
+          found: false,
+          code: lookupCode,
+          corruptedLines: 0,
+        }),
+      });
+      assert.deepEqual(await review("project-a", "run-123"), expected);
     }
   });
 });
