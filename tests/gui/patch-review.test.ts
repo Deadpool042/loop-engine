@@ -28,6 +28,45 @@ describe("GUI governed patch review", () => {
     assert.equal(result?.files[0]?.hunks[0]?.lines[1]?.newLineNumber, 1);
   });
 
+  it("decodes Git C-quoted paths in diff and file marker headers", () => {
+    const quotedPathPatch = `diff --git "a/foo bar.txt" "b/foo bar.txt"\n--- "a/foo bar.txt"\n+++ "b/foo bar.txt"\n@@ -1 +1 @@\n-before\n+after\n`;
+    const result = parseUnifiedPatch(quotedPathPatch);
+    assert.equal(result?.files[0]?.oldPath, "foo bar.txt");
+    assert.equal(result?.files[0]?.newPath, "foo bar.txt");
+  });
+
+  it("strictly decodes Git C-quoted octal UTF-8 path bytes", () => {
+    const quotedPathPatch = `diff --git "a/caf\\303\\251\\tmenu.txt" "b/caf\\303\\251\\tmenu.txt"\n--- "a/caf\\303\\251\\tmenu.txt"\n+++ "b/caf\\303\\251\\tmenu.txt"\n@@ -1 +1 @@\n-before\n+after\n`;
+    const result = parseUnifiedPatch(quotedPathPatch);
+    assert.equal(result?.files[0]?.oldPath, "café\tmenu.txt");
+  });
+
+  it("decodes Git C-quoted rename paths", () => {
+    const renamePatch = `diff --git "a/old\\tname.txt" "b/new\\tname.txt"\nsimilarity index 100%\nrename from "old\\tname.txt"\nrename to "new\\tname.txt"\n`;
+    const result = parseUnifiedPatch(renamePatch);
+    assert.equal(result?.files[0]?.status, "renamed");
+    assert.equal(result?.files[0]?.oldPath, "old\tname.txt");
+    assert.equal(result?.files[0]?.newPath, "new\tname.txt");
+  });
+
+  it("fails closed for malformed Git C-quoted path headers", () => {
+    const validBody = `\n--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-before\n+after\n`;
+    assert.equal(
+      parseUnifiedPatch(`diff --git "a/bad\\q.txt" "b/bad\\q.txt"${validBody}`),
+      null,
+    );
+    assert.equal(
+      parseUnifiedPatch(
+        `diff --git "a/unterminated.txt b/unterminated.txt${validBody}`,
+      ),
+      null,
+    );
+    assert.equal(
+      parseUnifiedPatch(`diff --git a/file.txt b/file.txt extra${validBody}`),
+      null,
+    );
+  });
+
   it("verifies the governed export before returning a projection", async () => {
     const result = await readPatchReview(exported, {
       lstat: async () =>

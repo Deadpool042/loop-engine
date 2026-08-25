@@ -63,14 +63,112 @@ function finishFile(file: MutableFile): PatchReviewFile {
   });
 }
 
-function parsePath(value: string): string | null {
-  if (value === "/dev/null") return null;
-  return value.startsWith("a/") || value.startsWith("b/")
-    ? value.slice(2)
-    : null;
+type GitPathToken = Readonly<{ value: string; end: number }>;
+
+function decodeGitPath(value: string): string | null {
+  if (!value.startsWith('"'))
+    return value.includes('"') || value.includes("\\") ? null : value;
+  if (!value.endsWith('"') || value.length < 2) return null;
+
+  const bytes: number[] = [];
+  for (let index = 1; index < value.length - 1; index++) {
+    const character = value[index]!;
+    if (character !== "\\") {
+      bytes.push(...new TextEncoder().encode(character));
+      continue;
+    }
+    const escaped = value[++index];
+    if (escaped === undefined || index >= value.length - 1) return null;
+    const escapedBytes =
+      escaped === '"'
+        ? [0x22]
+        : escaped === "\\"
+          ? [0x5c]
+          : escaped === "t"
+            ? [0x09]
+            : escaped === "n"
+              ? [0x0a]
+              : escaped === "r"
+                ? [0x0d]
+                : escaped === "a"
+                  ? [0x07]
+                  : escaped === "b"
+                    ? [0x08]
+                    : escaped === "v"
+                      ? [0x0b]
+                      : escaped === "f"
+                        ? [0x0c]
+                        : null;
+    if (escapedBytes !== null) {
+      bytes.push(...escapedBytes);
+      continue;
+    }
+    if (!/[0-7]/.test(escaped)) return null;
+    const octal = value.slice(index, index + 3);
+    if (!/^[0-7]{3}$/.test(octal)) return null;
+    bytes.push(Number.parseInt(octal, 8));
+    index += 2;
+  }
+  try {
+    const decoded = new TextDecoder("utf-8", { fatal: true }).decode(
+      new Uint8Array(bytes),
+    );
+    return decoded.includes("\0") ? null : decoded;
+  } catch {
+    return null;
+  }
 }
 
-/** Parses only the canonical, unquoted unified diff emitted by this exporter. */
+function readGitPathToken(value: string, start = 0): GitPathToken | null {
+  if (start >= value.length) return null;
+  if (value[start] !== '"') {
+    let end = start;
+    while (end < value.length && !/\s/.test(value[end]!)) end++;
+    if (end === start) return null;
+    const path = decodeGitPath(value.slice(start, end));
+    return path === null ? null : { value: path, end };
+  }
+  let end = start + 1;
+  while (end < value.length) {
+    if (value[end] === "\\") {
+      end += 2;
+      continue;
+    }
+    if (value[end] === '"') {
+      const path = decodeGitPath(value.slice(start, end + 1));
+      return path === null ? null : { value: path, end: end + 1 };
+    }
+    end++;
+  }
+  return null;
+}
+
+function parseGitDiffHeader(value: string): readonly [string, string] | null {
+  const oldPath = readGitPathToken(value);
+  if (oldPath === null || value[oldPath.end] !== " ") return null;
+  const newPath = readGitPathToken(value, oldPath.end + 1);
+  if (newPath === null || newPath.end !== value.length) return null;
+  if (!oldPath.value.startsWith("a/") || !newPath.value.startsWith("b/"))
+    return null;
+  return [oldPath.value.slice(2), newPath.value.slice(2)];
+}
+
+function parseGitFileMarkerPath(value: string): string | null | undefined {
+  if (value === "/dev/null") return null;
+  const token = readGitPathToken(value);
+  const decoded =
+    token !== null && token.end === value.length
+      ? token.value
+      : decodeGitPath(value.endsWith("\t") ? value.slice(0, -1) : value);
+  if (
+    decoded === null ||
+    (!decoded.startsWith("a/") && !decoded.startsWith("b/"))
+  )
+    return undefined;
+  return decoded.slice(2);
+}
+
+/** Parses only the canonical unified diff emitted by the Git exporter. */
 export function parseUnifiedPatch(
   content: string,
 ): Omit<PatchReviewDetail, "status" | "sha256" | "fileCount"> | null {
@@ -83,11 +181,11 @@ export function parseUnifiedPatch(
   let newLine = 0;
   for (const line of content.split("\n")) {
     if (line.startsWith("diff --git ")) {
-      const match = /^diff --git a\/(\S+) b\/(\S+)$/.exec(line);
-      if (!match) return null;
+      const paths = parseGitDiffHeader(line.slice(11));
+      if (paths === null) return null;
       const nextFile: MutableFile = {
-        oldPath: match[1]!,
-        newPath: match[2]!,
+        oldPath: paths[0],
+        newPath: paths[1],
         status: "modified",
         additions: 0,
         deletions: 0,
@@ -108,24 +206,28 @@ export function parseUnifiedPatch(
       continue;
     }
     if (line.startsWith("rename from ")) {
+      const path = decodeGitPath(line.slice(12));
+      if (path === null) return null;
       file.status = "renamed";
-      file.oldPath = line.slice(12);
+      file.oldPath = path;
       continue;
     }
     if (line.startsWith("rename to ")) {
+      const path = decodeGitPath(line.slice(10));
+      if (path === null) return null;
       file.status = "renamed";
-      file.newPath = line.slice(10);
+      file.newPath = path;
       continue;
     }
     if (line.startsWith("--- ")) {
-      const path = parsePath(line.slice(4));
-      if (path === null && line.slice(4) !== "/dev/null") return null;
+      const path = parseGitFileMarkerPath(line.slice(4));
+      if (path === undefined) return null;
       file.oldPath = path;
       continue;
     }
     if (line.startsWith("+++ ")) {
-      const path = parsePath(line.slice(4));
-      if (path === null && line.slice(4) !== "/dev/null") return null;
+      const path = parseGitFileMarkerPath(line.slice(4));
+      if (path === undefined) return null;
       file.newPath = path;
       continue;
     }
