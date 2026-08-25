@@ -52,6 +52,7 @@ window.loopDesktop.summary();
 window.loopDesktop.context(projectName);
 window.loopDesktop.review(projectName);
 window.loopDesktop.runs(projectName);
+window.loopDesktop.candidateReview(projectName, runId);
 window.loopDesktop.plan(projectName, candidateId);
 window.loopDesktop.execute({ projectName, candidateId, provider, model });
 window.loopDesktop.startExecution({
@@ -65,7 +66,7 @@ window.loopDesktop.cancelExecution(sessionId);
 ```
 
 Elles correspondent uniquement aux canaux `loop:summary`, `loop:context` et
-`loop:review`, `loop:runs`, `loop:plan`, `loop:execute`, `loop:execution-start`,
+`loop:review`, `loop:runs`, `loop:candidate-review`, `loop:plan`, `loop:execute`, `loop:execution-start`,
 `loop:execution-session` et `loop:execution-cancel`. Il n'existe aucun IPC
 générique de la forme commande + arguments, et `ipcRenderer` n'est pas exposé
 au renderer.
@@ -89,6 +90,7 @@ Le process principal invoque exclusivement :
 | `loop:context` | `pnpm loop context <project> --json`                                                                |
 | `loop:review`  | `pnpm loop review <project> --json`                                                                 |
 | `loop:runs`    | `pnpm loop runs <project> --json --limit 20`                                                        |
+| `loop:candidate-review` | `pnpm loop candidate review <project> --run-id <runId> --json`                                  |
 | `loop:plan`    | `pnpm loop run <project> --candidate <id> --mode plan --json`                                       |
 | `loop:execute` | `loop run <project> --candidate <id> --mode execute ... --export-patch <native destination> --json` |
 
@@ -128,6 +130,22 @@ identifiant de candidat. Les statuts `completed`, `blocked`, `failed` et
 valide et ne force pas le contrat de revue V27, dont la responsabilité est la
 session d'exécution structurée. Pour un `execute` compatible, la projection
 réutilise `ExecutionResultDetail` de V27.
+
+### Candidate Review cockpit (V36)
+
+V36 expose la revue V34/V35 d’une candidate publiée depuis le détail d’un run
+`publish` terminé dans l’historique. Le renderer transmet uniquement le nom du
+projet déjà sélectionné et le `runId`; il ne fournit jamais de ref, SHA, chemin,
+`cwd` ou argument Git. Le process principal invoque la commande publique
+`candidate review <project> --run-id <runId> --json` via l’IPC spécialisé
+`loop:candidate-review`.
+
+La réponse est reparsée fail-closed par un contrat GUI dédié avant affichage. Le
+panneau montre la ref candidate, le commit candidat, `baseSha`, les métadonnées
+minimales du commit, les fichiers ajoutés/modifiés/supprimés et les compteurs.
+Tout changement de projet ou de run invalide la réponse en vol. Cette capacité
+reste strictement read-only : aucun Apply, push, PR, merge, checkout, switch ou
+écriture de ref n’est exposé par le cockpit.
 
 ### Patch Review (V30) et prérequis d'identité (V31)
 

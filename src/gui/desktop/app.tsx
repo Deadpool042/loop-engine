@@ -47,6 +47,7 @@ import { formatRunHistoryStatus, parseRunHistoryDetail, type RunHistoryDetail, t
 import { parseGateReassessmentReport, type GateReassessmentReport } from "./gate-reassessment-contract.js";
 import type { DesktopExecutionDecisionDraft, DesktopExecutionDecisionResult } from "./execution-decision-contract.js";
 import type { PatchReviewFile, PatchReviewResult } from "./patch-review.js";
+import { parseCandidateReviewResponse, type CandidateReviewDetail } from "./candidate-review-contract.js";
 
 const RENEWABLE_DECISION_MESSAGES: Readonly<Record<string, string>> = {
   decision_missing: "Aucune décision d’exécution valide n’est disponible pour ce travail.",
@@ -323,6 +324,9 @@ export function App(): React.JSX.Element {
   const [runHistoryError, setRunHistoryError] = useState<string | null>(null);
   const [runHistoryLoading, setRunHistoryLoading] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [candidateReview, setCandidateReview] = useState<CandidateReviewDetail | null>(null);
+  const [candidateReviewError, setCandidateReviewError] = useState<string | null>(null);
+  const [candidateReviewLoading, setCandidateReviewLoading] = useState(false);
   const [planDetail, setPlanDetail] = useState<PlanDetail | null>(null);
   const [planProjectName, setPlanProjectName] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
@@ -364,6 +368,7 @@ export function App(): React.JSX.Element {
   const [gateReassessmentReport, setGateReassessmentReport] = useState<GateReassessmentReport | null>(null);
   const [gateReassessmentProjectName, setGateReassessmentProjectName] = useState<string | null>(null);
   const [gateReassessmentLoading, setGateReassessmentLoading] = useState(false);
+  const candidateReviewRequestId = useRef(0);
   const planRequestId = useRef(0);
   const decisionRequestId = useRef(0);
   const selectedProject =
@@ -467,6 +472,13 @@ export function App(): React.JSX.Element {
 
   const selectedProjectNameRef = useRef<string | null>(selectedProjectName);
   selectedProjectNameRef.current = selectedProjectName;
+
+  useEffect(() => {
+    candidateReviewRequestId.current += 1;
+    setCandidateReview(null);
+    setCandidateReviewError(null);
+    setCandidateReviewLoading(false);
+  }, [selectedProjectName, selectedRunId]);
 
   const proposalRunner = useRef(
     createRoadmapProposalRunner({
@@ -734,6 +746,59 @@ export function App(): React.JSX.Element {
       await preparePlan();
     } catch { if (requestId === decisionRequestId.current) setDecisionError("Impossible d’approuver la décision."); }
     finally { if (requestId === decisionRequestId.current) setDecisionApproveLoading(false); }
+  }
+
+  async function loadCandidateReview(): Promise<void> {
+    if (
+      selectedProjectName === null ||
+      selectedRun === null ||
+      selectedRun.mode !== "publish" ||
+      selectedRun.status !== "completed"
+    ) return;
+    const projectName = selectedProjectName;
+    const runId = selectedRun.runId;
+    const requestId = candidateReviewRequestId.current + 1;
+    candidateReviewRequestId.current = requestId;
+    setCandidateReview(null);
+    setCandidateReviewError(null);
+    setCandidateReviewLoading(true);
+    try {
+      const result = await window.loopDesktop.candidateReview(projectName, runId);
+      if (
+        requestId !== candidateReviewRequestId.current ||
+        selectedProjectNameRef.current !== projectName
+      ) return;
+      if (!result.ok) {
+        setCandidateReviewError(result.raw);
+        return;
+      }
+      const parsed = parseCandidateReviewResponse(result.json);
+      if (parsed === null) {
+        setCandidateReviewError(
+          "La réponse candidate review ne respecte pas le contrat JSON attendu.",
+        );
+        return;
+      }
+      if (!parsed.reviewed) {
+        setCandidateReviewError(`${parsed.code}: ${parsed.message}`);
+        return;
+      }
+      if (parsed.review.project !== projectName || parsed.review.runId !== runId) {
+        setCandidateReviewError(
+          "La candidate review ne correspond pas au run sélectionné.",
+        );
+        return;
+      }
+      setCandidateReview(parsed.review);
+    } catch {
+      if (requestId === candidateReviewRequestId.current) {
+        setCandidateReviewError("Impossible de relire la candidate publiée.");
+      }
+    } finally {
+      if (requestId === candidateReviewRequestId.current) {
+        setCandidateReviewLoading(false);
+      }
+    }
   }
 
   async function executePlan(): Promise<void> {
@@ -2092,7 +2157,44 @@ export function App(): React.JSX.Element {
                       {runHistory.corruptedLines > 0 && <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Historique partiellement illisible : {runHistory.corruptedLines} entrée(s) ignorée(s).</p>}
                       {runHistory.entries.length === 0 ? <p className="text-sm text-loop-muted">Aucun run enregistré pour ce projet.</p> : <ol className="divide-y divide-loop-line rounded-lg border border-loop-line bg-white">{runHistory.entries.map((entry) => <li key={entry.runId}><button type="button" onClick={() => setSelectedRunId(entry.runId)} className={`w-full px-4 py-3 text-left text-sm hover:bg-loop-paper ${selectedRun?.runId === entry.runId ? "bg-loop-paper" : ""}`}><span className="block font-medium">{entry.completedAt ?? entry.startedAt}</span><span className="mt-1 block text-loop-muted">{entry.mode} · {formatRunHistoryStatus(entry.status)} · run {entry.runId}{entry.candidateId ? ` · ${entry.candidateId}` : ""}</span></button></li>)}</ol>}
                     </div>
-                    {selectedRun && <section className="rounded-lg border border-loop-line bg-white p-4"><p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Run {selectedRun.runId}</p><dl className="mt-4 grid gap-4 text-sm"><div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Mode</dt><dd className="mt-1">{selectedRun.mode}</dd></div><div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Statut</dt><dd className="mt-1">{formatRunHistoryStatus(selectedRun.status)}</dd></div><div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Candidat</dt><dd className="mt-1 font-mono text-xs">{selectedRun.candidateId ?? "Non renseigné"}</dd></div>{selectedRun.executionResult?.modifiedFiles.length ? <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Fichiers modifiés</dt><dd className="mt-1"><ul className="space-y-1 font-mono text-xs text-loop-muted">{selectedRun.executionResult.modifiedFiles.slice(0, 8).map((path) => <li key={path}>{path}</li>)}</ul></dd></div> : null}{selectedRun.executionResult?.validation && <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Validation</dt><dd className="mt-1">{formatExecutionValidationStatus(selectedRun.executionResult.validation.status)} · {selectedRun.executionResult.validation.attempts} tentative(s)</dd></div>}</dl></section>}
+                    {selectedRun && (
+                      <section className="rounded-lg border border-loop-line bg-white p-4">
+                        <p className="m-0 text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Run {selectedRun.runId}</p>
+                        <dl className="mt-4 grid gap-4 text-sm">
+                          <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Mode</dt><dd className="mt-1">{selectedRun.mode}</dd></div>
+                          <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Statut</dt><dd className="mt-1">{formatRunHistoryStatus(selectedRun.status)}</dd></div>
+                          <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Candidat</dt><dd className="mt-1 font-mono text-xs">{selectedRun.candidateId ?? "Non renseigné"}</dd></div>
+                          {selectedRun.executionResult?.modifiedFiles.length ? <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Fichiers modifiés</dt><dd className="mt-1"><ul className="space-y-1 font-mono text-xs text-loop-muted">{selectedRun.executionResult.modifiedFiles.slice(0, 8).map((path) => <li key={path}>{path}</li>)}</ul></dd></div> : null}
+                          {selectedRun.executionResult?.validation && <div><dt className="text-xs font-medium uppercase tracking-[0.12em] text-loop-muted">Validation</dt><dd className="mt-1">{formatExecutionValidationStatus(selectedRun.executionResult.validation.status)} · {selectedRun.executionResult.validation.attempts} tentative(s)</dd></div>}
+                        </dl>
+                        {selectedRun.mode === "publish" && selectedRun.status === "completed" && (
+                          <div className="mt-4 border-t border-loop-line pt-4">
+                            <Button type="button" size="sm" variant="outline" disabled={candidateReviewLoading} onClick={loadCandidateReview}>
+                              {candidateReviewLoading ? "Lecture de la candidate…" : "Relire la candidate publiée"}
+                            </Button>
+                            {candidateReviewError && <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">{candidateReviewError}</p>}
+                            {candidateReview && candidateReview.runId === selectedRun.runId && candidateReview.project === selectedProjectName && (
+                              <section className="mt-4 rounded-md border border-loop-line bg-neutral-50 p-4" aria-label="Revue de la candidate publiée">
+                                <p className="m-0 text-sm font-medium">Candidate publiée</p>
+                                <p className="mt-2 break-all font-mono text-xs text-loop-muted">{candidateReview.candidateRef}</p>
+                                <p className="mt-2 text-sm"><span className="text-emerald-700">+{candidateReview.additions}</span> · <span className="text-rose-700">-{candidateReview.deletions}</span> · {candidateReview.changedFiles.length} fichier(s)</p>
+                                <dl className="mt-3 grid gap-3 text-xs">
+                                  <div><dt className="font-medium text-loop-muted">Commit candidat</dt><dd className="mt-1 break-all font-mono">{candidateReview.candidateCommitSha}</dd></div>
+                                  <div><dt className="font-medium text-loop-muted">Base Git</dt><dd className="mt-1 break-all font-mono">{candidateReview.baseSha}</dd></div>
+                                  <div><dt className="font-medium text-loop-muted">Commit</dt><dd className="mt-1">{candidateReview.commit.subject} · {candidateReview.commit.authorName} · {candidateReview.commit.authoredAt}</dd></div>
+                                </dl>
+                                <ul className="mt-3 space-y-1 font-mono text-xs text-loop-muted">
+                                  {candidateReview.changedFiles.map((file) => (
+                                    <li key={`${file.status}:${file.path}`}>{file.status} · {file.path} · {file.additions === null ? "binaire" : `+${file.additions}`} · {file.deletions === null ? "binaire" : `-${file.deletions}`}</li>
+                                  ))}
+                                </ul>
+                                <p className="mt-3 text-xs text-loop-muted">Lecture seule · aucune promotion, application, PR ou fusion.</p>
+                              </section>
+                            )}
+                          </div>
+                        )}
+                      </section>
+                    )}
                   </div>
                 )}
               </section>
