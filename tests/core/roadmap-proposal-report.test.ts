@@ -241,8 +241,7 @@ test("28/29. estimatedInputTokens includes the real, sanitized Structured Output
       toAnthropicOutputSchema(ROADMAP_PROPOSAL_OUTPUT_SCHEMA),
     );
     const promptOnly = estimateTokenCount(ROADMAP_PROPOSAL_SYSTEM_PROMPT);
-    const promptPlusSchema =
-      promptOnly + estimateTokenCount(schemaJson);
+    const promptPlusSchema = promptOnly + estimateTokenCount(schemaJson);
     // The schema (via the exact provider transform, not a re-implementation)
     // must materially raise the estimate beyond prompt + context alone.
     assert.ok(estimate.estimate.estimatedInputTokens >= promptPlusSchema);
@@ -251,10 +250,10 @@ test("28/29. estimatedInputTokens includes the real, sanitized Structured Output
   }
 });
 
-test("30. the real loop-engine repository uses open-roadmap routing with a fully accounted estimate", () => {
+test("30. the real loop-engine repository uses completed-roadmap routing with a fully accounted estimate", () => {
   // Mirrors the `loop-engine` entry in projects.yaml (path: .) and validates
-  // invariants of the current repository state. JP1 is now an explicit open
-  // candidate, so deterministic routing must use the balanced profile.
+  // invariants of the current repository state. JP1 is completed, so
+  // deterministic routing must use the economy profile.
   const loopEngineProject: ProjectConfig = {
     name: "loop-engine",
     path: process.cwd(),
@@ -274,8 +273,8 @@ test("30. the real loop-engine repository uses open-roadmap routing with a fully
   const estimate = generateRoadmapProposalEstimateReport(loopEngineProject);
   assert.equal(estimate.estimate.status, "available");
   if (estimate.estimate.status !== "available") return;
-  assert.equal(estimate.estimate.profile, "balanced");
-  assert.equal(estimate.estimate.model, "claude-sonnet-5");
+  assert.equal(estimate.estimate.profile, "economy");
+  assert.equal(estimate.estimate.model, "claude-haiku-4-5");
 
   const schemaJson = JSON.stringify(
     toAnthropicOutputSchema(ROADMAP_PROPOSAL_OUTPUT_SCHEMA),
@@ -297,7 +296,8 @@ test("31. estimatedCostUsd uses the corrected estimatedInputTokens, not the old 
     assert.equal(estimate.estimate.status, "available");
     if (estimate.estimate.status !== "available") return;
     assert.ok("estimatedCostUsd" in estimate.estimate);
-    const cost = (estimate.estimate as { estimatedCostUsd?: number }).estimatedCostUsd;
+    const cost = (estimate.estimate as { estimatedCostUsd?: number })
+      .estimatedCostUsd;
     assert.ok(cost !== undefined && cost > 0);
     // claude-haiku-4-5 pricing fixture: $1.00/M input, $5.00/M output.
     const expected =
