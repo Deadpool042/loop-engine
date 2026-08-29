@@ -86,3 +86,10 @@ Troisième candidat, retenu et livré : borner le nettoyage à l'annulation d'un
 - Les tests adversariaux essentiels livrent avec la capacité ; ils ne deviennent pas une série autonome de micro-lots.
 - Aucun nouveau lot test-only sans risque démontré, invariant manquant ou régression réelle.
 - Le burn-in doit utiliser les providers et contrats existants, sans ajouter de nouvelle couche de préparation, projection, admission, dispatch, handoff ou publication.
+
+## Axe Job Package portable
+
+Voir `docs/architecture/job-package-portable-contract.md` pour l'audit complet.
+
+- [x] Lot JP0 — Audit du contrat Job Package portable : comparaison factuelle de `LoopExecutionPlan`, du Project Handoff JSON et de `BoundaryHandoff` (usages réels, champs consommés, données host-specific), démonstration du problème de portabilité du chemin physique porté par `project: ProjectConfig` dans `LoopExecutionPlan`, et décision retenue de faire évoluer `LoopExecutionPlan` plutôt que de créer un nouveau type ou de réutiliser le Project Handoff. Aucune modification de `src/**`.
+- [ ] Lot JP1 — Séparer le contrat gouverné `LoopExecutionPlan` du contexte physique local d'invocation du `LoopExecutor` : `runLoopExecute` fournit séparément à la frontière `LoopExecutor` le chemin d'exécution qu'il connaît déjà (`executionProject.path`, y compris pour un worktree isolé via `executionProjectPath`), au lieu de le faire porter par le plan ; `claude-code-cli-executor.ts` et `codex-cli-executor.ts` consomment ce cwd local fourni séparément au lieu de lire `plan.project.path` ; `project: ProjectConfig` peut rester temporairement dans le plan pour compatibilité, seule sa consommation comme emplacement physique par les executors est éliminée ; aucun resolver host, health check, routing ou worker selection n'est ajouté.
