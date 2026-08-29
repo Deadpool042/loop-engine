@@ -8,16 +8,22 @@ import type {
   AgentRuntime,
 } from "../agents/types.js";
 import type { MinimalContextPackage } from "../context/types.js";
-import type { ProjectConfig } from "../core/config.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import type {
   AgentPolicyMode,
   AgentPolicyResolution,
 } from "../policy/types.js";
 
+/**
+ * The plan's only project identity: the logical name consumed by executor
+ * prompts. Never the physical checkout location — see LoopExecutor's cwd
+ * parameter (docs/architecture/job-package-portable-contract.md).
+ */
+export type LoopExecutionPlanProject = Readonly<{ name: string }>;
+
 export type CreateLoopExecutionPlanInput = Readonly<{
   runId: string;
-  project: ProjectConfig;
+  project: LoopExecutionPlanProject;
   candidate: RoadmapCandidate;
   agentPolicy: AgentPolicyResolution;
   contextPackage: MinimalContextPackage;
@@ -33,7 +39,7 @@ export type CreateLoopExecutionPlanInput = Readonly<{
 export type LoopExecutionPlan = Readonly<{
   schemaVersion: 1;
   runId: string;
-  project: ProjectConfig;
+  project: LoopExecutionPlanProject;
   candidate: RoadmapCandidate;
   contextPackage: MinimalContextPackage;
   allowedPaths?: readonly string[];
@@ -95,7 +101,7 @@ export function createLoopExecutionPlan(
   return Object.freeze({
     schemaVersion: 1 as const,
     runId: input.runId,
-    project: input.project,
+    project: Object.freeze({ name: input.project.name }),
     candidate: input.candidate,
     contextPackage: input.contextPackage,
     ...(input.allowedPaths === undefined

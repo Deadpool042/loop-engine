@@ -316,7 +316,7 @@ export async function runLoopExecute(
   const executionPlan = createLoopExecutionPlan(
     Object.freeze({
       runId,
-      project: executionProject,
+      project: Object.freeze({ name: executionProject.name }),
       candidate: cycle.candidate,
       agentPolicy,
       contextPackage,

@@ -39,12 +39,7 @@ function plan(selected: AgentProfile): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1,
     runId: "run-multi-provider-1",
-    project: Object.freeze({
-      name: "loop-engine",
-      path: ".",
-      roadmap: "ROADMAP.md",
-      validation: Object.freeze(["pnpm run ci"]),
-    }),
+    project: Object.freeze({ name: "loop-engine" }),
     candidate: Object.freeze({
       path: "ROADMAP.md",
       line: 1,
@@ -88,23 +83,27 @@ function assembly(
   });
 }
 
-const completed = (file: string): LoopExecutor => async () =>
-  Object.freeze({
-    status: "completed" as const,
-    modifiedFiles: Object.freeze([file]),
-    details: Object.freeze(["completed"]),
-  });
+const completed =
+  (file: string): LoopExecutor =>
+  async () =>
+    Object.freeze({
+      status: "completed" as const,
+      modifiedFiles: Object.freeze([file]),
+      details: Object.freeze(["completed"]),
+    });
 
-const failed = (code: string): LoopExecutor => async () =>
-  Object.freeze({
-    status: "failed" as const,
-    modifiedFiles: Object.freeze([]),
-    failure: Object.freeze({
-      code,
-      message: code,
-      details: Object.freeze([]),
-    }),
-  });
+const failed =
+  (code: string): LoopExecutor =>
+  async () =>
+    Object.freeze({
+      status: "failed" as const,
+      modifiedFiles: Object.freeze([]),
+      failure: Object.freeze({
+        code,
+        message: code,
+        details: Object.freeze([]),
+      }),
+    });
 
 test("admits a provider-specific fallback plan without widening budget", () => {
   const primary = profile("configured.codex", "openai", "codex", 2);
@@ -115,7 +114,10 @@ test("admits a provider-specific fallback plan without widening budget", () => {
   assert.equal(fallbackPlan.runtime, "claude_code");
   assert.equal(fallbackPlan.profileId, "configured.claude");
   assert.equal(fallbackPlan.budget.maxCalls, 2);
-  assert.equal(fallbackPlan.policy.rationale.at(-1), "Fallback admitted through profile configured.claude.");
+  assert.equal(
+    fallbackPlan.policy.rationale.at(-1),
+    "Fallback admitted through profile configured.claude.",
+  );
 });
 
 test("executes the configured fallback through one application executor", async () => {
