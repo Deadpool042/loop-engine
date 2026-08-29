@@ -32,6 +32,7 @@ export type LoopExecutorResult =
 
 export type LoopExecutor = (
   plan: LoopExecutionPlan,
+  cwd: string,
 ) => Promise<LoopExecutorResult>;
 
 export type LoopValidatorInput = Readonly<{

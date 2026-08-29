@@ -41,6 +41,7 @@ export type LoopProviderFailureClassifier = (
 export type LoopProviderFailoverOptions = Readonly<{
   attempts: readonly LoopProviderFailoverAttempt[];
   maxAttempts: number;
+  cwd: string;
   isRecoverableFailure?: LoopProviderFailureClassifier;
 }>;
 
@@ -56,7 +57,11 @@ function defaultFailureClassifier(failure: LoopRunFailure): boolean {
   return DEFAULT_RECOVERABLE_FAILURE_CODES.has(failure.code);
 }
 
-function fail(code: string, message: string, detail: string): LoopExecutorResult {
+function fail(
+  code: string,
+  message: string,
+  detail: string,
+): LoopExecutorResult {
   return Object.freeze({
     status: "failed" as const,
     modifiedFiles: Object.freeze([]),
@@ -114,7 +119,9 @@ function freezeEvidence(
   return Object.freeze({
     schemaVersion: LOOP_PROVIDER_FAILOVER_SCHEMA_VERSION,
     maxAttempts,
-    attemptedProviders: Object.freeze(attempts.map((attempt) => attempt.provider)),
+    attemptedProviders: Object.freeze(
+      attempts.map((attempt) => attempt.provider),
+    ),
     selectedProvider,
     attempts: Object.freeze([...attempts]),
   });
@@ -158,7 +165,7 @@ export async function executeLoopProviderFailover(
     let result: LoopExecutorResult;
 
     try {
-      result = await attempt.executor(attempt.plan);
+      result = await attempt.executor(attempt.plan, options.cwd);
     } catch {
       result = fail(
         "provider_executor_exception",
@@ -261,7 +268,7 @@ export function createProviderFailoverLoopExecutor(
     isRecoverableFailure?: LoopProviderFailureClassifier;
   }>,
 ): LoopExecutor {
-  return async (primaryPlan) => {
+  return async (primaryPlan, cwd) => {
     const attempts = resolveAttempts(primaryPlan);
     if (attempts[0]?.plan !== primaryPlan) {
       return fail(
@@ -274,6 +281,7 @@ export function createProviderFailoverLoopExecutor(
     const outcome = await executeLoopProviderFailover({
       attempts,
       maxAttempts: options.maxAttempts,
+      cwd,
       ...(options.isRecoverableFailure === undefined
         ? {}
         : { isRecoverableFailure: options.isRecoverableFailure }),

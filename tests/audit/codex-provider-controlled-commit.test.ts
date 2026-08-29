@@ -19,7 +19,7 @@ describe("Codex provider controlled commit audit", () => {
 
   it("accepts typed provider dispatch and detects publication effects", () => {
     const result = inspectCodexProviderControlledCommitInvariant(
-      'basename(options.executable.trim()) !== "codex"\\nreturn async (plan)\\n"--sandbox"\\n"workspace-write"\\n"--json"\\nplan.provider !== "openai" || plan.runtime !== "codex"\\nshell: false\\nmaxOutputBytes\\nworktree_not_clean\\nchild.kill("SIGTERM")\\nfetch(',
+      'basename(options.executable.trim()) !== "codex"\\nreturn async (plan, executionCwd)\\n"--sandbox"\\n"workspace-write"\\n"--json"\\nplan.provider !== "openai" || plan.runtime !== "codex"\\nshell: false\\nmaxOutputBytes\\nworktree_not_clean\\nchild.kill("SIGTERM")\\nfetch(',
       '["add", "--", ...files]\\n["commit", "--no-verify", "-m", message, "--", ...files]\\n["rev-parse", "HEAD"]\\nisSafeRelativePath\\ngit push',
       'execution.validation?.status !== "passed"\\n"nothing_to_commit"\\noptions.committer ?? gitLoopCommitter\\nmode: "commit" as const\\npublication: null',
       'provider?: LoopProviderId\\n"missing_provider_executable"\\n"missing_commit_message"\\nawait runLoopCommit(\\nawait runLoopPublish(',

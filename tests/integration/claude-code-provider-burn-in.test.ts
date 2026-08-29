@@ -26,13 +26,15 @@ function setupCleanWorktree(): { cwd: string; cleanup: () => void } {
   return { cwd, cleanup: () => rmSync(cwd, { recursive: true, force: true }) };
 }
 
-function burnInPlan(cwd: string): LoopExecutionPlan {
+const DECOY_PROJECT_PATH = "/nonexistent/decoy-project-path";
+
+function burnInPlan(_cwd: string): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1 as const,
     runId: "run-burn-in-1",
     project: {
       name: "burn-in-fixture",
-      path: cwd,
+      path: DECOY_PROJECT_PATH,
       type: "test",
       required_docs: [],
       validation: [],
@@ -98,7 +100,7 @@ describe("claude code provider burn-in", () => {
       assert.equal(typeof application.loopExecutor, "function");
 
       process.env.FAKE_CLAUDE_MODE = "success_with_file";
-      const result = await application.loopExecutor!(burnInPlan(cwd));
+      const result = await application.loopExecutor!(burnInPlan(cwd), cwd);
 
       assert.equal(result.status, "completed");
       assert.deepEqual(result.modifiedFiles, ["provider-created.txt"]);

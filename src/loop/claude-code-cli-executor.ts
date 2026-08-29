@@ -174,7 +174,7 @@ export function createClaudeCodeCliLoopExecutor(
     throw new TypeError("Claude Code maxTurns must be a positive integer.");
   }
 
-  return async (plan): Promise<LoopExecutorResult> => {
+  return async (plan, executionCwd): Promise<LoopExecutorResult> => {
     if (plan.provider !== "anthropic" || plan.runtime !== "claude_code") {
       return failure(
         "execution_plan_provider_mismatch",
@@ -191,7 +191,7 @@ export function createClaudeCodeCliLoopExecutor(
       );
     }
 
-    const cwd = resolve(plan.project.path);
+    const cwd = resolve(executionCwd);
     const before = await readModifiedWorktreeFiles(cwd);
     if (before === null) {
       return failure(

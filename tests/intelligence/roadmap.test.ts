@@ -238,10 +238,14 @@ describe("findRoadmapCandidates", () => {
       const { project, projectPath, cleanup } = setupRoadmap(testCase.roadmap);
       try {
         const candidate = findRoadmapCandidates(project, projectPath)[0];
-        assert.deepEqual(candidate?.admissibility, {
-          state: "not_admissible",
-          reason: "phase_gate_invalid",
-        }, testCase.name);
+        assert.deepEqual(
+          candidate?.admissibility,
+          {
+            state: "not_admissible",
+            reason: "phase_gate_invalid",
+          },
+          testCase.name,
+        );
       } finally {
         cleanup();
       }
@@ -389,7 +393,13 @@ describe("roadmap structured markdown tables", () => {
   it("recognizes lot rows and their explicit status without inventorying descriptive bullets", () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
     const content = readFileSync(
-      resolve(currentDir, "..", "fixtures", "roadmaps", "structured-lots-table.md"),
+      resolve(
+        currentDir,
+        "..",
+        "fixtures",
+        "roadmaps",
+        "structured-lots-table.md",
+      ),
       "utf8",
     );
     const { project, projectPath, cleanup } = setupRoadmap(content);
@@ -398,9 +408,18 @@ describe("roadmap structured markdown tables", () => {
       const candidates = findRoadmapCandidates(project, projectPath);
 
       assert.equal(candidates.length, 26);
-      assert.equal(candidates.filter((candidate) => candidate.status === "done").length, 10);
-      assert.equal(candidates.filter((candidate) => candidate.status === "todo").length, 16);
-      assert.equal(candidates.filter((candidate) => candidate.status === "unknown").length, 0);
+      assert.equal(
+        candidates.filter((candidate) => candidate.status === "done").length,
+        10,
+      );
+      assert.equal(
+        candidates.filter((candidate) => candidate.status === "todo").length,
+        16,
+      );
+      assert.equal(
+        candidates.filter((candidate) => candidate.status === "unknown").length,
+        0,
+      );
       assert.match(candidates[9]?.text ?? "", /H1-L3B/);
       assert.equal(candidates[9]?.status, "done");
       assert.match(candidates[10]?.text ?? "", /H1-L4/);
@@ -626,7 +645,7 @@ describe("execution projection contract", () => {
 });
 
 describe("loop-engine roadmap state", () => {
-  it("keeps delivered burn-ins, V23 and V25.0 done and selects JP1 as the explicit next lot", () => {
+  it("keeps delivered burn-ins, V23, V25.0 and JP1 done with no explicit next lot", () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
     const repoRoot = resolve(currentDir, "..", "..");
     const project: ProjectConfig = {
@@ -648,6 +667,9 @@ describe("loop-engine roadmap state", () => {
     const v25Candidates = candidates.filter((candidate) =>
       /V25\.0/.test(candidate.text),
     );
+    const jp1Candidates = candidates.filter((candidate) =>
+      /Lot JP1/.test(candidate.text),
+    );
 
     assert.ok(
       burnInCandidates.every((candidate) => candidate.status === "done"),
@@ -663,9 +685,12 @@ describe("loop-engine roadmap state", () => {
       v25Candidates.every((candidate) => candidate.status === "done"),
       "expected every parsed V25.0 candidate marker to be completed",
     );
+    assert.ok(jp1Candidates.length >= 1);
+    assert.ok(
+      jp1Candidates.every((candidate) => candidate.status === "done"),
+      "expected JP1 to be marked done in the roadmap",
+    );
 
-    const selected = selectRoadmapCandidate(candidates);
-    assert.equal(selected?.status, "todo");
-    assert.match(selected?.text ?? "", /Lot JP1/);
+    assert.equal(selectRoadmapCandidate(candidates), null);
   });
 });

@@ -1,6 +1,6 @@
-# Job Package portable contract — JP0 (audit)
+# Job Package portable contract — JP0 (audit) / JP1 (implémenté)
 
-Statut : audit conclu, aucune abstraction de production introduite, `src/**` inchangé.
+Statut : JP0 (audit) conclu ; JP1 implémenté — voir « JP1 — réalisé » en fin de document.
 
 Note de révision : la première version de JP1 proposait un champ additif `projectName`, qui duplique `plan.project.name` (déjà présent) sans retirer `project.path` du plan — elle ne démontrait donc aucune propriété de portabilité réelle. Le contrat minimal cible et JP1 ont été corrigés en conséquence (voir sections correspondantes).
 
@@ -152,3 +152,15 @@ Mécanisme cible, à documenter ici sans l'implémenter dans ce lot :
 5. Aucun resolver host, health check, routing ou worker selection n'est ajouté ; aucune nouvelle abstraction générique au-delà du minimum requis par cette frontière (pas de nouveau type `JobPackage`, pas de sérialisation cross-host).
 
 Ce micro-lot ne retire rien du plan actuel, ne casse aucun executor existant (le `cwd` réellement utilisé reste identique — y compris pour les worktrees isolés), et démontre la première propriété de portabilité réelle : les executors n'ont plus besoin de lire un chemin physique porté par le plan gouverné pour s'exécuter.
+
+## JP1 — réalisé
+
+Mécanisme livré, conforme au mécanisme cible ci-dessus :
+
+1. `LoopExecutor` (`src/loop/execution.ts`) a désormais la signature `(plan: LoopExecutionPlan, cwd: string) => Promise<LoopExecutorResult>` : le contexte physique local d'invocation est un second paramètre explicite, pas un champ additionnel du plan ni un objet de contexte abstrait.
+2. `runLoopExecute` (`src/loop/execute-runner.ts`) appelle l'executor avec `executionProject.path` — la même valeur qu'il dérive déjà pour le worktree normal ou isolé (`options.executionProjectPath`) — sans aucun changement de son calcul existant.
+3. `claude-code-cli-executor.ts` et `codex-cli-executor.ts` résolvent leur `cwd` depuis ce second paramètre (`resolve(executionCwd)`) et ne lisent plus `plan.project.path` pour déterminer où s'exécuter.
+4. `provider-failover.ts` (`executeLoopProviderFailover`, `createProviderFailoverLoopExecutor`) et `provider-failover-evidence-executor.ts` propagent ce même `cwd` à chaque executor de la séquence de failover, sans dupliquer le concept par provider — la localisation physique de l'exécution reste une donnée unique du cycle, pas du plan par-provider.
+5. `project: ProjectConfig` reste présent dans `LoopExecutionPlan` pour compatibilité (consommé par `content-policy.ts`, les tests d'inspection, et les assemblies de failover pour l'identité/nom du projet) ; seule sa consommation comme emplacement physique par les deux executors CLI réels a été retirée.
+
+Aucun resolver host, worker registry, health check, routing local/vps-main ou nouveau type `JobPackage` n'a été ajouté par ce lot.
