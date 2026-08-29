@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import {
-  createLoopExecutionPlan,
-} from "../../src/loop/execution-plan.js";
+import { createLoopExecutionPlan } from "../../src/loop/execution-plan.js";
 import type { LoopExecutorInput } from "../../src/loop/execution.js";
 
 function admittedInput(): LoopExecutorInput {
@@ -101,6 +99,27 @@ describe("createLoopExecutionPlan", () => {
     assert.equal(Object.isFrozen(plan.policy), true);
   });
 
+  it("carries only the project's logical name, never its physical path or full configuration", () => {
+    const plan = createLoopExecutionPlan(admittedInput());
+
+    assert.deepEqual(plan.project, { name: "loop-engine" });
+    assert.equal(Object.isFrozen(plan.project), true);
+    assert.equal(
+      (plan.project as Readonly<Record<string, unknown>>).path,
+      undefined,
+    );
+
+    const inputWithDifferentPath = {
+      ...admittedInput(),
+      project: { name: "loop-engine", path: "/some/other/host/checkout" },
+    } as unknown as LoopExecutorInput;
+    const planFromDifferentPath = createLoopExecutionPlan(
+      inputWithDifferentPath,
+    );
+
+    assert.deepEqual(planFromDifferentPath.project, plan.project);
+  });
+
   it("carries only explicit forbidden content terms in the immutable plan", () => {
     const plan = createLoopExecutionPlan({
       ...admittedInput(),
@@ -112,7 +131,10 @@ describe("createLoopExecutionPlan", () => {
       },
     });
 
-    assert.deepEqual(plan.brief?.forbiddenContentTerms, ["logrotate", "Docker"]);
+    assert.deepEqual(plan.brief?.forbiddenContentTerms, [
+      "logrotate",
+      "Docker",
+    ]);
     assert.equal(Object.isFrozen(plan.brief?.forbiddenContentTerms), true);
   });
 
@@ -120,7 +142,11 @@ describe("createLoopExecutionPlan", () => {
     const input = admittedInput();
     const rejected = {
       ...input,
-      agentPolicy: { ...input.agentPolicy, status: "policy_disabled", selection: null },
+      agentPolicy: {
+        ...input.agentPolicy,
+        status: "policy_disabled",
+        selection: null,
+      },
     } as unknown as LoopExecutorInput;
 
     assert.throws(

@@ -233,7 +233,9 @@ test("28/29. estimatedInputTokens includes the real, sanitized Structured Output
     "roadmap.md": "- [x] Done lot",
   });
   try {
-    const estimate = generateRoadmapProposalEstimateReport(project(fixture.path));
+    const estimate = generateRoadmapProposalEstimateReport(
+      project(fixture.path),
+    );
     assert.equal(estimate.estimate.status, "available");
     if (estimate.estimate.status !== "available") return;
 
@@ -252,16 +254,13 @@ test("28/29. estimatedInputTokens includes the real, sanitized Structured Output
 
 test("30. the real loop-engine repository uses completed-roadmap routing with a fully accounted estimate", () => {
   // Mirrors the `loop-engine` entry in projects.yaml (path: .) and validates
-  // invariants of the current repository state. JP1 is completed, so
+  // invariants of the current repository state. JP1 and JP2 are completed, so
   // deterministic routing must use the economy profile.
   const loopEngineProject: ProjectConfig = {
     name: "loop-engine",
     path: process.cwd(),
     type: "node-cli",
-    required_docs: [
-      "README.md",
-      "docs/architecture/project-intelligence.md",
-    ],
+    required_docs: ["README.md", "docs/architecture/project-intelligence.md"],
     validation: ["pnpm run validate"],
     requires_git: false,
     planning: {
@@ -292,7 +291,9 @@ test("31. estimatedCostUsd uses the corrected estimatedInputTokens, not the old 
     "roadmap.md": "- [x] Done lot",
   });
   try {
-    const estimate = generateRoadmapProposalEstimateReport(project(fixture.path));
+    const estimate = generateRoadmapProposalEstimateReport(
+      project(fixture.path),
+    );
     assert.equal(estimate.estimate.status, "available");
     if (estimate.estimate.status !== "available") return;
     assert.ok("estimatedCostUsd" in estimate.estimate);

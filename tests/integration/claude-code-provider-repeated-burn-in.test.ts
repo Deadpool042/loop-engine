@@ -59,20 +59,11 @@ function gitStatus(cwd: string): string {
   }).trim();
 }
 
-const DECOY_PROJECT_PATH = "/nonexistent/decoy-project-path";
-
 function burnInPlan(_cwd: string, runId: string): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1 as const,
     runId,
-    project: {
-      name: "burn-in-fixture",
-      path: DECOY_PROJECT_PATH,
-      type: "test",
-      required_docs: [],
-      validation: [],
-      roadmap: [],
-    },
+    project: { name: "burn-in-fixture" },
     candidate: {
       path: "roadmap.md",
       line: 1,

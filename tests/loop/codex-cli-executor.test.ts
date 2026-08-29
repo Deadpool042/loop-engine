@@ -58,20 +58,11 @@ process.stdout.write(JSON.stringify({ type: "task.completed" }) + "\\n");
   };
 }
 
-const DECOY_PROJECT_PATH = "/nonexistent/decoy-project-path";
-
 function fakePlan(_cwd: string): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1 as const,
     runId: "run-1",
-    project: {
-      name: "test",
-      path: DECOY_PROJECT_PATH,
-      type: "test",
-      required_docs: [],
-      validation: [],
-      roadmap: [],
-    },
+    project: { name: "test" },
     candidate: {
       path: "roadmap.md",
       line: 1,

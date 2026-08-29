@@ -45,7 +45,7 @@ Trois contrats peuvent être confondus avec un « Job Package » :
 
 - Producteur : `createBoundaryHandoff(descriptor)`, bridge pur depuis un `DispatchDescriptorResult`.
 - Consommateurs réels : uniquement son propre sous-arbre (`src/boundary/**`) et une règle d'audit (`src/audit/rules/audit.ts`). Aucun appelant hors de `src/boundary/**` et `src/dispatch/**`.
-- Le type porte structurellement `ready: false`, `accepted: false`, `dispatchable: false`, `executable: false`, `executionStarted: false` — c'est un objet RFC (« rfc-execution-boundary-v12 ») délibérément inerte, conçu pour être *revu*, pas exécuté.
+- Le type porte structurellement `ready: false`, `accepted: false`, `dispatchable: false`, `executable: false`, `executionStarted: false` — c'est un objet RFC (« rfc-execution-boundary-v12 ») délibérément inerte, conçu pour être _revu_, pas exécuté.
 - Il ne contient aucun `project.path`, aucun runtime, aucun worker : uniquement des identifiants d'évidence (`descriptorId`, `authorityId`, `eligibilityId`, versions de policy/mapping/protocole).
 - **Conclusion** : `BoundaryHandoff` n'est pas le même concept qu'un Job Package. C'est un artefact de gouvernance RFC non branché à l'exécution réelle, sans lien avec `LoopExecutionPlan` ou le Project Handoff. Il est exclu de la comparaison A/B/C.
 
@@ -113,13 +113,13 @@ Le Job Package portable minimal, projeté depuis `LoopExecutionPlan`, doit sépa
 - **capabilities/permissions** : `policy.requiredCapabilities`, `policy.requiredPermissions` (déjà présents) ;
 - **runtime/provider** : `provider`, `runtime`, `model`, `effort`, `budget`, `profileId` (déjà présents) ;
 - **worker** : actuellement absent en tant que champ explicite — à ne pas fabriquer avant qu'un deuxième worker consomme réellement un plan (cf. hors périmètre) ;
-- **emplacement physique du checkout** : ne doit **pas** être une donnée du contrat gouverné `LoopExecutionPlan`. `runLoopExecute` (`src/loop/execute-runner.ts:245-248`) connaît déjà ce chemin indépendamment du plan — y compris pour un worktree isolé via `options.executionProjectPath` — et le transporte aujourd'hui *dans* le plan via `executionProject` (`project: executionProject` à la construction, `execute-runner.ts:319`). Le contrat cible sépare cette connaissance déjà existante du plan gouverné : le chemin physique devient un **contexte local d'invocation** fourni séparément à la frontière `LoopExecutor`, jamais un champ que le plan doit porter pour être portable.
+- **emplacement physique du checkout** : ne doit **pas** être une donnée du contrat gouverné `LoopExecutionPlan`. `runLoopExecute` (`src/loop/execute-runner.ts:245-248`) connaît déjà ce chemin indépendamment du plan — y compris pour un worktree isolé via `options.executionProjectPath` — et le transporte aujourd'hui _dans_ le plan via `executionProject` (`project: executionProject` à la construction, `execute-runner.ts:319`). Le contrat cible sépare cette connaissance déjà existante du plan gouverné : le chemin physique devient un **contexte local d'invocation** fourni séparément à la frontière `LoopExecutor`, jamais un champ que le plan doit porter pour être portable.
 
 ## Frontière worker availability (conceptuelle uniquement, JP0)
 
 - Le Job Package peut exiger des **capabilities** (ex. `filesystem`, `git`, langage runtime attendu) — c'est une déclaration de besoin, pas une observation.
 - La disponibilité effective d'un worker (`local` up, `vps-main` up, capacités réellement exposées à cet instant) doit rester une **observation externe**, produite par Development Workspace ou LP-INFRA, jamais calculée ou mise en cache dans Loop Engine.
-- Loop Engine ne doit pas décider *lui-même* si un worker est disponible : il doit au plus consommer un état déjà observé (à l'image du contrat de santé transverse `C1`/`Projects/HEALTH.md`) pour admettre ou refuser un plan, sans health check, routeur ni failover propre à Loop Engine.
+- Loop Engine ne doit pas décider _lui-même_ si un worker est disponible : il doit au plus consommer un état déjà observé (à l'image du contrat de santé transverse `C1`/`Projects/HEALTH.md`) pour admettre ou refuser un plan, sans health check, routeur ni failover propre à Loop Engine.
 - Cette frontière reste non implémentée : aucun health check, routeur ou failover n'est ajouté par ce lot.
 
 ## Compatibilité
@@ -145,7 +145,7 @@ Constat réel à l'origine du mécanisme : `runLoopExecute` connaît déjà `exe
 
 Mécanisme cible, à documenter ici sans l'implémenter dans ce lot :
 
-1. `LoopExecutionPlan` reste inchangé dans JP0 (aucune modification de `src/**` dans ce lot) ; conserver temporairement `project: ProjectConfig` dans le plan pour compatibilité est acceptable — JP1 élimine d'abord sa *consommation* comme emplacement physique par les executors, pas sa présence dans le plan.
+1. `LoopExecutionPlan` reste inchangé dans JP0 (aucune modification de `src/**` dans ce lot) ; conserver temporairement `project: ProjectConfig` dans le plan pour compatibilité est acceptable — JP1 élimine d'abord sa _consommation_ comme emplacement physique par les executors, pas sa présence dans le plan.
 2. `runLoopExecute` fournit séparément le chemin physique d'exécution qu'il connaît déjà (`executionProject.path`), en plus du plan gouverné.
 3. La frontière `LoopExecutor` reçoit le plan gouverné **et** un contexte local minimal contenant le `cwd` — sans fusionner les deux notions dans un même champ de plan.
 4. `claude-code-cli-executor.ts` et `codex-cli-executor.ts` consomment ce cwd local fourni séparément au lieu de lire `plan.project.path`.
@@ -164,3 +164,62 @@ Mécanisme livré, conforme au mécanisme cible ci-dessus :
 5. `project: ProjectConfig` reste présent dans `LoopExecutionPlan` pour compatibilité (consommé par `content-policy.ts`, les tests d'inspection, et les assemblies de failover pour l'identité/nom du projet) ; seule sa consommation comme emplacement physique par les deux executors CLI réels a été retirée.
 
 Aucun resolver host, worker registry, health check, routing local/vps-main ou nouveau type `JobPackage` n'a été ajouté par ce lot.
+
+## Checkpoint post-JP1 — audit des consommateurs réels de `LoopExecutionPlan.project`
+
+Audit factuel mené après merge de JP1 (`main` à `814c8d9`), par usage réel du code — pas par lecture du seul type TypeScript.
+
+Recherche exhaustive de `plan.project.`, `primaryPlan.project.`, `attempt.plan.project.` et `executionPlan.project.` dans `src/**` (hors tests) :
+
+- **`src/loop/claude-code-cli-executor.ts:26`** — `plan.project.name` (texte du prompt envoyé au provider).
+- **`src/loop/codex-cli-executor.ts:25`** — `plan.project.name` (texte du prompt envoyé au provider).
+- Aucun autre point de `src/**` ne lit une propriété de `LoopExecutionPlan.project`.
+
+Constats complémentaires :
+
+- **`src/loop/content-policy.ts`** (`inspectWorktreeContentPolicy`) reçoit `plan: LoopExecutionPlan` mais ne lit que `plan.brief` ; il ne consomme aucune propriété de `plan.project`. (Correction du constat JP1 ci-dessus, qui le citait par erreur comme consommateur du `project` porté par le plan.)
+- **`src/loop/provider-failover.ts`**, **`provider-failover-evidence-executor.ts`** et **`src/composition/provider-failover-assembly.ts`** ne lisent que `provider`, `runtime`, `profileId`, `model`, `policy` et `budget` du plan — jamais `project`. Le spread `{ ...primaryPlan, ... }` dans `createFallbackExecutionPlan` recopie `project` tel quel sans jamais le lire.
+- **`src/loop/execution-plan-evidence.ts`** et **`src/loop/execution-plan-evidence-fingerprint.ts`** projettent l'identité d'exécution depuis `AgentPolicyResolution`, jamais depuis `plan.project` — ils excluent déjà explicitement tout chemin de projet de la surface d'évidence publique.
+- **`src/core/loop-execution-report-integrity.ts`** valide `value.project` sur l'enveloppe `LoopRunResult` (une chaîne, le nom de projet), qui est un contrat distinct sans rapport avec `LoopExecutionPlan.project`.
+- **`LoopValidatorInput.project`** et **`LoopRepairerInput.project`** (`src/loop/execution.ts`) restent des `ProjectConfig` complets, mais ce sont des contrats **distincts** de `LoopExecutionPlan`, construits séparément par `runLoopExecute` depuis `executionProject` (pas depuis le plan). `validateLoopExecution` en a besoin pour lire `project.validation` (les commandes de validation configurées). Ces deux frontières sont hors périmètre de JP2, qui porte exclusivement sur `LoopExecutionPlan`.
+- Le seul test qui observe encore `plan.project.path` en dehors de la compatibilité structurelle est `tests/integration/isolated-provider-execution.test.ts` (`observedPaths.push(plan.project.path)`), pour vérifier que deux projets isolés obtiennent des worktrees distincts. Ce test doit être adapté pour observer le `cwd` explicite (second paramètre `LoopExecutor` introduit par JP1) au lieu de `plan.project.path`, ce qui démontre justement l'invariant ciblé par JP2.
+
+**Conclusion de l'audit : seule l'identité logique du projet (`project.name`) est encore effectivement consommée depuis `LoopExecutionPlan.project`.** Aucun autre champ de `ProjectConfig` (`path`, `type`, `docs`, `roadmap`, `validation`) n'est lu à travers le plan gouverné nulle part dans `src/**`. `project.path` porté par le plan est donc le dernier couplage host-specific résiduel de `LoopExecutionPlan` — un vestige de compatibilité qui n'a plus aucun lecteur réel depuis JP1.
+
+## Décision JP2 : GO
+
+L'audit confirme la condition posée par JP0/JP1 : JP2 peut retirer `ProjectConfig` (et donc toute localisation physique) de `LoopExecutionPlan`, en ne conservant que l'identité logique nécessaire (`project.name`).
+
+### Contrat cible minimal de JP2
+
+`LoopExecutionPlan.project` passe de `ProjectConfig` à une forme minimale portant uniquement l'identité logique déjà consommée :
+
+```ts
+project: Readonly<{ name: string }>;
+```
+
+- Préserve `plan.project.name` pour les deux executors CLI (aucun changement de leur code au-delà du type d'entrée).
+- Ne recrée pas d'alias `projectName` : la forme reste `project.name`, cohérente avec l'usage existant.
+- `runLoopExecute` construit ce sous-ensemble depuis `executionProject.name` au lieu de passer `executionProject` (le `ProjectConfig` complet) tel quel.
+- Le `cwd` continue d'être fourni exclusivement via le second paramètre `LoopExecutor` introduit par JP1 (`executionProject.path`, inchangé y compris pour un worktree isolé via `executionProjectPath`) — jamais via le plan.
+- Le failover (`provider-failover.ts`) continue de propager ce même `cwd` à chaque tentative, sans changement de ce mécanisme.
+- `LoopValidatorInput.project` et `LoopRepairerInput.project` restent des `ProjectConfig` complets : ce sont des contrats distincts, non affectés par ce lot.
+
+### Exclusions explicites (rappel)
+
+JP2 n'introduit et ne doit pas introduire : un nouveau type générique `JobPackage` ; un resolver host ; un mapping `projectName → chemin` ; un worker registry ; un health check ; un routing local/vps-main ; un failover de worker ; un provisioning de workspace ; une intégration OpenClaw ; une nouvelle sérialisation publique ; ou toute nouvelle abstraction sans usage réel démontré. La disponibilité effective d'un worker reste une observation externe (Development Workspace / LP-INFRA), jamais une responsabilité de Loop Engine. Le chemin physique du checkout reste exclusivement un contexte local d'invocation du `LoopExecutor`, jamais une donnée du plan gouverné.
+
+## JP2 — réalisé
+
+Mécanisme livré, conforme au contrat cible ci-dessus :
+
+1. `LoopExecutionPlan.project` (`src/loop/execution-plan.ts`) est désormais un `LoopExecutionPlanProject = Readonly<{ name: string }>`, plus `ProjectConfig`. `CreateLoopExecutionPlanInput.project` porte la même forme minimale. `createLoopExecutionPlan` fige explicitement `project: Object.freeze({ name: input.project.name })` — aucune autre propriété ne peut transiter, même si l'appelant en fournit davantage.
+2. `runLoopExecute` (`src/loop/execute-runner.ts`) construit explicitement `project: Object.freeze({ name: executionProject.name })` lors de l'appel à `createLoopExecutionPlan`, au lieu de transmettre `executionProject` (le `ProjectConfig` complet). Le calcul de `executionProject` lui-même (normal ou worktree isolé via `executionProjectPath`) est inchangé et continue d'alimenter séparément le `cwd` du `LoopExecutor` (frontière JP1).
+3. `claude-code-cli-executor.ts` et `codex-cli-executor.ts` sont inchangés : ils lisaient déjà exclusivement `plan.project.name` pour le texte du prompt, et continuent de recevoir leur `cwd` via le second paramètre explicite introduit par JP1.
+4. `provider-failover.ts`, `provider-failover-evidence-executor.ts` et `src/composition/provider-failover-assembly.ts` sont inchangés dans leur logique : ils ne lisaient déjà que `provider`/`runtime`/`profileId`/`model`/`policy`/`budget` sur le plan, jamais `project`. Le `cwd` continue d'être propagé identiquement à toutes les tentatives par la frontière JP1.
+5. `LoopValidatorInput.project` et `LoopRepairerInput.project` (`src/loop/execution.ts`) restent des `ProjectConfig` complets — contrats distincts de `LoopExecutionPlan`, hors périmètre, toujours construits par `runLoopExecute` depuis `executionProject` directement (pas depuis le plan).
+6. Aucun contrat JSON public n'est modifié : `LoopExecutionPlan` n'est sérialisé dans aucune sortie `--json` existante.
+7. Preuve TypeScript : `plan.project.path`, `plan.project.type`, `plan.project.docs`, `plan.project.roadmap` et `plan.project.validation` ne compilent plus sur un `LoopExecutionPlan` — seul `plan.project.name` reste accessible.
+8. Preuve de test : `tests/loop/execution-plan.test.ts` démontre que `plan.project` ne contient que `{ name }` et qu'un `project.path` différent en entrée ne change rien au plan produit ; `tests/loop/execute-runner.test.ts` démontre que deux exécutions du même projet logique avec deux chemins physiques distincts produisent le même `plan.project` tout en recevant deux `cwd` distincts et corrects ; `tests/integration/isolated-provider-execution.test.ts` observe désormais le `cwd` explicite (second paramètre `LoopExecutor`) au lieu de `plan.project.path` pour prouver l'isolation entre projets.
+
+Aucun nouveau `JobPackage`, resolver host, worker registry, health check, routage multi-environnement ou sérialisation cross-host n'a été ajouté par ce lot.

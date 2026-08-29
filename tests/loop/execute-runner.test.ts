@@ -135,11 +135,20 @@ describe("runLoopExecute", () => {
         readModifiedWorktreeFiles,
         executor: async () => {
           await writeFile(join(cwd, "generated.md"), "Docker configuration\n");
-          return { status: "completed" as const, modifiedFiles: [], details: [] };
+          return {
+            status: "completed" as const,
+            modifiedFiles: [],
+            details: [],
+          };
         },
         validator: async () => {
           validatorCalls += 1;
-          return { status: "passed" as const, failedCommand: null, exitCode: 0, details: [] };
+          return {
+            status: "passed" as const,
+            failedCommand: null,
+            exitCode: 0,
+            details: [],
+          };
         },
       });
 
@@ -150,6 +159,61 @@ describe("runLoopExecute", () => {
       assert.equal(JSON.stringify(result).includes("docker"), false);
     } finally {
       await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("carries only the project's logical name in the plan, unaffected by its physical checkout path", async () => {
+    const firstCwd = await createGitWorktree();
+    const secondCwd = await createGitWorktree();
+    const candidate = fixtureCandidate();
+    const observedPlanProjects: unknown[] = [];
+    const observedCwds: string[] = [];
+
+    const runWithPath = async (path: string) => {
+      const project = { ...fixtureProject(), path };
+      return runLoopExecute(project.name, {
+        ...deterministicOptions(),
+        loadConfig: () => fixtureConfig(project),
+        planLoopCycle: () => ({
+          outcome: "ready" as const,
+          candidate,
+          plannedSteps: [],
+          snapshot: fixtureSnapshot(project, candidate),
+        }),
+        readModifiedWorktreeFiles: async () => [],
+        executor: async (plan, cwd) => {
+          observedPlanProjects.push(plan.project);
+          observedCwds.push(cwd);
+          return {
+            status: "completed" as const,
+            modifiedFiles: [],
+            details: [],
+          };
+        },
+        validator: async () => ({
+          status: "passed" as const,
+          failedCommand: null,
+          exitCode: 0,
+          details: [],
+        }),
+      });
+    };
+
+    try {
+      const first = await runWithPath(firstCwd);
+      const second = await runWithPath(secondCwd);
+
+      assert.equal(first.status, "completed");
+      assert.equal(second.status, "completed");
+      assert.deepEqual(observedPlanProjects, [
+        { name: "fixture-project" },
+        { name: "fixture-project" },
+      ]);
+      assert.notEqual(observedCwds[0], observedCwds[1]);
+      assert.deepEqual(observedCwds, [firstCwd, secondCwd]);
+    } finally {
+      await rm(firstCwd, { recursive: true, force: true });
+      await rm(secondCwd, { recursive: true, force: true });
     }
   });
 
@@ -173,11 +237,20 @@ describe("runLoopExecute", () => {
         readModifiedWorktreeFiles,
         executor: async () => {
           await writeFile(join(cwd, "outside.md"), "outside scope\n");
-          return { status: "completed" as const, modifiedFiles: [], details: [] };
+          return {
+            status: "completed" as const,
+            modifiedFiles: [],
+            details: [],
+          };
         },
         validator: async () => {
           validatorCalls += 1;
-          return { status: "passed" as const, failedCommand: null, exitCode: 0, details: [] };
+          return {
+            status: "passed" as const,
+            failedCommand: null,
+            exitCode: 0,
+            details: [],
+          };
         },
       });
 
@@ -215,16 +288,32 @@ describe("runLoopExecute", () => {
         }),
         readModifiedWorktreeFiles,
         executor: async () => {
-          await writeFile(join(cwd, "generated.md"), "Documentation standard\n");
-          return { status: "completed" as const, modifiedFiles: [], details: [] };
+          await writeFile(
+            join(cwd, "generated.md"),
+            "Documentation standard\n",
+          );
+          return {
+            status: "completed" as const,
+            modifiedFiles: [],
+            details: [],
+          };
         },
         validator: async () => {
           validatorCalls += 1;
-          return { status: "failed" as const, failedCommand: "expected", exitCode: 1, details: [] };
+          return {
+            status: "failed" as const,
+            failedCommand: "expected",
+            exitCode: 1,
+            details: [],
+          };
         },
         repairer: async () => {
           await writeFile(join(cwd, "repair.md"), "Docker configuration\n");
-          return { status: "completed" as const, modifiedFiles: [], details: [] };
+          return {
+            status: "completed" as const,
+            modifiedFiles: [],
+            details: [],
+          };
         },
       });
 
@@ -252,18 +341,29 @@ describe("runLoopExecute", () => {
         allowedPaths: ["docs/platform/**"],
       }),
       maxRepairs: 1,
-      readModifiedWorktreeFiles: async () => ["docs/platform/README.md", "docs/roadmap/projet-lp-infra.md"],
+      readModifiedWorktreeFiles: async () => [
+        "docs/platform/README.md",
+        "docs/roadmap/projet-lp-infra.md",
+      ],
       executor: async () => {
         executorCalls += 1;
         return {
           status: "completed",
-          modifiedFiles: ["docs/platform/README.md", "docs/roadmap/projet-lp-infra.md"],
+          modifiedFiles: [
+            "docs/platform/README.md",
+            "docs/roadmap/projet-lp-infra.md",
+          ],
           details: [],
         };
       },
       validator: async () => {
         validatorCalls += 1;
-        return { status: "passed", failedCommand: null, exitCode: 0, details: [] };
+        return {
+          status: "passed",
+          failedCommand: null,
+          exitCode: 0,
+          details: [],
+        };
       },
       repairer: async () => {
         repairCalls += 1;
@@ -276,7 +376,10 @@ describe("runLoopExecute", () => {
     assert.equal(repairCalls, 0);
     assert.equal(result.status, "failed");
     assert.equal(result.failure?.code, "scope_violation");
-    assert.match(result.failure?.details.join("\n") ?? "", /docs\/roadmap\/projet-lp-infra\.md/);
+    assert.match(
+      result.failure?.details.join("\n") ?? "",
+      /docs\/roadmap\/projet-lp-infra\.md/,
+    );
     assert.equal(result.validation, null);
     assert.equal(result.patchExport, undefined);
     assert.equal(result.commit, null);
@@ -302,14 +405,27 @@ describe("runLoopExecute", () => {
         inventoryCalls++ === 0
           ? ["src/feature.ts"]
           : ["src/feature.ts", "docs/outside.md"],
-      executor: async () => ({ status: "completed", modifiedFiles: ["src/feature.ts"], details: [] }),
+      executor: async () => ({
+        status: "completed",
+        modifiedFiles: ["src/feature.ts"],
+        details: [],
+      }),
       validator: async () => {
         validatorCalls += 1;
-        return { status: "failed", failedCommand: "pnpm run typecheck", exitCode: 1, details: [] };
+        return {
+          status: "failed",
+          failedCommand: "pnpm run typecheck",
+          exitCode: 1,
+          details: [],
+        };
       },
       repairer: async () => {
         repairCalls += 1;
-        return { status: "completed", modifiedFiles: ["docs/outside.md"], details: [] };
+        return {
+          status: "completed",
+          modifiedFiles: ["docs/outside.md"],
+          details: [],
+        };
       },
     });
 
@@ -342,10 +458,19 @@ describe("runLoopExecute", () => {
         inventoryCalls++ === 0
           ? ["src/feature.ts"]
           : ["src/feature.ts", "docs/outside.md"],
-      executor: async () => ({ status: "completed", modifiedFiles: ["src/feature.ts"], details: [] }),
+      executor: async () => ({
+        status: "completed",
+        modifiedFiles: ["src/feature.ts"],
+        details: [],
+      }),
       validator: async () => {
         validatorCalls += 1;
-        return { status: "failed", failedCommand: "pnpm run typecheck", exitCode: 1, details: [] };
+        return {
+          status: "failed",
+          failedCommand: "pnpm run typecheck",
+          exitCode: 1,
+          details: [],
+        };
       },
       repairer: async () => {
         repairCalls += 1;
@@ -379,7 +504,9 @@ describe("runLoopExecute", () => {
 
     const result = await runLoopExecute("fixture-project", {
       ...deterministicOptions(),
-      onProgress: (event) => { progress.push(event.status); },
+      onProgress: (event) => {
+        progress.push(event.status);
+      },
       readModifiedWorktreeFiles: async () => ["src/feature.ts"],
       executor: async () => {
         executorCalls += 1;
@@ -416,7 +543,13 @@ describe("runLoopExecute", () => {
       result.steps.map((step) => step.name),
       ["planning", "ready", "executing", "validating", "completed"],
     );
-    assert.deepEqual(progress, ["planning", "ready", "executing", "validating", "completed"]);
+    assert.deepEqual(progress, [
+      "planning",
+      "ready",
+      "executing",
+      "validating",
+      "completed",
+    ]);
   });
 
   it("repairs once and revalidates within the finite budget", async () => {
