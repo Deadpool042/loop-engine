@@ -16,7 +16,8 @@ function primaryMismatch(): LoopExecutorResult {
     modifiedFiles: Object.freeze([]),
     failure: Object.freeze({
       code: "provider_primary_plan_mismatch",
-      message: "The first failover attempt must preserve the admitted primary plan.",
+      message:
+        "The first failover attempt must preserve the admitted primary plan.",
       details: Object.freeze([
         "The resolver replaced or reordered the primary execution plan.",
       ]),
@@ -36,13 +37,14 @@ export function createEvidenceAwareProviderFailoverLoopExecutor(
     isRecoverableFailure?: LoopProviderFailureClassifier;
   }>,
 ): LoopExecutor {
-  return async (primaryPlan) => {
+  return async (primaryPlan, cwd) => {
     const attempts = resolveAttempts(primaryPlan);
     if (attempts[0]?.plan !== primaryPlan) return primaryMismatch();
 
     const outcome = await executeLoopProviderFailover({
       attempts,
       maxAttempts: options.maxAttempts,
+      cwd,
       ...(options.isRecoverableFailure === undefined
         ? {}
         : { isRecoverableFailure: options.isRecoverableFailure }),

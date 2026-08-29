@@ -1,4 +1,7 @@
-import { runLoopExecute, type LoopRunExecuteOptions } from "./execute-runner.js";
+import {
+  runLoopExecute,
+  type LoopRunExecuteOptions,
+} from "./execute-runner.js";
 import type { LoopExecutor } from "./execution.js";
 import { fingerprintLoopProviderFailoverEvidence } from "./provider-failover-evidence-integrity.js";
 import type { LoopProviderFailoverEvidence } from "./provider-failover.js";
@@ -18,8 +21,8 @@ export async function runLoopExecuteWithProviderFailoverEvidence(
   const evidenceAwareExecutor: LoopExecutor | undefined =
     executor === undefined
       ? undefined
-      : async (plan) => {
-          const result = await executor(plan);
+      : async (plan, cwd) => {
+          const result = await executor(plan, cwd);
           evidence = result.providerFailoverEvidence ?? null;
           return result;
         };
@@ -35,6 +38,8 @@ export async function runLoopExecuteWithProviderFailoverEvidence(
     ...result,
     providerFailoverEvidence: evidence,
     providerFailoverFingerprint:
-      evidence === null ? null : fingerprintLoopProviderFailoverEvidence(evidence),
+      evidence === null
+        ? null
+        : fingerprintLoopProviderFailoverEvidence(evidence),
   });
 }

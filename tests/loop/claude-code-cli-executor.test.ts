@@ -26,13 +26,15 @@ function setupCleanWorktree(): { cwd: string; cleanup: () => void } {
   return { cwd, cleanup: () => rmSync(cwd, { recursive: true, force: true }) };
 }
 
-function fakePlan(cwd: string): LoopExecutionPlan {
+const DECOY_PROJECT_PATH = "/nonexistent/decoy-project-path";
+
+function fakePlan(_cwd: string): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1 as const,
     runId: "run-1",
     project: {
       name: "test",
-      path: cwd,
+      path: DECOY_PROJECT_PATH,
       type: "test",
       required_docs: [],
       validation: [],
@@ -126,7 +128,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         executable: FAKE_CLAUDE,
         timeoutMs: 5_000,
       });
-      const result = await executor(fakePlan(cwd));
+      const result = await executor(fakePlan(cwd), cwd);
       assert.equal(result.status, "completed");
     } finally {
       cleanup();
@@ -141,7 +143,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         timeoutMs: 5_000,
       });
       process.env.FAKE_CLAUDE_MODE = "is_error";
-      const result = await executor(fakePlan(cwd));
+      const result = await executor(fakePlan(cwd), cwd);
       assert.equal(result.status, "failed");
       assert.equal(
         result.status === "failed" ? result.failure.code : null,
@@ -161,7 +163,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         timeoutMs: 5_000,
       });
       process.env.FAKE_CLAUDE_MODE = "max_turns";
-      const result = await executor(fakePlan(cwd));
+      const result = await executor(fakePlan(cwd), cwd);
       assert.equal(result.status, "failed");
       assert.equal(
         result.status === "failed" ? result.failure.code : null,
@@ -185,7 +187,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         timeoutMs: 5_000,
       });
       process.env.FAKE_CLAUDE_MODE = "invalid_json";
-      const result = await executor(fakePlan(cwd));
+      const result = await executor(fakePlan(cwd), cwd);
       assert.equal(result.status, "failed");
       assert.equal(
         result.status === "failed" ? result.failure.code : null,
@@ -205,7 +207,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         timeoutMs: 5_000,
       });
       process.env.FAKE_CLAUDE_MODE = "nonzero_exit_with_file";
-      const result = await executor(fakePlan(cwd));
+      const result = await executor(fakePlan(cwd), cwd);
       assert.equal(result.status, "failed");
       assert.equal(
         result.status === "failed" ? result.failure.code : null,
@@ -232,7 +234,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         timeoutMs: 200,
       });
       process.env.FAKE_CLAUDE_MODE = "hang";
-      const result = await executor(fakePlan(cwd));
+      const result = await executor(fakePlan(cwd), cwd);
       assert.equal(result.status, "failed");
       assert.equal(
         result.status === "failed" ? result.failure.code : null,
@@ -252,7 +254,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         timeoutMs: 5_000,
       });
       process.env.FAKE_CLAUDE_MODE = "nonzero_exit";
-      const result = await executor(fakePlan(cwd));
+      const result = await executor(fakePlan(cwd), cwd);
       const serialized = JSON.stringify(result);
       assert.equal(serialized.includes("Implement exactly one"), false);
       assert.equal(serialized.includes("error_during_execution"), false);
@@ -274,18 +276,29 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         timeoutMs: 5_000,
       });
 
-      const result = await executor(Object.freeze({
-        ...fakePlan(cwd),
-        allowedPaths: ["ADR/0006-strategie-observabilite.md", "docs/roadmap/projet-lp-infra.md"],
-        brief: {
-          objective: "Define the observability strategy.",
-          deliverables: ["ADR/0006-strategie-observabilite.md", "Update H3-L1 roadmap status."],
-          outOfScope: ["Tool installation"],
-        },
-      }));
+      const result = await executor(
+        Object.freeze({
+          ...fakePlan(cwd),
+          allowedPaths: [
+            "ADR/0006-strategie-observabilite.md",
+            "docs/roadmap/projet-lp-infra.md",
+          ],
+          brief: {
+            objective: "Define the observability strategy.",
+            deliverables: [
+              "ADR/0006-strategie-observabilite.md",
+              "Update H3-L1 roadmap status.",
+            ],
+            outOfScope: ["Tool installation"],
+          },
+        }),
+        cwd,
+      );
 
       assert.equal(result.status, "completed");
-      const prompt = (JSON.parse(readFileSync(capturePath, "utf8")) as string[]).at(-1) ?? "";
+      const prompt =
+        (JSON.parse(readFileSync(capturePath, "utf8")) as string[]).at(-1) ??
+        "";
       assert.match(prompt, /Governed mission brief:/);
       assert.match(prompt, /Required deliverables:/);
       assert.match(prompt, /Update H3-L1 roadmap status\./);
@@ -310,7 +323,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         timeoutMs: 5_000,
       });
 
-      const result = await executor(fakePlan(cwd));
+      const result = await executor(fakePlan(cwd), cwd);
 
       assert.equal(result.status, "completed");
 
@@ -342,15 +355,18 @@ describe("createClaudeCodeCliLoopExecutor", () => {
       const result = await createClaudeCodeCliLoopExecutor({
         executable: FAKE_CLAUDE,
         timeoutMs: 5_000,
-      })({
-        ...fakePlan(cwd),
-        brief: {
-          objective: "Write a documentation standard.",
-          deliverables: ["provider-created.md"],
-          outOfScope: ["Infrastructure configuration"],
-          forbiddenContentTerms: ["docker"],
+      })(
+        {
+          ...fakePlan(cwd),
+          brief: {
+            objective: "Write a documentation standard.",
+            deliverables: ["provider-created.md"],
+            outOfScope: ["Infrastructure configuration"],
+            forbiddenContentTerms: ["docker"],
+          },
         },
-      });
+        cwd,
+      );
       assert.equal(result.status, "failed");
       assert.equal(
         result.status === "failed" ? result.failure.code : null,
@@ -370,15 +386,18 @@ describe("createClaudeCodeCliLoopExecutor", () => {
       const result = await createClaudeCodeCliLoopExecutor({
         executable: FAKE_CLAUDE,
         timeoutMs: 5_000,
-      })({
-        ...fakePlan(cwd),
-        brief: {
-          objective: "Write a documentation standard.",
-          deliverables: ["provider-created.txt"],
-          outOfScope: ["Infrastructure configuration"],
-          forbiddenContentTerms: ["docker"],
+      })(
+        {
+          ...fakePlan(cwd),
+          brief: {
+            objective: "Write a documentation standard.",
+            deliverables: ["provider-created.txt"],
+            outOfScope: ["Infrastructure configuration"],
+            forbiddenContentTerms: ["docker"],
+          },
         },
-      });
+        cwd,
+      );
       assert.equal(result.status, "completed");
     } finally {
       delete process.env.FAKE_CLAUDE_MODE;

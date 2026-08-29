@@ -136,7 +136,7 @@ export function createCodexCliLoopExecutor(
     throw new TypeError("Codex output limit must be a positive integer.");
   }
 
-  return async (plan): Promise<LoopExecutorResult> => {
+  return async (plan, executionCwd): Promise<LoopExecutorResult> => {
     if (plan.provider !== "openai" || plan.runtime !== "codex") {
       return failure(
         "execution_plan_provider_mismatch",
@@ -153,7 +153,7 @@ export function createCodexCliLoopExecutor(
       );
     }
 
-    const cwd = resolve(plan.project.path);
+    const cwd = resolve(executionCwd);
     const before = await readModifiedWorktreeFiles(cwd);
     if (before === null)
       return failure(

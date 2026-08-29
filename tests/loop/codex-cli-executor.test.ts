@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -44,23 +51,70 @@ process.stdout.write(JSON.stringify({ type: "task.completed" }) + "\\n");
 `,
   );
   chmodSync(executable, 0o755);
-  return { cwd, executable, cleanup: () => rmSync(root, { recursive: true, force: true }) };
+  return {
+    cwd,
+    executable,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
 }
 
-function fakePlan(cwd: string): LoopExecutionPlan {
+const DECOY_PROJECT_PATH = "/nonexistent/decoy-project-path";
+
+function fakePlan(_cwd: string): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1 as const,
     runId: "run-1",
-    project: { name: "test", path: cwd, type: "test", required_docs: [], validation: [], roadmap: [] },
-    candidate: { path: "roadmap.md", line: 1, text: "- [ ] test candidate", kind: "safe", reason: "no sensitive keyword detected", status: "todo", priority: "default" },
-    contextPackage: { project: "test", budget: { maxFiles: 10, maxCharacters: 1000, maxEstimatedTokens: 1000, includeFullFiles: false }, files: [], omitted: [], totalCharacters: 0, estimatedTokens: 0, truncated: false },
+    project: {
+      name: "test",
+      path: DECOY_PROJECT_PATH,
+      type: "test",
+      required_docs: [],
+      validation: [],
+      roadmap: [],
+    },
+    candidate: {
+      path: "roadmap.md",
+      line: 1,
+      text: "- [ ] test candidate",
+      kind: "safe",
+      reason: "no sensitive keyword detected",
+      status: "todo",
+      priority: "default",
+    },
+    contextPackage: {
+      project: "test",
+      budget: {
+        maxFiles: 10,
+        maxCharacters: 1000,
+        maxEstimatedTokens: 1000,
+        includeFullFiles: false,
+      },
+      files: [],
+      omitted: [],
+      totalCharacters: 0,
+      estimatedTokens: 0,
+      truncated: false,
+    },
     provider: "openai",
     runtime: "codex",
     profileId: "profile-1",
     model: "gpt-5.6-terra",
     effort: "low",
-    budget: { maxTokens: null, maxCostUsd: null, maxDurationMs: null, maxCalls: null, maxRepairs: null },
-    policy: { id: "policy-1", mode: "execute", status: "resolved", requiredCapabilities: [], requiredPermissions: [], rationale: [] },
+    budget: {
+      maxTokens: null,
+      maxCostUsd: null,
+      maxDurationMs: null,
+      maxCalls: null,
+      maxRepairs: null,
+    },
+    policy: {
+      id: "policy-1",
+      mode: "execute",
+      status: "resolved",
+      requiredCapabilities: [],
+      requiredPermissions: [],
+      rationale: [],
+    },
   });
 }
 
@@ -98,9 +152,12 @@ describe("createCodexCliLoopExecutor", () => {
     try {
       process.env.FAKE_CODEX_CAPTURE_ARGS = captureArgs;
       process.env.FAKE_CODEX_CAPTURE_CWD = captureCwd;
-      const executor = createCodexCliLoopExecutor({ executable, timeoutMs: 5_000 });
+      const executor = createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      });
 
-      const result = await executor(fakePlan(cwd));
+      const result = await executor(fakePlan(cwd), cwd);
 
       assert.equal(result.status, "completed");
       const args = JSON.parse(readFileSync(captureArgs, "utf8")) as string[];
@@ -114,7 +171,10 @@ describe("createCodexCliLoopExecutor", () => {
       ]);
       assert.equal(args.includes("--full-auto"), false);
       assert.match(args.at(-1) ?? "", /Stay inside the current worktree\./);
-      assert.equal(readFileSync(captureCwd, "utf8"), realpathSync(resolve(cwd)));
+      assert.equal(
+        readFileSync(captureCwd, "utf8"),
+        realpathSync(resolve(cwd)),
+      );
     } finally {
       delete process.env.FAKE_CODEX_CAPTURE_ARGS;
       delete process.env.FAKE_CODEX_CAPTURE_CWD;
@@ -126,10 +186,19 @@ describe("createCodexCliLoopExecutor", () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       process.env.FAKE_CODEX_MODE = "nonzero";
-      const result = await createCodexCliLoopExecutor({ executable, timeoutMs: 5_000 })(fakePlan(cwd));
+      const result = await createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(fakePlan(cwd), cwd);
       assert.equal(result.status, "failed");
-      assert.equal(result.status === "failed" ? result.failure.code : null, "provider_failed");
-      assert.equal(JSON.stringify(result).includes("Codex CLI execution failed."), true);
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "provider_failed",
+      );
+      assert.equal(
+        JSON.stringify(result).includes("Codex CLI execution failed."),
+        true,
+      );
     } finally {
       delete process.env.FAKE_CODEX_MODE;
       cleanup();
@@ -140,10 +209,16 @@ describe("createCodexCliLoopExecutor", () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       process.env.FAKE_CODEX_MODE = "nonzero_after_write";
-      const result = await createCodexCliLoopExecutor({ executable, timeoutMs: 5_000 })(fakePlan(cwd));
+      const result = await createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(fakePlan(cwd), cwd);
 
       assert.equal(result.status, "failed");
-      assert.equal(result.status === "failed" ? result.failure.code : null, "provider_failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "provider_failed",
+      );
       assert.deepEqual(result.modifiedFiles, ["outside.md"]);
     } finally {
       delete process.env.FAKE_CODEX_MODE;
@@ -158,7 +233,7 @@ describe("createCodexCliLoopExecutor", () => {
         executable,
         model: "gpt-5.6-sol",
         timeoutMs: 5_000,
-      })(fakePlan(cwd));
+      })(fakePlan(cwd), cwd);
 
       assert.equal(result.status, "failed");
       assert.equal(
@@ -174,9 +249,15 @@ describe("createCodexCliLoopExecutor", () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       process.env.FAKE_CODEX_MODE = "hang";
-      const result = await createCodexCliLoopExecutor({ executable, timeoutMs: 100 })(fakePlan(cwd));
+      const result = await createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 100,
+      })(fakePlan(cwd), cwd);
       assert.equal(result.status, "failed");
-      assert.equal(result.status === "failed" ? result.failure.code : null, "provider_limit_exceeded");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "provider_limit_exceeded",
+      );
     } finally {
       delete process.env.FAKE_CODEX_MODE;
       cleanup();
@@ -187,17 +268,26 @@ describe("createCodexCliLoopExecutor", () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       process.env.FAKE_CODEX_MODE = "success_with_forbidden_content";
-      const result = await createCodexCliLoopExecutor({ executable, timeoutMs: 5_000 })({
-        ...fakePlan(cwd),
-        brief: {
-          objective: "Write a documentation standard.",
-          deliverables: ["provider-created.md"],
-          outOfScope: ["Infrastructure configuration"],
-          forbiddenContentTerms: ["docker"],
+      const result = await createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(
+        {
+          ...fakePlan(cwd),
+          brief: {
+            objective: "Write a documentation standard.",
+            deliverables: ["provider-created.md"],
+            outOfScope: ["Infrastructure configuration"],
+            forbiddenContentTerms: ["docker"],
+          },
         },
-      });
+        cwd,
+      );
       assert.equal(result.status, "failed");
-      assert.equal(result.status === "failed" ? result.failure.code : null, "content_policy_violation");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "content_policy_violation",
+      );
       assert.equal(JSON.stringify(result).includes("docker"), false);
     } finally {
       delete process.env.FAKE_CODEX_MODE;
@@ -209,15 +299,21 @@ describe("createCodexCliLoopExecutor", () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       process.env.FAKE_CODEX_MODE = "success_with_allowed_content";
-      const result = await createCodexCliLoopExecutor({ executable, timeoutMs: 5_000 })({
-        ...fakePlan(cwd),
-        brief: {
-          objective: "Write a documentation standard.",
-          deliverables: ["provider-created.md"],
-          outOfScope: ["Infrastructure configuration"],
-          forbiddenContentTerms: ["docker"],
+      const result = await createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(
+        {
+          ...fakePlan(cwd),
+          brief: {
+            objective: "Write a documentation standard.",
+            deliverables: ["provider-created.md"],
+            outOfScope: ["Infrastructure configuration"],
+            forbiddenContentTerms: ["docker"],
+          },
         },
-      });
+        cwd,
+      );
       assert.equal(result.status, "completed");
     } finally {
       delete process.env.FAKE_CODEX_MODE;

@@ -15,7 +15,13 @@
 //      beyond what the (simulated) provider actually left behind.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -53,13 +59,15 @@ function gitStatus(cwd: string): string {
   }).trim();
 }
 
-function burnInPlan(cwd: string, runId: string): LoopExecutionPlan {
+const DECOY_PROJECT_PATH = "/nonexistent/decoy-project-path";
+
+function burnInPlan(_cwd: string, runId: string): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1 as const,
     runId,
     project: {
       name: "burn-in-fixture",
-      path: cwd,
+      path: DECOY_PROJECT_PATH,
       type: "test",
       required_docs: [],
       validation: [],
@@ -133,6 +141,7 @@ describe("claude code provider repeated burn-in", () => {
       process.env.FAKE_CLAUDE_OUTPUT_FILE = "run-one.txt";
       const first = await application.loopExecutor!(
         burnInPlan(cwd, "run-repeated-burn-in-1a"),
+        cwd,
       );
 
       assert.equal(first.status, "completed");
@@ -147,6 +156,7 @@ describe("claude code provider repeated burn-in", () => {
       process.env.FAKE_CLAUDE_OUTPUT_FILE = "run-two.txt";
       const second = await application.loopExecutor!(
         burnInPlan(cwd, "run-repeated-burn-in-1b"),
+        cwd,
       );
 
       assert.equal(second.status, "completed");
@@ -177,6 +187,7 @@ describe("claude code provider repeated burn-in", () => {
       process.env.FAKE_CLAUDE_OUTPUT_FILE = "provider-delta.txt";
       const result = await application.loopExecutor!(
         burnInPlan(cwd, "run-repeated-burn-in-2"),
+        cwd,
       );
 
       // Verified against src/loop/claude-code-cli-executor.ts: the
@@ -215,6 +226,7 @@ describe("claude code provider repeated burn-in", () => {
       process.env.FAKE_CLAUDE_OUTPUT_FILE = "run-one.txt";
       const first = await application.loopExecutor!(
         burnInPlan(cwd, "run-repeated-burn-in-3a"),
+        cwd,
       );
       assert.equal(first.status, "completed");
 
@@ -225,6 +237,7 @@ describe("claude code provider repeated burn-in", () => {
       delete process.env.FAKE_CLAUDE_OUTPUT_FILE;
       const second = await application.loopExecutor!(
         burnInPlan(cwd, "run-repeated-burn-in-3b"),
+        cwd,
       );
 
       assert.equal(second.status, "failed");
@@ -264,6 +277,7 @@ describe("claude code provider repeated burn-in", () => {
       process.env.FAKE_CLAUDE_OUTPUT_FILE = "/tmp/absolute.txt";
       const absoluteResult = await application.loopExecutor!(
         burnInPlan(cwd, "run-repeated-burn-in-4a"),
+        cwd,
       );
       assert.equal(absoluteResult.status, "failed");
       assert.deepEqual(absoluteResult.modifiedFiles, []);
@@ -272,6 +286,7 @@ describe("claude code provider repeated burn-in", () => {
       process.env.FAKE_CLAUDE_OUTPUT_FILE = "../escape.txt";
       const traversalResult = await application.loopExecutor!(
         burnInPlan(cwd, "run-repeated-burn-in-4b"),
+        cwd,
       );
       assert.equal(traversalResult.status, "failed");
       assert.deepEqual(traversalResult.modifiedFiles, []);
@@ -280,6 +295,7 @@ describe("claude code provider repeated burn-in", () => {
       delete process.env.FAKE_CLAUDE_OUTPUT_FILE;
       const defaultResult = await application.loopExecutor!(
         burnInPlan(cwd, "run-repeated-burn-in-4c"),
+        cwd,
       );
       assert.equal(defaultResult.status, "completed");
       assert.deepEqual(defaultResult.modifiedFiles, ["provider-created.txt"]);

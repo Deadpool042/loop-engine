@@ -340,7 +340,10 @@ export async function runLoopExecute(
 
   let executionResult;
   try {
-    executionResult = await dependencies.executor(executionPlan);
+    executionResult = await dependencies.executor(
+      executionPlan,
+      executionProject.path,
+    );
   } catch {
     transition("failed", "failed", "failed", [
       "The injected LoopExecutor threw an error.",
@@ -366,10 +369,9 @@ export async function runLoopExecute(
       cycle.candidate,
       Object.freeze({
         code: "scope_violation",
-        message: "Modified files fall outside the authorized writable file scope.",
-        details: Object.freeze(
-          rejected.map((path) => `Out of scope: ${path}`),
-        ),
+        message:
+          "Modified files fall outside the authorized writable file scope.",
+        details: Object.freeze(rejected.map((path) => `Out of scope: ${path}`)),
       }),
     );
   }
@@ -396,9 +398,7 @@ export async function runLoopExecute(
       Object.freeze({
         code,
         message,
-        details: Object.freeze([
-          "Content-policy diagnostics are redacted.",
-        ]),
+        details: Object.freeze(["Content-policy diagnostics are redacted."]),
       }),
     );
   }

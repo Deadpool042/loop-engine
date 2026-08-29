@@ -13,7 +13,7 @@ const ARCHITECTURE_FILE =
 
 const REQUIRED_PROVIDER_TOKENS = Object.freeze([
   'basename(options.executable.trim()) !== "codex"',
-  "return async (plan)",
+  "return async (plan, executionCwd)",
   '"--sandbox"',
   '"workspace-write"',
   '"--json"',
