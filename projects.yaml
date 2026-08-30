@@ -20,12 +20,20 @@ projects:
       - docs/architecture
       - docs/domains
       - docs/roadmap/README.md
-      - docs/roadmap/loop-engine.md
     validation:
       - pnpm run typecheck
       - pnpm run lint
+    planning:
+      mode: roadmap
+      objective_source: docs/objectif-produit.md
     roadmap:
-      - docs/roadmap/loop-engine.md
+      - docs/roadmap/README.md
+      - docs/roadmap/h1-boutique-vendable/README.md
+      - docs/roadmap/h2-commerce-fiable/README.md
+      - docs/roadmap/h3-administration-avancee/README.md
+      - docs/roadmap/h4-plateforme-automatisation/README.md
+      - docs/roadmap/gestion-contenu-admin-hygiene/README.md
+      - docs/roadmap/editorial-marketing-intents/README.md
 
   - name: lp-infra
     path: ../lp-infra-runtime
