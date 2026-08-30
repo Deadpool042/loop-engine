@@ -27,6 +27,7 @@ import {
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import {
   generateRoadmapProposalFromContext,
+  type RoadmapProposal,
   ROADMAP_PROPOSAL_ESTIMATED_OUTPUT_TOKENS,
   ROADMAP_PROPOSAL_ESTIMATED_STRUCTURED_OUTPUT_OVERHEAD_TOKENS,
   ROADMAP_PROPOSAL_OUTPUT_SCHEMA,
@@ -283,6 +284,161 @@ export async function generateRoadmapProposalReport(
           }),
     },
   };
+}
+
+export type RoadmapDecisionStatus =
+  | "existing_candidate"
+  | "proposal"
+  | "no_proposal"
+  | "unavailable";
+
+export type RoadmapDecisionReport = Readonly<{
+  schemaVersion: 1;
+  project: Readonly<{ name: string }>;
+  decision: RoadmapDecisionStatus;
+  reason: string;
+  candidate?: ReturnType<typeof projectRoadmapProposalCandidate>;
+  proposal?: Extract<RoadmapProposal, { status: "proposed" }>;
+  providerCall?: Readonly<{
+    requested: true;
+    status: "unavailable" | "failed" | "completed";
+    reason?: string;
+    provider?: string;
+    model?: string;
+    effort?: AnthropicEffort | null;
+    usage?: { inputTokens: number; outputTokens: number };
+    actualCalculatedCostUsd?: number;
+  }>;
+}>;
+
+/**
+ * Resolves the two branches that never require a provider call: an already
+ * admissible roadmap candidate (preferred over generating anything new), or
+ * an explicit unavailable/blocked reason (planning not eligible, objective
+ * not configured, or a proposal exists to request but was not requested).
+ * Returns `null` when the caller must decide whether to request a proposal.
+ */
+function resolveDeterministicRoadmapDecision(
+  project: ProjectConfig,
+): RoadmapDecisionReport | null {
+  const snapshot = generateProjectReport(project);
+  const projectName = { name: snapshot.project.name };
+
+  if (snapshot.roadmap.selectedCandidate !== null) {
+    return Object.freeze({
+      schemaVersion: 1 as const,
+      project: projectName,
+      decision: "existing_candidate" as const,
+      reason: "admissible_candidate_selected",
+      candidate: projectRoadmapProposalCandidate(
+        snapshot.roadmap.selectedCandidate,
+      ),
+    });
+  }
+
+  if (!snapshot.objective.eligibleForRoadmapProposal) {
+    return Object.freeze({
+      schemaVersion: 1 as const,
+      project: projectName,
+      decision: "unavailable" as const,
+      reason: snapshot.objective.reason ?? snapshot.planning.recommendation,
+    });
+  }
+
+  return null;
+}
+
+/**
+ * The single governed decision contract: existing_candidate | proposal |
+ * no_proposal | unavailable. An admissible roadmap candidate is always
+ * preferred and never triggers a provider call. When no candidate exists,
+ * a provider call happens only when `requestProposal` is explicitly passed
+ * (see PL1 doctrine — a decision must never hide an implicit paid call
+ * behind a status/summary/next-shaped command); otherwise the decision is
+ * `unavailable` with reason `proposal_requires_explicit_request`, since a
+ * roadmap being empty or complete is never sufficient by itself to justify
+ * proposing new work.
+ */
+export async function generateRoadmapDecisionReport(
+  project: ProjectConfig,
+  options: Readonly<{
+    requestProposal?: Readonly<{
+      provider: TextOnlyProvider;
+      providerAvailable: boolean;
+      model?: string;
+      effort?: AnthropicEffort;
+      timeoutMs: number;
+    }>;
+  }> = {},
+): Promise<RoadmapDecisionReport> {
+  const deterministic = resolveDeterministicRoadmapDecision(project);
+  if (deterministic) return deterministic;
+
+  const projectName = { name: project.name };
+
+  if (options.requestProposal === undefined) {
+    return Object.freeze({
+      schemaVersion: 1 as const,
+      project: projectName,
+      decision: "unavailable" as const,
+      reason: "proposal_requires_explicit_request",
+    });
+  }
+
+  const proposalReport = await generateRoadmapProposalReport(
+    project,
+    options.requestProposal,
+  );
+  const { result } = proposalReport;
+
+  if (result.status !== "completed") {
+    return Object.freeze({
+      schemaVersion: 1 as const,
+      project: projectName,
+      decision: "unavailable" as const,
+      reason: result.reason,
+      providerCall: Object.freeze({
+        requested: true as const,
+        status: result.status,
+        reason: result.reason,
+        ...("provider" in result && result.provider !== undefined
+          ? { provider: result.provider }
+          : {}),
+        ...("model" in result && result.model !== undefined
+          ? { model: result.model }
+          : {}),
+      }),
+    });
+  }
+
+  const proposal = proposalReport.proposal!;
+  const actualCalculatedCostUsd = (
+    result as { actualCalculatedCostUsd?: number }
+  ).actualCalculatedCostUsd;
+  const decision: RoadmapDecisionStatus =
+    proposal.status === "proposed" ? "proposal" : "no_proposal";
+
+  return Object.freeze({
+    schemaVersion: 1 as const,
+    project: projectName,
+    decision,
+    reason:
+      proposal.status === "no_proposal"
+        ? proposal.reason
+        : "gap_demonstrated_against_canonical_objective",
+    ...(proposal.status === "proposed" ? { proposal } : {}),
+    providerCall: Object.freeze({
+      requested: true as const,
+      status: result.status,
+      provider: result.provider,
+      model: result.model,
+      effort: result.effort,
+      ...(result.usage ? { usage: result.usage } : {}),
+      ...(actualCalculatedCostUsd === undefined
+        ? {}
+        : { actualCalculatedCostUsd }),
+    }),
+  });
 }
 
 export function generateRoadmapProposalEstimateReport(project: ProjectConfig) {

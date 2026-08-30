@@ -51,6 +51,12 @@ export function printHelp(): void {
   terminal.info(
     "pnpm loop roadmap proposal-context <project> --json — contexte de proposition en JSON",
   );
+  terminal.info(
+    "pnpm loop roadmap decision <project> [--json] — décision gouvernée : existing_candidate | proposal | no_proposal | unavailable",
+  );
+  terminal.info(
+    "pnpm loop roadmap decision <project> --request-proposal --provider anthropic_api [--json] — autorise l'unique appel provider borné nécessaire pour trancher proposal/no_proposal",
+  );
   terminal.info("pnpm loop prompt <project>         — prompt court à copier");
   terminal.info(
     "pnpm loop prompt <project> --json  — contexte de prompt en JSON",
