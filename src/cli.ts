@@ -51,6 +51,10 @@ import {
   printRoadmapProposalEstimateJson,
 } from "./commands/roadmap-propose-estimate.js";
 import {
+  printRoadmapDecision,
+  printRoadmapDecisionJson,
+} from "./commands/roadmap-decision.js";
+import {
   printGateReassessment,
   printGateReassessmentEstimateJson,
   printGateReassessmentJson,
@@ -251,6 +255,78 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   json
     ? await printRoadmapProposalJson(application, project, input)
     : await printRoadmapProposal(application, project, input);
+} else if (command === "roadmap" && process.argv[3] === "decision") {
+  const json = process.argv.includes("--json");
+  const project = resolveProjectOrExit("roadmap decision", 4);
+  const requestProposal = process.argv.includes("--request-proposal");
+
+  if (!requestProposal) {
+    json
+      ? await printRoadmapDecisionJson(application, project, {})
+      : await printRoadmapDecision(application, project, {});
+  } else {
+    const provider = optionValue("--provider");
+    const model = optionValue("--provider-model");
+    const effort = optionValue("--provider-effort");
+    const timeoutValue = optionValue("--provider-timeout-ms");
+    if (provider !== "anthropic_api")
+      failOption(
+        json,
+        "unsupported_provider",
+        "--provider anthropic_api is required with --request-proposal.",
+      );
+    if (hasOption("--provider-timeout-ms") && timeoutValue === undefined)
+      failOption(
+        json,
+        "invalid_provider_timeout",
+        "Missing value for --provider-timeout-ms",
+      );
+    const timeoutMs =
+      timeoutValue === undefined ? 60_000 : Number(timeoutValue);
+    if (
+      !Number.isInteger(timeoutMs) ||
+      timeoutMs < 1_000 ||
+      timeoutMs > 120_000
+    )
+      failOption(
+        json,
+        "invalid_provider_timeout",
+        "Invalid --provider-timeout-ms value.",
+      );
+    if (hasOption("--provider-effort") && effort === undefined)
+      failOption(
+        json,
+        "invalid_provider_effort",
+        "Missing value for --provider-effort",
+      );
+    if (effort !== undefined && !model)
+      failOption(
+        json,
+        "provider_effort_requires_provider_model",
+        "--provider-effort requires an explicit --provider-model.",
+      );
+    if (
+      effort !== undefined &&
+      !(ANTHROPIC_EFFORT_VALUES as readonly string[]).includes(effort)
+    )
+      failOption(
+        json,
+        "invalid_provider_effort",
+        "Invalid --provider-effort value.",
+      );
+    const input = {
+      requestProposal: {
+        ...(model ? { model } : {}),
+        ...(effort
+          ? { effort: effort as (typeof ANTHROPIC_EFFORT_VALUES)[number] }
+          : {}),
+        timeoutMs,
+      },
+    };
+    json
+      ? await printRoadmapDecisionJson(application, project, input)
+      : await printRoadmapDecision(application, project, input);
+  }
 } else if (
   command === "roadmap" &&
   process.argv[3] === "reassess-gates-estimate"
@@ -348,7 +424,7 @@ else if (command === "roadmap" && process.argv[3] === "status") {
   else terminal.info("Execution-decision current requires --json.");
 } else if (command === "roadmap") {
   terminal.error(
-    "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json] | roadmap propose-estimate <project> [--json] | roadmap propose <project> --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>] [--json]",
+    "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json] | roadmap propose-estimate <project> [--json] | roadmap propose <project> --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>] [--json] | roadmap decision <project> [--request-proposal --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>]] [--json]",
   );
   process.exit(1);
 } else if (command === "audit") {
