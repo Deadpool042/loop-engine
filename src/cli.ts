@@ -91,6 +91,7 @@ import {
   printWorkspaceProjectStatus,
   printWorkspaceProjectStatusJson,
 } from "./commands/workspace.js";
+import { registerProjectEnvelopeCommand } from "./commands/project-register.js";
 
 const application = createLoopApplicationAssembly();
 
@@ -207,6 +208,33 @@ else if (command === "workspace" && process.argv[3] === "status") {
     application,
     config,
     project,
+    json,
+  );
+  if (exitCode !== 0) process.exitCode = exitCode;
+} else if (command === "project" && process.argv[3] === "register") {
+  const json = process.argv.includes("--json");
+  const projectName = process.argv[4];
+  const type = optionValue("--type");
+  const confirmed = hasOption("--confirm-brief-approved");
+  if (!projectName || projectName.startsWith("--")) {
+    failOption(json, "missing_project", "Missing project argument for project register");
+  }
+  if (!type) {
+    failOption(json, "missing_project_type", "--type is required for project register");
+  }
+  if (!confirmed) {
+    failOption(
+      json,
+      "brief_approval_required",
+      "--confirm-brief-approved is required for project register",
+    );
+  }
+  const exitCode = registerProjectEnvelopeCommand(
+    application,
+    process.cwd(),
+    projectName,
+    type,
+    true,
     json,
   );
   if (exitCode !== 0) process.exitCode = exitCode;

@@ -61,6 +61,14 @@ Un projet absent en mode `on_demand` ou `none` expose `expectedAbsent: true` et 
 
 ---
 
+## Project registration
+
+Le registre `projects.yaml` reste la source de vérité déclarative du portefeuille. Un nouveau projet n'y entre qu'après création de son enveloppe Git et approbation explicite de son `PROJECT-BRIEF.md`.
+
+La commande `loop project register <project> --type <type> --confirm-brief-approved` ne crée pas de projet, de dépôt distant, de framework ou de roadmap. Elle enregistre uniquement une enveloppe locale déjà approuvée. Elle exige que le projet soit un enfant direct du workspace, sur `main`, propre, et que le type corresponde au brief approuvé.
+
+L'écriture est volontairement limitée à `projects.yaml`. Loop Engine doit lui-même être sur une branche dédiée, propre et différente de `main`, afin que l'enregistrement suive ensuite le workflow Git/PR normal. La commande refuse les identités et chemins déjà enregistrés et restaure le registre initial si la vérification post-écriture échoue.
+
 ## Planning state
 
 La sémantique de planning appartient à Loop Engine et complète, sans la remplacer, l'analyse des candidats.

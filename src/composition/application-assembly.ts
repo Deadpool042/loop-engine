@@ -78,6 +78,7 @@ import {
   type CandidatePublicationReview,
 } from "./candidate-publication-review.js";
 import { materializeWorkspaceProject } from "../workspace/materialization.js";
+import { registerProjectEnvelope } from "../workspace/project-registration.js";
 
 export type LoopApplicationCodexProviderOptions = Omit<
   CodexProviderConfiguration,
@@ -170,6 +171,7 @@ export type LoopApplicationAssembly = Readonly<{
   isAuditRuleTag: typeof isAuditRuleTag;
   loadConfig: typeof loadConfig;
   materializeWorkspaceProject: typeof materializeWorkspaceProject;
+  registerProjectEnvelope: typeof registerProjectEnvelope;
   loopAgentRegistry?: AgentRegistry;
   loopExecutor?: LoopExecutor;
   loopProviderId?: LoopProviderId;
@@ -337,6 +339,7 @@ export function createLoopApplicationAssembly(
     isAuditRuleTag,
     loadConfig,
     materializeWorkspaceProject,
+    registerProjectEnvelope,
     ...(providerDependency === undefined
       ? {}
       : {
