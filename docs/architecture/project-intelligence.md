@@ -23,6 +23,7 @@ Le moteur fusionne ces informations dans un snapshot unique.
 Champs prévus :
 
 - project : name, type, path
+- workspace : mode, dependencies, materialized, expectedAbsent, repository
 - git : branch, clean
 - docs : required, missing
 - validation : commands, configured
@@ -38,6 +39,25 @@ Champs prévus :
 - aucune dépendance à un fournisseur IA
 - aucune consommation de tokens par défaut
 - architecture extensible
+
+---
+
+## Workspace materialization
+
+Le registre `projects.yaml` décrit aussi la présence attendue d'un projet sur le worker courant. Cette information ne change ni la priorité produit ni la source de vérité GitHub ; elle indique seulement comment le checkout local est géré.
+
+Modes supportés :
+
+- `permanent` : le checkout est attendu en permanence sur le worker ;
+- `source_only` : le checkout Git est attendu, sans installation permanente des dépendances ;
+- `on_demand` : l'absence locale est normale et le checkout peut être matérialisé lorsque le projet devient actif ;
+- `none` : aucun checkout n'est requis sur ce worker.
+
+`workspace.dependencies` vaut `none`, `on_demand` ou `production` et reste une politique déclarative distincte de la matérialisation du source.
+
+La commande `loop workspace materialize <project>` n'accepte aucune URL arbitraire. Elle utilise uniquement le slug GitHub `repository` déclaré dans le registre, confine la destination à un enfant direct du workspace, clone uniquement `main` si le checkout est absent et n'effectue qu'un fetch + merge `--ff-only` lorsqu'il existe déjà. Un worktree sale, une branche différente de `main`, un origin inattendu ou un espace disque inférieur à `workspace_policy.min_free_disk_gib` font échouer l'opération sans fallback destructif.
+
+Un projet absent en mode `on_demand` ou `none` expose `expectedAbsent: true` et ne dégrade pas la santé du portefeuille. À l'inverse, l'absence d'un projet `permanent` ou `source_only` reste visible comme anomalie à corriger.
 
 ---
 

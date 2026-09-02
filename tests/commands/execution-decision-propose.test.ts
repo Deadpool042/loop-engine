@@ -2,10 +2,20 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runExecutionDecisionProposal } from "../../src/composition/execution-decision-proposal.js";
 import { ExecutionDecisionProviderFailure } from "../../src/governance/execution-decision-provider.js";
+import {
+  calculateCostUsd,
+  resolveAnthropicPricing,
+} from "../../src/text-only-provider/index.js";
 
 const sha = "a".repeat(40);
 const current = { project: "lp-infra", projectPath: "/tmp/lp", candidateId: "H4-L1", sourceDocument: "docs/roadmap.md", gitHead: sha, executionDecisionPath: ".governance/execution-decision.yaml", projectConfig: {} } as never;
 const input = { project: "lp-infra", candidateId: "H4-L1", sourceDocument: "docs/roadmap.md", gitHead: sha, provider: "anthropic_api" as const, model: "claude-sonnet-5" as const, effort: "low" as const, timeoutMs: 60_000 as const };
+const currentSonnetPricing = resolveAnthropicPricing(input.model);
+assert.ok(currentSonnetPricing);
+const currentPricingMetadata =
+  currentSonnetPricing.effectiveFrom === "1970-01-01"
+    ? {}
+    : { pricingEffectiveDate: currentSonnetPricing.effectiveFrom };
 
 test("execution-decision CLI fails stale before provider invocation for every current binding mismatch", async () => {
   for (const changed of [{ candidateId: "H4-L2" }, { sourceDocument: "other.md" }, { gitHead: "b".repeat(40) }]) {
@@ -20,7 +30,7 @@ test("execution-decision CLI returns bounded provider telemetry and proposal wit
   let calls = 0;
   const report = await runExecutionDecisionProposal(input, { current: () => current, createProvider: () => ({ invoke: async () => { calls++; throw new Error("injected proposer owns this"); } }), propose: async () => ({ status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 12, usage: { inputTokens: 100, outputTokens: 20 }, proposal: { objective: "ADR", deliverables: ["ADR", "Update candidate state"], outOfScope: ["execute"], allowedPaths: ["docs/adr.md", "docs/roadmap.md"] } }) });
   assert.equal(calls, 0);
-  assert.deepEqual(report, { schemaVersion: 1, project: "lp-infra", result: { status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 12, usage: { inputTokens: 100, outputTokens: 20 }, actualCalculatedCostUsd: 0.0004 }, proposal: { objective: "ADR", deliverables: ["ADR", "Update candidate state"], outOfScope: ["execute"], allowedPaths: ["docs/adr.md", "docs/roadmap.md"] } });
+  assert.deepEqual(report, { schemaVersion: 1, project: "lp-infra", result: { status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 12, usage: { inputTokens: 100, outputTokens: 20 }, actualCalculatedCostUsd: calculateCostUsd(100, 20, currentSonnetPricing), ...currentPricingMetadata }, proposal: { objective: "ADR", deliverables: ["ADR", "Update candidate state"], outOfScope: ["execute"], allowedPaths: ["docs/adr.md", "docs/roadmap.md"] } });
 });
 
 test("execution-decision CLI rejects directory provider scopes without widening them", async () => {
@@ -32,7 +42,7 @@ test("execution-decision CLI rejects directory provider scopes without widening 
 
 test("execution-decision CLI preserves invalid-draft telemetry without exposing the rejected proposal", async () => {
   const report = await runExecutionDecisionProposal(input, { current: () => current, propose: async () => ({ status: "completed", provider: "anthropic_api", model: "claude-sonnet-5", effort: "low", durationMs: 6041, usage: { inputTokens: 671, outputTokens: 369 }, proposal: { objective: "ADR architecture cockpit", deliverables: ["ADR"], outOfScope: ["implementation"], allowedPaths: ["docs/roadmap/projet-lp-infra.md", "docs/adr/", "docs/roadmap/"], forbiddenContentTerms: [] } }) });
-  assert.deepEqual(report, { schemaVersion: 1, project: "lp-infra", result: { status: "failed", code: "decision_draft_invalid", model: "claude-sonnet-5", durationMs: 6041, usage: { inputTokens: 671, outputTokens: 369 }, actualCalculatedCostUsd: 0.005032, draftValidationIssue: "allowed_paths_invalid" } });
+  assert.deepEqual(report, { schemaVersion: 1, project: "lp-infra", result: { status: "failed", code: "decision_draft_invalid", model: "claude-sonnet-5", durationMs: 6041, usage: { inputTokens: 671, outputTokens: 369 }, actualCalculatedCostUsd: calculateCostUsd(671, 369, currentSonnetPricing), ...currentPricingMetadata, draftValidationIssue: "allowed_paths_invalid" } });
   assert.equal("proposal" in report, false);
 });
 

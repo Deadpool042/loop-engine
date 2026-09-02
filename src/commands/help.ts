@@ -11,6 +11,9 @@ export function printHelp(): void {
   terminal.info("pnpm loop json-check      — validate all public JSON outputs");
   terminal.info("pnpm run rag-index        — rebuild local RAG index");
   terminal.info("pnpm loop doctor          — vérification config/docs/git");
+  terminal.info("pnpm loop workspace status --json — état de matérialisation du portefeuille");
+  terminal.info("pnpm loop workspace status <project> [--json] — état du workspace projet");
+  terminal.info("pnpm loop workspace materialize <project> [--json] — clone/synchronise le repo déclaré");
 
   terminal.section("Project");
   terminal.info(

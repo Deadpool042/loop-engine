@@ -611,6 +611,7 @@ export function generateProjectContextReport(project: ProjectConfig) {
   return {
     schemaVersion: 1 as const,
     project: snapshot.project,
+    workspace: snapshot.workspace,
     git: snapshot.git,
     planning: snapshot.planning,
     docs: snapshot.docs,
@@ -632,6 +633,7 @@ export function generateProjectHandoffReport(project: ProjectConfig) {
   return {
     schemaVersion: 1 as const,
     project: snapshot.project,
+    workspace: snapshot.workspace,
     git: snapshot.git,
     roadmap: {
       available: snapshot.roadmap.available,
@@ -655,6 +657,7 @@ export function generateNextProjectActionReport(project: ProjectConfig) {
   return {
     schemaVersion: 1 as const,
     project: snapshot.project,
+    workspace: snapshot.workspace,
     git: snapshot.git,
     roadmap: {
       available: snapshot.roadmap.available,
@@ -674,6 +677,7 @@ export function generateProjectPromptReport(project: ProjectConfig) {
   return {
     schemaVersion: 1 as const,
     project: snapshot.project,
+    workspace: snapshot.workspace,
     git: snapshot.git,
     docs: snapshot.docs,
     roadmap: {

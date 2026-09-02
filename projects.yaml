@@ -1,6 +1,13 @@
+workspace_policy:
+  min_free_disk_gib: 20
+
 projects:
   - name: development-workspace
     path: ../development-workspace
+    repository: Deadpool042/development-workspace
+    workspace:
+      mode: permanent
+      dependencies: production
     type: development-workspace
     required_docs:
       - AGENTS.md
@@ -14,6 +21,10 @@ projects:
 
   - name: creatyss
     path: ../CREATYSS
+    repository: Deadpool042/CREATYSS
+    workspace:
+      mode: source_only
+      dependencies: on_demand
     type: next-prisma
     required_docs:
       - AGENTS.md
@@ -37,6 +48,10 @@ projects:
 
   - name: lp-infra
     path: ../lp-infra-runtime
+    repository: Deadpool042/LP-INFRA
+    workspace:
+      mode: source_only
+      dependencies: none
     execution_decision: .governance/execution-decision.yaml
     type: infra
     required_docs:
@@ -51,6 +66,9 @@ projects:
 
   - name: n8n
     path: ../n8n
+    workspace:
+      mode: none
+      dependencies: none
     type: automation
     optional: true
     requires_git: false
@@ -62,6 +80,10 @@ projects:
 
   - name: loop-engine
     path: .
+    repository: Deadpool042/loop-engine
+    workspace:
+      mode: permanent
+      dependencies: production
     type: node-cli
     planning:
       mode: roadmap
