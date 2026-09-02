@@ -45,6 +45,8 @@ import type { AgentRegistry } from "../agents/registry.js";
 import {
   type AnthropicEffort,
   type TextOnlyProvider,
+  type TextOnlyProviderInput,
+  type TextOnlyProviderResult,
 } from "../text-only-provider/index.js";
 import { createLoopProviderFailoverAssembly } from "./provider-failover-assembly.js";
 import {
@@ -195,7 +197,9 @@ export type LoopApplicationAuditSelection = AuditRuleSelection;
 export type LoopApplicationAuditReport = AuditReport;
 
 const unconfiguredTextOnlyProvider: TextOnlyProvider = Object.freeze({
-  invoke: async (input) => ({
+  invoke: async (
+    input: TextOnlyProviderInput,
+  ): Promise<TextOnlyProviderResult> => ({
     status: "failed",
     provider: "unconfigured",
     model: input.model,
