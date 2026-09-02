@@ -1,4 +1,4 @@
-import { calculateCostUsd, resolveAnthropicPricing, type TextOnlyProvider } from "../text-only-provider/index.js";
+import { calculateCostUsd, resolveAnthropicPricing, type TextOnlyProvider, type TextOnlyProviderInput, type TextOnlyProviderResult } from "../text-only-provider/index.js";
 import { ExecutionDecisionProviderFailure, proposeExecutionDecisionWithTelemetry } from "../governance/execution-decision-provider.js";
 import { getCurrentExecutionDecisionState, type ProductionCurrent } from "../governance/execution-decision-production.js";
 import type { ExecutionDecisionCurrent } from "../governance/execution-decision-service.js";
@@ -9,7 +9,9 @@ export type ExecutionDecisionProposeInput = Readonly<{ project: string; candidat
 type Dependencies = Readonly<{ current?: (project: string) => ProductionCurrent | null; createProvider?: () => TextOnlyProvider; propose?: typeof proposeExecutionDecisionWithTelemetry }>;
 
 const unconfiguredProvider: TextOnlyProvider = Object.freeze({
-  invoke: async (providerInput) => ({
+  invoke: async (
+    providerInput: TextOnlyProviderInput,
+  ): Promise<TextOnlyProviderResult> => ({
     status: "failed",
     provider: "unconfigured",
     model: providerInput.model,
