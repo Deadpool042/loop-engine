@@ -45,8 +45,7 @@ import type { AgentRegistry } from "../agents/registry.js";
 import {
   type AnthropicEffort,
   type TextOnlyProvider,
-  type TextOnlyProviderInput,
-  type TextOnlyProviderResult,
+  unconfiguredTextOnlyProvider,
 } from "../text-only-provider/index.js";
 import { createLoopProviderFailoverAssembly } from "./provider-failover-assembly.js";
 import {
@@ -195,21 +194,6 @@ export type LoopApplicationRunMode =
 export type LoopApplicationAuditProfile = AuditProfile;
 export type LoopApplicationAuditSelection = AuditRuleSelection;
 export type LoopApplicationAuditReport = AuditReport;
-
-const unconfiguredTextOnlyProvider: TextOnlyProvider = Object.freeze({
-  invoke: async (
-    input: TextOnlyProviderInput,
-  ): Promise<TextOnlyProviderResult> => ({
-    status: "failed",
-    provider: "unconfigured",
-    model: input.model,
-    code: "provider_unavailable",
-    message:
-      "No internal text-only provider is configured. Use assistant handoff or inject an explicit provider.",
-    durationMs: 0,
-    truncated: false,
-  }),
-});
 
 function resolveLegacyProvider(
   options: LoopApplicationAssemblyOptions,
