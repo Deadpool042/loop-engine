@@ -30,12 +30,17 @@ describe("handoff command", () => {
     const json = JSON.parse(output) as {
       schemaVersion?: unknown;
       project?: { name?: unknown };
+      planning?: { mode?: unknown };
+      objective?: { available?: unknown; source?: unknown };
       roadmap?: unknown;
       instructions?: unknown;
     };
 
     assert.equal(json.schemaVersion, 1);
     assert.equal(json.project?.name, "loop-engine");
+    assert.equal(typeof json.planning?.mode, "string");
+    assert.equal(typeof json.objective?.available, "boolean");
+    assert.ok("source" in (json.objective ?? {}));
     assert.ok(json.roadmap);
     assert.ok(Array.isArray(json.instructions));
   });

@@ -635,6 +635,8 @@ export function generateProjectHandoffReport(project: ProjectConfig) {
     project: snapshot.project,
     workspace: snapshot.workspace,
     git: snapshot.git,
+    planning: snapshot.planning,
+    objective: snapshot.objective,
     roadmap: {
       available: snapshot.roadmap.available,
       paths: snapshot.roadmap.paths,
