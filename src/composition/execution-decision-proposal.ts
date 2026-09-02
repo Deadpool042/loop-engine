@@ -1,4 +1,4 @@
-import { calculateCostUsd, resolveAnthropicPricing, type TextOnlyProvider, type TextOnlyProviderInput, type TextOnlyProviderResult } from "../text-only-provider/index.js";
+import { calculateCostUsd, resolveAnthropicPricing, type TextOnlyProvider, unconfiguredTextOnlyProvider } from "../text-only-provider/index.js";
 import { ExecutionDecisionProviderFailure, proposeExecutionDecisionWithTelemetry } from "../governance/execution-decision-provider.js";
 import { getCurrentExecutionDecisionState, type ProductionCurrent } from "../governance/execution-decision-production.js";
 import type { ExecutionDecisionCurrent } from "../governance/execution-decision-service.js";
@@ -8,20 +8,6 @@ export type ExecutionDecisionCliResult = Readonly<{ schemaVersion: 1; project: s
 export type ExecutionDecisionProposeInput = Readonly<{ project: string; candidateId: string; sourceDocument: string; gitHead: string; provider: "anthropic_api"; model: "claude-sonnet-5"; effort: "low"; timeoutMs: 60_000 }>;
 type Dependencies = Readonly<{ current?: (project: string) => ProductionCurrent | null; createProvider?: () => TextOnlyProvider; propose?: typeof proposeExecutionDecisionWithTelemetry }>;
 
-const unconfiguredProvider: TextOnlyProvider = Object.freeze({
-  invoke: async (
-    providerInput: TextOnlyProviderInput,
-  ): Promise<TextOnlyProviderResult> => ({
-    status: "failed",
-    provider: "unconfigured",
-    model: providerInput.model,
-    code: "provider_unavailable",
-    message: "No execution-decision provider is configured.",
-    durationMs: 0,
-    truncated: false,
-  }),
-});
-
 function sameBindings(current: ExecutionDecisionCurrent | null, input: ExecutionDecisionProposeInput): current is ExecutionDecisionCurrent { return current !== null && current.project === input.project && current.candidateId === input.candidateId && current.sourceDocument === input.sourceDocument && current.gitHead === input.gitHead; }
 export async function runExecutionDecisionProposal(input: ExecutionDecisionProposeInput, dependencies: Dependencies = {}): Promise<ExecutionDecisionCliResult> {
   const current = (dependencies.current ?? getCurrentExecutionDecisionState)(input.project);
@@ -30,7 +16,7 @@ export async function runExecutionDecisionProposal(input: ExecutionDecisionPropo
     return { schemaVersion: 1, project: input.project, result: { status: "failed", code: "provider_not_configured" } };
   }
   try {
-    const provider = dependencies.createProvider?.() ?? unconfiguredProvider;
+    const provider = dependencies.createProvider?.() ?? unconfiguredTextOnlyProvider;
     const completed = await (dependencies.propose ?? proposeExecutionDecisionWithTelemetry)(provider, current);
     const pricing = completed.usage === undefined ? null : resolveAnthropicPricing(completed.model);
     const pricingMetadata = pricing === null || pricing.effectiveFrom === "1970-01-01" ? {} : { pricingEffectiveDate: pricing.effectiveFrom };
