@@ -43,8 +43,6 @@ import {
 } from "../core/index.js";
 import type { AgentRegistry } from "../agents/registry.js";
 import {
-  createAnthropicApiProvider,
-  hasAnthropicApiCredential,
   type AnthropicEffort,
   type TextOnlyProvider,
 } from "../text-only-provider/index.js";
@@ -94,8 +92,11 @@ export type LoopApplicationAssemblyOptions = Readonly<{
   providerRegistry?: LoopProviderRegistry;
   providerAssemblies?: readonly LoopProviderAssembly[];
   maxProviderAttempts?: number;
+  /** Explicit opt-in text-only provider. No provider is constructed by default. */
   textOnlyProvider?: TextOnlyProvider;
   textOnlyProviderCredentialAvailable?: () => boolean;
+  /** Explicit opt-in provider factory for execution-decision proposal generation. */
+  executionDecisionProviderFactory?: () => TextOnlyProvider;
   /** @deprecated Prefer provider: { id: "codex", ... }. */
   codexProvider?: LoopApplicationCodexProviderOptions;
   /** @deprecated Prefer provider: { id: "claude_code", ... }. */
@@ -193,6 +194,19 @@ export type LoopApplicationAuditProfile = AuditProfile;
 export type LoopApplicationAuditSelection = AuditRuleSelection;
 export type LoopApplicationAuditReport = AuditReport;
 
+const unconfiguredTextOnlyProvider: TextOnlyProvider = Object.freeze({
+  invoke: async (input) => ({
+    status: "failed",
+    provider: "unconfigured",
+    model: input.model,
+    code: "provider_unavailable",
+    message:
+      "No internal text-only provider is configured. Use assistant handoff or inject an explicit provider.",
+    durationMs: 0,
+    truncated: false,
+  }),
+});
+
 function resolveLegacyProvider(
   options: LoopApplicationAssemblyOptions,
 ): LoopProviderConfiguration | undefined {
@@ -268,10 +282,9 @@ export function createLoopApplicationAssembly(
         });
 
   const textOnlyProvider =
-    options.textOnlyProvider ?? createAnthropicApiProvider();
+    options.textOnlyProvider ?? unconfiguredTextOnlyProvider;
   const textOnlyProviderCredentialAvailable =
-    options.textOnlyProviderCredentialAvailable ??
-    (() => hasAnthropicApiCredential());
+    options.textOnlyProviderCredentialAvailable ?? (() => true);
   const isolatedRunPublish = createIsolatedProviderRunPublish({
     runExecute:
       isolatedRunExecute ?? runLoopExecuteWithProviderFailoverEvidence,
@@ -350,7 +363,13 @@ export function createLoopApplicationAssembly(
       isolatedRunExecute ?? runLoopExecuteWithProviderFailoverEvidence,
     runLoopPublish: isolatedRunPublish,
     runLoopPlan,
-    runExecutionDecisionProposal,
+    runExecutionDecisionProposal: (input) =>
+      runExecutionDecisionProposal(
+        input,
+        options.executionDecisionProviderFactory === undefined
+          ? {}
+          : { createProvider: options.executionDecisionProviderFactory },
+      ),
     getExecutionDecisionCurrentReport,
   });
 }
