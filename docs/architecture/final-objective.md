@@ -22,7 +22,19 @@ L'impact documentaire d'un changement est qualifié localement avant tout appel 
 
 Le comportement par défaut reste non destructif : pas d'appel IA automatique, pas de commit automatique, pas de push automatique et aucune modification arbitraire des projets observés. Une exception de gouvernance est autorisée uniquement lorsqu'un projet déclare explicitement `execution_decision` : après approbation humaine, Loop Engine peut publier ce seul artefact de décision dans le chemin configuré, avec confinement au projet, écriture transactionnelle, validation post-publication et récupération en cas d'échec de validation. Cette exception n'autorise aucune logique métier ni aucune écriture générale dans le projet observé. Un `execute` explicitement configuré s'effectue dans un Git worktree isolé et temporaire, jamais dans le dépôt source. Ces garanties ne s'effacent jamais devant un mode explicitement sélectionné : pas de commit automatique et pas de push automatique restent la règle tant qu'un mode `commit` ou `publish` n'a pas été explicitement demandé par l'humain.
 
-Claude doit donc améliorer le moteur, préserver les garde-fous, respecter les contrats JSON et travailler par petits lots vérifiables.
+## Runtime IA principal et spécialistes
+
+Dans le mode interactif normal, **ChatGPT + Development Workspace** constitue le runtime IA principal. Loop Engine fournit la gouvernance, le contexte, les décisions déterministes et les validations ; il ne doit pas déclencher un second modèle simplement parce qu'un raisonnement est nécessaire alors que ChatGPT pilote déjà la mission.
+
+Les opérations qui ne nécessitent aucun raisonnement génératif restent entièrement déterministes : lecture des roadmaps, sélection des candidats, gates, état Git, historique des runs, diagnostics, validations et projections de cockpit.
+
+Claude Code, Codex et les autres runtimes restent des spécialistes secondaires **opt-in**. Ils ne font pas partie du chemin critique et ne sont appelés que lorsqu'un avantage concret est démontré pour un lot donné (par exemple exécution spécialisée, seconde lecture indépendante, tâche mécanique volumineuse ou expérimentation). Leur indisponibilité ne doit pas empêcher le fonctionnement normal de l'écosystème.
+
+Aucune API IA payante ne constitue un fallback implicite. Une API externe payante reste une exception explicitement autorisée pour une action précise. L'objectif est de maximiser le travail réalisé via les abonnements interactifs et les outils déterministes, sans transformer les quotas/crédits API en dépendance d'infrastructure.
+
+L'autonomie cible est forte **à l'intérieur d'un micro-lot** : préparation, implémentation, validations, réparation bornée, review et livraison peuvent être orchestrées jusqu'à un gate explicite. Les décisions structurantes ou irréversibles (brief initial, roadmap initiale, architecture majeure, secret/facturation, production, destruction de données) restent soumises à une validation humaine explicite.
+
+Les assistants et runtimes qui améliorent Loop Engine doivent préserver ces garde-fous, respecter les contrats JSON et travailler par petits lots vérifiables.
 
 ## Source de vérité produit
 

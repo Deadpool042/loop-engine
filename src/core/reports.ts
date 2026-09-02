@@ -125,6 +125,39 @@ export function generateRoadmapPlanningStatusReport(project: ProjectConfig) {
   };
 }
 
+/**
+ * Deterministic, bounded roadmap projection for external/read-only cockpits.
+ * It is intentionally independent from objective/proposal eligibility: a
+ * roadmap remains observable even when no objective source is configured.
+ * No provider is consulted and no planning decision is recomputed here.
+ */
+export function generateRoadmapOverviewReport(project: ProjectConfig) {
+  const snapshot = generateProjectReport(project);
+  const projected = buildRoadmapProposalContext(snapshot);
+
+  return Object.freeze({
+    schemaVersion: 1 as const,
+    project: Object.freeze({
+      name: snapshot.project.name,
+      type: snapshot.project.type,
+    }),
+    planning: snapshot.planning,
+    roadmap: Object.freeze({
+      available: snapshot.roadmap.available,
+      paths: Object.freeze([...snapshot.roadmap.paths]),
+      selectedCandidate:
+        snapshot.roadmap.selectedCandidate === null
+          ? null
+          : projectRoadmapProposalCandidate(snapshot.roadmap.selectedCandidate),
+      candidates: projected.candidates,
+      phaseGates: projected.phaseGates,
+      stats: snapshot.roadmap.stats,
+      summary: snapshot.roadmap.summary,
+    }),
+    health: snapshot.health,
+  });
+}
+
 export function generateProjectObjectiveReport(project: ProjectConfig) {
   const snapshot = generateProjectReport(project);
   return {

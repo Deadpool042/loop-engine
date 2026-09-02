@@ -12,6 +12,7 @@ import {
   generateProjectPromptReport,
   generateProjectReport,
   generateRoadmapDecisionReport,
+  generateRoadmapOverviewReport,
   generateRoadmapPlanningStatusReport,
   generateRoadmapProposalContextReport,
   generateRoadmapProposalEstimateReport,
@@ -122,6 +123,7 @@ export type LoopApplicationAssembly = Readonly<{
   generateProjectObjectiveReport: typeof generateProjectObjectiveReport;
   generateProjectPromptReport: typeof generateProjectPromptReport;
   generateProjectReport: typeof generateProjectReport;
+  generateRoadmapOverviewReport: typeof generateRoadmapOverviewReport;
   generateRoadmapPlanningStatusReport: typeof generateRoadmapPlanningStatusReport;
   generateRoadmapProposalContextReport: typeof generateRoadmapProposalContextReport;
   generateRoadmapDecisionReport: (
@@ -290,6 +292,7 @@ export function createLoopApplicationAssembly(
     generateProjectObjectiveReport,
     generateProjectPromptReport,
     generateProjectReport,
+    generateRoadmapOverviewReport,
     generateRoadmapPlanningStatusReport,
     generateRoadmapProposalContextReport,
     generateRoadmapDecisionReport: (project, input) =>
