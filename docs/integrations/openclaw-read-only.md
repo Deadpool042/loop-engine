@@ -32,17 +32,21 @@ Le node OpenClaw `VPS Main` publie un serveur MCP `developmentWorkspace` filtré
 
 OpenClaw ne fournit jamais de `cwd`, package manager, script, provider, modèle ou credential. Ces paramètres restent fixés côté Development Workspace.
 
-Le Cockpit V1 utilise :
+Le Cockpit utilise :
 
 - `roadmap.projects` pour transporter `project_list` ;
 - `roadmap.cockpit` pour transporter `project_handoff` sans exiger qu'un candidat soit présent ;
-- le sélecteur de projet et l'affichage restent entièrement déterministes.
+- `roadmap.overview` pour transporter la projection bornée de tous les candidats et phase-gates d'une roadmap ;
+- `roadmap.runs` pour transporter une fenêtre bornée du Run History existant ;
+- le sélecteur de projet et tous les affichages restent entièrement déterministes.
 
-`roadmap.read` et `roadmap.handoff` restent disponibles pour le flux spécialisé de décision/préparation d'un lot. `roadmap.propose` peut rester présent comme capacité secondaire explicite, mais il n'est ni affiché ni appelé par le Project Cockpit V1.
+La projection roadmap dédiée est indépendante de l'éligibilité à une proposition IA : une roadmap doit rester visualisable même lorsqu'aucun `objective_source` n'est configuré, comme pour LP-INFRA. OpenClaw ne parse jamais directement les fichiers roadmap et ne lit jamais les journaux JSONL ; ces responsabilités restent exclusivement dans Loop Engine.
+
+`roadmap.read` et `roadmap.handoff` restent disponibles pour le flux spécialisé de décision/préparation d'un lot. `roadmap.propose` peut rester présent comme capacité secondaire explicite, mais il n'est ni affiché ni appelé par le Cockpit de supervision.
 
 ## Données affichées
 
-Le Project Cockpit projette directement le handoff Loop Engine, notamment :
+Le Cockpit projette directement les contrats Loop Engine, notamment :
 
 - identité et type du projet ;
 - santé ;
@@ -51,10 +55,12 @@ Le Project Cockpit projette directement le handoff Loop Engine, notamment :
 - résumé roadmap ;
 - prochain candidat sélectionnable et priorité ;
 - objectif canonique et sa source ;
+- tous les candidats roadmap bornés avec statut, priorité, admissibilité et fichier source ;
 - gates de phase ;
-- validations déclarées.
+- validations déclarées ;
+- historique récent borné des runs avec mode, statut, timestamps et résultat terminal.
 
-L'absence de candidat, d'objectif ou de gate reste une donnée valide et doit être affichée explicitement ; le Cockpit ne fabrique jamais de remplacement.
+L'absence de candidat, d'objectif, de gate ou de run reste une donnée valide et doit être affichée explicitement ; le Cockpit ne fabrique jamais de remplacement.
 
 ## Garde-fous
 

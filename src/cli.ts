@@ -35,6 +35,10 @@ import {
   printRoadmapStatusJson,
 } from "./commands/roadmap.js";
 import {
+  printRoadmapOverview,
+  printRoadmapOverviewJson,
+} from "./commands/roadmap-overview.js";
+import {
   printProjectObjective,
   printProjectObjectiveJson,
 } from "./commands/objective.js";
@@ -211,6 +215,11 @@ else if (command === "workspace" && process.argv[3] === "status") {
   process.argv.includes("--json")
     ? printRoadmapStatusJson(application, project)
     : printRoadmapStatus(application, project);
+} else if (command === "roadmap" && process.argv[3] === "overview") {
+  const project = resolveProjectOrExit("roadmap overview", 4);
+  process.argv.includes("--json")
+    ? printRoadmapOverviewJson(application, project)
+    : printRoadmapOverview(application, project);
 } else if (command === "roadmap" && process.argv[3] === "objective") {
   const project = resolveProjectOrExit("roadmap objective", 4);
   process.argv.includes("--json")
@@ -454,7 +463,7 @@ else if (command === "workspace" && process.argv[3] === "status") {
   else terminal.info("Execution-decision current requires --json.");
 } else if (command === "roadmap") {
   terminal.error(
-    "Usage: pnpm loop roadmap status|objective|proposal-context <project> [--json] | roadmap propose-estimate <project> [--json] | roadmap propose <project> --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>] [--json] | roadmap decision <project> [--request-proposal --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>]] [--json]",
+    "Usage: pnpm loop roadmap status|overview|objective|proposal-context <project> [--json] | roadmap propose-estimate <project> [--json] | roadmap propose <project> --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>] [--json] | roadmap decision <project> [--request-proposal --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>]] [--json]",
   );
   process.exit(1);
 } else if (command === "audit") {
@@ -746,7 +755,7 @@ else if (command === "review") {
   if (exitCode !== 0) process.exitCode = exitCode;
 } else {
   terminal.error(
-    "Usage: pnpm loop help|summary|status|doctor|roadmap status|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>|runs <project> [--limit N | --run-id <runId>]|candidate review <project> --run-id <runId>",
+    "Usage: pnpm loop help|summary|status|doctor|roadmap status|overview|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>|runs <project> [--limit N | --run-id <runId>]|candidate review <project> --run-id <runId>",
   );
   process.exit(1);
 }
