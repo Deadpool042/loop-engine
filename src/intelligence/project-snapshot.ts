@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { type ProjectConfig } from "../core/config.js";
@@ -15,24 +16,21 @@ import { type ProjectSnapshot } from "./snapshot.js";
 
 export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
   const projectPath = resolve(project.path);
+  const workspaceMode = project.workspace?.mode ?? "permanent";
+  const dependencyMode = project.workspace?.dependencies ?? "none";
+  const materialized = existsSync(projectPath);
+  const expectedAbsent =
+    !materialized && (workspaceMode === "on_demand" || workspaceMode === "none");
 
-  const missingDocs = project.required_docs.filter(
-    (doc) => !docExists(projectPath, doc),
-  );
+  const missingDocs = expectedAbsent
+    ? []
+    : project.required_docs.filter((doc) => !docExists(projectPath, doc));
 
-  const clean =
-    project.requires_git === false
-      ? true
-      : getGitState(projectPath) === "clean";
-
-  const branch =
-    project.requires_git === false ? "n/a" : getGitBranch(projectPath);
-
-  const statusText =
-    project.requires_git === false ? "" : getGitStatusText(projectPath);
-
-  const lastCommit =
-    project.requires_git === false ? null : getLastCommit(projectPath);
+  const bypassGit = project.requires_git === false || expectedAbsent;
+  const clean = bypassGit ? true : getGitState(projectPath) === "clean";
+  const branch = bypassGit ? "n/a" : getGitBranch(projectPath);
+  const statusText = bypassGit ? "" : getGitStatusText(projectPath);
+  const lastCommit = bypassGit ? null : getLastCommit(projectPath);
 
   const roadmapPaths = project.roadmap ?? [];
 
@@ -100,6 +98,14 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
       name: project.name,
       type: project.type,
       path: projectPath,
+    },
+
+    workspace: {
+      mode: workspaceMode,
+      dependencies: dependencyMode,
+      materialized,
+      expectedAbsent,
+      repository: project.repository ?? null,
     },
 
     git: {

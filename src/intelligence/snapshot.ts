@@ -7,6 +7,14 @@ export type ProjectSnapshot = Readonly<{
     path: string;
   }>;
 
+  workspace: Readonly<{
+    mode: "permanent" | "source_only" | "on_demand" | "none";
+    dependencies: "none" | "on_demand" | "production";
+    materialized: boolean;
+    expectedAbsent: boolean;
+    repository: string | null;
+  }>;
+
   git: Readonly<{
     branch: string;
     clean: boolean;

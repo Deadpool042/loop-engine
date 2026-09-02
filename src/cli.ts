@@ -81,6 +81,12 @@ import { terminal } from "./ui/terminal.js";
 import { printJsonError } from "./commands/json-error.js";
 import { printExecutionDecisionProposalJson } from "./commands/execution-decision-propose.js";
 import { printExecutionDecisionCurrentJson } from "./commands/execution-decision-current.js";
+import {
+  materializeWorkspaceProjectCommand,
+  printWorkspacePortfolioStatusJson,
+  printWorkspaceProjectStatus,
+  printWorkspaceProjectStatusJson,
+} from "./commands/workspace.js";
 
 const application = createLoopApplicationAssembly();
 
@@ -176,7 +182,31 @@ else if (command === "rag-search") {
   });
 } else if (command === "doctor")
   printDoctor(application, application.loadConfig());
-else if (command === "roadmap" && process.argv[3] === "status") {
+else if (command === "workspace" && process.argv[3] === "status") {
+  const json = process.argv.includes("--json");
+  const projectArgument = process.argv[4];
+  if (!projectArgument || projectArgument.startsWith("--")) {
+    if (json)
+      printWorkspacePortfolioStatusJson(application, application.loadConfig());
+    else terminal.error("Usage: pnpm loop workspace status <project> [--json]");
+  } else {
+    const project = resolveProjectOrExit("workspace status", 4);
+    json
+      ? printWorkspaceProjectStatusJson(application, project)
+      : printWorkspaceProjectStatus(application, project);
+  }
+} else if (command === "workspace" && process.argv[3] === "materialize") {
+  const json = process.argv.includes("--json");
+  const config = application.loadConfig();
+  const project = resolveProjectOrExit("workspace materialize", 4);
+  const exitCode = materializeWorkspaceProjectCommand(
+    application,
+    config,
+    project,
+    json,
+  );
+  if (exitCode !== 0) process.exitCode = exitCode;
+} else if (command === "roadmap" && process.argv[3] === "status") {
   const project = resolveProjectOrExit("roadmap status", 4);
   process.argv.includes("--json")
     ? printRoadmapStatusJson(application, project)
