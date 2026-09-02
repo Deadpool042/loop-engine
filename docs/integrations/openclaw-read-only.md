@@ -2,88 +2,99 @@
 
 ## Objectif
 
-Permettre à OpenClaw de consommer la décision de roadmap gouvernée de Loop Engine sans déclencher d'action autonome ni de seconde source de décision.
+Permettre à OpenClaw d'afficher le pilotage gouverné de Loop Engine sans devenir une seconde source de décision, sans déclencher d'action autonome et sans appeler de provider IA pour l'affichage.
 
-OpenClaw doit aider à préparer une session humaine, pas piloter le dépôt seul.
+Le Project Cockpit est une projection déterministe destinée à la supervision distante/mobile. Loop Engine reste la source de gouvernance.
 
 ## Contrat canonique actuel
 
-Depuis PL2 / OpenClaw O4, OpenClaw n'invoque plus directement la CLI Loop Engine (`pnpm exec tsx src/cli.ts ...`). Le chemin réel est :
+Depuis le Project Cockpit V1 du 2026-09-02, le chemin de lecture portefeuille est :
 
 ```text
-OpenClaw Control UI
+OpenClaw Control UI — Project Cockpit
   ↓
 Gateway OpenClaw
   ↓
-node Mac
+node VPS Main
   ↓
 mcp.tools.call.v1 (server: developmentWorkspace)
   ↓
-roadmap_decision (Development Workspace / dw-mcp)
+project_list / project_handoff
   ↓
-pnpm loop roadmap decision <project> [--request-proposal --provider anthropic_api --provider-timeout-ms <t>] --json
+Development Workspace vps-main
+  ↓
+pnpm loop summary --json / pnpm loop handoff <project> --json
   ↓
 Loop Engine
 ```
 
-Development Workspace expose l'unique outil MCP borné `roadmap_decision({ project, requestProposal?, timeoutMs? })` (voir `development-workspace/docs/connectors/README.md`), qui appelle ce contrat CLI. OpenClaw ne fournit jamais `cwd`, `packageManager`, `script`, `provider`, `provider-model`, `provider-effort` ni de credential : ces éléments restent fixés côté Development Workspace.
+Le node OpenClaw `VPS Main` publie un serveur MCP `developmentWorkspace` filtré. Pour le Cockpit, les capacités utiles sont `project_list` et `project_handoff`; `workspace_info` et `roadmap_decision` restent disponibles comme capacités de diagnostic/gouvernance bornées.
 
-Le contrat CLI sous-jacent reste :
+OpenClaw ne fournit jamais de `cwd`, package manager, script, provider, modèle ou credential. Ces paramètres restent fixés côté Development Workspace.
 
-```bash
-pnpm exec tsx src/cli.ts roadmap decision <project> --json
-pnpm exec tsx src/cli.ts roadmap decision <project> --request-proposal --provider anthropic_api --provider-timeout-ms <t> --json
-```
+Le Cockpit V1 utilise :
 
-## Sortie gouvernée
+- `roadmap.projects` pour transporter `project_list` ;
+- `roadmap.cockpit` pour transporter `project_handoff` sans exiger qu'un candidat soit présent ;
+- le sélecteur de projet et l'affichage restent entièrement déterministes.
 
-`roadmap decision --json` retourne `schemaVersion: 1` et l'une de ces valeurs de `decision` :
+`roadmap.read` et `roadmap.handoff` restent disponibles pour le flux spécialisé de décision/préparation d'un lot. `roadmap.propose` peut rester présent comme capacité secondaire explicite, mais il n'est ni affiché ni appelé par le Project Cockpit V1.
 
-- `existing_candidate` — un candidat admissible existe déjà (`candidate`) ;
-- `proposal` — une proposition a été générée (`proposal`, et `providerCall` si un appel provider a eu lieu) ; une `proposal` n'est jamais un lot autorisé et nécessite une validation/matérialisation humaine avant de devenir une mission gouvernée ;
-- `no_proposal` — aucun nouveau travail n'est justifié ;
-- `unavailable` — aucune décision automatique n'est disponible (voir `reason`, par exemple `proposal_requires_explicit_request`).
+## Données affichées
 
-Toute autre valeur de `schemaVersion` ou de `decision`, tout JSON invalide, ou toute indisponibilité de transport/MCP/outil doit être traitée en échec explicite (fail closed) par le consommateur, jamais interprétée ou transformée en décision fabriquée.
+Le Project Cockpit projette directement le handoff Loop Engine, notamment :
 
-## Usage recommandé
+- identité et type du projet ;
+- santé ;
+- branche et propreté Git ;
+- mode de planning ;
+- résumé roadmap ;
+- prochain candidat sélectionnable et priorité ;
+- objectif canonique et sa source ;
+- gates de phase ;
+- validations déclarées.
 
-1. L'utilisateur sélectionne un projet dans OpenClaw.
-2. OpenClaw appelle `roadmap_decision({ project })` (déterministe, sans provider).
-3. OpenClaw affiche `project` / `decision` / `reason`, et selon le cas `candidate`, `proposal` ou l'absence de travail.
-4. Si `decision = unavailable` avec `reason = proposal_requires_explicit_request`, OpenClaw peut proposer une action utilisateur explicite (jamais automatique) qui appelle `roadmap_decision({ project, requestProposal: true, timeoutMs })`.
-5. Une `proposal` reste affichée sans être matérialisée : aucun prompt de mission n'est généré depuis ce chemin.
-6. Les décisions restent humaines.
+L'absence de candidat, d'objectif ou de gate reste une donnée valide et doit être affichée explicitement ; le Cockpit ne fabrique jamais de remplacement.
 
 ## Garde-fous
 
-- Aucun appel IA automatique : `requestProposal: true` exige toujours une action utilisateur explicite.
+- Aucun LLM ni provider IA pour l'affichage du Cockpit.
+- Aucun appel API payant requis par le Cockpit.
 - Aucun commit automatique.
 - Aucun push automatique.
 - Aucune modification automatique.
 - Aucun déploiement automatique.
-- OpenClaw ne recalcule jamais la policy ni n'interprète une gate métier : il affiche la décision de Loop Engine telle quelle.
-- Les décisions restent humaines.
+- OpenClaw ne recalcule jamais une priorité, une gate ou une décision métier.
+- Les données viennent de Loop Engine via les outils MCP bornés de Development Workspace.
+- Toute indisponibilité de transport, MCP, outil ou schéma doit produire un état explicite et échouer fermé.
+- Les décisions et actions mutantes restent humaines ou passent par un workflow gouverné distinct.
 
-## Données utiles
+## Topologie multi-host
 
-Le JSON `roadmap decision --json` expose :
+Le Cockpit portefeuille lit actuellement le worker logique `vps-main` via le node OpenClaw `VPS Main`, afin de refléter les repos gouvernés présents sur le VPS et de rester disponible lorsque le Mac est absent.
 
-- `schemaVersion`
-- `project.name`
-- `decision`
-- `reason`
-- `candidate` (si `existing_candidate`)
-- `proposal` et `providerCall` (si `proposal`)
+Cette topologie ne transforme pas `vps-main` en source de vérité : Git et les documents canoniques des projets restent les sources de vérité. Le node OpenClaw est uniquement un transport de capacités Development Workspace.
 
-`providerCall`, lorsqu'il existe, n'expose que `provider`, `model`, `effort`, `inputTokens`, `outputTokens`, `cacheCreationInputTokens`, `cacheReadInputTokens`, `actualCalculatedCostUsd` — jamais de secret.
+La sélection du worker pour une mission d'exécution reste un problème distinct du Cockpit et suit la politique multi-host de Development Workspace / Loop Engine.
+
+## Critère d'acceptation V1
+
+Le test de référence est Creatyss. Après synchronisation des repos du VPS, le Project Cockpit doit afficher le candidat :
+
+```text
+Search storefront V2 [P1]
+```
+
+avec l'objectif canonique, l'état du projet et les gates issus du même `project_handoff`.
 
 ## Historique
 
-Les anciennes commandes `summary --json` / `context <project> --json` / `next <project> --json` / `prompt <project> --json` / `review <project> --json` restent des commandes CLI Loop Engine valides pour un usage interactif humain (ChatGPT, terminal), mais ne constituent plus le chemin d'intégration OpenClaw : ce rôle est désormais porté par `roadmap decision --json`, consommé via l'outil MCP borné `roadmap_decision` de Development Workspace.
+Avant le Project Cockpit V1, l'intégration OpenClaw était centrée sur `roadmap_decision` via le node Mac et pouvait proposer explicitement un appel provider. Cette capacité reste secondaire, mais elle ne définit plus le chemin de lecture portefeuille.
+
+Les commandes CLI Loop Engine restent disponibles pour les usages interactifs gouvernés ; OpenClaw ne les invoque pas directement et passe par Development Workspace.
 
 ## Checklist
 
-Avant toute intégration réelle avec OpenClaw, utiliser :
+Avant toute évolution du Cockpit, utiliser :
 
 - `docs/integrations/openclaw-read-only-checklist.md`
