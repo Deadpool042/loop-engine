@@ -19,6 +19,23 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 - [x] Lot V22.0 — contenu multi-ligne des candidats roadmap conservé et classifié dans le prompt d'exécution
 - [x] Lot V22.1 — frontière candidate explicite, inventaire de prose conservé et sélection exécutable protégée
 
+## Cycle actif V40 — renouvellement de roadmap et alignement du runtime principal
+
+Contexte vérifié le 2026-09-03 : toutes les capacités précédemment planifiées sont livrées, mais le premier renouvellement réel d'une roadmap a révélé deux gaps de gouvernance. D'une part, `roadmap decision --request-proposal` reste codé autour de `anthropic_api` alors que l'architecture canonique définit ChatGPT comme orchestrateur interactif principal et OpenClaw/Sol comme runtime autonome secondaire sans fallback API payant. D'autre part, un projet dont la roadmap est épuisée est aujourd'hui projeté comme `no_admissible_candidate`, sans distinguer « objectif atteint / attente volontaire » de « objectif encore disponible, roadmap à renouveler ».
+
+- [ ] [P1] V40.0 — Aligner le contrat `roadmap decision --request-proposal` sur la politique provider réelle : remplacer la dépendance codée en dur à `anthropic_api` par la sélection explicite d'un provider supporté, accepter le runtime autonome OpenClaw/Sol lorsqu'il est configuré, et ne jamais introduire de fallback API payant implicite. Le mode interactif ChatGPT reste capable de produire lui-même la roadmap à partir du handoff sans second LLM. Couverture CLI et régression du wrapper Development Workspace requises.
+- [ ] [P2] V40.1 — Introduire un état déterministe de renouvellement de roadmap : distinguer au minimum `roadmap_exhausted_objective_available`, `objective_required`, `maintenance_no_work`, `gated_no_work` et `no_admissible_candidate`. `handoff`, `roadmap status/overview/decision` et `summary` doivent projeter la même sémantique sans créer de candidat ni appeler de provider.
+- [ ] [P2] V40.2 — Formaliser le contrat de proposition de renouvellement : une proposition est un artefact borné et reviewable dérivé de l'objectif canonique + état réel, jamais une écriture automatique dans le projet. La matérialisation de la roadmap reste une mutation Development Workspace après validation humaine ; Loop Engine conserve sélection, gates et validation déterministes. Aucun nouveau système de persistence ni second format de roadmap.
+- [ ] [P3] V40.3 — Projeter le renouvellement dans le Project Cockpit existant : afficher clairement « roadmap épuisée », « objectif manquant », « gate externe/différée » ou « renouvellement disponible », et exposer l'action de proposition uniquement lorsqu'elle est admissible. Aucun LLM pour l'affichage, aucun nouveau cockpit, aucune duplication de `project_handoff`/`project_roadmap`.
+
+### Gates V40
+
+- aucun provider IA payant requis par défaut ;
+- aucune génération automatique au simple affichage d'un projet ;
+- aucune écriture de roadmap sans validation humaine explicite ;
+- les modes `maintenance`, `deferred` et les phase-gates existantes conservent leur sémantique ;
+- ne pas transformer un projet volontairement sans travail en backlog artificiel.
+
 ## Lot actif — burn-in vertical
 
 - [x] Burn-in 1 — Ajouter `tests/integration/claude-code-provider-burn-in.test.ts` en réutilisant `tests/fixtures/fake-claude/claude`. Le test doit exécuter le chemin `LoopApplicationAssembly -> LoopExecutor -> worktree observation` dans un dépôt Git temporaire, faire créer exactement un fichier par le faux provider, vérifier que `modifiedFiles` reflète exactement ce fichier, puis valider avec `pnpm exec tsx --test tests/integration/claude-code-provider-burn-in.test.ts`. Aucun provider réel, aucune nouvelle abstraction, aucun commit, push ou publish.

@@ -252,10 +252,10 @@ test("28/29. estimatedInputTokens includes the real, sanitized Structured Output
   }
 });
 
-test("30. the real loop-engine repository uses completed-roadmap routing with a fully accounted estimate", () => {
+test("30. the real loop-engine repository uses open-roadmap routing with a fully accounted estimate", () => {
   // Mirrors the `loop-engine` entry in projects.yaml (path: .) and validates
-  // invariants of the current repository state. JP1 and JP2 are completed, so
-  // deterministic routing must use the economy profile.
+  // invariants of the current repository state. V40 now contains bounded open
+  // work, so deterministic routing must use the balanced profile.
   const loopEngineProject: ProjectConfig = {
     name: "loop-engine",
     path: process.cwd(),
@@ -272,8 +272,8 @@ test("30. the real loop-engine repository uses completed-roadmap routing with a 
   const estimate = generateRoadmapProposalEstimateReport(loopEngineProject);
   assert.equal(estimate.estimate.status, "available");
   if (estimate.estimate.status !== "available") return;
-  assert.equal(estimate.estimate.profile, "economy");
-  assert.equal(estimate.estimate.model, "claude-haiku-4-5");
+  assert.equal(estimate.estimate.profile, "balanced");
+  assert.equal(estimate.estimate.model, "claude-sonnet-5");
 
   const schemaJson = JSON.stringify(
     toAnthropicOutputSchema(ROADMAP_PROPOSAL_OUTPUT_SCHEMA),

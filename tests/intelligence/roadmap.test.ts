@@ -645,7 +645,7 @@ describe("execution projection contract", () => {
 });
 
 describe("loop-engine roadmap state", () => {
-  it("keeps delivered burn-ins, V23, V25.0, JP1 and JP2 done with no explicit next lot", () => {
+  it("keeps historical delivered lots done and selects V40.0 as the renewed next lot", () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
     const repoRoot = resolve(currentDir, "..", "..");
     const project: ProjectConfig = {
@@ -699,6 +699,9 @@ describe("loop-engine roadmap state", () => {
       "expected JP2 to be marked done in the roadmap",
     );
 
-    assert.equal(selectRoadmapCandidate(candidates), null);
+    const selected = selectRoadmapCandidate(candidates);
+    assert.equal(selected?.status, "todo");
+    assert.equal(selected?.priority, "p1");
+    assert.match(selected?.text ?? "", /V40\.0/);
   });
 });
