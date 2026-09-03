@@ -71,6 +71,7 @@ import {
   mergeChangedPaths,
   untrackedPathsFromGitStatus,
 } from "../documentation/index.js";
+import { resolveSelectedLotDetail } from "./selected-lot-detail.js";
 
 export function generateProjectReport(project: ProjectConfig) {
   return buildProjectSnapshot(project);
@@ -149,6 +150,10 @@ export function generateRoadmapOverviewReport(project: ProjectConfig) {
         snapshot.roadmap.selectedCandidate === null
           ? null
           : projectRoadmapProposalCandidate(snapshot.roadmap.selectedCandidate),
+      selectedLotDetail: resolveSelectedLotDetail(
+        snapshot.project.path,
+        snapshot.roadmap.selectedCandidate,
+      ),
       candidates: projected.candidates,
       phaseGates: projected.phaseGates,
       stats: snapshot.roadmap.stats,
@@ -674,6 +679,10 @@ export function generateProjectHandoffReport(project: ProjectConfig) {
       available: snapshot.roadmap.available,
       paths: snapshot.roadmap.paths,
       selectedCandidate: snapshot.roadmap.selectedCandidate,
+      selectedLotDetail: resolveSelectedLotDetail(
+        snapshot.project.path,
+        snapshot.roadmap.selectedCandidate,
+      ),
       phaseGates: snapshot.roadmap.phaseGates,
       summary: snapshot.roadmap.summary,
       stats: snapshot.roadmap.stats,
