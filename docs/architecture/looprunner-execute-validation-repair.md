@@ -56,6 +56,18 @@ It returns either:
 
 The runner calls this port at most once per cycle.
 
+The selected Codex or Claude Code runtime may organize that single top-level
+invocation with runtime-native skills or sub-agents. This does not create
+additional `LoopExecutor` calls and does not create a Loop Engine task graph.
+Low-effort plans are instructed to work directly; higher-effort plans may
+delegate only when independent work or an independent review materially
+improves speed or safety. The prompt requires delegated work to respect the
+same brief, writable scope, policy permissions and no-publication boundary.
+V41 does not claim a new sub-agent-level sandbox or observer. The selected
+runtime remains responsible for one final worktree delta, and the existing
+post-executor scope guard and configured validation remain the mechanical
+authority over that result.
+
 ### LoopValidator
 
 Receives the project, candidate, current modified-file inventory, run id and
@@ -205,12 +217,14 @@ V14.4 does not add:
 - worktree rollback;
 - automatic promotion, push, tag or publication;
 - resume persistence or durable cancellation;
-- an unbounded repair loop.
+- an unbounded repair loop;
+- a Loop Engine sub-agent scheduler, nested execution-plan graph or separate
+  persistence for runtime-internal delegation.
 
 ## Acceptance invariants
 
 1. Policy rejection causes zero executor calls.
-2. The executor is called at most once.
+2. The top-level executor port is called at most once; runtime-internal delegation creates neither another LoopExecutor call nor a second execution plan.
 3. Validation runs only after a completed executor result.
 4. Each repair is followed by validation, never by commit.
 5. The finite repair budget is the most restrictive of caller request and resolved policy ceiling, and the same effective value reaches the repairer.
