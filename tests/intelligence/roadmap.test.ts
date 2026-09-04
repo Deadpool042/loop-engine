@@ -645,7 +645,7 @@ describe("execution projection contract", () => {
 });
 
 describe("loop-engine roadmap state", () => {
-  it("keeps historical delivered lots done and leaves V40 fully exhausted", () => {
+  it("keeps historical delivered lots through V43 done and leaves no active candidate", () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
     const repoRoot = resolve(currentDir, "..", "..");
     const project: ProjectConfig = {
@@ -707,6 +707,17 @@ describe("loop-engine roadmap state", () => {
       v40Candidates.every((candidate) => candidate.status === "done"),
       "expected V40.0 through V40.3 to be marked done in the roadmap",
     );
+
+    const v43Candidates = candidates.filter((candidate) =>
+      /V43\.0/.test(candidate.text),
+    );
+    assert.equal(v43Candidates.length, 1);
+    assert.equal(v43Candidates[0]?.status, "done");
+
+    const activeCandidates = candidates.filter(
+      (candidate) => candidate.status !== "done",
+    );
+    assert.equal(activeCandidates.length, 0);
 
     const selected = selectRoadmapCandidate(candidates);
     assert.equal(selected, null);

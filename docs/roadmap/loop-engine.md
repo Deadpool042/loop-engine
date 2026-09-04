@@ -64,11 +64,11 @@ Contexte vérifié le 2026-09-04 : le workflow GitHub dupliquait la validation c
 - aucun cache de `node_modules`, artifact de dépendances ou nouveau service de CI ;
 - rollback immédiat si la protection de branche exige un ancien statut supprimé.
 
-## Cycle actif V43 — suppression du bootstrap pnpm redondant
+## Cycle livré V43 — suppression du bootstrap pnpm redondant
 
 Contexte vérifié le 2026-09-04 : après consolidation V42, les runs #1294/#1296 ont passé plusieurs minutes dans `pnpm/action-setup@v6` sur `Running self-installer...`, alors que `Setup Node` et `pnpm install --frozen-lockfile` ont pris seulement quelques secondes. `package.json` fixe déjà exactement `pnpm@10.33.1` via `packageManager`, et Node 22 fournit Corepack pour activer cette version sans action pnpm séparée. V43 supprime donc l'action `pnpm/action-setup` au lieu de simplement la rétrograder.
 
-- [ ] [P1] V43.0 — Supprimer `pnpm/action-setup` du job `CI gate`, conserver un unique `actions/setup-node@v6` en Node 22, activer Corepack puis vérifier la version pnpm avant l'installation. Retirer temporairement le cache pnpm de `setup-node`, qui suppose que `pnpm` soit déjà disponible au moment du setup. La PR constitue le burn-in réel : conserver le changement uniquement si `CI gate` reste vert et si le temps total baisse nettement ; un cache séparé ne sera réintroduit que si les mesures montrent qu'il est utile.
+- [x] [P1] V43.0 — Supprimer `pnpm/action-setup` du job `CI gate`, conserver un unique `actions/setup-node@v6` en Node 22, activer Corepack puis vérifier la version pnpm avant l'installation. Retirer temporairement le cache pnpm de `setup-node`, qui suppose que `pnpm` soit déjà disponible au moment du setup. Burn-in PR #232 / run #1297 : `Setup Node` 4 s, `Enable pinned pnpm` 2 s et `Install dependencies` 3 s ; le `CI gate` complet est tombé à environ 2 min au lieu d'environ 9 min sur V42. Le premier run V43 a échoué uniquement sur une assertion de roadmap devenue obsolète, corrigée dans le même lot.
 
 ### Gates V43
 
