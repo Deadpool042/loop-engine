@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+This file provides guidance to any assistant or runtime working with code in this repository.
 
 ## Objectif final
 
@@ -8,11 +8,11 @@ Voir `docs/architecture/final-objective.md`.
 
 Cette page constitue la source de vérité du produit et définit l'objectif final de Loop Engine.
 
-Codex doit s’y référer avant toute évolution structurante.
+Tout assistant ou runtime doit s’y référer avant toute évolution structurante.
 
 ## What this is
 
-Loop Engine is a local, deterministic CLI orchestrator that reads and inspects a small set of local projects declared in `projects.yaml` (Creatyss, lp-infra, n8n, and itself). It reports Git state, checks required docs, surfaces roadmap candidates, and prepares short context/prompt payloads — all without ever touching the projects it inspects. It now also covers:
+Loop Engine is a local, deterministic governance and orchestration engine over projects declared in `projects.yaml`. It reports Git state, checks required docs, surfaces roadmap candidates, prepares bounded context/prompt payloads, and exposes explicit execution contracts. Read/plan paths remain non-destructive by default; write-capable paths exist only behind explicit governed modes and scope guards. It now also covers:
 
 - project piloting (`summary`, `status`, `doctor`, `context`, `validate`, `review`, `next`);
 - context and handoff generation (`context`, `handoff`, `prompt`) for pasting into an assistant;
@@ -20,11 +20,17 @@ Loop Engine is a local, deterministic CLI orchestrator that reads and inspects a
 - an executable Audit Engine with human and JSON reports, profiles, and a strict CI mode (`audit`);
 - human-readable and JSON reports across the CLI (`--json` on most commands).
 
-Loop Engine now also targets autonomous orchestration by small lots — see `docs/architecture/autonomous-loop-runner.md` for the LoopRunner architecture (planning → executing → validating → repairing → completed/blocked/failed/cancelled, and the `plan`/`execute`/`commit`/`publish` modes). `plan` remains the default and never calls an agent. An explicitly configured Codex or Claude Code provider runs `execute` in a temporary isolated Git worktree; explicit `commit` remains bounded and `publish` is rejected.
+Loop Engine supports governed orchestration by small lots — see `docs/architecture/looprunner-execute-validation-repair.md` for the current execution contract and `docs/architecture/autonomous-loop-runner.md` for the historical LoopRunner architecture. `plan` remains the default and never calls an agent. An explicitly configured Codex or Claude Code provider can run `execute` in a temporary isolated Git worktree; explicit `commit` remains bounded and `publish` can create only a validated internal candidate ref, never a push/merge or user-branch mutation.
+
+## Runtime IA principal
+
+Dans le workflow interactif normal, **ChatGPT + Development Workspace** est le runtime IA principal. Loop Engine fournit la gouvernance, les contrats déterministes et les validations ; il ne déclenche pas un second modèle simplement parce qu'un raisonnement est nécessaire.
+
+Claude Code, Codex et les autres runtimes sont des spécialistes **opt-in**. Leur indisponibilité ne doit pas bloquer le fonctionnement normal, et aucune API IA payante n'est un fallback implicite.
 
 **Core philosophy (non-negotiable, enforced throughout the codebase):**
 
-- No automatic AI calls by default — Loop Engine only prepares context for a human to paste into an assistant.
+- No automatic AI calls by default — deterministic planning, roadmap, policy, gates, history and validation stay model-free; an AI runtime is invoked only through an explicit admitted execution path.
 - No automatic commit, no automatic push.
 - Commit and push only happen under an explicitly selected mode (`commit`, `publish`); the default mode (`plan`) never commits or pushes.
 - Watched projects are read-only by default. The only current write exception is the explicitly configured `execution_decision` governance artifact: after human approval, Loop Engine may publish that single file at the configured in-project path using the bounded transactional/validated publication path. This does not authorize general writes or business-logic changes in the watched project.
@@ -51,7 +57,7 @@ Run a single test file directly: `pnpm exec tsx --test tests/intelligence/roadma
 
 `pnpm run ci` is the full reference validation and must pass before any commit or release.
 
-CLI commands (see `src/cli.ts` for the full routing table): `help`, `summary [--json]`, `status`, `doctor`, `json-check`, `rag-index`, `rag-search`, `audit [--json] [--strict] [--profile <name>]`, `handoff <project> [--json]`, `context <project> [--json]`, `validate <project>`, `review <project> [--json]`, `next <project> [--json]`, `prompt <project> [--json]`, `run <project> [--mode plan|execute|commit] [--json]`. `execute` requires an explicit provider executable; `commit` additionally requires an explicit message; `publish` is rejected.
+CLI commands (see `src/cli.ts` for the full routing table): `help`, `summary [--json]`, `status`, `doctor`, `json-check`, `rag-index`, `rag-search`, `audit [--json] [--strict] [--profile <name>]`, `handoff <project> [--json]`, `context <project> [--json]`, `validate <project>`, `review <project> [--json]`, `next <project> [--json]`, `prompt <project> [--json]`, `run <project> [--mode plan|execute|commit|publish] [--json]`. `execute` requires an explicit provider executable; `commit` additionally requires an explicit message; `publish` creates only a bounded validated candidate ref and never pushes or merges it.
 
 Loop Engine is self-hosted: it's declared in `projects.yaml` as project `loop-engine` (path `.`), so `pnpm loop context loop-engine`, `pnpm loop validate loop-engine`, etc. all work against this repo itself.
 
@@ -64,7 +70,7 @@ skip the application assembly boundary from a command.
 - **`src/cli.ts`** — routes argv to a command handler. Contains no business logic, no direct Git/doc/roadmap access. Just: read command → resolve project (if needed) → call the command.
 - **`src/commands/`** — one file per user-facing command (`summary`, `status`, `doctor`, `context`, `validate`, `review`, `next`, `prompt`, `run`, `help`). Each command consumes only the injected `LoopApplicationAssembly`, loads a `ProjectSnapshot` (or, for `run`, a `LoopRunResult`) through that contract, and renders it (text or `--json`); it must not import Core or internal implementation layers directly.
 - **`src/composition/`** — the single concrete application assembly layer. `createLoopApplicationAssembly(...)` wires Core application services and optional concrete providers behind the immutable `LoopApplicationAssembly` contract. Core must never depend on this layer.
-- **`src/loop/`** — the LoopRunner core (V7.2, `plan` mode only): `types.ts` (`LoopRunMode`, `LoopRunStatus`, `LoopRunResult`, …), `state-machine.ts` (`canTransition`), `planner.ts` (`planLoopCycle`, composes `intelligence/project-snapshot.ts` without duplicating it), `runner.ts` (`runLoopPlan`). See `docs/architecture/autonomous-loop-runner.md`.
+- **`src/loop/`** — the LoopRunner core for `plan`, explicit `execute`, bounded validation/repair, `commit` and candidate `publish`. It owns execution plans, evidence, scope/content guards and run-state transitions while delegating project-state computation to `intelligence/project-snapshot.ts`. See `docs/architecture/looprunner-execute-validation-repair.md`.
 - **`src/intelligence/`** — the engine. `project-snapshot.ts` builds the central `ProjectSnapshot` (see `src/intelligence/snapshot.ts` for the type) by merging declarative config (`projects.yaml`) with computed state (Git, docs, roadmap). `roadmap.ts` is the roadmap reader (see below). **This is the single source of truth commands must consume — never have a command re-read Git/docs/roadmap directly.**
 - **`src/core/`** — small, deterministic low-level primitives: `config.ts` (loads/parses `projects.yaml`), `git.ts` (shells out to `git`, always fails soft to `"unknown"`/`null`), `docs.ts` (file existence checks), `project.ts` (project lookup/arg parsing).
 - **`src/ui/terminal.ts`** — the only place that formats terminal output; commands call `terminal.*` rather than inlining styling.
