@@ -100,3 +100,20 @@ projects:
       - pnpm run validate
     roadmap:
       - docs/roadmap/loop-engine.md
+  - name: openclaw-control
+    path: ../openclaw-control
+    type: openclaw-extension
+    workspace:
+      mode: source_only
+      dependencies: on_demand
+    required_docs:
+      - AGENTS.md
+      - README.md
+      - PROJECT-BRIEF.md
+      - docs/roadmap/README.md
+    validation: []
+    planning:
+      mode: roadmap
+      objective_source: PROJECT-BRIEF.md
+    roadmap:
+      - docs/roadmap/README.md
