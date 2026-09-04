@@ -82,17 +82,20 @@ export function selectRoadmapProposalProfile(
     phaseGates.truncated ||
     objectiveTruncated;
   const openWork = stats.todo + stats.inProgress;
+  const activeBlocked = candidates.items.filter(
+    (candidate) => candidate.kind === "blocked",
+  ).length;
 
   if (truncated) {
     return routing("deep", "context_truncated");
   }
-  if (stats.blocked >= HIGH_COMPLEXITY_BLOCKED_THRESHOLD) {
+  if (activeBlocked >= HIGH_COMPLEXITY_BLOCKED_THRESHOLD) {
     return routing("deep", "multiple_blocked_candidates");
   }
   if (openWork > HIGH_COMPLEXITY_OPEN_WORK_THRESHOLD) {
     return routing("deep", "large_open_backlog");
   }
-  if (openWork === 0 && stats.blocked === 0) {
+  if (candidates.total === 0) {
     return routing("economy", "roadmap_complete_no_signal");
   }
   return routing("balanced", "bounded_open_work");

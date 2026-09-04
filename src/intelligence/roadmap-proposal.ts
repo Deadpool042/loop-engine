@@ -257,7 +257,8 @@ function truncation(value: unknown): boolean {
   if (!isObject(value)) return false;
   return Object.entries(value).some(
     ([key, item]) =>
-      (key.endsWith("Truncated") && item === true) || truncation(item),
+      ((key === "truncated" || key.endsWith("Truncated")) && item === true) ||
+      truncation(item),
   );
 }
 /**

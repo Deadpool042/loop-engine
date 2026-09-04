@@ -77,8 +77,8 @@ type CompactRoadmapProposalContext = Readonly<{
  *  - `priority: "default"`: the common case; kept only when non-default.
  *  - Already-`done` candidates: the system prompt only ever asks for
  *    `observedGaps`/`assumptions`, never a list of finished work, and `stats.done`
- *    already reports the count. Verbatim text of completed lines is not required
- *    to compare the objective against the *remaining* state.
+ *    already reports the count. The proposal context normally removes them before
+ *    this boundary; this filter remains as defense in depth for hand-built inputs.
  *  - `line` numbers, git branch name, validation command list, path/branch
  *    truncation flags: not used by the model to judge a gap; `git.clean` and
  *    `validation.configured` (booleans) are kept because "repo dirty" or
@@ -90,9 +90,7 @@ export function buildCompactRoadmapProposalContext(
   if (context.context !== "available") return null;
 
   const items = context.roadmap.candidates.items
-    .filter(
-      (candidate) => candidate.status !== "done" || candidate.kind !== "safe",
-    )
+    .filter((candidate) => candidate.status !== "done")
     .map((candidate): CompactCandidate => ({
       path: candidate.path,
       text: candidate.text,

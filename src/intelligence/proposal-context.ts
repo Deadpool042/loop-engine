@@ -141,9 +141,7 @@ export function projectRoadmapProposalStringCollection(
  * Projects only canonical snapshot data into a bounded, inspectable context.
  * It never changes planning, candidate admissibility, gates, or selection.
  */
-export function buildRoadmapProposalContext(
-  snapshot: ProjectSnapshot,
-): Readonly<{
+type BoundedRoadmapProposalContext = Readonly<{
   candidates: Readonly<{
     items: readonly ProposalCandidate[];
     total: number;
@@ -154,10 +152,12 @@ export function buildRoadmapProposalContext(
     total: number;
     truncated: boolean;
   }>;
-}> {
-  const candidates = snapshot.roadmap.candidates;
-  const phaseGates = snapshot.roadmap.phaseGates;
+}>;
 
+function projectBoundedRoadmapContext(
+  candidates: ProjectSnapshot["roadmap"]["candidates"],
+  phaseGates: ProjectSnapshot["roadmap"]["phaseGates"],
+): BoundedRoadmapProposalContext {
   return Object.freeze({
     candidates: Object.freeze({
       items: Object.freeze(
@@ -178,4 +178,52 @@ export function buildRoadmapProposalContext(
       truncated: phaseGates.length > MAX_PROPOSAL_CONTEXT_PHASE_GATES,
     }),
   });
+}
+
+/**
+ * Full bounded roadmap projection used by read-only overview surfaces.
+ * Historical completed candidates remain visible here; this is inventory,
+ * not the model-facing renewal context.
+ */
+export function buildRoadmapProposalContext(
+  snapshot: ProjectSnapshot,
+): BoundedRoadmapProposalContext {
+  return projectBoundedRoadmapContext(
+    snapshot.roadmap.candidates,
+    snapshot.roadmap.phaseGates,
+  );
+}
+
+/**
+ * Bounded renewal context used by roadmap proposal and gate-reassessment calls.
+ *
+ * Completed candidates are historical evidence already represented by
+ * `roadmap.stats.done`; their verbatim text must never consume the finite
+ * candidate window or make a completed roadmap appear truncated. Phase gates
+ * are retained only when they belong to a still-active candidate. Relative
+ * order remains canonical within both collections.
+ *
+ * This guarantees that:
+ * - arbitrarily long completed history cannot force a deeper model or block a
+ *   proposal call;
+ * - an active candidate after many completed lots cannot disappear behind
+ *   historical entries;
+ * - genuine overflow of active work remains fail-closed via `truncated`.
+ */
+export function buildRoadmapRenewalContext(
+  snapshot: ProjectSnapshot,
+): BoundedRoadmapProposalContext {
+  const candidates = snapshot.roadmap.candidates.filter(
+    (candidate) => candidate.status !== "done",
+  );
+  const activePhaseIds = new Set(
+    candidates.flatMap((candidate) =>
+      candidate.phaseId === undefined ? [] : [candidate.phaseId],
+    ),
+  );
+  const phaseGates = snapshot.roadmap.phaseGates.filter((gate) =>
+    activePhaseIds.has(gate.phaseId),
+  );
+
+  return projectBoundedRoadmapContext(candidates, phaseGates);
 }
