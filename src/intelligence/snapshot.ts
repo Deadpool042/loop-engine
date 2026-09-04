@@ -50,6 +50,7 @@ export type ProjectSnapshot = Readonly<{
       | "deferred_no_work"
       | "external_planning_source"
       | "roadmap_exhausted_objective_available"
+      | "worktree_dirty_review_required"
       | "objective_required"
       | "gated_no_work"
       | "no_admissible_candidate";

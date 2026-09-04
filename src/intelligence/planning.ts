@@ -20,6 +20,7 @@ export type PlanningRecommendation =
   | "deferred_no_work"
   | "external_planning_source"
   | "roadmap_exhausted_objective_available"
+  | "worktree_dirty_review_required"
   | "objective_required"
   | "gated_no_work"
   | "no_admissible_candidate";
@@ -83,6 +84,7 @@ export function buildPlanningStatus(options: Readonly<{
     }>;
   }>[];
   objectiveAvailable?: boolean;
+  worktreeClean?: boolean;
 }>): PlanningStatus {
   const configuredPaths = Object.freeze([...(options.project.roadmap ?? [])]);
   const roadmapConfigured = configuredPaths.length > 0;
@@ -144,6 +146,17 @@ export function buildPlanningStatus(options: Readonly<{
       discoveredPaths,
       voluntaryNoWork: false,
       recommendation: "no_roadmap_present",
+    });
+  }
+
+  if (options.worktreeClean === false) {
+    return Object.freeze({
+      mode,
+      roadmapConfigured,
+      configuredPaths,
+      discoveredPaths,
+      voluntaryNoWork: false,
+      recommendation: "worktree_dirty_review_required",
     });
   }
 
