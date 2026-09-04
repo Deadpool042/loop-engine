@@ -6,12 +6,15 @@ import {
   createGitWorktreeWorkspaceManager,
   createIsolatedWorkerPlatform,
   createLocalProjectLockManager,
+  SourceWorktreePreflightError,
 } from "../execution/index.js";
 import type { LoopRunExecuteOptions } from "../loop/execute-runner.js";
 import type { LoopExecutor } from "../loop/execution.js";
 import { runLoopExecuteWithProviderFailoverEvidence } from "../loop/provider-failover-runner.js";
 import type { LoopRunResult } from "../loop/types.js";
 import type { AgentRegistry } from "../agents/registry.js";
+import { loadConfig } from "../core/config.js";
+import { findProject } from "../core/project.js";
 import {
   exportValidatedGitPatch,
   ValidatedGitPatchExportError,
@@ -91,10 +94,27 @@ export function createIsolatedProviderRunExecute(
     const attemptId = createAttemptId();
     const now = runOptions.now ?? (() => new Date().toISOString());
     const executor = runOptions.executor ?? options.executor;
-
+    let allowedSourceDirtyPaths: readonly string[] = Object.freeze([]);
     try {
+      const project = findProject(
+        (runOptions.loadConfig ?? loadConfig)(),
+        projectName,
+      );
+      const executionDecision =
+        typeof project?.execution_decision === "string"
+          ? project.execution_decision.trim()
+          : "";
+      allowedSourceDirtyPaths =
+        executionDecision.length === 0
+          ? Object.freeze([])
+          : Object.freeze([executionDecision]);
+
       const outcome = await platform.execute(
-        Object.freeze({ projectId: projectName, attemptId }),
+        Object.freeze({
+          projectId: projectName,
+          attemptId,
+          allowedSourceDirtyPaths,
+        }),
         async (workspace) => {
           const result = await execute(projectName, {
             ...runOptions,
@@ -151,7 +171,18 @@ export function createIsolatedProviderRunExecute(
             "project_locked",
             "Another isolated execution already holds this project lock.",
           );
-    } catch {
+    } catch (error) {
+      if (error instanceof SourceWorktreePreflightError) {
+        return isolatedFailure(
+          projectName,
+          attemptId,
+          now,
+          error.code,
+          error.code === "source_worktree_dirty"
+            ? "Source worktree contains local changes outside the allowed execution-decision artifact."
+            : "Unable to verify the source worktree before isolated execution.",
+        );
+      }
       return isolatedFailure(
         projectName,
         attemptId,

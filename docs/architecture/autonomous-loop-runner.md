@@ -86,6 +86,16 @@ Claude Code explicitement configuré, la composition acquiert d'abord un lock pa
 projet puis exécute provider et validation dans un Git worktree isolé et
 temporaire. Le dépôt source ne reçoit aucune modification du mode `execute`.
 
+Depuis V46, l'allocation du worktree isolé vérifie le dépôt source sous ce lock
+avant `git worktree add --detach ... HEAD`. Toute modification locale qui ne
+correspond pas exactement à l'artefact `execution_decision` déclaré bloque
+l'exécution avec `source_worktree_dirty`, avant création du worktree et avant
+appel provider. L'artefact de décision reste l'unique exception : il peut être
+non commité car son `source.gitHead` autorise précisément le HEAD exécuté et
+n'a pas besoin d'appartenir à ce commit. Une impossibilité d'inspecter le dépôt
+échoue avec `source_worktree_inspection_failed`. Le mode `publish` hérite de
+ce même preflight puisqu'il réutilise l'exécution isolée.
+
 `--export-patch <path>` est une option opt-in réservée à `execute` avec un
 provider explicite. Après la validation finale réussie, la composition exporte
 le diff Git binaire du worktree isolé vers ce chemin. L'artefact est refusé si
