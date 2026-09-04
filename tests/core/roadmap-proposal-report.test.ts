@@ -252,10 +252,10 @@ test("28/29. estimatedInputTokens includes the real, sanitized Structured Output
   }
 });
 
-test("30. the real loop-engine repository uses completed-roadmap routing with a fully accounted estimate", () => {
+test("30. the real loop-engine repository uses exhausted-roadmap routing with a fully accounted estimate", () => {
   // Mirrors the `loop-engine` entry in projects.yaml (path: .) and validates
-  // invariants of the current repository state. JP1 and JP2 are completed, so
-  // deterministic routing must use the economy profile.
+  // invariants of the current repository state. V40 is fully delivered, so
+  // deterministic renewal routing uses the economy profile.
   const loopEngineProject: ProjectConfig = {
     name: "loop-engine",
     path: process.cwd(),

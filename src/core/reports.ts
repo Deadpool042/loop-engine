@@ -346,6 +346,8 @@ export type RoadmapDecisionReport = Readonly<{
     effort?: AnthropicEffort | null;
     usage?: { inputTokens: number; outputTokens: number };
     actualCalculatedCostUsd?: number;
+    /** Bounded provider failure classification; never raw provider diagnostics. */
+    failureCode?: string;
   }>;
 }>;
 
@@ -374,12 +376,15 @@ function resolveDeterministicRoadmapDecision(
     });
   }
 
-  if (!snapshot.objective.eligibleForRoadmapProposal) {
+  if (
+    snapshot.planning.recommendation === "gated_no_work" ||
+    !snapshot.objective.eligibleForRoadmapProposal
+  ) {
     return Object.freeze({
       schemaVersion: 1 as const,
       project: projectName,
       decision: "unavailable" as const,
-      reason: snapshot.objective.reason ?? snapshot.planning.recommendation,
+      reason: snapshot.planning.recommendation,
     });
   }
 
@@ -415,11 +420,12 @@ export async function generateRoadmapDecisionReport(
   const projectName = { name: project.name };
 
   if (options.requestProposal === undefined) {
+    const snapshot = generateProjectReport(project);
     return Object.freeze({
       schemaVersion: 1 as const,
       project: projectName,
       decision: "unavailable" as const,
-      reason: "proposal_requires_explicit_request",
+      reason: snapshot.planning.recommendation,
     });
   }
 
@@ -444,6 +450,9 @@ export async function generateRoadmapDecisionReport(
           : {}),
         ...("model" in result && result.model !== undefined
           ? { model: result.model }
+          : {}),
+        ...("providerFailure" in result && result.providerFailure !== undefined
+          ? { failureCode: result.providerFailure.code }
           : {}),
       }),
     });

@@ -28,7 +28,7 @@ describe("project context report", () => {
         configuredPaths: ["roadmap.md"],
         discoveredPaths: [],
         voluntaryNoWork: false,
-        recommendation: "no_admissible_candidate",
+        recommendation: "objective_required",
       });
       assert.equal(report.roadmap.stats.todo, 0);
       assert.equal(typeof report.git.statusText, "string");

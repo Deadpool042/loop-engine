@@ -49,6 +49,9 @@ export type ProjectSnapshot = Readonly<{
       | "maintenance_no_work"
       | "deferred_no_work"
       | "external_planning_source"
+      | "roadmap_exhausted_objective_available"
+      | "objective_required"
+      | "gated_no_work"
       | "no_admissible_candidate";
   }>;
 

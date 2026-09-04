@@ -121,6 +121,22 @@ function invalidResponseProvider(): TextOnlyProvider {
   };
 }
 
+function failedProvider(): TextOnlyProvider {
+  return {
+    async invoke(input) {
+      return {
+        status: "failed",
+        provider: "openclaw_agent",
+        model: input.model,
+        code: "provider_unavailable",
+        message: "redacted provider failure",
+        durationMs: 7,
+        truncated: false,
+      };
+    },
+  };
+}
+
 test("1. an existing admissible candidate wins: existing_candidate, provider never called", async () => {
   const fixture = setupProject({
     "objective.md": "Objective.",
@@ -158,7 +174,7 @@ test("2. a warning-kind admissible candidate is selected the same way (Roadmap R
   }
 });
 
-test("3. a closed phase-gate blocking the only candidate never invents work: unavailable, no provider call", async () => {
+test("3. a closed phase-gate blocking the only candidate projects gated_no_work and never invents work", async () => {
   const fixture = setupProject({
     "objective.md": "Objective.",
     "roadmap.md": [
@@ -169,7 +185,7 @@ test("3. a closed phase-gate blocking the only candidate never invents work: una
   try {
     const report = await generateRoadmapDecisionReport(project(fixture.path));
     assert.equal(report.decision, "unavailable");
-    assert.equal(report.reason, "proposal_requires_explicit_request");
+    assert.equal(report.reason, "gated_no_work");
   } finally {
     fixture.cleanup();
   }
@@ -240,7 +256,7 @@ test("6. objective unavailable => unavailable, deterministic, no provider call e
       },
     );
     assert.equal(report.decision, "unavailable");
-    assert.equal(report.reason, "objective_source_not_configured");
+    assert.equal(report.reason, "objective_required");
   } finally {
     fixture.cleanup();
   }
@@ -263,7 +279,7 @@ test("7. an oversized objective source fails closed as unavailable, not as a fab
       },
     );
     assert.equal(report.decision, "unavailable");
-    assert.equal(report.reason, "objective_source_too_large");
+    assert.equal(report.reason, "objective_required");
   } finally {
     fixture.cleanup();
   }
@@ -316,7 +332,33 @@ test("9. an invalid provider response fails closed as unavailable and materializ
   }
 });
 
-test("10. a roadmap being complete alone never triggers a proposal without an explicit request", async () => {
+test("10. a provider failure exposes only its bounded failure code", async () => {
+  const fixture = setupProject({
+    "objective.md": "Objective.",
+    "roadmap.md": "- [x] Done lot",
+  });
+  try {
+    const report = await generateRoadmapDecisionReport(
+      project(fixture.path),
+      {
+        requestProposal: {
+          provider: failedProvider(),
+          providerAvailable: true,
+          model: "openai/gpt-5.6-sol",
+          timeoutMs: 60_000,
+        },
+      },
+    );
+    assert.equal(report.decision, "unavailable");
+    assert.equal(report.reason, "provider_error");
+    assert.equal(report.providerCall?.failureCode, "provider_unavailable");
+    assert.equal(JSON.stringify(report).includes("redacted provider failure"), false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("11. a complete roadmap projects renewal availability without triggering a proposal", async () => {
   const fixture = setupProject({
     "objective.md": "Objective.",
     "roadmap.md": "- [x] Done lot",
@@ -324,7 +366,7 @@ test("10. a roadmap being complete alone never triggers a proposal without an ex
   try {
     const report = await generateRoadmapDecisionReport(project(fixture.path));
     assert.equal(report.decision, "unavailable");
-    assert.equal(report.reason, "proposal_requires_explicit_request");
+    assert.equal(report.reason, "roadmap_exhausted_objective_available");
   } finally {
     fixture.cleanup();
   }

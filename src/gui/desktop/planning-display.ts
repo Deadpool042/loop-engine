@@ -94,6 +94,46 @@ export function getPlanningDisplay(detail: ContextDetail): PlanningDisplay {
         ? `${gate.phaseId} · ${gate.blockedBy}`
         : gate.phaseId,
     );
+
+  if (detail.planning?.recommendation === "gated_no_work") {
+    return Object.freeze({
+      ...base,
+      heading: "Travail bloqué par une gate",
+      description: "La roadmap contient encore du travail, mais aucune phase n’est actuellement admissible.",
+      blockedGates: Object.freeze(blockedGates),
+      showRoadmapProposalAction: false,
+      showGateReassessmentAction: blockedGates.length > 0,
+    });
+  }
+
+  if (
+    detail.planning?.mode === "roadmap" &&
+    detail.planning?.recommendation === "roadmap_exhausted_objective_available"
+  ) {
+    return Object.freeze({
+      ...base,
+      heading: "Roadmap épuisée",
+      description: "L’objectif canonique est disponible : un renouvellement peut être proposé puis revu avant toute écriture.",
+      blockedGates: Object.freeze([]),
+      showRoadmapProposalAction: true,
+      showGateReassessmentAction: false,
+    });
+  }
+
+  if (
+    detail.planning?.mode === "roadmap" &&
+    detail.planning?.recommendation === "objective_required"
+  ) {
+    return Object.freeze({
+      ...base,
+      heading: "Objectif canonique requis",
+      description: "La roadmap est épuisée, mais aucun objectif canonique n’est disponible pour justifier la suite.",
+      blockedGates: Object.freeze([]),
+      showRoadmapProposalAction: false,
+      showGateReassessmentAction: false,
+    });
+  }
+
   if ((detail.roadmap.stats?.todo ?? 0) > 0 && blockedGates.length > 0) {
     return Object.freeze({
       ...base,
@@ -102,21 +142,6 @@ export function getPlanningDisplay(detail: ContextDetail): PlanningDisplay {
       blockedGates: Object.freeze(blockedGates),
       showRoadmapProposalAction: false,
       showGateReassessmentAction: true,
-    });
-  }
-
-  if (
-    detail.planning?.mode === "roadmap" &&
-    detail.planning?.recommendation === "no_admissible_candidate" &&
-    detail.roadmap.stats?.todo === 0
-  ) {
-    return Object.freeze({
-      ...base,
-      heading: "Roadmap terminée",
-      description: "Aucun travail restant.",
-      blockedGates: Object.freeze([]),
-      showRoadmapProposalAction: true,
-      showGateReassessmentAction: false,
     });
   }
 

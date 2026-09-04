@@ -245,7 +245,7 @@ test("deferred projects retain configured roadmap information", () => {
   }
 });
 
-test("distinguishes a configured roadmap without an admissible candidate", () => {
+test("reports objective_required when a configured roadmap is exhausted without a canonical objective", () => {
   const fixture = setupProject({ "roadmap.md": "- [x] already done" });
   try {
     const snapshot = buildProjectSnapshot(
@@ -253,7 +253,30 @@ test("distinguishes a configured roadmap without an admissible candidate", () =>
     );
 
     assert.equal(snapshot.roadmap.selectedCandidate, null);
-    assert.equal(snapshot.planning.recommendation, "no_admissible_candidate");
+    assert.equal(snapshot.planning.recommendation, "objective_required");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("reports roadmap_exhausted_objective_available when renewal has a canonical objective", () => {
+  const fixture = setupProject({
+    "roadmap.md": "- [x] already done",
+    "objective.md": "# Objective\nKeep the project useful.",
+  });
+  try {
+    const snapshot = buildProjectSnapshot(
+      project(fixture.path, {
+        roadmap: ["roadmap.md"],
+        planning: { mode: "roadmap", objective_source: "objective.md" },
+      }),
+    );
+
+    assert.equal(snapshot.roadmap.selectedCandidate, null);
+    assert.equal(
+      snapshot.planning.recommendation,
+      "roadmap_exhausted_objective_available",
+    );
   } finally {
     fixture.cleanup();
   }
@@ -277,7 +300,8 @@ test("keeps closed phase-gate candidate admissibility unchanged", () => {
       reason: "phase_closed",
       blockedBy: "H0-RC",
     });
-    assert.equal(snapshot.planning.recommendation, "no_admissible_candidate");
+    assert.equal(snapshot.planning.recommendation, "gated_no_work");
+    assert.equal(snapshot.planning.voluntaryNoWork, false);
   } finally {
     fixture.cleanup();
   }

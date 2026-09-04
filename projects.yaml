@@ -16,6 +16,7 @@ projects:
     validation: []
     planning:
       mode: roadmap
+      objective_source: docs/objective.md
     roadmap:
       - roadmap/workflow-roadmap.md
 
@@ -54,6 +55,9 @@ projects:
       dependencies: none
     execution_decision: .governance/execution-decision.yaml
     type: infra
+    planning:
+      mode: roadmap
+      objective_source: docs/objective.md
     required_docs:
       - README.md
       - docs
@@ -62,6 +66,7 @@ projects:
       - bash -n templates/infra/backup-offsite-template.sh
       - bash -n templates/infra/deploy-vps-template.sh
     roadmap:
+      - docs/roadmap/README.md
       - docs/roadmap/projet-lp-infra.md
 
   - name: n8n

@@ -67,7 +67,7 @@ describe("GUI planning display", () => {
           planning: {
             mode: "roadmap",
             roadmapConfigured: true,
-            recommendation: "no_admissible_candidate",
+            recommendation: "roadmap_exhausted_objective_available",
           },
           roadmap: {
             ...context().roadmap,
@@ -77,10 +77,36 @@ describe("GUI planning display", () => {
       ),
       {
         modeLabel: "Roadmap",
-        heading: "Roadmap terminée",
-        description: "Aucun travail restant.",
+        heading: "Roadmap épuisée",
+        description: "L’objectif canonique est disponible : un renouvellement peut être proposé puis revu avant toute écriture.",
         blockedGates: [],
         showRoadmapProposalAction: true,
+        showGateReassessmentAction: false,
+      },
+    );
+  });
+
+  it("blocks renewal when the canonical objective is missing", () => {
+    assert.deepEqual(
+      getPlanningDisplay(
+        context({
+          planning: {
+            mode: "roadmap",
+            roadmapConfigured: true,
+            recommendation: "objective_required",
+          },
+          roadmap: {
+            ...context().roadmap,
+            stats: { ...context().roadmap.stats!, todo: 0, done: 45 },
+          },
+        }),
+      ),
+      {
+        modeLabel: "Roadmap",
+        heading: "Objectif canonique requis",
+        description: "La roadmap est épuisée, mais aucun objectif canonique n’est disponible pour justifier la suite.",
+        blockedGates: [],
+        showRoadmapProposalAction: false,
         showGateReassessmentAction: false,
       },
     );
@@ -116,7 +142,7 @@ describe("GUI planning display", () => {
           planning: {
             mode: "roadmap",
             roadmapConfigured: true,
-            recommendation: "no_admissible_candidate",
+            recommendation: "gated_no_work",
           },
           roadmap: {
             ...context().roadmap,
@@ -130,8 +156,8 @@ describe("GUI planning display", () => {
       ),
       {
         modeLabel: "Roadmap",
-        heading: "Aucun travail admissible",
-        description: "Les prochaines phases sont actuellement bloquées.",
+        heading: "Travail bloqué par une gate",
+        description: "La roadmap contient encore du travail, mais aucune phase n’est actuellement admissible.",
         blockedGates: [
           "H4 · retours-terrain-2027",
           "H5 · h4-and-adr-iac",

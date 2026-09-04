@@ -19,6 +19,9 @@ export type PlanningRecommendation =
   | "maintenance_no_work"
   | "deferred_no_work"
   | "external_planning_source"
+  | "roadmap_exhausted_objective_available"
+  | "objective_required"
+  | "gated_no_work"
   | "no_admissible_candidate";
 
 export type PlanningStatus = Readonly<{
@@ -72,6 +75,14 @@ export function buildPlanningStatus(options: Readonly<{
   project: ProjectConfig;
   projectPath: string;
   selectedCandidate: unknown | null;
+  candidates?: readonly Readonly<{
+    status: "todo" | "in_progress" | "done" | "unknown";
+    admissibility?: Readonly<{
+      state: "admissible" | "not_admissible";
+      reason: "no_phase_gate" | "phase_open" | "phase_closed" | "phase_gate_invalid";
+    }>;
+  }>[];
+  objectiveAvailable?: boolean;
 }>): PlanningStatus {
   const configuredPaths = Object.freeze([...(options.project.roadmap ?? [])]);
   const roadmapConfigured = configuredPaths.length > 0;
@@ -136,15 +147,67 @@ export function buildPlanningStatus(options: Readonly<{
     });
   }
 
+  if (options.selectedCandidate !== null) {
+    return Object.freeze({
+      mode,
+      roadmapConfigured,
+      configuredPaths,
+      discoveredPaths,
+      voluntaryNoWork: false,
+      recommendation: "roadmap_configured",
+    });
+  }
+
+  const knownOpenCandidates = (options.candidates ?? []).filter(
+    (candidate) =>
+      candidate.status === "todo" || candidate.status === "in_progress",
+  );
+  if (
+    knownOpenCandidates.length > 0 &&
+    knownOpenCandidates.every(
+      (candidate) =>
+        candidate.admissibility?.state === "not_admissible" &&
+        candidate.admissibility.reason === "phase_closed",
+    )
+  ) {
+    return Object.freeze({
+      mode,
+      roadmapConfigured,
+      configuredPaths,
+      discoveredPaths,
+      voluntaryNoWork: false,
+      recommendation: "gated_no_work",
+    });
+  }
+
+  if (knownOpenCandidates.length === 0 && options.objectiveAvailable === false) {
+    return Object.freeze({
+      mode,
+      roadmapConfigured,
+      configuredPaths,
+      discoveredPaths,
+      voluntaryNoWork: false,
+      recommendation: "objective_required",
+    });
+  }
+
+  if (knownOpenCandidates.length === 0 && options.objectiveAvailable === true) {
+    return Object.freeze({
+      mode,
+      roadmapConfigured,
+      configuredPaths,
+      discoveredPaths,
+      voluntaryNoWork: false,
+      recommendation: "roadmap_exhausted_objective_available",
+    });
+  }
+
   return Object.freeze({
     mode,
     roadmapConfigured,
     configuredPaths,
     discoveredPaths,
     voluntaryNoWork: false,
-    recommendation:
-      options.selectedCandidate === null
-        ? "no_admissible_candidate"
-        : "roadmap_configured",
+    recommendation: "no_admissible_candidate",
   });
 }
