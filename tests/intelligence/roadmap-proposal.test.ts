@@ -306,10 +306,41 @@ test("26. provider-level failures never carry validation telemetry, expose only 
   }
   assert.doesNotMatch(JSON.stringify(result), /no credential|sk-test-secret/);
 });
-test("27. refuses unavailable, truncated and missing-credential contexts before provider", async () => {
+test("27. refuses unavailable, field-truncated, collection-truncated and missing-credential contexts before provider", async () => {
   const calls = { value: 0 };
-  for (const [value, available] of [[context({ context: null, objective: { available: false, eligibleForRoadmapProposal: false, reason: "planning_mode_maintenance" } }), true], [context({ project: { name: "loop-engine", nameTruncated: true } }), true], [context(), false]] as const) {
-    const result = await generateRoadmapProposalFromContext(value as never, { provider: fake(noProposal, calls), providerAvailable: available, model: "claude-sonnet-5", timeoutMs: 1000 });
+  const base = context();
+  const collectionTruncated = context({
+    roadmap: {
+      ...base.roadmap,
+      candidates: {
+        ...base.roadmap.candidates,
+        truncated: true,
+      },
+    },
+  });
+
+  for (const [value, available] of [
+    [
+      context({
+        context: null,
+        objective: {
+          available: false,
+          eligibleForRoadmapProposal: false,
+          reason: "planning_mode_maintenance",
+        },
+      }),
+      true,
+    ],
+    [context({ project: { name: "loop-engine", nameTruncated: true } }), true],
+    [collectionTruncated, true],
+    [context(), false],
+  ] as const) {
+    const result = await generateRoadmapProposalFromContext(value as never, {
+      provider: fake(noProposal, calls),
+      providerAvailable: available,
+      model: "claude-sonnet-5",
+      timeoutMs: 1000,
+    });
     assert.equal(result.result.status, "unavailable");
   }
   assert.equal(calls.value, 0);

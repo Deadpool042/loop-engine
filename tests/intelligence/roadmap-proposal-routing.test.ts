@@ -19,8 +19,23 @@ function context(
     candidatesTruncated?: boolean;
     phaseGatesTruncated?: boolean;
     configuredPathsTruncated?: boolean;
+    candidateKinds?: readonly ("safe" | "warning" | "blocked")[];
   }> = {},
 ) {
+  const activeCount = stats.total - stats.done;
+  const candidateKinds =
+    overrides.candidateKinds ??
+    Array.from({ length: activeCount }, () => "safe" as const);
+  const items = candidateKinds.map((kind, index) => ({
+    kind,
+    status:
+      index < stats.todo
+        ? ("todo" as const)
+        : index < stats.todo + stats.inProgress
+          ? ("in_progress" as const)
+          : ("unknown" as const),
+  }));
+
   return {
     context: "available" as const,
     objective: { sourceTruncated: false },
@@ -28,8 +43,8 @@ function context(
       configuredPathsTruncated: overrides.configuredPathsTruncated ?? false,
       stats,
       candidates: {
-        items: [],
-        total: 0,
+        items,
+        total: activeCount,
         truncated: overrides.candidatesTruncated ?? false,
       },
       phaseGates: {
@@ -73,16 +88,19 @@ test("routes bounded open work to balanced", () => {
   assert.equal(routing.effort, "low");
 });
 
-test("routes multiple blocked candidates to deep", () => {
+test("routes multiple active blocked candidates to deep", () => {
   const routing = selectRoadmapProposalProfile(
-    context({
-      total: 5,
-      todo: 3,
-      inProgress: 0,
-      done: 2,
-      unknown: 0,
-      blocked: 3,
-    }),
+    context(
+      {
+        total: 5,
+        todo: 3,
+        inProgress: 0,
+        done: 2,
+        unknown: 0,
+        blocked: 3,
+      },
+      { candidateKinds: ["blocked", "blocked", "blocked"] },
+    ),
   );
   assert.equal(routing.profile, "deep");
   assert.equal(routing.model, "claude-sonnet-5");
@@ -103,15 +121,30 @@ test("routes a large open backlog to deep", () => {
   assert.equal(routing.profile, "deep");
 });
 
-test("routes a truncated context to deep regardless of stats", () => {
+test("routes genuinely truncated active candidate context to deep", () => {
   const routing = selectRoadmapProposalProfile(
     context(
-      { total: 5, todo: 0, inProgress: 0, done: 5, unknown: 0, blocked: 0 },
+      { total: 51, todo: 51, inProgress: 0, done: 0, unknown: 0, blocked: 0 },
       { candidatesTruncated: true },
     ),
   );
   assert.equal(routing.profile, "deep");
   assert.equal(routing.reason, "context_truncated");
+});
+
+test("historical blocked classifications do not escalate a completed roadmap", () => {
+  const routing = selectRoadmapProposalProfile(
+    context({
+      total: 3,
+      todo: 0,
+      inProgress: 0,
+      done: 3,
+      unknown: 0,
+      blocked: 3,
+    }),
+  );
+  assert.equal(routing.profile, "economy");
+  assert.equal(routing.reason, "roadmap_complete_no_signal");
 });
 
 test("routes an unavailable context to economy without inspecting anything else", () => {

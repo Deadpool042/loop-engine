@@ -60,6 +60,7 @@ import {
 import {
   boundProposalContextString,
   buildRoadmapProposalContext,
+  buildRoadmapRenewalContext,
   MAX_PROPOSAL_CONTEXT_CONFIGURED_PATHS,
   MAX_PROPOSAL_CONTEXT_VALIDATION_COMMANDS,
   projectRoadmapProposalCandidate,
@@ -218,7 +219,7 @@ export function generateRoadmapProposalContextReport(
     });
   }
 
-  const proposalContext = buildRoadmapProposalContext(snapshot);
+  const proposalContext = buildRoadmapRenewalContext(snapshot);
   const configuredPaths = projectRoadmapProposalStringCollection(
     snapshot.roadmap.paths,
     MAX_PROPOSAL_CONTEXT_CONFIGURED_PATHS,

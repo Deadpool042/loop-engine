@@ -18,6 +18,7 @@ import {
   type TextOnlyProvider,
 } from "../../src/text-only-provider/index.js";
 import { estimateTokenCount } from "../../src/intelligence/roadmap-proposal-context-compaction.js";
+import { MAX_PROPOSAL_CONTEXT_CANDIDATES } from "../../src/intelligence/proposal-context.js";
 
 function setupProject(files: Readonly<Record<string, string>>): {
   path: string;
@@ -247,6 +248,83 @@ test("28/29. estimatedInputTokens includes the real, sanitized Structured Output
     // The schema (via the exact provider transform, not a re-implementation)
     // must materially raise the estimate beyond prompt + context alone.
     assert.ok(estimate.estimate.estimatedInputTokens >= promptPlusSchema);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("long completed history stays economy and remains provider-callable", async () => {
+  const fixture = setupProject({
+    "objective.md": "Objective.",
+    "roadmap.md": Array.from(
+      { length: MAX_PROPOSAL_CONTEXT_CANDIDATES + 25 },
+      (_, index) => `- [x] Historical lot ${index + 1}`,
+    ).join("\n"),
+  });
+  try {
+    let providerCalls = 0;
+    const provider: TextOnlyProvider = {
+      async invoke(input) {
+        providerCalls += 1;
+        return fakeProvider("claude-haiku-4-5", {
+          input_tokens: 100,
+          output_tokens: 10,
+        }).invoke(input);
+      },
+    };
+
+    const report = await generateRoadmapProposalReport(project(fixture.path), {
+      provider,
+      providerAvailable: true,
+      timeoutMs: 60_000,
+    });
+
+    assert.equal(report.profile, "economy");
+    assert.equal(report.result.status, "completed");
+    assert.equal(providerCalls, 1);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("genuine active-candidate overflow remains deep and fail-closed before provider", async () => {
+  const fixture = setupProject({
+    "objective.md": "Objective.",
+    "roadmap.md": Array.from(
+      { length: MAX_PROPOSAL_CONTEXT_CANDIDATES + 1 },
+      (_, index) => `- [ ] Active lot ${index + 1}`,
+    ).join("\n"),
+  });
+  try {
+    const estimate = generateRoadmapProposalEstimateReport(project(fixture.path));
+    assert.equal(estimate.estimate.status, "available");
+    if (estimate.estimate.status === "available") {
+      assert.equal(estimate.estimate.profile, "deep");
+      assert.equal(estimate.estimate.reason, "context_truncated");
+    }
+
+    let providerCalls = 0;
+    const provider: TextOnlyProvider = {
+      async invoke(input) {
+        providerCalls += 1;
+        return fakeProvider("claude-sonnet-5", {
+          input_tokens: 100,
+          output_tokens: 10,
+        }).invoke(input);
+      },
+    };
+    const report = await generateRoadmapProposalReport(project(fixture.path), {
+      provider,
+      providerAvailable: true,
+      timeoutMs: 60_000,
+    });
+
+    assert.equal(report.profile, "deep");
+    assert.equal(report.result.status, "unavailable");
+    if (report.result.status === "unavailable") {
+      assert.equal(report.result.reason, "proposal_context_truncated");
+    }
+    assert.equal(providerCalls, 0);
   } finally {
     fixture.cleanup();
   }

@@ -66,9 +66,9 @@ Contexte vérifié le 2026-09-04 : le workflow GitHub dupliquait la validation c
 
 ## Cycle livré V43 — suppression du bootstrap pnpm redondant
 
-Contexte vérifié le 2026-09-04 : après consolidation V42, les runs #1294/#1296 ont passé plusieurs minutes dans `pnpm/action-setup@v6` sur `Running self-installer...`, alors que `Setup Node` et `pnpm install --frozen-lockfile` ont pris seulement quelques secondes. `package.json` fixe déjà exactement `pnpm@10.33.1` via `packageManager`, et Node 22 fournit Corepack pour activer cette version sans action pnpm séparée. V43 supprime donc l'action `pnpm/action-setup` au lieu de simplement la rétrograder.
+Contexte vérifié le 2026-09-04 : après consolidation V42, les runs #1294/#1296 ont passé plusieurs minutes dans `pnpm/action-setup@v6` sur `Running self-installer...`, alors que `Setup Node` et `pnpm install --frozen-lockfile` ont pris seulement quelques secondes. `package.json` fixe déjà exactement `pnpm@10.33.1` via `packageManager`, et Node 22 fournit Corepack pour activer cette version sans action pnpm séparée. Le burn-in V43 a ensuite exposé une seconde dette indépendante dans Project Intelligence : au 51e candidat historique, la fenêtre de proposition bornée à 50 marquait une roadmap entièrement terminée comme tronquée et la routait artificiellement vers `deep`; de plus, la barrière provider ne détectait pas les flags de collection `truncated: true`. V43 ferme ces deux régressions sans augmenter les bornes : l'overview conserve l'inventaire historique, tandis que le contexte de renouvellement ne borne que le travail non terminé et reste fail-closed sur un véritable overflow actif.
 
-- [x] [P1] V43.0 — Supprimer `pnpm/action-setup` du job `CI gate`, conserver un unique `actions/setup-node@v6` en Node 22, activer Corepack puis vérifier la version pnpm avant l'installation. Retirer temporairement le cache pnpm de `setup-node`, qui suppose que `pnpm` soit déjà disponible au moment du setup. Burn-in PR #232 / run #1297 : `Setup Node` 4 s, `Enable pinned pnpm` 2 s et `Install dependencies` 3 s ; le `CI gate` complet est tombé à environ 2 min au lieu d'environ 9 min sur V42. Le premier run V43 a échoué uniquement sur une assertion de roadmap devenue obsolète, corrigée dans le même lot.
+- [x] [P1] V43.0 — Remplacer le bootstrap pnpm séparé par Corepack dans le job `CI gate`, conserver un unique `actions/setup-node@v6` en Node 22, puis vérifier la version pnpm avant l'installation. Retirer temporairement le cache pnpm de `setup-node`, qui suppose que `pnpm` soit déjà disponible au moment du setup. Burn-in PR #232 / run #1297 : `Setup Node` 4 s, `Enable pinned pnpm` 2 s et `Install dependencies` 3 s ; le `CI gate` complet est tombé à environ 2 min au lieu d'environ 9 min sur V42. Les runs de qualification ont aussi révélé puis fermé les assertions historiques V40 et le seuil structurel des 50 candidats : l'historique `done` reste comptabilisé mais ne consomme plus la fenêtre du Proposal Context, un candidat actif après un long historique reste visible, >50 candidats actifs restent `truncated -> deep`, et tout `truncated: true` bloque désormais l'appel provider avant effet.
 
 ### Gates V43
 
@@ -77,7 +77,7 @@ Contexte vérifié le 2026-09-04 : après consolidation V42, les runs #1294/#129
 - aucun `pnpm/action-setup` ni second bootstrap de package manager ;
 - `AUDIT-012` vérifie explicitement Node unique + Corepack + absence du setup pnpm séparé ;
 - décision fondée sur les temps réels `Setup Node`, `Enable pinned pnpm`, `Install dependencies` et `CI gate` ;
-- aucun changement applicatif.
+- aucun changement du runtime d'exécution, des providers, des credentials ou des appels payants ; le seul durcissement fonctionnel hors CI concerne le contexte/routage déterministe de renouvellement de roadmap découvert pendant le burn-in.
 
 ## Lot actif — burn-in vertical
 

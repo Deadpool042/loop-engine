@@ -83,7 +83,7 @@ test("builds a V1 proposal context from canonical snapshot data", () => {
   }
 });
 
-test("keeps an explicitly requested completed roadmap eligible for context", () => {
+test("keeps a completed roadmap eligible without sending historical candidates", () => {
   const fixture = setupProject({
     "objective.md": "Canonical objective.",
     "roadmap.md": "- [x] Completed milestone",
@@ -92,10 +92,13 @@ test("keeps an explicitly requested completed roadmap eligible for context", () 
     const report = generateRoadmapProposalContextReport(project(fixture.path));
 
     assert.equal(report.context, "available");
+    assert.equal(report.roadmap.stats.total, 1);
+    assert.equal(report.roadmap.stats.done, 1);
     assert.equal(report.roadmap.stats.todo, 0);
     assert.equal(report.roadmap.summary.selectable, 0);
-    assert.equal(report.roadmap.candidates.total, 1);
-    assert.equal(report.roadmap.candidates.items[0]?.status, "done");
+    assert.equal(report.roadmap.candidates.total, 0);
+    assert.equal(report.roadmap.candidates.items.length, 0);
+    assert.equal(report.roadmap.candidates.truncated, false);
   } finally {
     fixture.cleanup();
   }
@@ -129,6 +132,57 @@ test("includes closed phase-gates and canonical blockedBy reasons", () => {
       report.roadmap.candidates.items[0]?.admissibility?.reason,
       "phase_closed",
     );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("completed history cannot hide a later active candidate or consume the proposal bound", () => {
+  const fixture = setupProject({
+    "objective.md": "Canonical objective.",
+    "roadmap.md": [
+      ...Array.from(
+        { length: MAX_PROPOSAL_CONTEXT_CANDIDATES + 1 },
+        (_, index) => `- [x] Historical lot ${index + 1}`,
+      ),
+      "- [ ] [P1] Active lot after long completed history",
+    ].join("\n"),
+  });
+  try {
+    const report = generateRoadmapProposalContextReport(project(fixture.path));
+
+    assert.equal(report.context, "available");
+    assert.equal(report.roadmap.stats.done, MAX_PROPOSAL_CONTEXT_CANDIDATES + 1);
+    assert.equal(report.roadmap.stats.todo, 1);
+    assert.equal(report.roadmap.candidates.total, 1);
+    assert.equal(report.roadmap.candidates.truncated, false);
+    assert.equal(report.roadmap.candidates.items.length, 1);
+    assert.equal(report.roadmap.candidates.items[0]?.status, "todo");
+    assert.match(
+      report.roadmap.candidates.items[0]?.text ?? "",
+      /Active lot after long completed history/,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("completed history alone never marks proposal candidates as truncated", () => {
+  const fixture = setupProject({
+    "objective.md": "Canonical objective.",
+    "roadmap.md": Array.from(
+      { length: MAX_PROPOSAL_CONTEXT_CANDIDATES + 20 },
+      (_, index) => `- [x] Historical lot ${index + 1}`,
+    ).join("\n"),
+  });
+  try {
+    const report = generateRoadmapProposalContextReport(project(fixture.path));
+
+    assert.equal(report.context, "available");
+    assert.equal(report.roadmap.stats.done, MAX_PROPOSAL_CONTEXT_CANDIDATES + 20);
+    assert.equal(report.roadmap.candidates.total, 0);
+    assert.equal(report.roadmap.candidates.items.length, 0);
+    assert.equal(report.roadmap.candidates.truncated, false);
   } finally {
     fixture.cleanup();
   }
