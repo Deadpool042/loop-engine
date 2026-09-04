@@ -19,7 +19,7 @@ La source de décision reste l'audit `docs/audits/architecture-delivery-readines
 - [x] Lot V22.0 — contenu multi-ligne des candidats roadmap conservé et classifié dans le prompt d'exécution
 - [x] Lot V22.1 — frontière candidate explicite, inventaire de prose conservé et sélection exécutable protégée
 
-## Cycle actif V40 — renouvellement de roadmap et alignement du runtime principal
+## Cycle livré V40 — renouvellement de roadmap et alignement du runtime principal
 
 Contexte vérifié le 2026-09-03 : toutes les capacités précédemment planifiées sont livrées, mais le premier renouvellement réel d'une roadmap a révélé deux gaps de gouvernance. D'une part, `roadmap decision --request-proposal` reste codé autour de `anthropic_api` alors que l'architecture canonique définit ChatGPT comme orchestrateur interactif principal et OpenClaw/Sol comme runtime autonome secondaire sans fallback API payant. D'autre part, un projet dont la roadmap est épuisée est aujourd'hui projeté comme `no_admissible_candidate`, sans distinguer « objectif atteint / attente volontaire » de « objectif encore disponible, roadmap à renouveler ».
 
@@ -35,6 +35,20 @@ Contexte vérifié le 2026-09-03 : toutes les capacités précédemment planifi�
 - aucune écriture de roadmap sans validation humaine explicite ;
 - les modes `maintenance`, `deferred` et les phase-gates existantes conservent leur sémantique ;
 - ne pas transformer un projet volontairement sans travail en backlog artificiel.
+
+## Cycle actif V41 — délégation runtime-native bornée
+
+Contexte vérifié le 2026-09-04 : `LoopExecutionPlan` porte déjà la mission, le contexte borné, `allowedPaths`, les permissions, l'effort, les budgets et la policy ; le runner impose déjà le scope après exécution puis les validations et l'evidence. Ajouter un graphe Fable, un scheduler de sous-agents ou un second contrat d'exécution dupliquerait donc des capacités existantes. Le gap réel est uniquement d'autoriser Codex et Claude Code à exploiter leurs skills/sous-agents natifs lorsque cela apporte un gain, sans leur transférer l'autorité de gouvernance.
+
+- [x] [P1] V41.0 — Runtime-managed delegation : les deux executors CLI existants reçoivent une consigne dérivée de `LoopExecutionPlan.effort`. Un plan `low` privilégie l'exécution directe ; les efforts supérieurs peuvent employer skills ou sous-agents uniquement pour des flux indépendants ou une revue indépendante utile. La consigne impose le même objectif, livrables, hors-périmètre, `allowedPaths`, permissions et interdiction de publication, et interdit d'introduire un autre provider, runtime, credential ou API payante. Aucun sandbox ou observateur spécifique des sous-agents n'est revendiqué : le contrôle mécanique reste le delta final unique, soumis aux scope guards, validations et evidence Loop Engine existants. Aucun nouveau type, graphe, scheduler, provider ou système de persistence.
+
+### Gates V41
+
+- aucun Fable, routeur externe ou crédit/API payante requis ;
+- aucune nouvelle abstraction de planification ou de persistence ;
+- la délégation interne reste une optimisation du runtime, jamais une autorité de validation ;
+- les petits lots `low` évitent le coût de coordination par défaut ;
+- le scope post-executor, les validations, audits et frontières Git existants restent inchangés.
 
 ## Lot actif — burn-in vertical
 

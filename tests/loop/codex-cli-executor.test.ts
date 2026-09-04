@@ -161,7 +161,17 @@ describe("createCodexCliLoopExecutor", () => {
         "--json",
       ]);
       assert.equal(args.includes("--full-auto"), false);
-      assert.match(args.at(-1) ?? "", /Stay inside the current worktree\./);
+      const prompt = args.at(-1) ?? "";
+      assert.match(prompt, /Stay inside the current worktree\./);
+      assert.match(prompt, /Prefer direct execution for this low-effort task\./);
+      assert.match(
+        prompt,
+        /Do not add or switch to another external provider, paid API, credential, or runtime\./,
+      );
+      assert.doesNotMatch(
+        prompt,
+        /You may use runtime-native skills or sub-agents/,
+      );
       assert.equal(
         readFileSync(captureCwd, "utf8"),
         realpathSync(resolve(cwd)),
@@ -169,6 +179,53 @@ describe("createCodexCliLoopExecutor", () => {
     } finally {
       delete process.env.FAKE_CODEX_CAPTURE_ARGS;
       delete process.env.FAKE_CODEX_CAPTURE_CWD;
+      cleanup();
+    }
+  });
+
+  it("allows bounded runtime-managed delegation above low effort", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    const captureArgs = join(cwd, "../codex-delegation-arguments.json");
+    try {
+      process.env.FAKE_CODEX_CAPTURE_ARGS = captureArgs;
+      const executor = createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      });
+
+      const result = await executor(
+        {
+          ...fakePlan(cwd),
+          effort: "medium",
+          allowedPaths: ["src/**"],
+          brief: {
+            objective: "Implement the bounded change.",
+            deliverables: ["Update the implementation."],
+            outOfScope: ["Unrelated refactors"],
+          },
+        },
+        cwd,
+      );
+
+      assert.equal(result.status, "completed");
+      const args = JSON.parse(readFileSync(captureArgs, "utf8")) as string[];
+      const prompt = args.at(-1) ?? "";
+      assert.match(
+        prompt,
+        /You may use runtime-native skills or sub-agents when independent work streams or an independent review would materially improve speed or safety\./,
+      );
+      assert.match(prompt, /Keep delegation minimal and shallow/);
+      assert.match(
+        prompt,
+        /Any runtime-native skill or sub-agent remains bound by the same objective, deliverables, out-of-scope rules, writable file scope, policy permissions, and no-publication boundary\./,
+      );
+      assert.match(prompt, /You remain responsible for one final worktree delta\./);
+      assert.match(
+        prompt,
+        /Delegated work is not authoritative validation; Loop Engine validates the final delta after you return\./,
+      );
+    } finally {
+      delete process.env.FAKE_CODEX_CAPTURE_ARGS;
       cleanup();
     }
   });

@@ -83,6 +83,21 @@ Depuis V26, les providers réellement configurés pour `execute` respectent cett
 
 L'`effort` d'un `AgentProfile` reste l'axe de classement du sélecteur ; l'effort réellement demandé à une invocation est `AgentPolicyResolution.requirements.minimumEffort` et est projeté tel quel dans `LoopExecutionPlan.effort`. Les deux valeurs peuvent légitimement différer et doivent rester distinguées dans les surfaces d'observabilité.
 
+### Délégation interne gérée par le runtime (V41)
+
+La sélection Loop Engine reste bornée à **un executor principal** par cycle. Codex et Claude Code peuvent cependant utiliser leurs propres skills ou sous-agents à l'intérieur de cette invocation lorsque le runtime sélectionné fournit déjà cette capacité. Loop Engine ne construit donc aucun second graphe de tâches, ne persiste aucun arbre de sous-agents et ne tente pas de reproduire leur scheduler interne.
+
+La consigne d'exécution dépend uniquement de l'effort déjà résolu :
+
+- `low` : privilégier l'exécution directe et éviter le coût de coordination d'un sous-agent, sauf nécessité d'utiliser une capacité runtime déjà disponible ;
+- `medium`, `high`, `xhigh` et `max` : la délégation interne est permise lorsqu'un flux réellement indépendant ou une revue indépendante améliore matériellement vitesse ou sûreté ; elle doit rester minimale et peu profonde.
+
+Cette liberté d'organisation **ne crée aucune autorité supplémentaire**. La consigne transmise au runtime exige que tout skill ou sous-agent respecte le même objectif, les mêmes livrables, le même hors-périmètre, `allowedPaths`, les permissions de policy et la frontière sans publication. Elle interdit également de basculer vers un autre provider/runtime ou d'introduire une API payante ou un credential supplémentaire au nom de cette délégation.
+
+V41 n'ajoute toutefois **aucun sandbox ni observateur spécifique aux sous-agents** et ne prétend donc pas mesurer leur arbre interne. Le contrôle mécanique reste celui déjà qualifié : le runtime principal doit rendre un unique delta final dans le worktree, puis le scope guard vérifie les fichiers modifiés avant validation, commit ou publication.
+
+La validation ne lui est jamais déléguée comme autorité : les contrôles post-executor de scope, les validations configurées, les audits et l'evidence Loop Engine restent les seules preuves gouvernées de réussite. La délégation interne est donc une optimisation d'exécution, pas une nouvelle couche de gouvernance.
+
 Aucun profil par défaut n'a de priorité fixe sur un autre : le registry ne trie pas, ne classe pas — c'est au sélecteur de décider, uniquement à partir de capacités/permissions/budget/effort.
 
 ## `AgentSelector`
