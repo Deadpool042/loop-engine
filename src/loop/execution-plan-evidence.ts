@@ -7,6 +7,10 @@ import type {
   AgentRuntime,
 } from "../agents/types.js";
 import type { AgentPolicyResolution } from "../policy/types.js";
+import {
+  resolveLoopRuntimeDelegationPolicy,
+  type LoopRuntimeDelegationPolicy,
+} from "./runtime-delegation.js";
 
 export type LoopExecutionPlanEvidence = Readonly<{
   schemaVersion: 1;
@@ -15,6 +19,7 @@ export type LoopExecutionPlanEvidence = Readonly<{
   profileId: string;
   model: string;
   effort: AgentEffort;
+  delegation: LoopRuntimeDelegationPolicy;
   budget: AgentBudget;
   allowedPaths?: readonly string[];
   policy: Readonly<{
@@ -44,6 +49,7 @@ export function projectLoopExecutionPlanEvidence(
   }
 
   const profile = resolution.selection.profile;
+  const effort = resolution.requirements.minimumEffort;
   return Object.freeze({
     schemaVersion: 1 as const,
     provider: profile.provider,
@@ -52,7 +58,8 @@ export function projectLoopExecutionPlanEvidence(
     model: profile.model,
     // Effort reflects the resolved execution plan (policy requirements),
     // not the provider profile's own declared effort. See LoopExecutionPlan.effort.
-    effort: resolution.requirements.minimumEffort,
+    effort,
+    delegation: resolveLoopRuntimeDelegationPolicy(effort),
     budget: Object.freeze({ ...profile.budget }),
     ...(allowedPaths === undefined || allowedPaths === null
       ? {}

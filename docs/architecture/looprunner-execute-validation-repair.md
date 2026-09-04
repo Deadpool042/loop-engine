@@ -68,6 +68,14 @@ runtime remains responsible for one final worktree delta, and the existing
 post-executor scope guard and configured validation remain the mechanical
 authority over that result.
 
+Since V44, this choice is no longer duplicated inside each executor prompt.
+`LoopExecutionPlan.delegation` carries the deterministic closed mode
+(`direct_preferred` or `runtime_managed_allowed`) derived from the admitted
+effort. Both CLI executors consume that same field, and the corresponding
+`LoopExecutionPlanEvidence.delegation` is covered by the existing evidence
+fingerprint. This improves contract observability without adding a sub-agent
+scheduler, an internal delegation counter or any new execution authority.
+
 ### LoopValidator
 
 Receives the project, candidate, current modified-file inventory, run id and
