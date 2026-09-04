@@ -3,6 +3,7 @@ import { basename, resolve } from "node:path";
 
 import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
+import { buildLoopRuntimeDelegationGuidance } from "./runtime-delegation.js";
 import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
 import { readModifiedWorktreeFiles } from "./worktree-status.js";
 
@@ -16,26 +17,6 @@ export type ClaudeCodeCliLoopExecutorOptions = Readonly<{
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
-}
-
-function runtimeDelegationGuidance(
-  plan: LoopExecutionPlan,
-): readonly string[] {
-  const common = [
-    "Any runtime-native skill or sub-agent remains bound by the same objective, deliverables, out-of-scope rules, writable file scope, policy permissions, and no-publication boundary.",
-    "Do not add or switch to another external provider, paid API, credential, or runtime.",
-    "You remain responsible for one final worktree delta. Delegated work is not authoritative validation; Loop Engine validates the final delta after you return.",
-  ];
-
-  return plan.effort === "low"
-    ? [
-        "Prefer direct execution for this low-effort task. Avoid sub-agents unless they are strictly necessary to use an already-available runtime capability.",
-        ...common,
-      ]
-    : [
-        "You may use runtime-native skills or sub-agents when independent work streams or an independent review would materially improve speed or safety. Keep delegation minimal and shallow; do not delegate simple sequential work.",
-        ...common,
-      ];
 }
 
 function buildPrompt(plan: LoopExecutionPlan): string {
@@ -71,7 +52,7 @@ function buildPrompt(plan: LoopExecutionPlan): string {
               ]),
           "Produce every required deliverable, but only within the writable file scope.",
         ]),
-    ...runtimeDelegationGuidance(plan),
+    ...buildLoopRuntimeDelegationGuidance(plan.delegation),
     "Stay inside the current worktree. Do not commit, push, tag, publish, alter credentials, or expose secrets.",
     "Implement only the target files explicitly named by the selected candidate.",
     "Finish by leaving only the intended source changes in the worktree.",

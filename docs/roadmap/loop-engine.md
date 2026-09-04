@@ -79,6 +79,20 @@ Contexte vérifié le 2026-09-04 : après consolidation V42, les runs #1294/#129
 - décision fondée sur les temps réels `Setup Node`, `Enable pinned pnpm`, `Install dependencies` et `CI gate` ;
 - aucun changement du runtime d'exécution, des providers, des credentials ou des appels payants ; le seul durcissement fonctionnel hors CI concerne le contexte/routage déterministe de renouvellement de roadmap découvert pendant le burn-in.
 
+## Cycle livré V44 — contrat explicite de délégation runtime
+
+Contexte vérifié le 2026-09-04 : V41 autorisait déjà Claude Code et Codex à utiliser leurs skills/sous-agents natifs, mais chaque executor redéduisait séparément la même règle depuis `LoopExecutionPlan.effort`. Cette duplication rendait la décision implicite dans les prompts et absente de l'evidence gouvernée. Le bon niveau d'abstraction reste le plan top-level existant : aucun graphe Fable, scheduler ou arbre de sous-agents n'est ajouté.
+
+- [x] [P1] V44.0 — Matérialiser une politique de délégation fermée dans `LoopExecutionPlan` : `direct_preferred` pour `low`, `runtime_managed_allowed` au-dessus. Les deux executors consomment la même donnée au lieu de recalculer la règle ; `LoopExecutionPlanEvidence` la projette et son fingerprint la couvre. Aucun compteur de sous-agents, profondeur maximale fictive, provider supplémentaire, credential, API payante, appel executor supplémentaire ou nouvelle persistence.
+
+### Gates V44
+
+- la décision est dérivée uniquement de l'effort déjà admis par la policy ;
+- Claude Code et Codex partagent le même contrat et la même guidance ;
+- toute dérive du champ `delegation` invalide le fingerprint d'evidence ;
+- la délégation interne reste advisory : seul le delta final, le scope guard et les validations sont mécaniquement autoritatifs ;
+- aucune modification des frontières commit/push/publish ni du nombre d'appels top-level `LoopExecutor`.
+
 ## Lot actif — burn-in vertical
 
 - [x] Burn-in 1 — Ajouter `tests/integration/claude-code-provider-burn-in.test.ts` en réutilisant `tests/fixtures/fake-claude/claude`. Le test doit exécuter le chemin `LoopApplicationAssembly -> LoopExecutor -> worktree observation` dans un dépôt Git temporaire, faire créer exactement un fichier par le faux provider, vérifier que `modifiedFiles` reflète exactement ce fichier, puis valider avec `pnpm exec tsx --test tests/integration/claude-code-provider-burn-in.test.ts`. Aucun provider réel, aucune nouvelle abstraction, aucun commit, push ou publish.

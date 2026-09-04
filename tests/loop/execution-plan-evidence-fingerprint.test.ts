@@ -17,6 +17,10 @@ function evidence(): LoopExecutionPlanEvidence {
     profileId: "codex-medium",
     model: "gpt-5.6-terra",
     effort: "medium",
+    delegation: {
+      mode: "runtime_managed_allowed",
+      reason: "higher_effort",
+    },
     budget: { maxInputTokens: 10_000, maxOutputTokens: 4_000 },
     policy: {
       id: "default-agent-policy",
@@ -66,6 +70,20 @@ test("detects evidence drift", () => {
   );
 });
 
+test("detects delegation-policy drift", () => {
+  const original = evidence();
+  const fingerprint = fingerprintLoopExecutionPlanEvidence(original);
+  const changed = {
+    ...original,
+    delegation: { mode: "direct_preferred", reason: "low_effort" },
+  } as LoopExecutionPlanEvidence;
+
+  assert.equal(
+    verifyLoopExecutionPlanEvidenceFingerprint(changed, fingerprint),
+    false,
+  );
+});
+
 test("detects writable file scope drift", () => {
   const original = { ...evidence(), allowedPaths: ["docs/platform/**"] };
   const fingerprint = fingerprintLoopExecutionPlanEvidence(original);
@@ -85,6 +103,7 @@ test("execution report emits evidence and matching fingerprint together", () => 
     mode: "execute",
     reasons: ["selected deterministic profile"],
     requirements: {
+      minimumEffort: "medium",
       requiredCapabilities: ["code"],
       requiredPermissions: ["workspace_write"],
       rationale: ["safe candidate"],

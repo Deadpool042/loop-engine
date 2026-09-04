@@ -93,10 +93,36 @@ describe("createLoopExecutionPlan", () => {
     assert.equal(plan.profileId, "configured.claude_code");
     assert.equal(plan.model, "claude-sonnet-4-5");
     assert.equal(plan.effort, "medium");
+    assert.deepEqual(plan.delegation, {
+      mode: "runtime_managed_allowed",
+      reason: "higher_effort",
+    });
+    assert.equal(Object.isFrozen(plan.delegation), true);
     assert.equal(plan.policy.status, "resolved");
     assert.equal(Object.isFrozen(plan), true);
     assert.equal(Object.isFrozen(plan.budget), true);
     assert.equal(Object.isFrozen(plan.policy), true);
+  });
+
+  it("derives direct-preferred delegation for low-effort plans", () => {
+    const input = admittedInput();
+    const lowEffort = {
+      ...input,
+      agentPolicy: {
+        ...input.agentPolicy,
+        requirements: {
+          ...input.agentPolicy.requirements,
+          minimumEffort: "low",
+        },
+      },
+    } as unknown as LoopExecutorInput;
+
+    const plan = createLoopExecutionPlan(lowEffort);
+
+    assert.deepEqual(plan.delegation, {
+      mode: "direct_preferred",
+      reason: "low_effort",
+    });
   });
 
   it("carries only the project's logical name, never its physical path or full configuration", () => {

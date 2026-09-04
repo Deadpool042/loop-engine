@@ -92,6 +92,10 @@ function burnInPlan(_cwd: string, runId: string): LoopExecutionPlan {
     profileId: "configured.claude_code",
     model: "claude-haiku-4-5",
     effort: "low",
+    delegation: {
+      mode: "direct_preferred",
+      reason: "low_effort",
+    },
     budget: {
       maxTokens: null,
       maxCostUsd: null,

@@ -98,6 +98,28 @@ V41 n'ajoute toutefois **aucun sandbox ni observateur spécifique aux sous-agent
 
 La validation ne lui est jamais déléguée comme autorité : les contrôles post-executor de scope, les validations configurées, les audits et l'evidence Loop Engine restent les seules preuves gouvernées de réussite. La délégation interne est donc une optimisation d'exécution, pas une nouvelle couche de gouvernance.
 
+### Contrat de délégation explicite (V44)
+
+V44 retire la dernière duplication de décision introduite par V41. La règle n'est
+plus redéduite séparément par les prompts Claude Code et Codex : elle est
+matérialisée une seule fois dans `LoopExecutionPlan.delegation` à partir de
+l'effort déjà admis par la policy.
+
+Le contrat fermé expose seulement deux modes :
+
+- `direct_preferred` pour un effort `low` ;
+- `runtime_managed_allowed` pour `medium`, `high`, `xhigh` et `max`.
+
+Cette donnée est également projetée dans `LoopExecutionPlanEvidence` et couverte
+par son fingerprint SHA-256. Une modification observable du mode ou de sa raison
+invalide donc l'intégrité de l'evidence comme n'importe quelle dérive de modèle,
+scope ou policy.
+
+Ce contrat ne prétend toujours pas observer ni limiter mécaniquement la profondeur
+ou le nombre de sous-agents internes. Les executors consomment le mode comme
+consigne commune ; le runtime principal reste responsable d'un seul delta final,
+et les scope guards puis validations Loop Engine restent l'autorité mécanique.
+
 Aucun profil par défaut n'a de priorité fixe sur un autre : le registry ne trie pas, ne classe pas — c'est au sélecteur de décider, uniquement à partir de capacités/permissions/budget/effort.
 
 ## `AgentSelector`

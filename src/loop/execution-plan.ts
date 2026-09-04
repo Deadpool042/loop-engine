@@ -8,6 +8,10 @@ import type {
   AgentRuntime,
 } from "../agents/types.js";
 import type { MinimalContextPackage } from "../context/types.js";
+import {
+  resolveLoopRuntimeDelegationPolicy,
+  type LoopRuntimeDelegationPolicy,
+} from "./runtime-delegation.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import type {
   AgentPolicyMode,
@@ -54,6 +58,7 @@ export type LoopExecutionPlan = Readonly<{
   profileId: string;
   model: string;
   effort: AgentEffort;
+  delegation: LoopRuntimeDelegationPolicy;
   budget: AgentBudget;
   policy: Readonly<{
     id: string;
@@ -98,6 +103,7 @@ export function createLoopExecutionPlan(
   }
 
   const profile = input.agentPolicy.selection.profile;
+  const effort = input.agentPolicy.requirements.minimumEffort;
   return Object.freeze({
     schemaVersion: 1 as const,
     runId: input.runId,
@@ -129,7 +135,8 @@ export function createLoopExecutionPlan(
     model: profile.model,
     // Effort belongs to this invocation. The selected provider profile only
     // supplies runtime capabilities and a deterministic ranking preference.
-    effort: input.agentPolicy.requirements.minimumEffort,
+    effort,
+    delegation: resolveLoopRuntimeDelegationPolicy(effort),
     budget: Object.freeze({ ...profile.budget }),
     policy: Object.freeze({
       id: input.agentPolicy.policyId,

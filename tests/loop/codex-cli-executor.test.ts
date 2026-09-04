@@ -91,6 +91,10 @@ function fakePlan(_cwd: string): LoopExecutionPlan {
     profileId: "profile-1",
     model: "gpt-5.6-terra",
     effort: "low",
+    delegation: {
+      mode: "direct_preferred",
+      reason: "low_effort",
+    },
     budget: {
       maxTokens: null,
       maxCostUsd: null,
@@ -197,6 +201,10 @@ describe("createCodexCliLoopExecutor", () => {
         {
           ...fakePlan(cwd),
           effort: "medium",
+          delegation: {
+            mode: "runtime_managed_allowed",
+            reason: "higher_effort",
+          },
           allowedPaths: ["src/**"],
           brief: {
             objective: "Implement the bounded change.",

@@ -11,6 +11,7 @@ test("projects bounded immutable evidence from an admitted execution policy", ()
     mode: "execute",
     reasons: ["selected deterministic profile"],
     requirements: {
+      minimumEffort: "medium",
       requiredCapabilities: ["code"],
       requiredPermissions: ["workspace_write"],
       rationale: ["safe candidate"],
@@ -33,6 +34,10 @@ test("projects bounded immutable evidence from an admitted execution policy", ()
   assert.equal(evidence?.provider, "openai");
   assert.equal(evidence?.runtime, "codex");
   assert.equal(evidence?.profileId, "codex-medium");
+  assert.deepEqual(evidence?.delegation, {
+    mode: "runtime_managed_allowed",
+    reason: "higher_effort",
+  });
   assert.equal(evidence?.policy.id, "default-agent-policy");
   assert.equal(Object.isFrozen(evidence), true);
   assert.equal("project" in (evidence as object), false);
@@ -67,6 +72,7 @@ test("evidence effort reflects the resolved policy requirement, not the profile'
 
   const evidence = projectLoopExecutionPlanEvidence(resolution);
   assert.equal(evidence?.effort, "medium");
+  assert.equal(evidence?.delegation.mode, "runtime_managed_allowed");
 });
 
 test("execution reports include null evidence when no execution was admitted", () => {

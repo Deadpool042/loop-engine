@@ -28,6 +28,7 @@ export function canonicalizeLoopExecutionPlanEvidence(
     profileId: evidence.profileId,
     model: evidence.model,
     effort: evidence.effort,
+    delegation: evidence.delegation,
     budget: evidence.budget,
     ...(evidence.allowedPaths === undefined
       ? {}

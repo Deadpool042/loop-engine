@@ -59,6 +59,10 @@ function fakePlan(_cwd: string): LoopExecutionPlan {
     profileId: "profile-1",
     model: "claude-haiku-4-5",
     effort: "low",
+    delegation: {
+      mode: "direct_preferred",
+      reason: "low_effort",
+    },
     budget: {
       maxTokens: null,
       maxCostUsd: null,
@@ -364,6 +368,10 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         Object.freeze({
           ...fakePlan(cwd),
           effort: "high",
+          delegation: {
+            mode: "runtime_managed_allowed",
+            reason: "higher_effort",
+          },
           allowedPaths: ["src/**"],
           brief: {
             objective: "Implement the bounded change.",
