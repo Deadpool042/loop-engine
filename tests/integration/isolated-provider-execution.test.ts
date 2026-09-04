@@ -168,6 +168,87 @@ function normalizeMacTemporaryPath(path: string): string {
 }
 
 describe("isolated provider execution", () => {
+  it("allows an uncommitted execution decision as the only dirty source artifact", async () => {
+    const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
+    const project = await createRepository(root, "source");
+    project.execution_decision = "decision.yaml";
+    await writeFile(join(project.path, "decision.yaml"), "state: READY\n");
+    const cwdCapture = join(root, "provider-cwd.txt");
+    const app = application([project], root);
+
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success_with_file";
+      process.env.FAKE_CLAUDE_CAPTURE_CWD = cwdCapture;
+      const result = await app.runLoopExecute(
+        project.name,
+        optionsFor([project]),
+      );
+
+      assert.equal(result.status, "completed");
+      assert.deepEqual(result.modifiedFiles, ["provider-created.txt"]);
+      assert.notEqual((await readFile(cwdCapture, "utf8")).trim(), project.path);
+      await assert.rejects(
+        readFile(join(project.path, "provider-created.txt"), "utf8"),
+      );
+      assert.equal(
+        execFileSync("git", ["status", "--porcelain=v1"], {
+          cwd: project.path,
+          encoding: "utf8",
+        }).trim(),
+        "?? decision.yaml",
+      );
+      await assertNoOrphans(root);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      delete process.env.FAKE_CLAUDE_CAPTURE_CWD;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects isolated execution when source WIP exists beyond the execution decision", async () => {
+    const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
+    const project = await createRepository(root, "source");
+    project.execution_decision = "decision.yaml";
+    await writeFile(join(project.path, "decision.yaml"), "state: READY\n");
+    await writeFile(join(project.path, "README.md"), "source\nunfinished\n");
+    await writeFile(join(project.path, "local-wip.txt"), "unfinished\n");
+    const cwdCapture = join(root, "provider-cwd.txt");
+    const app = application([project], root);
+
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success_with_file";
+      process.env.FAKE_CLAUDE_CAPTURE_CWD = cwdCapture;
+      const result = await app.runLoopExecute(
+        project.name,
+        optionsFor([project]),
+      );
+
+      assert.equal(result.status, "failed");
+      assert.equal(result.failure?.code, "source_worktree_dirty");
+      assert.equal(result.validation, null);
+      assert.deepEqual(result.modifiedFiles, []);
+      await assert.rejects(readFile(cwdCapture, "utf8"));
+      assert.equal(
+        execFileSync("git", ["status", "--porcelain=v1"], {
+          cwd: project.path,
+          encoding: "utf8",
+        })
+          .trim()
+          .split("\n")
+          .sort()
+          .join("\n"),
+        ["M README.md", "?? decision.yaml", "?? local-wip.txt"]
+          .sort()
+          .join("\n"),
+      );
+      await assertNoOrphans(root);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      delete process.env.FAKE_CLAUDE_CAPTURE_CWD;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("runs the provider and validation in one isolated worktree, then leaves the source unchanged", async () => {
     const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
     const project = await createRepository(root, "source");

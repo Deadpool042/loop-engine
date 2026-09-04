@@ -1,6 +1,12 @@
 export type WorkspaceAllocationRequest = Readonly<{
   projectId: string;
   attemptId: string;
+  /**
+   * Repository-relative paths that may be locally dirty without invalidating
+   * an isolated HEAD-based workspace. Intended for narrow control artifacts
+   * such as the project-owned execution decision.
+   */
+  allowedSourceDirtyPaths?: readonly string[];
 }>;
 
 export type WorkspaceHandle = Readonly<{

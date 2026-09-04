@@ -11,6 +11,22 @@ import {
 
 const execFileAsync = promisify(execFile);
 
+export class SourceWorktreePreflightError extends Error {
+  readonly code: "source_worktree_dirty" | "source_worktree_inspection_failed";
+
+  constructor(
+    code: "source_worktree_dirty" | "source_worktree_inspection_failed",
+  ) {
+    super(
+      code === "source_worktree_dirty"
+        ? "Source worktree contains changes outside the allowed control artifacts."
+        : "Source worktree could not be inspected before isolated execution.",
+    );
+    this.name = "SourceWorktreePreflightError";
+    this.code = code;
+  }
+}
+
 function encodeSegment(value: string): string {
   return Buffer.from(value, "utf8").toString("base64url");
 }
@@ -25,6 +41,56 @@ async function runGit(
   });
 }
 
+async function readGitPaths(
+  repositoryPath: string,
+  args: readonly string[],
+): Promise<readonly string[]> {
+  try {
+    const { stdout } = await execFileAsync("git", args, {
+      cwd: repositoryPath,
+      encoding: "utf8",
+    });
+    return Object.freeze(
+      stdout
+        .split("\0")
+        .filter((path) => path.length > 0),
+    );
+  } catch {
+    throw new SourceWorktreePreflightError(
+      "source_worktree_inspection_failed",
+    );
+  }
+}
+
+async function assertSourceWorktreeReady(
+  repositoryPath: string,
+  allowedSourceDirtyPaths: readonly string[],
+): Promise<void> {
+  const [tracked, untracked] = await Promise.all([
+    readGitPaths(repositoryPath, [
+      "diff",
+      "--name-only",
+      "-z",
+      "HEAD",
+      "--",
+    ]),
+    readGitPaths(repositoryPath, [
+      "ls-files",
+      "--others",
+      "--exclude-standard",
+      "-z",
+      "--",
+    ]),
+  ]);
+  const allowed = new Set(allowedSourceDirtyPaths);
+  const unexpected = [...new Set([...tracked, ...untracked])].filter(
+    (path) => !allowed.has(path),
+  );
+  if (unexpected.length > 0) {
+    throw new SourceWorktreePreflightError("source_worktree_dirty");
+  }
+}
+
 export type GitWorktreeWorkspaceManagerOptions = Readonly<{
   workspaceRoot: string;
   resolveRepositoryPath(projectId: string): string;
@@ -37,12 +103,18 @@ export function createGitWorktreeWorkspaceManager(
   const repositoriesByWorkspaceId = new Map<string, string>();
 
   return createWorkspaceManager(
-    async ({ projectId, attemptId }) => {
+    async (request) => {
+      const { projectId, attemptId } = request;
       await mkdir(options.workspaceRoot, { recursive: true });
       const workspaceId = `${encodeSegment(projectId)}.${encodeSegment(attemptId)}`;
       const path = join(options.workspaceRoot, workspaceId);
       const repositoryPath = options.resolveRepositoryPath(projectId);
       const baseRef = options.baseRef ?? "HEAD";
+
+      await assertSourceWorktreeReady(
+        repositoryPath,
+        request.allowedSourceDirtyPaths ?? [],
+      );
 
       try {
         await runGit(repositoryPath, [

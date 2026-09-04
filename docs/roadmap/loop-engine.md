@@ -108,6 +108,21 @@ Contexte vérifié le 2026-09-04 : après V44, le plan sait explicitement si la 
 - les projets sans `execution_decision` ne changent pas de sémantique ;
 - ce gate prouve un effet borné, pas la satisfaction sémantique des livrables : celle-ci reste soumise aux validations et à la review de l'orchestrateur/humain.
 
+## Cycle livré V46 — preflight du worktree source avant isolation
+
+Contexte vérifié le 2026-09-04 sur Creatyss : le dépôt réel était sur `feat/vnext2-f4-trust-consent-hardening` avec un worktree fortement modifié, alors que l'exécution provider isolée construit son workspace depuis `HEAD`. Sans gate dédié, `git worktree add --detach ... HEAD` pouvait donc démarrer un lot sur un snapshot qui excluait silencieusement le WIP local. La seule saleté source légitime déjà prévue par l'architecture est l'artefact `execution_decision`, qui peut rester non commité pour éviter une circularité avec son propre `source.gitHead`.
+
+- [x] [P1] V46.0 — Vérifier le dépôt source sous le lock projet et juste avant l'allocation du worktree isolé. Les chemins modifiés suivis ou non suivis doivent être vides, à l'exception exacte du `execution_decision` configuré pour ce projet. Toute autre modification bloque avant provider avec `source_worktree_dirty`; une inspection Git impossible bloque avec `source_worktree_inspection_failed`. Le mode `publish` hérite automatiquement de ce preflight via son `runExecute` isolé. Aucun changement du sélecteur roadmap, de la priorité safe/warning, de la décision YAML, du provider, du commit ou de la publication Git.
+
+### Gates V46
+
+- le contrôle s'exécute après acquisition du lock projet et avant `git worktree add` ;
+- un `execution_decision` non commité reste explicitement autorisé ;
+- toute autre modification tracked ou untracked du dépôt source bloque l'isolation ;
+- aucun provider ni validation ne démarre après un refus du preflight ;
+- aucun fichier du WIP source n'est copié ou synthétisé dans le worktree isolé ;
+- le sélecteur de roadmap reste inchangé : V46 corrige la cohérence du snapshot exécuté, pas la politique de priorité.
+
 ## Lot actif — burn-in vertical
 
 - [x] Burn-in 1 — Ajouter `tests/integration/claude-code-provider-burn-in.test.ts` en réutilisant `tests/fixtures/fake-claude/claude`. Le test doit exécuter le chemin `LoopApplicationAssembly -> LoopExecutor -> worktree observation` dans un dépôt Git temporaire, faire créer exactement un fichier par le faux provider, vérifier que `modifiedFiles` reflète exactement ce fichier, puis valider avec `pnpm exec tsx --test tests/integration/claude-code-provider-burn-in.test.ts`. Aucun provider réel, aucune nouvelle abstraction, aucun commit, push ou publish.
