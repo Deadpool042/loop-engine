@@ -76,6 +76,25 @@ effort. Both CLI executors consume that same field, and the corresponding
 fingerprint. This improves contract observability without adding a sub-agent
 scheduler, an internal delegation counter or any new execution authority.
 
+### Governed completion gate (V45)
+
+A project-owned execution decision in state `READY` is an explicit
+authorization to produce a bounded worktree delta. V45 therefore rejects a
+governed execute cycle with `no_effective_change` when the observed worktree
+delta is empty after a successful executor return. This gate runs before
+configured validation, so an unrelated green validation command cannot turn a
+no-op into a completed governed lot.
+
+The same invariant is rechecked after every successful repair. A repair that
+removes the entire delta cannot be revalidated as a successful completion.
+
+This rule applies only to cycles authorized by `execution_decision`. Legacy
+non-governed projects keep their historical empty-delta behavior; migrating
+that behavior globally would be a separate compatibility decision. The gate
+does not claim semantic proof that every deliverable is satisfied: scope,
+content policy and project validations remain the existing mechanical
+authorities, while semantic review stays at the orchestrator/human layer.
+
 ### LoopValidator
 
 Receives the project, candidate, current modified-file inventory, run id and
