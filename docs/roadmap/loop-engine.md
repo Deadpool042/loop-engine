@@ -64,6 +64,21 @@ Contexte vérifié le 2026-09-04 : le workflow GitHub dupliquait la validation c
 - aucun cache de `node_modules`, artifact de dépendances ou nouveau service de CI ;
 - rollback immédiat si la protection de branche exige un ancien statut supprimé.
 
+## Cycle actif V43 — suppression du bootstrap pnpm redondant
+
+Contexte vérifié le 2026-09-04 : après consolidation V42, les runs #1294/#1296 ont passé plusieurs minutes dans `pnpm/action-setup@v6` sur `Running self-installer...`, alors que `Setup Node` et `pnpm install --frozen-lockfile` ont pris seulement quelques secondes. `package.json` fixe déjà exactement `pnpm@10.33.1` via `packageManager`, et Node 22 fournit Corepack pour activer cette version sans action pnpm séparée. V43 supprime donc l'action `pnpm/action-setup` au lieu de simplement la rétrograder.
+
+- [ ] [P1] V43.0 — Supprimer `pnpm/action-setup` du job `CI gate`, conserver un unique `actions/setup-node@v6` en Node 22, activer Corepack puis vérifier la version pnpm avant l'installation. Retirer temporairement le cache pnpm de `setup-node`, qui suppose que `pnpm` soit déjà disponible au moment du setup. La PR constitue le burn-in réel : conserver le changement uniquement si `CI gate` reste vert et si le temps total baisse nettement ; un cache séparé ne sera réintroduit que si les mesures montrent qu'il est utile.
+
+### Gates V43
+
+- aucun changement de pnpm 10.33.1 ni de `packageManager` ;
+- aucun changement des commandes de validation ;
+- aucun `pnpm/action-setup` ni second bootstrap de package manager ;
+- `AUDIT-012` vérifie explicitement Node unique + Corepack + absence du setup pnpm séparé ;
+- décision fondée sur les temps réels `Setup Node`, `Enable pinned pnpm`, `Install dependencies` et `CI gate` ;
+- aucun changement applicatif.
+
 ## Lot actif — burn-in vertical
 
 - [x] Burn-in 1 — Ajouter `tests/integration/claude-code-provider-burn-in.test.ts` en réutilisant `tests/fixtures/fake-claude/claude`. Le test doit exécuter le chemin `LoopApplicationAssembly -> LoopExecutor -> worktree observation` dans un dépôt Git temporaire, faire créer exactement un fichier par le faux provider, vérifier que `modifiedFiles` reflète exactement ce fichier, puis valider avec `pnpm exec tsx --test tests/integration/claude-code-provider-burn-in.test.ts`. Aucun provider réel, aucune nouvelle abstraction, aucun commit, push ou publish.

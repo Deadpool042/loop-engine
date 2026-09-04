@@ -47,20 +47,26 @@ for (const invariant of GITHUB_ACTIONS_CI_CONTRACT.exactCounts) {
   });
 }
 
-const legacyJobs = ["typecheck", "tests", "audit-strict", "audit-profiles"] as const;
+const forbiddenFixtures = [
+  "uses: pnpm/action-setup@v6",
+  "cache: pnpm",
+  "  typecheck:\n    runs-on: ubuntu-latest",
+  "  tests:\n    runs-on: ubuntu-latest",
+  "  audit-strict:\n    runs-on: ubuntu-latest",
+  "  audit-profiles:\n    runs-on: ubuntu-latest",
+] as const;
 
 for (const [index, pattern] of GITHUB_ACTIONS_CI_CONTRACT.forbiddenPatterns.entries()) {
-  test(`consolidated GitHub Actions CI contract rejects legacy job ${legacyJobs[index]}`, () => {
+  test(`consolidated GitHub Actions CI contract rejects forbidden pattern ${pattern.source}`, () => {
     const source = readFileSync(".github/workflows/ci.yml", "utf8");
-    const job = legacyJobs[index];
+    const fixture = forbiddenFixtures[index];
 
-    assert.ok(job);
+    assert.ok(fixture);
 
-    const mutated = `${source}\n  ${job}:\n    runs-on: ubuntu-latest\n`;
-    const report = inspectGithubActionsCiContract(mutated);
+    const report = inspectGithubActionsCiContract(`${source}\n${fixture}\n`);
 
     assert.ok(
-      report.violations.includes(`forbidden legacy job: ${pattern.source}`),
+      report.violations.includes(`forbidden CI pattern: ${pattern.source}`),
     );
   });
 }

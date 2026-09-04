@@ -12,8 +12,9 @@ type CountInvariant = Readonly<{
 export const GITHUB_ACTIONS_CI_CONTRACT = Object.freeze({
   requiredPatterns: Object.freeze([
     /uses:\s*actions\/checkout@v\d+/,
-    /uses:\s*pnpm\/action-setup@v\d+/,
     /uses:\s*actions\/setup-node@v\d+/,
+    /corepack enable/,
+    /pnpm --version/,
     /\bquality:/,
     /\bci-gate:/,
     /needs:[\s\S]*- quality/,
@@ -23,13 +24,13 @@ export const GITHUB_ACTIONS_CI_CONTRACT = Object.freeze({
   ]),
   exactCounts: Object.freeze([
     Object.freeze({
-      label: "pnpm setup",
-      pattern: /uses:\s*pnpm\/action-setup@v\d+/g,
+      label: "Node setup",
+      pattern: /uses:\s*actions\/setup-node@v\d+/g,
       expected: 1,
     }),
     Object.freeze({
-      label: "Node setup",
-      pattern: /uses:\s*actions\/setup-node@v\d+/g,
+      label: "Corepack enable",
+      pattern: /corepack enable/g,
       expected: 1,
     }),
     Object.freeze({
@@ -44,6 +45,8 @@ export const GITHUB_ACTIONS_CI_CONTRACT = Object.freeze({
     }),
   ] satisfies readonly CountInvariant[]),
   forbiddenPatterns: Object.freeze([
+    /uses:\s*pnpm\/action-setup@v\d+/,
+    /cache:\s*pnpm/,
     /(?:^|\n)\s{2}typecheck:/,
     /(?:^|\n)\s{2}tests:/,
     /(?:^|\n)\s{2}audit-strict:/,
@@ -71,7 +74,7 @@ export function inspectGithubActionsCiContract(
 
   const forbiddenViolations = GITHUB_ACTIONS_CI_CONTRACT.forbiddenPatterns
     .filter((pattern) => pattern.test(source))
-    .map((pattern) => `forbidden legacy job: ${pattern.source}`);
+    .map((pattern) => `forbidden CI pattern: ${pattern.source}`);
 
   return Object.freeze({
     missing: Object.freeze(missing),

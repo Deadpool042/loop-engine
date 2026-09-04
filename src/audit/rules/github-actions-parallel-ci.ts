@@ -12,7 +12,7 @@ export const AUDIT_GITHUB_ACTIONS_CI_RULE: AuditRule = {
   severity: "warning",
   title: "GitHub Actions enforces the consolidated CI contract",
   description:
-    "The repository should expose one fail-closed reference validation gate with a single Node/pnpm bootstrap.",
+    "The repository should expose one fail-closed reference validation gate with a single Node bootstrap and Corepack-managed pnpm.",
   check: () => {
     if (!existsSync(WORKFLOW_PATH)) {
       return fail(
@@ -32,7 +32,7 @@ export const AUDIT_GITHUB_ACTIONS_CI_RULE: AuditRule = {
         AUDIT_GITHUB_ACTIONS_CI_RULE,
         "GitHub Actions consolidated CI contract is incomplete.",
         [...report.missing, ...report.violations],
-        "Restore Quality plus one CI gate that performs one setup/install and runs pnpm run ci.",
+        "Restore Quality plus one CI gate with one Node setup, Corepack-managed pnpm, one dependency install, and pnpm run ci.",
       );
     }
 

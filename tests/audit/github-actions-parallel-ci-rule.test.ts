@@ -17,10 +17,13 @@ test("AUDIT-012 uses the consolidated CI contract in the runtime registry", () =
   assert.equal(registered.check().status, "pass");
 });
 
-test("consolidated CI runs the canonical reference validation once", () => {
+test("consolidated CI uses one Node bootstrap and Corepack-managed pnpm", () => {
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
 
-  assert.equal(workflow.includes("AUDIT-012 compatibility marker"), false);
+  assert.equal(workflow.includes("pnpm/action-setup"), false);
+  assert.equal(workflow.includes("cache: pnpm"), false);
+  assert.equal(workflow.includes("corepack enable"), true);
+  assert.equal(workflow.includes("pnpm --version"), true);
   assert.equal(workflow.includes("pnpm run ci"), true);
   assert.equal(workflow.includes("\n  typecheck:"), false);
   assert.equal(workflow.includes("\n  tests:"), false);
