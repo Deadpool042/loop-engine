@@ -123,6 +123,20 @@ Contexte vérifié le 2026-09-04 sur Creatyss : le dépôt réel était sur `fea
 - aucun fichier du WIP source n'est copié ou synthétisé dans le worktree isolé ;
 - le sélecteur de roadmap reste inchangé : V46 corrige la cohérence du snapshot exécuté, pas la politique de priorité.
 
+## Cycle livré V47 — signal de WIP source dans le planning
+
+Contexte vérifié le 2026-09-04 sur Creatyss après V46 : le dépôt restait sur `feat/vnext2-f4-trust-consent-hardening` avec un worktree fortement modifié, alors que le sélecteur roadmap exposait encore VNEXT2-F5 comme candidat théorique suivant. Le sélecteur `safe > warning > blocked` est volontaire et ne doit pas être contourné ; le défaut réel était l'absence d'un signal distinguant « candidat roadmap visible » de « prochaine action opérationnelle à démarrer maintenant ».
+
+- [x] [P1] V47.0 — Ajouter `planning.recommendation = worktree_dirty_review_required` pour un projet Git en mode roadmap avec worktree source dirty. Le candidat déterministe reste visible dans `roadmap.selectedCandidate`, mais le planning indique d'abord de reprendre/reviewer le WIP local. Aucun statut roadmap n'est inféré depuis le nom de branche ou les fichiers modifiés, aucune priorité `safe/warning/blocked` n'est changée, et aucun nouveau lot n'est automatiquement marqué `in_progress`.
+
+### Gates V47
+
+- un worktree dirty avec roadmap configurée ne peut plus être projeté comme un simple `roadmap_configured` ;
+- le candidat théorique reste visible pour conserver la transparence de la roadmap ;
+- aucun rapprochement heuristique entre branche Git et identifiant de lot ;
+- maintenance, deferred, external et absence de roadmap conservent leur sémantique existante ;
+- aucun effet de bord filesystem, provider ou exécution.
+
 ## Lot actif — burn-in vertical
 
 - [x] Burn-in 1 — Ajouter `tests/integration/claude-code-provider-burn-in.test.ts` en réutilisant `tests/fixtures/fake-claude/claude`. Le test doit exécuter le chemin `LoopApplicationAssembly -> LoopExecutor -> worktree observation` dans un dépôt Git temporaire, faire créer exactement un fichier par le faux provider, vérifier que `modifiedFiles` reflète exactement ce fichier, puis valider avec `pnpm exec tsx --test tests/integration/claude-code-provider-burn-in.test.ts`. Aucun provider réel, aucune nouvelle abstraction, aucun commit, push ou publish.

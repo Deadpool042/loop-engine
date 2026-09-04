@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -71,6 +72,48 @@ test("reports a configured roadmap", () => {
     assert.deepEqual(status.configuredPaths, ["roadmap.md"]);
     assert.deepEqual(status.discoveredPaths, []);
     assert.equal(status.recommendation, "roadmap_configured");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("requires dirty worktree review before presenting roadmap work as actionable", () => {
+  const fixture = setupProject({
+    "roadmap.md": "- [ ] [P2] Next planned lot",
+    "tracked.txt": "baseline\n",
+  });
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: fixture.path });
+    execFileSync("git", ["config", "user.email", "test@example.com"], {
+      cwd: fixture.path,
+    });
+    execFileSync("git", ["config", "user.name", "Test"], {
+      cwd: fixture.path,
+    });
+    execFileSync("git", ["add", "."], { cwd: fixture.path });
+    execFileSync("git", ["commit", "-q", "-m", "test: baseline"], {
+      cwd: fixture.path,
+    });
+    writeFileSync(join(fixture.path, "tracked.txt"), "local wip\n");
+
+    const snapshot = buildProjectSnapshot(
+      project(fixture.path, {
+        requires_git: true,
+        roadmap: ["roadmap.md"],
+      }),
+    );
+
+    assert.equal(snapshot.git.clean, false);
+    assert.match(snapshot.git.statusText, /tracked\.txt/);
+    assert.match(
+      snapshot.roadmap.selectedCandidate?.text ?? "",
+      /Next planned lot/,
+    );
+    assert.equal(
+      snapshot.planning.recommendation,
+      "worktree_dirty_review_required",
+    );
+    assert.equal(snapshot.planning.voluntaryNoWork, false);
   } finally {
     fixture.cleanup();
   }

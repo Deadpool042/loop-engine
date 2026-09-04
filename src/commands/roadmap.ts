@@ -30,6 +30,8 @@ function recommendationLabel(
       return "consulter la source de pilotage externe";
     case "roadmap_exhausted_objective_available":
       return "roadmap épuisée — renouvellement possible depuis l'objectif canonique";
+    case "worktree_dirty_review_required":
+      return "worktree modifié — reprendre ou reviewer le WIP avant un nouveau lot";
     case "objective_required":
       return "objectif canonique requis avant renouvellement";
     case "gated_no_work":

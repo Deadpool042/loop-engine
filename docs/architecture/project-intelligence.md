@@ -79,6 +79,8 @@ La commande `loop roadmap status <project>` inspecte uniquement le root du proje
 
 Une recommandation de planning est structurelle et déterministe. Elle prime donc sur l'absence ou la présence d'un candidat : maintenance, deferred, external et roadmap découverte mais non raccordée ne déclenchent aucun travail.
 
+Depuis V47, un projet Git en mode roadmap dont le worktree source est modifié expose `planning.recommendation = "worktree_dirty_review_required"`. Le candidat roadmap déterministe reste visible dans `roadmap.selectedCandidate` pour conserver l'information de planification, mais il ne doit pas être interprété comme une invitation à démarrer un nouveau lot. La prochaine action opérationnelle est d'abord de reprendre, reviewer, sauvegarder ou clarifier le WIP local existant. Cette règle n'infère jamais quel lot a produit le WIP et ne modifie ni son statut roadmap ni la priorité `safe/warning/blocked`.
+
 ## Roadmap candidates
 
 Le moteur peut détecter des candidats simples dans les fichiers déclarés dans `roadmap`.

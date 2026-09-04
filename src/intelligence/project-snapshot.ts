@@ -90,6 +90,7 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
     selectedCandidate: selectedRoadmapCandidate,
     candidates: roadmapCandidates,
     objectiveAvailable: objective.available,
+    worktreeClean: clean,
   });
 
   const health: ProjectSnapshot["health"] =
