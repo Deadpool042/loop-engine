@@ -6,20 +6,20 @@ import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 const WORKFLOW_PATH = ".github/workflows/ci.yml";
 
-export const AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE: AuditRule = {
+export const AUDIT_GITHUB_ACTIONS_CI_RULE: AuditRule = {
   id: "AUDIT-012",
   category: "architecture",
   severity: "warning",
-  title: "GitHub Actions enforces the parallel CI contract",
+  title: "GitHub Actions enforces the consolidated CI contract",
   description:
-    "The repository should expose a fail-closed parallel GitHub Actions workflow with one aggregate CI gate.",
+    "The repository should expose one fail-closed reference validation gate with a single Node/pnpm bootstrap.",
   check: () => {
     if (!existsSync(WORKFLOW_PATH)) {
       return fail(
-        AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE,
+        AUDIT_GITHUB_ACTIONS_CI_RULE,
         "GitHub Actions CI workflow is missing.",
         [WORKFLOW_PATH],
-        "Restore .github/workflows/ci.yml with the required parallel jobs and fail-closed CI gate.",
+        "Restore .github/workflows/ci.yml with Quality and one fail-closed CI gate.",
       );
     }
 
@@ -27,18 +27,18 @@ export const AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE: AuditRule = {
       readFileSync(WORKFLOW_PATH, "utf8"),
     );
 
-    if (report.missing.length > 0) {
+    if (report.missing.length > 0 || report.violations.length > 0) {
       return fail(
-        AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE,
-        "GitHub Actions parallel CI contract is incomplete.",
-        report.missing,
-        "Restore every required parallel job, CI gate dependency, result binding, and fail-closed gate invariant.",
+        AUDIT_GITHUB_ACTIONS_CI_RULE,
+        "GitHub Actions consolidated CI contract is incomplete.",
+        [...report.missing, ...report.violations],
+        "Restore Quality plus one CI gate that performs one setup/install and runs pnpm run ci.",
       );
     }
 
     return pass(
-      AUDIT_GITHUB_ACTIONS_PARALLEL_CI_RULE,
-      "GitHub Actions enforces the parallel CI contract.",
+      AUDIT_GITHUB_ACTIONS_CI_RULE,
+      "GitHub Actions enforces the consolidated CI contract.",
       [WORKFLOW_PATH],
     );
   },

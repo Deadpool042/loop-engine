@@ -36,7 +36,7 @@ Contexte vérifié le 2026-09-03 : toutes les capacités précédemment planifi�
 - les modes `maintenance`, `deferred` et les phase-gates existantes conservent leur sémantique ;
 - ne pas transformer un projet volontairement sans travail en backlog artificiel.
 
-## Cycle actif V41 — délégation runtime-native bornée
+## Cycle livré V41 — délégation runtime-native bornée
 
 Contexte vérifié le 2026-09-04 : `LoopExecutionPlan` porte déjà la mission, le contexte borné, `allowedPaths`, les permissions, l'effort, les budgets et la policy ; le runner impose déjà le scope après exécution puis les validations et l'evidence. Ajouter un graphe Fable, un scheduler de sous-agents ou un second contrat d'exécution dupliquerait donc des capacités existantes. Le gap réel est uniquement d'autoriser Codex et Claude Code à exploiter leurs skills/sous-agents natifs lorsque cela apporte un gain, sans leur transférer l'autorité de gouvernance.
 
@@ -49,6 +49,20 @@ Contexte vérifié le 2026-09-04 : `LoopExecutionPlan` porte déjà la mission, 
 - la délégation interne reste une optimisation du runtime, jamais une autorité de validation ;
 - les petits lots `low` évitent le coût de coordination par défaut ;
 - le scope post-executor, les validations, audits et frontières Git existants restent inchangés.
+
+## Cycle livré V42 — CI de référence consolidée
+
+Contexte vérifié le 2026-09-04 : le workflow GitHub dupliquait la validation canonique en quatre jobs Node distincts, chacun répétant checkout, setup pnpm, setup Node et `pnpm install --frozen-lockfile`. Or `package.json` et `AGENTS.md` définissent déjà `pnpm run ci` comme source de vérité de la validation complète (`validate + audit:strict + audit:profiles`). Le coût principal observé sur les PR V40/V41 provenait du bootstrap répété avant les validations. Le premier burn-in de la PR #231 a aussi révélé que `AUDIT-012` et ses tests codifiaient encore l'ancien parallélisme comme invariant et rejetaient explicitement `pnpm run ci`; ce contrat est remplacé dans le même lot par un invariant consolidé fail-closed (un seul setup/install, `Quality`, un seul `CI gate`, validation canonique et diagnostics d'échec).
+
+- [x] [P1] V42.0 — Consolider la CI sur la validation canonique : conserver `Quality` pour `git diff --check`, puis exécuter `pnpm run ci` dans un unique job `CI gate` avec un seul setup/install. Conserver un log diagnostic borné en artifact uniquement en cas d'échec. Aucun changement des commandes de validation, des règles d'audit, des tests, des contrats JSON ou du runtime applicatif. La PR sert de burn-in réel : merge uniquement si GitHub considère le nouveau `CI gate` vert et la branche mergeable.
+
+### Gates V42
+
+- une seule installation de dépendances Node par workflow de PR ;
+- `pnpm run ci` reste l'unique définition de la validation de référence ;
+- aucun check fonctionnel n'est supprimé : typecheck, tests, JSON contracts, strict audit et audit profiles restent exécutés ;
+- aucun cache de `node_modules`, artifact de dépendances ou nouveau service de CI ;
+- rollback immédiat si la protection de branche exige un ancien statut supprimé.
 
 ## Lot actif — burn-in vertical
 
