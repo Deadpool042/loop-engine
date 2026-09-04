@@ -89,6 +89,9 @@ const WORK_AVAILABILITY_REASON_LABELS: Readonly<
   maintenance_no_work: "Aucun travail prévu en maintenance",
   deferred_no_work: "Travail roadmap différé",
   external_planning_source: "Planning géré par une source externe",
+  roadmap_exhausted_objective_available: "Roadmap épuisée · renouvellement disponible",
+  objective_required: "Roadmap épuisée · objectif canonique requis",
+  gated_no_work: "Travail roadmap bloqué par une gate",
   no_admissible_candidate: "Aucun candidat roadmap admissible",
 };
 

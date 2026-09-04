@@ -28,6 +28,12 @@ function recommendationLabel(
       return "aucune action proposée";
     case "external_planning_source":
       return "consulter la source de pilotage externe";
+    case "roadmap_exhausted_objective_available":
+      return "roadmap épuisée — renouvellement possible depuis l'objectif canonique";
+    case "objective_required":
+      return "objectif canonique requis avant renouvellement";
+    case "gated_no_work":
+      return "aucun travail admissible — phase-gate fermé";
     case "no_admissible_candidate":
       return "aucun candidat admissible";
   }

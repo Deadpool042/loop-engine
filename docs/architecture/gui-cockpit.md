@@ -43,6 +43,24 @@ d'invocation issu de `requirements.minimumEffort`, qui est celui affiché et
 utilisé par l'exécution, et l'effort du profil, conservé séparément comme donnée
 de classement du sélecteur. Le renderer ne recalcule aucune de ces valeurs.
 
+### Renouvellement de roadmap V40
+
+Le cockpit consomme directement `planning.recommendation` calculé par le Core ;
+il ne déduit jamais un état de renouvellement depuis `todo`, une phrase de
+roadmap ou un résultat provider. Les états spécifiques sont affichés comme tels :
+
+- `roadmap_exhausted_objective_available` : roadmap épuisée et renouvellement disponible ;
+- `objective_required` : roadmap épuisée mais objectif canonique manquant ;
+- `gated_no_work` : travail restant mais bloqué par une phase-gate ;
+- les modes `maintenance`, `deferred` et `external` conservent leurs projections dédiées.
+
+L'action de proposition n'est affichée que pour
+`roadmap_exhausted_objective_available`. L'affichage et l'estimation locale ne
+déclenchent pas de provider ; une génération éventuelle reste une action
+explicite et produit seulement un artefact reviewable. Le cockpit ne matérialise
+jamais cette proposition dans la roadmap et n'ajoute aucun second système de
+planning.
+
 ### Frontière de confiance
 
 Le preload expose seulement les API explicites suivantes :

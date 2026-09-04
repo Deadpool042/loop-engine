@@ -11,7 +11,7 @@ import {
 } from "../core/git.js";
 import { analyzeRoadmaps, selectRoadmapCandidate } from "./roadmap.js";
 import { buildObjectiveStatus } from "./objective.js";
-import { buildPlanningStatus } from "./planning.js";
+import { buildPlanningStatus, resolvePlanningMode } from "./planning.js";
 import { type ProjectSnapshot } from "./snapshot.js";
 
 export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
@@ -78,16 +78,18 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
     hasBlocked: roadmapStats.blocked > 0,
   };
 
+  const objective = buildObjectiveStatus({
+    project,
+    projectPath,
+    mode: resolvePlanningMode(project),
+  });
+
   const planning = buildPlanningStatus({
     project,
     projectPath,
     selectedCandidate: selectedRoadmapCandidate,
-  });
-
-  const objective = buildObjectiveStatus({
-    project,
-    projectPath,
-    mode: planning.mode,
+    candidates: roadmapCandidates,
+    objectiveAvailable: objective.available,
   });
 
   const health: ProjectSnapshot["health"] =

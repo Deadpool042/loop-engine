@@ -227,6 +227,20 @@ Cette synthèse est calculée dans `intelligence/`, pas dans les commandes.
 
 Elle sert aux sorties JSON compactes, aux futurs dashboards et aux intégrations read-only.
 
+## Renouvellement déterministe V40
+
+Quand aucun candidat admissible n'est sélectionné, le snapshot conserve des états distincts plutôt que de réduire toutes les situations à `no_admissible_candidate` :
+
+- `roadmap_exhausted_objective_available` : plus aucun travail ouvert et un objectif canonique est disponible ; une proposition de renouvellement peut être demandée explicitement ;
+- `objective_required` : roadmap épuisée mais aucun objectif canonique n'est disponible ; aucune proposition n'est admissible ;
+- `gated_no_work` : du travail ouvert existe encore mais toutes les phases concernées sont fermées par des phase-gates ; ce blocage n'est pas une absence volontaire de travail ;
+- `maintenance_no_work` et `deferred_no_work` : absence volontaire ou différée selon le mode de planning ;
+- `no_admissible_candidate` : fallback prudent lorsqu'aucun état plus précis n'est démontré.
+
+Ces états sont calculés une fois dans le snapshot puis projetés par `handoff`, `context`, `summary` et les commandes roadmap. Leur affichage ne déclenche aucun provider et ne crée aucun candidat.
+
+Une proposition de renouvellement est un artefact borné et reviewable : elle part uniquement de l'objectif canonique et de l'état projeté, distingue gaps observés et hypothèses, et contient au plus trois lots. Elle n'écrit jamais la roadmap. Toute matérialisation reste une mutation Development Workspace séparée, après validation humaine explicite.
+
 ## Priorité roadmap
 
 Chaque candidat roadmap expose une `priority`.
