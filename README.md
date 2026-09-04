@@ -1,42 +1,57 @@
 # Loop Engine
 
-Orchestrateur local léger pour piloter les projets de développement sans IA automatique par défaut.
+Moteur local de gouvernance et d’orchestration déterministe pour transformer l’état réel des projets en contexte court, prochaine action sûre, contrats d’exécution, validations et preuves auditables.
+
+Aucun appel IA n’est nécessaire pour lire les roadmaps, sélectionner un candidat, appliquer les gates, inspecter Git ou produire les projections de cockpit.
 
 ## Objectif final
 
-Voir `docs/architecture/final-objective.md`.
+La source de vérité de l'objectif final est `docs/architecture/final-objective.md`.
 
-Cette page constitue la source de vérité du produit et définit l'objectif final de Loop Engine.
+Tout assistant ou runtime qui fait évoluer Loop Engine doit s’y référer avant une évolution structurante.
 
-Claude doit s’y référer avant toute évolution structurante.
+Le contrat courant du cycle d’exécution est documenté dans `docs/architecture/looprunner-execute-validation-repair.md`. L’architecture historique du LoopRunner reste disponible dans `docs/architecture/autonomous-loop-runner.md`.
 
-Loop Engine vise désormais l'orchestration autonome par petits lots. Voir `docs/architecture/autonomous-loop-runner.md` pour l'architecture historique du LoopRunner et `docs/architecture/looprunner-execute-validation-repair.md` pour le contrat courant du mode `execute`.
+## Runtime principal et spécialistes
 
-## Objectifs V0
+Dans le workflow normal :
 
-- lister les projets locaux ;
-- détecter leur état Git ;
-- documenter les sources importantes ;
-- préparer des contextes courts pour Claude, Codex ou GPT ;
-- limiter la consommation de tokens ;
-- garder les décisions humaines.
+- **ChatGPT + Development Workspace** constitue le runtime IA interactif principal ;
+- **Loop Engine** fournit gouvernance, roadmap, contexte, politique, gates, historique et validations déterministes ;
+- **Claude Code** et **Codex** restent des exécutants spécialisés opt-in lorsqu’un lot justifie leur usage ;
+- aucun provider IA payant n’est un fallback implicite.
 
-Le mode d'inspection et le mode `plan` ne modifient pas les dépôts pilotés. Le mode `execute` ne peut modifier que le projet explicitement ciblé, au travers d'un `LoopExecutor` injecté et admis par la politique.
+Loop Engine ne déclenche donc pas un second modèle simplement parce que ChatGPT pilote déjà une tâche.
+
+## Positionnement actuel
+
+Loop Engine sait notamment :
+
+- inventorier les projets et leur état Git ;
+- lire les objectifs, roadmaps et phase gates ;
+- produire les handoffs et contextes bornés ;
+- sélectionner une prochaine action explicable ;
+- préparer une politique d’agent et un plan d’exécution ;
+- exécuter explicitement un provider admis dans un worktree Git isolé ;
+- valider et réparer de façon bornée ;
+- produire des candidates/reports/evidences sans modifier implicitement une branche utilisateur ;
+- exposer des contrats JSON stables à OpenClaw et aux autres consommateurs.
+
+La roadmap interne est actuellement épuisée : **55 lots terminés, aucun lot actif**. Un nouveau cycle ne doit être ouvert qu’à partir d’un besoin réel ou d’un objectif explicitement renouvelé.
 
 ## Principes
 
 - 0 IA automatique par défaut.
-- 0 token consommé par défaut.
+- 0 token consommé par défaut pour le déterministe.
 - Pas de commit automatique.
 - Pas de push automatique.
 - Le mode par défaut (`plan`) ne modifie rien.
-- `execute` doit être demandé explicitement et nécessite un provider CLI concret explicitement configuré ; il s'exécute dans un Git worktree isolé et temporaire, jamais dans le dépôt source.
-- `commit` exige un message explicite et reste contrôlé ; `publish` est une
-  action CLI explicite qui crée seulement une ref Git candidate interne après
-  validation isolée, sans modifier le worktree, l'index, HEAD ou une branche
-  utilisateur.
-- Les validations locales passent après l'exécution et avant toute future revue, réparation, commit ou publication.
+- `execute` doit être demandé explicitement et nécessite un provider concret explicitement configuré ; il s’exécute dans un Git worktree isolé et temporaire.
+- `commit` et `publish` restent des modes explicites et bornés.
+- `publish` crée uniquement une candidate Git interne après validation ; il ne pousse pas, ne merge pas et ne modifie pas une branche utilisateur.
+- Les validations locales passent après l’exécution et avant toute livraison.
 - Les projets pilotés restent indépendants.
+- Les décisions structurantes ou irréversibles restent soumises à une validation humaine explicite.
 
 ## Commandes
 
