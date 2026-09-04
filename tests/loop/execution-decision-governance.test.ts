@@ -403,8 +403,13 @@ describe("project-owned execution decision governance", () => {
         },
         executor: async () => {
           executorCalls += 1;
-          return { status: "completed", modifiedFiles: [], details: [] };
+          return {
+            status: "completed",
+            modifiedFiles: ["src/generated.ts"],
+            details: [],
+          };
         },
+        readModifiedWorktreeFiles: async () => ["src/generated.ts"],
         validator: async () => ({
           status: "passed",
           failedCommand: null,
@@ -499,6 +504,144 @@ describe("project-owned execution decision governance", () => {
     }
   });
 
+  it("fails governed READY execution before validation when the worktree delta is empty", async () => {
+    const { project } = setupGovernedProject({
+      roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+      decisionYaml: (sha) => readyDecision(sha, "H1-L4"),
+    });
+    const config: Config = { projects: [project] };
+
+    try {
+      let validatorCalls = 0;
+      const execution = await runLoopExecute(project.name, {
+        loadConfig: () => config,
+        readModifiedWorktreeFiles: async () => [],
+        executor: async () => ({
+          status: "completed",
+          modifiedFiles: [],
+          details: [],
+        }),
+        validator: async () => {
+          validatorCalls += 1;
+          return {
+            status: "passed",
+            failedCommand: null,
+            exitCode: 0,
+            details: [],
+          };
+        },
+      });
+
+      assert.equal(execution.status, "failed");
+      assert.equal(execution.failure?.code, "no_effective_change");
+      assert.deepEqual(execution.modifiedFiles, []);
+      assert.equal(validatorCalls, 0);
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("fails governed execution when a successful repair removes the entire delta", async () => {
+    const { project } = setupGovernedProject({
+      roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
+      decisionYaml: (sha) => readyDecision(sha, "H1-L4"),
+    });
+    const config: Config = { projects: [project] };
+    const observedDeltas: readonly string[][] = [
+      ["src/generated.ts"],
+      [],
+    ];
+    let worktreeReads = 0;
+    let validatorCalls = 0;
+    let repairerCalls = 0;
+
+    try {
+      const execution = await runLoopExecute(project.name, {
+        loadConfig: () => config,
+        maxRepairs: 1,
+        readModifiedWorktreeFiles: async () =>
+          observedDeltas[worktreeReads++] ?? [],
+        executor: async () => ({
+          status: "completed",
+          modifiedFiles: ["src/generated.ts"],
+          details: [],
+        }),
+        validator: async () => {
+          validatorCalls += 1;
+          return {
+            status: "failed",
+            failedCommand: "pnpm run validate",
+            exitCode: 1,
+            details: ["fixture validation failure"],
+          };
+        },
+        repairer: async () => {
+          repairerCalls += 1;
+          return {
+            status: "completed",
+            modifiedFiles: [],
+            details: [],
+          };
+        },
+      });
+
+      assert.equal(execution.status, "failed");
+      assert.equal(execution.failure?.code, "no_effective_change");
+      assert.deepEqual(execution.modifiedFiles, []);
+      assert.equal(validatorCalls, 1);
+      assert.equal(repairerCalls, 1);
+      assert.equal(worktreeReads, 2);
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves empty-delta execute behavior for non-governed legacy projects", async () => {
+    const projectPath = mkdtempSync(join(tmpdir(), "loop-legacy-empty-delta-"));
+    writeFileSync(
+      join(projectPath, "roadmap.md"),
+      "| H1-L4 | Legacy candidate | ⬜ À faire |",
+    );
+    const project: ProjectConfig = {
+      name: "fixture",
+      path: projectPath,
+      type: "test",
+      required_docs: [],
+      validation: [],
+      roadmap: ["roadmap.md"],
+      requires_git: false,
+    };
+    const config: Config = { projects: [project] };
+
+    try {
+      let validatorCalls = 0;
+      const execution = await runLoopExecute(project.name, {
+        loadConfig: () => config,
+        readModifiedWorktreeFiles: async () => [],
+        executor: async () => ({
+          status: "completed",
+          modifiedFiles: [],
+          details: [],
+        }),
+        validator: async () => {
+          validatorCalls += 1;
+          return {
+            status: "passed",
+            failedCommand: null,
+            exitCode: 0,
+            details: [],
+          };
+        },
+      });
+
+      assert.equal(execution.status, "completed");
+      assert.equal(execution.failure, null);
+      assert.equal(validatorCalls, 1);
+    } finally {
+      rmSync(projectPath, { recursive: true, force: true });
+    }
+  });
+
   it("authorizes plan and execute end-to-end when governed, READY, and fresh", async () => {
     const { project } = setupGovernedProject({
       roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",
@@ -514,10 +657,14 @@ describe("project-owned execution decision governance", () => {
       let executedCandidateId: string | undefined;
       const execution = await runLoopExecute(project.name, {
         loadConfig: () => config,
-        readModifiedWorktreeFiles: async () => [],
+        readModifiedWorktreeFiles: async () => ["src/generated.ts"],
         executor: async (executionPlan) => {
           executedCandidateId = executionPlan.candidate.id;
-          return { status: "completed", modifiedFiles: [], details: [] };
+          return {
+            status: "completed",
+            modifiedFiles: ["src/generated.ts"],
+            details: [],
+          };
         },
         validator: async () => ({
           status: "passed",

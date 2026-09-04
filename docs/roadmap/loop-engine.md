@@ -93,6 +93,21 @@ Contexte vérifié le 2026-09-04 : V41 autorisait déjà Claude Code et Codex à
 - la délégation interne reste advisory : seul le delta final, le scope guard et les validations sont mécaniquement autoritatifs ;
 - aucune modification des frontières commit/push/publish ni du nombre d'appels top-level `LoopExecutor`.
 
+## Cycle livré V45 — completion gate gouverné
+
+Contexte vérifié le 2026-09-04 : après V44, le plan sait explicitement si la délégation runtime-native est permise, mais le runner pouvait encore accepter un executor `completed` avec zéro modification puis laisser des validations globales vertes conclure le lot. Pour un projet ayant explicitement publié une décision `READY`, ce no-op constitue un faux succès observable.
+
+- [x] [P1] V45.0 — Exiger un delta worktree non vide pour tout cycle `execute` autorisé par `execution_decision`. Le gate `no_effective_change` s'exécute après l'observation réelle du worktree et avant validation ; il est rejoué après toute réparation réussie pour empêcher une réparation qui annule tout le delta d'être revalidée comme succès. Les projets legacy non gouvernés conservent leur comportement historique. Aucun nouveau modèle, critère génératif, provider, scheduler, commit ou publication.
+
+### Gates V45
+
+- un `READY` gouverné ne peut jamais devenir `completed` avec un delta vide ;
+- aucune validation n'est appelée après détection d'un no-op gouverné ;
+- une réparation qui ramène le delta à zéro échoue avant revalidation ;
+- le scope guard continue de s'appliquer sur l'inventaire Git réel ;
+- les projets sans `execution_decision` ne changent pas de sémantique ;
+- ce gate prouve un effet borné, pas la satisfaction sémantique des livrables : celle-ci reste soumise aux validations et à la review de l'orchestrateur/humain.
+
 ## Lot actif — burn-in vertical
 
 - [x] Burn-in 1 — Ajouter `tests/integration/claude-code-provider-burn-in.test.ts` en réutilisant `tests/fixtures/fake-claude/claude`. Le test doit exécuter le chemin `LoopApplicationAssembly -> LoopExecutor -> worktree observation` dans un dépôt Git temporaire, faire créer exactement un fichier par le faux provider, vérifier que `modifiedFiles` reflète exactement ce fichier, puis valider avec `pnpm exec tsx --test tests/integration/claude-code-provider-burn-in.test.ts`. Aucun provider réel, aucune nouvelle abstraction, aucun commit, push ou publish.

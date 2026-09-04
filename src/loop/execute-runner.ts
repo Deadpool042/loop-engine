@@ -270,6 +270,8 @@ export async function runLoopExecute(
     );
   }
 
+  const governedExecution = cycle.authorizedBy === "execution_decision";
+
   agentPolicy = dependencies.resolvePolicy({
     policy: dependencies.agentPolicy,
     registry: dependencies.agentRegistry,
@@ -376,6 +378,30 @@ export async function runLoopExecute(
     );
   }
 
+  function failForMissingGovernedDelta(): LoopRunResult | null {
+    if (
+      !governedExecution ||
+      modifiedFiles.size > 0
+    ) {
+      return null;
+    }
+
+    transition("failed", "failed", "failed", [
+      "Governed execution produced no worktree change.",
+    ]);
+    return finalize(
+      cycle.candidate,
+      Object.freeze({
+        code: "no_effective_change",
+        message:
+          "Governed execution produced no worktree change.",
+        details: Object.freeze([
+          "A READY execution decision requires a non-empty worktree delta before validation.",
+        ]),
+      }),
+    );
+  }
+
   async function failForContentPolicyViolation(): Promise<LoopRunResult | null> {
     const inspection = await inspectWorktreeContentPolicy(
       executionPlan,
@@ -435,6 +461,9 @@ export async function runLoopExecute(
     transition("failed", "failed", "failed", [executionResult.failure.message]);
     return finalize(cycle.candidate, executionResult.failure);
   }
+
+  const initialCompletionFailure = failForMissingGovernedDelta();
+  if (initialCompletionFailure !== null) return initialCompletionFailure;
 
   const initialContentPolicyFailure = await failForContentPolicyViolation();
   if (initialContentPolicyFailure !== null) return initialContentPolicyFailure;
@@ -578,6 +607,9 @@ export async function runLoopExecute(
       transition("failed", "failed", "failed", [repairResult.failure.message]);
       return finalize(cycle.candidate, repairResult.failure);
     }
+
+    const repairCompletionFailure = failForMissingGovernedDelta();
+    if (repairCompletionFailure !== null) return repairCompletionFailure;
 
     const repairContentPolicyFailure = await failForContentPolicyViolation();
     if (repairContentPolicyFailure !== null) return repairContentPolicyFailure;
