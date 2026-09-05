@@ -188,6 +188,27 @@ Troisième candidat, retenu et livré : borner le nettoyage à l'annulation d'un
 - [x] V28 — Cockpit Run History Drill-down : le cockpit consomme la lecture Run History existante via `loop:runs`, IPC explicite read-only borné à 20, et un contrat GUI fail-closed. Il affiche plusieurs runs récents, leur détail compact, `cancelled` et les lignes corrompues déjà comptées par le Core, sans lecture JSONL renderer, sans nouvelle persistence ni effet sur policy/sélection.
 - [x] V29 — Agent Decision Intelligence : la sélection existante transmet désormais les allow-lists provider/runtime effectivement fusionnées au sélecteur, conserve les profils rejetés et les alternatives admissibles non retenues sous forme compacte, puis stabilise cette décision face à un ordre de registry équivalent. Aucun nouveau selector, budget, provider ou appel IA ; voir `docs/architecture/agent-orchestration.md` et `docs/architecture/agent-policy-engine.md`.
 
+## Cycle V48 — routage multi-modèles orienté coût, capacité et quota
+
+Contexte vérifié le 2026-09-05 : Codex CLI et Claude Code sont déjà intégrés comme providers concrets, mais le Run History ne contient encore aucune exécution réelle gouvernée de ces runtimes sur les projets actifs. Le bon ordre est donc de qualifier d'abord le chemin d'exécution réel, puis d'introduire progressivement un portefeuille configurable de modèles économiques, standards, complexes et frontier. La conception détaillée, les gates et les améliorations futures sont dans [model-routing-v48.md](model-routing-v48.md).
+
+- [ ] [P1] V48.0 — Premier execute réel gouverné : qualifier un micro-lot sûr via le chemin existant Loop Engine -> provider CLI -> worktree isolé -> scope guard -> validation -> evidence, sans mutation du dépôt source.
+- [ ] [P1] V48.1 — Burn-in multi-provider minimal : démontrer Codex CLI et Claude Code sur des cas comparables et qualifier le failover existant sans second mécanisme inter-provider.
+- [ ] [P2] V48.2 — Portefeuille de modèles configurable : représenter plusieurs profils par provider/runtime avec capacités vérifiées et niveau économique révisable, sans hardcoder Luna/Terra/Sol/Astra ou Haiku/Sonnet/Opus/Fable comme invariants métier.
+- [ ] [P2] V48.3 — Sélection coût/capacité déterministe : filtrer d'abord par capacités, permissions, policy, disponibilité et budget, puis choisir le niveau économique minimal parmi les profils admissibles.
+- [ ] [P2] V48.4 — Evidence d'efficacité par modèle : réutiliser Run History/evidence pour comparer réussite, reprises, durée, validations et métriques de coût/quota uniquement lorsqu'elles sont fiables.
+- [ ] [P3] V48.5 — Escalade intra-provider bornée : monter de niveau uniquement sur une raison d'échec structurée et directement vers le prochain profil qui comble le gap, sans cascade exhaustive de tous les modèles.
+- [ ] [P3] V48.6 — Stratégie abonnement / crédits / API : privilégier à capacité comparable l'usage déjà inclus, représenter explicitement les quotas inconnus et ne jamais fabriquer une télémétrie de coût ou de quota.
+
+### Gates V48
+
+- aucun nouveau scheduler, sélecteur parallèle ou LLM chargé de choisir un autre LLM ;
+- aucune automatisation de routage avant qualification des executors réels ;
+- aucun élargissement de permissions pendant une escalade ;
+- aucun prix, quota ou capacité inventé ;
+- le failover, Run History, evidence, scope guards et validations existants restent les primitives canoniques ;
+- Astra et Fable restent des profils frontier optionnels tant que leur valeur n'est pas démontrée sur nos propres lots.
+
 ## Gel architectural
 
 - Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).
