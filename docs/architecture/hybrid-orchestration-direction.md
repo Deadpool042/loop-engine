@@ -115,6 +115,12 @@ La cible OpenClaw décrite ici concerne une façade distante/mobile externe qui 
 
 Elle ne doit pas être confondue avec un éventuel provider/protocole OpenClaw interne ou historique dans le code de Loop Engine.
 
+## n8n
+
+n8n reste une capacité d'automatisation et d'intégration périphérique, pas un second orchestrateur de développement. Il peut relayer des webhooks, synchroniser des services externes, exécuter des workflows marketing ou administratifs et porter d'autres automatisations non critiques lorsque cela réduit réellement la complexité.
+
+Il ne sélectionne pas les lots, ne porte pas la roadmap, ne remplace ni Loop Engine ni Development Workspace et ne doit pas devenir une dépendance indispensable du coeur métier de Creatyss. Son contrat de maintenance et les critères d'ouverture d'un lot sont définis dans [Frontière de maintenance n8n](n8n-maintenance-boundary.md).
+
 ## Hors périmètre de cette note
 
 Cette note n’autorise aucune modification runtime immédiate. Elle ne valide ni un deuxième VPS, ni un runner lourd sur VPS, ni le provisionnement permanent de tous les repos, ni la suppression d’un provider existant.

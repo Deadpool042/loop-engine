@@ -5,7 +5,10 @@ import { join } from "node:path";
 import test from "node:test";
 
 import type { ProjectConfig } from "../../src/core/config.js";
-import { generateRoadmapOverviewReport } from "../../src/core/reports.js";
+import {
+  generateRoadmapCandidateDetailReport,
+  generateRoadmapOverviewReport,
+} from "../../src/core/reports.js";
 
 function setupProject(roadmap: string): { path: string; cleanup: () => void } {
   const path = join(
@@ -51,6 +54,72 @@ test("exposes a roadmap deterministically without requiring an objective source"
     assert.equal(report.roadmap.stats.todo, 2);
     assert.equal(report.roadmap.selectedCandidate?.priority, "p1");
     assert.match(report.roadmap.selectedCandidate?.text ?? "", /Next lot/);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("exposes candidate detail keys and resolves a requested candidate without caller paths", () => {
+  const fixture = setupProject(
+    [
+      "⏳ [P1] VNEXT3-G1 — Social drafts admin",
+      "- [ ] [P1] VNEXT3-G2 — Wishlist V2",
+    ].join("\n"),
+  );
+
+  try {
+    writeFileSync(
+      join(fixture.path, "cycle.md"),
+      [
+        "# Cycle",
+        "",
+        "## VNEXT3-G1 — Social drafts admin",
+        "",
+        "### État observé",
+        "",
+        "Code livré.",
+        "",
+        "### Critère restant",
+        "",
+        "Recette UI staging.",
+        "",
+        "## VNEXT3-G2 — Wishlist V2",
+        "",
+        "### Objectif V1",
+        "",
+        "Persister les favoris authentifiés.",
+      ].join("\n"),
+    );
+
+    const overview = generateRoadmapOverviewReport(project(fixture.path));
+    const first = overview.roadmap.candidates.items[0];
+    const second = overview.roadmap.candidates.items[1];
+
+    assert.equal(first?.id, "VNEXT3-G1");
+    assert.equal(second?.id, "VNEXT3-G2");
+    assert.match(first?.detailKey ?? "", /^[a-f0-9]{32}$/);
+    assert.match(second?.detailKey ?? "", /^[a-f0-9]{32}$/);
+    assert.notEqual(first?.detailKey, second?.detailKey);
+
+    const detail = generateRoadmapCandidateDetailReport(
+      project(fixture.path),
+      first!.detailKey,
+    );
+
+    assert.equal(detail.status, "ok");
+    if (detail.status !== "ok") return;
+    assert.equal(detail.detail.path, "cycle.md");
+    assert.equal(detail.detail.title, "VNEXT3-G1 — Social drafts admin");
+    assert.deepEqual(
+      detail.detail.sections.map((section) => section.kind),
+      ["status", "acceptance"],
+    );
+
+    const missing = generateRoadmapCandidateDetailReport(
+      project(fixture.path),
+      "0".repeat(32),
+    );
+    assert.equal(missing.status, "not_found");
   } finally {
     fixture.cleanup();
   }

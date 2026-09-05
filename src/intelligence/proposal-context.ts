@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { type ProjectSnapshot } from "./snapshot.js";
 
 export const MAX_PROPOSAL_CONTEXT_CANDIDATES = 50;
@@ -21,6 +23,7 @@ type ProposalCandidate = Readonly<{
   path: string;
   pathTruncated: boolean;
   line: number;
+  detailKey: string;
   text: string;
   textTruncated: boolean;
   kind: "safe" | "warning" | "blocked";
@@ -71,6 +74,19 @@ function projectOptionalString(
   };
 }
 
+export function roadmapCandidateDetailKey(
+  candidate: ProjectSnapshot["roadmap"]["candidates"][number],
+): string {
+  return createHash("sha256")
+    .update(candidate.path)
+    .update("\0")
+    .update(String(candidate.line))
+    .update("\0")
+    .update(candidate.text)
+    .digest("hex")
+    .slice(0, 32);
+}
+
 export function projectRoadmapProposalCandidate(
   candidate: ProjectSnapshot["roadmap"]["candidates"][number],
 ): ProposalCandidate {
@@ -84,6 +100,7 @@ export function projectRoadmapProposalCandidate(
     path: path.value,
     pathTruncated: path.truncated,
     line: candidate.line,
+    detailKey: roadmapCandidateDetailKey(candidate),
     text: text.value,
     textTruncated: text.truncated,
     kind: candidate.kind,

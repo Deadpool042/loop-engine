@@ -39,6 +39,10 @@ import {
   printRoadmapOverviewJson,
 } from "./commands/roadmap-overview.js";
 import {
+  printRoadmapCandidateDetail,
+  printRoadmapCandidateDetailJson,
+} from "./commands/roadmap-detail.js";
+import {
   printProjectObjective,
   printProjectObjectiveJson,
 } from "./commands/objective.js";
@@ -253,6 +257,20 @@ else if (command === "workspace" && process.argv[3] === "status") {
   process.argv.includes("--json")
     ? printRoadmapOverviewJson(application, project)
     : printRoadmapOverview(application, project);
+} else if (command === "roadmap" && process.argv[3] === "detail") {
+  const json = process.argv.includes("--json");
+  const project = resolveProjectOrExit("roadmap detail", 4);
+  const candidateKey = optionValue("--candidate-key");
+  if (!candidateKey) {
+    failOption(
+      json,
+      "missing_candidate_value",
+      "--candidate-key is required for roadmap detail",
+    );
+  }
+  json
+    ? printRoadmapCandidateDetailJson(application, project, candidateKey)
+    : printRoadmapCandidateDetail(application, project, candidateKey);
 } else if (command === "roadmap" && process.argv[3] === "objective") {
   const project = resolveProjectOrExit("roadmap objective", 4);
   process.argv.includes("--json")
