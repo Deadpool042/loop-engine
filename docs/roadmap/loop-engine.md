@@ -214,7 +214,7 @@ Contexte initial du 2026-09-05 : Codex CLI et Claude Code étaient intégrés co
 
 Objectif : réutiliser les executors Codex CLI / Claude Code existants pour la délégation spécialiste sans créer de launcher concurrent dans Development Workspace, tout en empêchant une exécution autonome d'hériter de credentials API ou d'élargir silencieusement ses permissions.
 
-- [ ] [P1] V49.0 — Durcir l'exécution CLI abonnement : construire un environnement enfant allowlisté qui conserve uniquement les variables système/auth locale nécessaires et exclut les clés API/fournisseur non nécessaires ; maintenir Codex sous `workspace-write` sans voie d'approbation hors sandbox ; limiter Claude Code aux outils fichier nécessaires à la mission, sans Bash/MCP/Chrome implicite ; conserver worktree isolé, scope, validation, content policy, failover et funding policy existants. Aucun nouveau runner, scheduler, selector ou provider API.
+- [x] [P1] V49.0 — Exécution CLI abonnement durcie : environnement subprocess allowlisté sans clés API/tokens/SSH implicites ; Codex utilise `--ignore-user-config`, `workspace-write` et `approval_policy="never"` pour empêcher config/MCP/approbation hors sandbox ; Claude Code est limité à `Read,Edit,Write,Glob,Grep` avec config MCP vide stricte. Worktree isolé, scope, validation, content policy, failover et funding policy restent inchangés. Aucun nouveau runner, scheduler, selector ou provider API.
 
 ### Gates V49
 

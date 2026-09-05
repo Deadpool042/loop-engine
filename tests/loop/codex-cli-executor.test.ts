@@ -32,8 +32,10 @@ function setupCleanWorktree(): {
 import { writeFileSync } from "node:fs";
 const captureArgs = process.env.FAKE_CODEX_CAPTURE_ARGS;
 const captureCwd = process.env.FAKE_CODEX_CAPTURE_CWD;
+const captureEnv = process.env.FAKE_CODEX_CAPTURE_ENV;
 if (captureArgs) writeFileSync(captureArgs, JSON.stringify(process.argv.slice(2)));
 if (captureCwd) writeFileSync(captureCwd, process.cwd());
+if (captureEnv) writeFileSync(captureEnv, JSON.stringify(process.env));
 const mode = process.env.FAKE_CODEX_MODE ?? "success";
 if (mode === "hang") setInterval(() => {}, 1000);
 if (mode === "nonzero") process.exit(9);
@@ -158,8 +160,11 @@ describe("createCodexCliLoopExecutor", () => {
       const args = JSON.parse(readFileSync(captureArgs, "utf8")) as string[];
       assert.deepEqual(args.slice(0, -1), [
         "exec",
+        "--ignore-user-config",
         "--sandbox",
         "workspace-write",
+        "-c",
+        'approval_policy="never"',
         "--model",
         "gpt-5.6-terra",
         "--json",
@@ -183,6 +188,42 @@ describe("createCodexCliLoopExecutor", () => {
     } finally {
       delete process.env.FAKE_CODEX_CAPTURE_ARGS;
       delete process.env.FAKE_CODEX_CAPTURE_CWD;
+      cleanup();
+    }
+  });
+
+  it("does not inherit API keys or unrelated credentials into Codex", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    const captureEnv = join(cwd, "../codex-env.json");
+    try {
+      process.env.FAKE_CODEX_CAPTURE_ENV = captureEnv;
+      process.env.OPENAI_API_KEY = "should-not-reach-codex";
+      process.env.ANTHROPIC_API_KEY = "should-not-reach-codex";
+      process.env.GITHUB_TOKEN = "should-not-reach-codex";
+      process.env.SSH_AUTH_SOCK = "/tmp/should-not-reach-codex";
+
+      const result = await createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(fakePlan(cwd), cwd);
+
+      assert.equal(result.status, "completed");
+      const childEnv = JSON.parse(readFileSync(captureEnv, "utf8")) as Record<
+        string,
+        string
+      >;
+      assert.equal(childEnv.OPENAI_API_KEY, undefined);
+      assert.equal(childEnv.ANTHROPIC_API_KEY, undefined);
+      assert.equal(childEnv.GITHUB_TOKEN, undefined);
+      assert.equal(childEnv.SSH_AUTH_SOCK, undefined);
+      assert.equal(childEnv.HOME, process.env.HOME);
+      assert.equal(childEnv.PATH, process.env.PATH);
+    } finally {
+      delete process.env.FAKE_CODEX_CAPTURE_ENV;
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.GITHUB_TOKEN;
+      delete process.env.SSH_AUTH_SOCK;
       cleanup();
     }
   });

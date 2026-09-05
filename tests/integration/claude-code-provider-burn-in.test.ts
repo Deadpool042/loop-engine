@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -18,12 +24,24 @@ const FAKE_CLAUDE = resolve(
   "claude",
 );
 
-function setupCleanWorktree(): { cwd: string; cleanup: () => void } {
-  const cwd = mkdtempSync(join(tmpdir(), "loop-burn-in-"));
-  execFileSync("git", ["init", "-q"], { cwd });
+function setupCleanWorktree(): {
+  cwd: string;
+  executable: string;
+  cleanup: () => void;
+} {
+  const root = mkdtempSync(join(tmpdir(), "loop-burn-in-"));
+  const cwd = join(root, "worktree");
+  const executable = join(root, "claude");
+  copyFileSync(FAKE_CLAUDE, executable);
+  chmodSync(executable, 0o755);
+  execFileSync("git", ["init", "-q", cwd]);
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
   execFileSync("git", ["config", "user.name", "Test"], { cwd });
-  return { cwd, cleanup: () => rmSync(cwd, { recursive: true, force: true }) };
+  return {
+    cwd,
+    executable,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
 }
 
 function burnInPlan(_cwd: string): LoopExecutionPlan {
@@ -83,12 +101,12 @@ function burnInPlan(_cwd: string): LoopExecutionPlan {
 
 describe("claude code provider burn-in", () => {
   it("observes exactly the file created by the fake provider through LoopApplicationAssembly -> LoopExecutor -> worktree observation", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const application = createLoopApplicationAssembly({
         provider: {
           id: "claude_code",
-          executable: FAKE_CLAUDE,
+          executable,
           timeoutMs: 5_000,
         },
       });

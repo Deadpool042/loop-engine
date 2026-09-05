@@ -50,3 +50,26 @@ Les tests/commandes de validation restent exécutés par Loop Engine, pas par Cl
 - executors toujours fail-closed sur mismatch provider/modèle, timeout, sortie invalide et content policy ;
 - tests ciblés et CI verts ;
 - preuve permettant à DW-V3.2 de conclure par réutilisation plutôt que par duplication.
+
+## Preuve de livraison V49.0
+
+L'implémentation ajoute `src/loop/subscription-cli-environment.ts`, une allowlist déterministe pour les subprocesses CLI. Les clés API/provider, tokens GitHub, agent SSH, URL de base de données, proxies et autres variables non déclarées ne sont plus hérités par défaut. Les emplacements locaux nécessaires à l'authentification abonnement (`HOME`, `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, XDG) et les variables système minimales restent disponibles.
+
+Codex est lancé en mode non interactif avec :
+
+- `--ignore-user-config` pour empêcher l'héritage de MCP/config utilisateur dans ce run autonome ;
+- `--sandbox workspace-write` ;
+- `approval_policy="never"` injecté pour la session ;
+- le modèle explicitement issu du `LoopExecutionPlan`.
+
+Claude Code est lancé avec :
+
+- `--permission-mode acceptEdits` ;
+- `--tools Read,Edit,Write,Glob,Grep` ;
+- `--strict-mcp-config --mcp-config {}` ;
+- aucun outil Bash, MCP ou navigateur implicitement disponible ;
+- `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` ajouté explicitement à l'environnement assaini.
+
+Le contrôle mécanique existant reste inchangé : worktree Git propre et isolé, observation du delta réel, scope guard, content policy, validations Loop Engine, timeout/output limits et aucune capacité commit/push/publish/deploy dans les executors.
+
+Qualification locale avant clôture : 37/37 tests V49 ciblés, groupe Core/frontières 635/635, TypeScript, `json-check`, audit strict 635/635, audit profiles et `git diff --check` verts. Les tests couvrent explicitement l'absence de `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN` et `SSH_AUTH_SOCK` dans les deux subprocesses. La CI complète reste le gate final de livraison.
