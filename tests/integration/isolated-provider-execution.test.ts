@@ -16,6 +16,7 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { createLoopApplicationAssembly } from "../../src/composition/index.js";
+import { IsolatedWorkspaceDependencyPreparationError } from "../../src/composition/isolated-provider-execution.js";
 import type { Config, ProjectConfig } from "../../src/core/config.js";
 import type { RoadmapCandidate } from "../../src/intelligence/roadmap.js";
 import type { ProjectSnapshot } from "../../src/intelligence/snapshot.js";
@@ -123,12 +124,22 @@ function optionsFor(projects: readonly ProjectConfig[]): LoopRunExecuteOptions {
   };
 }
 
-function application(projects: readonly ProjectConfig[], root: string) {
+function application(
+  projects: readonly ProjectConfig[],
+  root: string,
+  prepareWorkspaceDependencies?: (
+    project: ProjectConfig,
+    workspacePath: string,
+  ) => Promise<void>,
+) {
   return createLoopApplicationAssembly({
     provider: { id: "claude_code", executable: FAKE_CLAUDE, timeoutMs: 5_000 },
     isolatedProviderExecution: {
       lockRoot: join(root, "locks"),
       workspaceRoot: join(root, "workspaces"),
+      ...(prepareWorkspaceDependencies
+        ? { prepareWorkspaceDependencies }
+        : {}),
       resolveRepositoryPath: (projectId) => {
         const project = projects.find(
           (candidateProject) => candidateProject.name === projectId,
@@ -281,6 +292,54 @@ describe("isolated provider execution", () => {
         providerCwd.startsWith(`${await realpath(join(root, "workspaces"))}/`),
       );
       assert.equal(validationCwd, providerCwd);
+      await assertCleanSource(project, "provider-created.txt");
+      await assertNoOrphans(root);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      delete process.env.FAKE_CLAUDE_CAPTURE_CWD;
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("fails before the provider when production dependency preparation fails", async () => {
+    const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
+    const project = await createRepository(root, "source");
+    project.workspace = {
+      mode: "permanent",
+      dependencies: "production",
+    };
+    const cwdCapture = join(root, "provider-cwd.txt");
+    let preparedWorkspacePath: string | undefined;
+    const app = application(
+      [project],
+      root,
+      async (_project, workspacePath) => {
+        preparedWorkspacePath = workspacePath;
+        throw new IsolatedWorkspaceDependencyPreparationError(
+          "expected preparation failure",
+        );
+      },
+    );
+
+    try {
+      process.env.FAKE_CLAUDE_MODE = "success_with_file";
+      process.env.FAKE_CLAUDE_CAPTURE_CWD = cwdCapture;
+      const result = await app.runLoopExecute(
+        project.name,
+        optionsFor([project]),
+      );
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.failure?.code,
+        "workspace_dependency_preparation_failed",
+      );
+      assert.equal(result.validation, null);
+      assert.deepEqual(result.modifiedFiles, []);
+      assert.ok(
+        preparedWorkspacePath?.startsWith(join(root, "workspaces") + "/"),
+      );
+      await assert.rejects(readFile(cwdCapture, "utf8"));
       await assertCleanSource(project, "provider-created.txt");
       await assertNoOrphans(root);
     } finally {

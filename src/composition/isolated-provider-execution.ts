@@ -1,6 +1,9 @@
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { access, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { promisify } from "node:util";
 
 import {
   createGitWorktreeWorkspaceManager,
@@ -13,7 +16,7 @@ import type { LoopExecutor } from "../loop/execution.js";
 import { runLoopExecuteWithProviderFailoverEvidence } from "../loop/provider-failover-runner.js";
 import type { LoopRunResult } from "../loop/types.js";
 import type { AgentRegistry } from "../agents/registry.js";
-import { loadConfig } from "../core/config.js";
+import { loadConfig, type ProjectConfig } from "../core/config.js";
 import { findProject } from "../core/project.js";
 import {
   exportValidatedGitPatch,
@@ -21,6 +24,87 @@ import {
 } from "./validated-git-patch-export.js";
 
 const DEFAULT_ROOT = join(tmpdir(), "loop-engine-isolated-provider-execution");
+const execFileAsync = promisify(execFile);
+
+export class IsolatedWorkspaceDependencyPreparationError extends Error {
+  readonly code = "workspace_dependency_preparation_failed" as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "IsolatedWorkspaceDependencyPreparationError";
+  }
+}
+
+export type IsolatedWorkspaceDependencyInstall = (
+  workspacePath: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+) => Promise<void>;
+
+async function runOfflinePnpmInstall(
+  workspacePath: string,
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
+  await execFileAsync("pnpm", [...args], {
+    cwd: workspacePath,
+    encoding: "utf8",
+    env,
+    maxBuffer: 1024 * 1024,
+    timeout: 120_000,
+  });
+}
+
+export async function prepareIsolatedWorkspaceDependencies(
+  project: ProjectConfig,
+  workspacePath: string,
+  install: IsolatedWorkspaceDependencyInstall = runOfflinePnpmInstall,
+): Promise<void> {
+  if (project.workspace?.dependencies !== "production") return;
+
+  let packageManager: unknown;
+  try {
+    const manifest = JSON.parse(
+      await readFile(join(workspacePath, "package.json"), "utf8"),
+    ) as Readonly<{ packageManager?: unknown }>;
+    packageManager = manifest.packageManager;
+    await access(join(workspacePath, "pnpm-lock.yaml"));
+  } catch {
+    throw new IsolatedWorkspaceDependencyPreparationError(
+      "Production dependency preparation requires package.json and pnpm-lock.yaml.",
+    );
+  }
+
+  if (
+    typeof packageManager !== "string" ||
+    !packageManager.startsWith("pnpm@")
+  ) {
+    throw new IsolatedWorkspaceDependencyPreparationError(
+      "Production dependency preparation currently requires a pinned pnpm packageManager.",
+    );
+  }
+
+  try {
+    await install(
+      workspacePath,
+      Object.freeze([
+        "install",
+        "--offline",
+        "--frozen-lockfile",
+        "--ignore-scripts",
+      ]),
+      {
+        ...process.env,
+        CI: "1",
+        COREPACK_ENABLE_NETWORK: "0",
+      },
+    );
+  } catch {
+    throw new IsolatedWorkspaceDependencyPreparationError(
+      "Unable to prepare production dependencies from the local pnpm store.",
+    );
+  }
+}
 
 export type IsolatedProviderExecutionOptions = Readonly<{
   executor: LoopExecutor;
@@ -30,6 +114,10 @@ export type IsolatedProviderExecutionOptions = Readonly<{
   workspaceRoot?: string;
   createAttemptId?: () => string;
   runLoopExecute?: typeof runLoopExecuteWithProviderFailoverEvidence;
+  prepareWorkspaceDependencies?: (
+    project: ProjectConfig,
+    workspacePath: string,
+  ) => Promise<void>;
 }>;
 
 function isolatedFailure(
@@ -89,6 +177,9 @@ export function createIsolatedProviderRunExecute(
   const createAttemptId = options.createAttemptId ?? randomUUID;
   const execute =
     options.runLoopExecute ?? runLoopExecuteWithProviderFailoverEvidence;
+  const prepareWorkspaceDependencies =
+    options.prepareWorkspaceDependencies ??
+    prepareIsolatedWorkspaceDependencies;
 
   return async (projectName, runOptions: LoopRunExecuteOptions = {}) => {
     const attemptId = createAttemptId();
@@ -100,8 +191,17 @@ export function createIsolatedProviderRunExecute(
         (runOptions.loadConfig ?? loadConfig)(),
         projectName,
       );
+      if (!project) {
+        return isolatedFailure(
+          projectName,
+          attemptId,
+          now,
+          "isolated_execution_failed",
+          "Unable to resolve the project before isolated execution.",
+        );
+      }
       const executionDecision =
-        typeof project?.execution_decision === "string"
+        typeof project.execution_decision === "string"
           ? project.execution_decision.trim()
           : "";
       allowedSourceDirtyPaths =
@@ -116,6 +216,21 @@ export function createIsolatedProviderRunExecute(
           allowedSourceDirtyPaths,
         }),
         async (workspace) => {
+          try {
+            await prepareWorkspaceDependencies(project, workspace.path);
+          } catch (error) {
+            if (error instanceof IsolatedWorkspaceDependencyPreparationError) {
+              return isolatedFailure(
+                projectName,
+                attemptId,
+                now,
+                error.code,
+                "Unable to prepare isolated workspace dependencies.",
+              );
+            }
+            throw error;
+          }
+
           const result = await execute(projectName, {
             ...runOptions,
             executor,
