@@ -355,5 +355,9 @@ export function resolveSelectedLotDetail(
   projectPath: string,
   candidate: SelectedCandidateReference | null,
 ): SelectedLotDetail | null {
-  return resolveRoadmapCandidateDetail(projectPath, candidate);
+  if (candidate === null) return null;
+  const projectRoot = resolve(projectPath);
+  const realProjectRoot = safeRealProjectRoot(projectPath);
+  if (realProjectRoot === null) return null;
+  return resolveExplicitLinkedDetail(projectRoot, realProjectRoot, candidate);
 }

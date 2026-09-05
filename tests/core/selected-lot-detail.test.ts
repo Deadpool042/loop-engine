@@ -4,7 +4,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, it } from "node:test";
 
-import { resolveSelectedLotDetail } from "../../src/core/selected-lot-detail.js";
+import {
+  resolveRoadmapCandidateDetail,
+  resolveSelectedLotDetail,
+} from "../../src/core/selected-lot-detail.js";
 
 describe("selected lot detail", () => {
   it("resolves and structures the markdown linked by the selected candidate", () => {
@@ -119,7 +122,7 @@ describe("selected lot detail", () => {
         ].join("\n"),
       );
 
-      const detail = resolveSelectedLotDetail(root, {
+      const detail = resolveRoadmapCandidateDetail(root, {
         id: "VNEXT3-G1",
         path: "docs/roadmap/README.md",
         text: "⏳ [P1] VNEXT3-G1 — Social drafts admin",
