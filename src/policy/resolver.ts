@@ -19,6 +19,7 @@ import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import {
   getAllowedPermissionsForMode,
   getForecastSelectionBudgetForMode,
+  getExecutionBudgetForMode,
   getContextBudgetForEffort,
   mergeAllowedProviders,
   mergeAllowedRuntimes,
@@ -209,7 +210,10 @@ export function deriveTaskRequirements(
       ? {}
       : { preferredCapabilityTier }),
     contextBudget: getContextBudgetForEffort(minimumEffort),
-    executionBudget: DEFAULT_MODE_BUDGETS[mode],
+    executionBudget: getExecutionBudgetForMode(
+      mode,
+      policy.allowEscalation,
+    ),
     rationale,
   };
 }
@@ -355,7 +359,10 @@ export function resolvePolicy(
   const budget = mergeBudgetsRestrictively(
     mergeBudgetsRestrictively(
       policy.defaultBudget,
-      getForecastSelectionBudgetForMode(mode),
+      getForecastSelectionBudgetForMode(
+        mode,
+        policy.allowEscalation,
+      ),
     ),
     toBudget(request.requestedBudget ?? {}),
   );

@@ -18,6 +18,8 @@ const REQUIRED_RUNNER_TOKENS = Object.freeze([
   "agentPolicy.selectionRequest.budgetCeiling?.maxRepairs",
   "Math.min(dependencies.maxRepairs, policyRepairCeiling)",
   "await dependencies.executor(",
+  "modelEscalationUsed",
+  "executorCalls >= effectiveMaxCalls",
   'transition("validating"',
   'transition("repairing"',
   "repairAttempts >= effectiveMaxRepairs",
@@ -116,7 +118,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
     title:
       "LoopRunner execute mode validates and repairs within a finite budget",
     description:
-      "The V14.4 execute runner must require policy admission, call one injected executor, validate after execution, clamp the caller repair request to the resolved policy ceiling, repair only within that effective finite budget, revalidate after repair, report modified files, and never commit or publish itself.",
+      "The V14.4 execute runner must require policy admission, call the injected executor once on the normal path and at most once more for an explicitly authorized V48.5 model escalation, validate after execution, clamp repair and call budgets to policy ceilings, revalidate after repair or escalation, report modified files, and never commit or publish itself.",
     metadata: {
       introducedIn: "V14.4",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -151,10 +153,10 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
         ...result.forbidden.map(
           (token) => `${RUNNER_FILE} -> forbidden: ${token}`,
         ),
-        ...(result.executorCallCount === 1
+        ...(result.executorCallCount === 2
           ? []
           : [
-              `${RUNNER_FILE} -> expected one executor call site, found ${result.executorCallCount}`,
+              `${RUNNER_FILE} -> expected exactly two bounded executor call sites (primary + optional model escalation), found ${result.executorCallCount}`,
             ]),
         ...(result.repairBeforeRevalidation
           ? []
@@ -166,7 +168,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Keep V14.4 as one fail-closed execute/validate/repair boundary: admit policy before execution, clamp the requested repair count to the resolved policy ceiling, invoke one injected executor, revalidate after each bounded repair, and leave commit/publication null inside the execute runner; route explicit candidate publication outside it.",
+            "Keep V14.4/V48.5 as one fail-closed execute/validate/repair boundary: admit policy before execution, clamp repair and call budgets to the resolved policy ceiling, keep exactly one primary executor site plus one optional model-escalation site, revalidate after each bounded repair/escalation, and leave commit/publication null inside the execute runner; route provider failover and explicit candidate publication through their existing boundaries.",
           )
         : pass(
             rule,

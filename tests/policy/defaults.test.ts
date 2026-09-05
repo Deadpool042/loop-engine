@@ -9,6 +9,7 @@ import {
 import {
   DEFAULT_MODE_BUDGETS,
   getAllowedPermissionsForMode,
+  getExecutionBudgetForMode,
   getForecastSelectionBudgetForMode,
   getContextBudgetForEffort,
   mergeAllowedProviders,
@@ -85,6 +86,21 @@ describe("DEFAULT_MODE_BUDGETS", () => {
   });
 });
 
+describe("getExecutionBudgetForMode — bounded escalation is explicit opt-in", () => {
+  it("preserves the historical single-call default", () => {
+    assert.equal(getExecutionBudgetForMode("execute").maxCalls, 1);
+    assert.equal(getExecutionBudgetForMode("commit").maxCalls, 1);
+    assert.equal(getExecutionBudgetForMode("publish").maxCalls, 1);
+  });
+
+  it("allows exactly one additional call when escalation is explicitly enabled", () => {
+    assert.equal(getExecutionBudgetForMode("execute", true).maxCalls, 2);
+    assert.equal(getExecutionBudgetForMode("commit", true).maxCalls, 2);
+    assert.equal(getExecutionBudgetForMode("publish", true).maxCalls, 2);
+    assert.equal(getExecutionBudgetForMode("plan", true).maxCalls, 0);
+  });
+});
+
 describe("getForecastSelectionBudgetForMode — a compatibility simulation, never an executable authorization", () => {
   it("simulates mode execute for a plan forecast (never gates the preview on plan's own 0-call budget)", () => {
     assert.deepEqual(
@@ -100,6 +116,12 @@ describe("getForecastSelectionBudgetForMode — a compatibility simulation, neve
         DEFAULT_MODE_BUDGETS[mode],
       );
     }
+  });
+
+  it("forecasts the explicit two-call escalation ceiling without changing plan's real zero-call budget", () => {
+    assert.equal(getForecastSelectionBudgetForMode("plan", true).maxCalls, 2);
+    assert.equal(getForecastSelectionBudgetForMode("execute", true).maxCalls, 2);
+    assert.equal(getExecutionBudgetForMode("plan", true).maxCalls, 0);
   });
 });
 

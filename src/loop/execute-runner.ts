@@ -10,6 +10,12 @@ import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
 import { resolvePolicy } from "../policy/resolver.js";
 import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
 import { createLoopExecutionPlan } from "./execution-plan.js";
+import {
+  createIntraProviderEscalationPlan,
+  modelEscalationProfileEvidence,
+  selectIntraProviderModelEscalation,
+  type LoopModelEscalationEvidence,
+} from "./model-escalation.js";
 import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import { findOutOfScopeFiles } from "./file-scope.js";
 import { readModifiedWorktreeFiles } from "./worktree-status.js";
@@ -155,6 +161,8 @@ export async function runLoopExecute(
   let contextPackage: MinimalContextPackage | null = null;
   let writableFileScope: readonly string[] | null = null;
   let brief: NonNullable<LoopRunResult["brief"]> | null = null;
+  let modelEscalationEvidence: LoopModelEscalationEvidence | null = null;
+  let executorCalls = 0;
 
   function transition(
     to: LoopRunStatus,
@@ -207,6 +215,7 @@ export async function runLoopExecute(
       contextPackage,
       writableFileScope,
       brief,
+      modelEscalationEvidence,
     });
   }
 
@@ -328,6 +337,18 @@ export async function runLoopExecute(
       ...(cycle.brief === undefined ? {} : { brief: cycle.brief }),
     }),
   );
+  let activeExecutionPlan = executionPlan;
+  const executionBudgetCalls =
+    agentPolicy.requirements.executionBudget.maxCalls ?? 1;
+  const selectionBudgetCalls =
+    agentPolicy.selectionRequest.budgetCeiling?.maxCalls;
+  const effectiveMaxCalls =
+    typeof selectionBudgetCalls === "number"
+      ? Math.min(executionBudgetCalls, selectionBudgetCalls)
+      : executionBudgetCalls;
+  let providerFailoverControlsAttempts = false;
+  let modelEscalationUsed = false;
+
   writableFileScope = executionPlan.allowedPaths ?? null;
 
   transition("ready", "ready", "completed", [
@@ -342,8 +363,9 @@ export async function runLoopExecute(
 
   let executionResult;
   try {
+    executorCalls += 1;
     executionResult = await dependencies.executor(
-      executionPlan,
+      activeExecutionPlan,
       executionProject.path,
     );
   } catch {
@@ -359,6 +381,9 @@ export async function runLoopExecute(
       ),
     );
   }
+
+  providerFailoverControlsAttempts =
+    (executionResult.providerFailoverEvidence?.maxAttempts ?? 0) > 1;
 
   function failForScopeViolation(): LoopRunResult | null {
     if (writableFileScope === null) return null;
@@ -404,7 +429,7 @@ export async function runLoopExecute(
 
   async function failForContentPolicyViolation(): Promise<LoopRunResult | null> {
     const inspection = await inspectWorktreeContentPolicy(
-      executionPlan,
+      activeExecutionPlan,
       executionProject.path,
       [...modifiedFiles],
     );
@@ -527,6 +552,166 @@ export async function runLoopExecute(
     }
 
     if (repairAttempts >= effectiveMaxRepairs) {
+      if (
+        !modelEscalationUsed &&
+        dependencies.agentPolicy.allowEscalation
+      ) {
+        modelEscalationUsed = true;
+        const previousProfile = dependencies.agentRegistry.profiles.find(
+          (profile) => profile.id === activeExecutionPlan.profileId,
+        );
+
+        if (!previousProfile) {
+          transition("failed", "failed", "failed", [
+            "The active executor profile disappeared from the registry.",
+          ]);
+          return finalize(
+            cycle.candidate,
+            internalFailure(
+              "model_escalation_profile_missing",
+              "The active executor profile is unavailable for escalation.",
+              activeExecutionPlan.profileId,
+            ),
+          );
+        }
+
+        const from = modelEscalationProfileEvidence(previousProfile);
+
+        if (providerFailoverControlsAttempts) {
+          modelEscalationEvidence = Object.freeze({
+            schemaVersion: 1,
+            reason: "validation_failed",
+            outcome: "not_authorized",
+            maxCalls: effectiveMaxCalls,
+            callsUsed: executorCalls,
+            from,
+            to: null,
+            detail: "provider_failover_already_controls_attempt_budget",
+          });
+        } else if (executorCalls >= effectiveMaxCalls) {
+          modelEscalationEvidence = Object.freeze({
+            schemaVersion: 1,
+            reason: "validation_failed",
+            outcome: "not_authorized",
+            maxCalls: effectiveMaxCalls,
+            callsUsed: executorCalls,
+            from,
+            to: null,
+            detail: "call_budget_exhausted",
+          });
+        } else {
+          const escalation = selectIntraProviderModelEscalation({
+            registry: dependencies.agentRegistry,
+            request: agentPolicy.selectionRequest,
+            previousProfileId: activeExecutionPlan.profileId,
+            failureReason: "validation_failed",
+          });
+
+          if (escalation.outcome === "escalated") {
+            const escalatedPlan = createIntraProviderEscalationPlan(
+              activeExecutionPlan,
+              escalation.profile,
+              escalation.failureReason,
+            );
+            const to = modelEscalationProfileEvidence(escalation.profile);
+            activeExecutionPlan = escalatedPlan;
+            executorCalls += 1;
+            modelEscalationEvidence = Object.freeze({
+              schemaVersion: 1,
+              reason: escalation.failureReason,
+              outcome: "escalated",
+              maxCalls: effectiveMaxCalls,
+              callsUsed: executorCalls,
+              from,
+              to,
+              detail: null,
+            });
+
+            transition("executing", "escalating", "completed", [
+              `Validation failed after repairs; escalating model ${from.profileId} -> ${to.profileId}.`,
+              `Escalation reason: ${escalation.failureReason}.`,
+            ]);
+
+            let escalatedExecutionResult;
+            try {
+              escalatedExecutionResult = await dependencies.executor(
+                activeExecutionPlan,
+                executionProject.path,
+              );
+            } catch {
+              transition("failed", "failed", "failed", [
+                "The escalated LoopExecutor threw an error.",
+              ]);
+              return finalize(
+                cycle.candidate,
+                internalFailure(
+                  "executor_failed",
+                  "The escalated LoopExecutor failed.",
+                  "Executor errors are redacted from the public result.",
+                ),
+              );
+            }
+
+            const escalationWorktreeFailure =
+              await refreshModifiedFilesFromWorktree();
+            if (escalationWorktreeFailure !== null) {
+              return escalationWorktreeFailure;
+            }
+            const escalationScopeFailure = failForScopeViolation();
+            if (escalationScopeFailure !== null) {
+              return escalationScopeFailure;
+            }
+
+            if (escalatedExecutionResult.status === "failed") {
+              transition("failed", "failed", "failed", [
+                escalatedExecutionResult.failure.message,
+              ]);
+              return finalize(
+                cycle.candidate,
+                escalatedExecutionResult.failure,
+              );
+            }
+
+            const escalationCompletionFailure =
+              failForMissingGovernedDelta();
+            if (escalationCompletionFailure !== null) {
+              return escalationCompletionFailure;
+            }
+
+            const escalationContentPolicyFailure =
+              await failForContentPolicyViolation();
+            if (escalationContentPolicyFailure !== null) {
+              return escalationContentPolicyFailure;
+            }
+
+            transition(
+              "validating",
+              "validating",
+              "completed",
+              escalatedExecutionResult.details,
+            );
+            continue;
+          }
+
+          modelEscalationEvidence = Object.freeze({
+            schemaVersion: 1,
+            reason: "validation_failed",
+            outcome:
+              escalation.outcome === "exhausted"
+                ? "exhausted"
+                : "not_applicable",
+            maxCalls: effectiveMaxCalls,
+            callsUsed: executorCalls,
+            from,
+            to: null,
+            detail:
+              escalation.outcome === "exhausted"
+                ? "no_higher_admissible_profile"
+                : escalation.reason,
+          });
+        }
+      }
+
       transition("failed", "failed", "failed", [
         "Validation failed and the repair budget is exhausted.",
       ]);

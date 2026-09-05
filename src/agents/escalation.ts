@@ -21,9 +21,9 @@ export type AgentEscalationRequest = Readonly<{
   request: AgentSelectionRequest;
   previousProfileId: string;
   // Captured for explainability and for a future LoopExecutor journal.
-  // This lot's algorithm does not branch on the reason — every failure
-  // escalates the same way, to the smallest strictly-more-capable eligible
-  // profile. Reason-specific escalation policy is left to a later lot.
+  // The historical Agent escalation contract does not branch on the reason:
+  // every explicit failure escalates by effort. V48.5 model-tier escalation
+  // is a separate concern in src/loop/model-escalation.ts.
   failureReason: AgentFailureReason;
 }>;
 
@@ -35,9 +35,8 @@ export type AgentEscalationResult =
     }>
   | Readonly<{ outcome: "exhausted"; rejected: readonly AgentRejection[] }>;
 
-// Never invoked implicitly: escalation only happens when a caller supplies
-// a real previousProfileId and failureReason. There is no automatic retry
-// or background escalation anywhere in this module.
+// Historical V7/V13 contract. Never invoked implicitly: escalation only
+// happens when a caller supplies a real previousProfileId and failureReason.
 export function escalateAgentProfile(
   input: AgentEscalationRequest,
 ): AgentEscalationResult {

@@ -68,12 +68,28 @@ export const DEFAULT_MODE_BUDGETS: Readonly<
 // matches the real mode's own default otherwise. The literal "plan mode
 // makes 0 calls, ever" guarantee is enforced by the runner's control flow
 // never invoking an agent, not by this function's return value.
+export function getExecutionBudgetForMode(
+  mode: AgentPolicyMode,
+  allowEscalation = false,
+): AgentBudget {
+  const base = DEFAULT_MODE_BUDGETS[mode];
+  if (mode === "plan" || !allowEscalation) return base;
+  return Object.freeze({
+    ...base,
+    // V48.5: one primary invocation plus at most one reviewed model
+    // escalation. The default policy keeps allowEscalation=false, so the
+    // historical single-call behavior remains the default.
+    maxCalls: 2,
+  });
+}
+
 export function getForecastSelectionBudgetForMode(
   mode: AgentPolicyMode,
+  allowEscalation = false,
 ): AgentBudget {
   return mode === "plan"
-    ? DEFAULT_MODE_BUDGETS.execute
-    : DEFAULT_MODE_BUDGETS[mode];
+    ? getExecutionBudgetForMode("execute", allowEscalation)
+    : getExecutionBudgetForMode(mode, allowEscalation);
 }
 
 const BUDGET_DIMENSIONS = [

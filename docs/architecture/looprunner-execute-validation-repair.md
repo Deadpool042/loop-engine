@@ -16,12 +16,14 @@ V14.4 turns one selected roadmap candidate into one bounded application cycle:
 plan candidate
 -> resolve execute policy
 -> build bounded context
--> call one injected LoopExecutor
+-> call the injected LoopExecutor once on the normal path
 -> collect reported modified files
 -> enforce the governed writable file scope
 -> run configured validations and audit commands
 -> optionally call one injected LoopRepairer per failed validation
--> stop after the effective policy-capped repair budget
+-> after repair exhaustion, optionally perform one policy-authorized same-provider model escalation
+-> re-observe scope/content and revalidate the escalated result
+-> stop after the effective policy-capped repair and call budgets
 -> completed OR failed
 ```
 
@@ -54,11 +56,9 @@ It returns either:
 - `completed`, with stable details and reported modified file paths; or
 - `failed`, with a structured `LoopRunFailure` and any files already modified.
 
-The runner calls this port at most once per cycle.
+The runner calls this port once on the normal path. Since V48.5, an explicit policy opt-in may authorize **one additional top-level call** with a higher economic-tier profile from the same provider/runtime after a structured validation failure and only within the effective `maxCalls` budget. The default policy remains single-call. This bounded model escalation never becomes a loop and is not stacked on top of a multi-attempt provider failover.
 
-The selected Codex or Claude Code runtime may organize that single top-level
-invocation with runtime-native skills or sub-agents. This does not create
-additional `LoopExecutor` calls and does not create a Loop Engine task graph.
+The selected Codex or Claude Code runtime may organize each authorized top-level invocation with runtime-native skills or sub-agents. This does not create additional `LoopExecutor` calls and does not create a Loop Engine task graph.
 Low-effort plans are instructed to work directly; higher-effort plans may
 delegate only when independent work or an independent review materially
 improves speed or safety. The prompt requires delegated work to respect the
@@ -146,13 +146,9 @@ unless:
 - `AgentPolicyResolution.status === "resolved"`; and
 - `selection.outcome === "selected"`.
 
-A denial returns `agent_policy_rejected` with zero executor, validator and
-repairer calls.
+A denial returns `agent_policy_rejected` with zero executor, validator and repairer calls.
 
-The resolved `selectionRequest.budgetCeiling` is also an execution ceiling where
-the runner has a matching local control. In particular,
-`selectionRequest.budgetCeiling.maxRepairs` bounds the repair cycle after
-admission; the caller cannot widen it with `--max-repairs`.
+The resolved `selectionRequest.budgetCeiling` is also an execution ceiling where the runner has a matching local control. `selectionRequest.budgetCeiling.maxRepairs` bounds the repair cycle after admission; the caller cannot widen it with `--max-repairs`. V48.5 also enforces `maxCalls`: the historical/default policy authorizes one top-level call, while `allowEscalation: true` may raise the mode ceiling to exactly two calls. The second call is usable only for the dedicated same-provider model escalation and never authorizes an arbitrary retry.
 
 ## Validation result
 
@@ -251,8 +247,8 @@ V14.4 does not add:
 ## Acceptance invariants
 
 1. Policy rejection causes zero executor calls.
-2. The top-level executor port is called at most once; runtime-internal delegation creates neither another LoopExecutor call nor a second execution plan.
-3. Validation runs only after a completed executor result.
+2. The top-level executor port is called once by default and at most twice only when V48.5 escalation is explicitly authorized and budgeted; runtime-internal delegation creates no additional LoopExecutor call. Provider failover and model escalation are never stacked in the same cycle.
+3. Validation runs only after a completed executor result and is rerun after an escalated result.
 4. Each repair is followed by validation, never by commit.
 5. The finite repair budget is the most restrictive of caller request and resolved policy ceiling, and the same effective value reaches the repairer.
 6. Modified files include executor and repairer reports without duplicates.

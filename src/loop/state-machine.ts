@@ -8,7 +8,7 @@ const TRANSITIONS: Readonly<Record<LoopRunStatus, readonly LoopRunStatus[]>> = {
   planning: ["ready", "blocked", "failed"],
   ready: ["executing", "completed", "cancelled"],
   executing: ["validating", "failed", "cancelled"],
-  validating: ["completed", "repairing", "failed"],
+  validating: ["completed", "repairing", "executing", "failed"],
   repairing: ["executing", "validating", "failed"],
   completed: ["idle"],
   blocked: [],

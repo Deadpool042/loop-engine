@@ -17,6 +17,7 @@ const VALID_TRANSITIONS: readonly [LoopRunStatus, LoopRunStatus][] = [
   ["executing", "cancelled"],
   ["validating", "completed"],
   ["validating", "repairing"],
+  ["validating", "executing"],
   ["validating", "failed"],
   ["repairing", "executing"],
   ["repairing", "validating"],

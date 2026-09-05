@@ -33,13 +33,13 @@ describe("LoopRunner execute validation repair audit", () => {
     );
   });
 
-  it("detects duplicate executor call sites and forbidden effects", () => {
+  it("detects a third executor call site and forbidden effects", () => {
     const runner = readFileSync(RUNNER_FILE, "utf8");
     const result = inspect(
       `${runner}\nawait dependencies.executor({});\nprocess.env.SECRET;`,
     );
 
-    assert.equal(result.executorCallCount, 2);
+    assert.equal(result.executorCallCount, 3);
     assert.deepEqual(result.forbidden, ["process.env"]);
   });
 

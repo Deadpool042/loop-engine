@@ -405,6 +405,35 @@ describe("resolvePolicy — gates, in order", () => {
     assert.equal(result.status, "no_compatible_agent");
   });
 
+  it("keeps escalation opt-in bounded and lets a requested budget reduce it back to one call", () => {
+    const registry = createAgentRegistry([
+      profile({ id: "economy", economicTier: "economy" }),
+      profile({ id: "standard", economicTier: "standard" }),
+    ]);
+    const escalated = resolvePolicy({
+      policy: policy({ allowEscalation: true }),
+      registry,
+      candidate: candidate({ text: "- [ ] Implement the new feature" }),
+      mode: "execute",
+    });
+
+    assert.equal(escalated.status, "resolved");
+    assert.equal(escalated.requirements.executionBudget.maxCalls, 2);
+    assert.equal(escalated.selectionRequest.budgetCeiling?.maxCalls, 2);
+
+    const restricted = resolvePolicy({
+      policy: policy({ allowEscalation: true }),
+      registry,
+      candidate: candidate({ text: "- [ ] Implement the new feature" }),
+      mode: "execute",
+      request: { requestedBudget: { maxCalls: 1 } },
+    });
+
+    assert.equal(restricted.status, "resolved");
+    assert.equal(restricted.requirements.executionBudget.maxCalls, 2);
+    assert.equal(restricted.selectionRequest.budgetCeiling?.maxCalls, 1);
+  });
+
   it("budget_exhausted when a real mode's merged budget allows zero calls", () => {
     const registry = createAgentRegistry([profile({ id: "any" })]);
 

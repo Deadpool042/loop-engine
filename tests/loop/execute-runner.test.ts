@@ -5,10 +5,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { createAgentRegistry } from "../../src/agents/registry.js";
+import type { AgentProfile } from "../../src/agents/types.js";
 import type { Config, ProjectConfig } from "../../src/core/config.js";
 import type { RoadmapCandidate } from "../../src/intelligence/roadmap.js";
 import type { ProjectSnapshot } from "../../src/intelligence/snapshot.js";
 import { runLoopExecute } from "../../src/loop/execute-runner.js";
+import { DEFAULT_AGENT_POLICY } from "../../src/policy/defaults.js";
 import { readModifiedWorktreeFiles } from "../../src/loop/worktree-status.js";
 
 function fixtureProject(): ProjectConfig {
@@ -100,6 +103,29 @@ function deterministicOptions() {
       truncated: false,
     }),
     readModifiedWorktreeFiles: async () => [],
+  };
+}
+
+function escalationProfile(
+  overrides: Partial<AgentProfile> = {},
+): AgentProfile {
+  return {
+    id: "economy",
+    runtime: "codex",
+    provider: "openai",
+    model: "economy-model",
+    effort: "low",
+    economicTier: "economy",
+    capabilities: ["code_edit", "test_execution"],
+    permissions: ["read_only", "write_worktree", "shell_exec"],
+    budget: {
+      maxTokens: null,
+      maxCostUsd: null,
+      maxDurationMs: null,
+      maxCalls: 1,
+      maxRepairs: 1,
+    },
+    ...overrides,
   };
 }
 
@@ -748,6 +774,264 @@ describe("runLoopExecute", () => {
     assert.equal(result.failure?.code, "agent_policy_rejected");
     assert.equal(result.validation, null);
     assert.deepEqual(result.modifiedFiles, []);
+  });
+
+  it("performs exactly one same-provider model escalation after validation failure when explicitly authorized", async () => {
+    const registry = createAgentRegistry([
+      escalationProfile({
+        id: "economy",
+        model: "economy-model",
+        economicTier: "economy",
+      }),
+      escalationProfile({
+        id: "standard",
+        model: "standard-model",
+        economicTier: "standard",
+      }),
+      escalationProfile({
+        id: "advanced",
+        model: "advanced-model",
+        economicTier: "advanced",
+      }),
+    ]);
+    const observedPlans: Array<{
+      profileId: string;
+      provider: string;
+      runtime: string;
+      model: string;
+      effort: string;
+    }> = [];
+    let executorCalls = 0;
+    let validatorCalls = 0;
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: {
+        ...DEFAULT_AGENT_POLICY,
+        allowEscalation: true,
+      },
+      agentRegistry: registry,
+      maxRepairs: 0,
+      readModifiedWorktreeFiles: async () => ["src/feature.ts"],
+      executor: async (plan) => {
+        executorCalls += 1;
+        observedPlans.push({
+          profileId: plan.profileId,
+          provider: plan.provider,
+          runtime: plan.runtime,
+          model: plan.model,
+          effort: plan.effort,
+        });
+        return {
+          status: "completed",
+          modifiedFiles: ["src/feature.ts"],
+          details: [`Executor call ${executorCalls} completed.`],
+        };
+      },
+      validator: async ({ attempt }) => {
+        validatorCalls += 1;
+        return attempt === 1
+          ? {
+              status: "failed",
+              failedCommand: "pnpm run test",
+              exitCode: 1,
+              details: ["Validation failed on the economy profile."],
+            }
+          : {
+              status: "passed",
+              failedCommand: null,
+              exitCode: 0,
+              details: ["Validation passed after one model escalation."],
+            };
+      },
+    });
+
+    assert.equal(result.status, "completed");
+    assert.equal(executorCalls, 2);
+    assert.equal(validatorCalls, 2);
+    assert.deepEqual(
+      observedPlans.map((plan) => plan.profileId),
+      ["economy", "standard"],
+    );
+    assert.deepEqual(
+      observedPlans.map((plan) => [plan.provider, plan.runtime]),
+      [
+        ["openai", "codex"],
+        ["openai", "codex"],
+      ],
+    );
+    assert.deepEqual(
+      observedPlans.map((plan) => plan.effort),
+      ["medium", "medium"],
+    );
+    assert.equal(result.validation?.attempts, 2);
+    assert.equal(result.validation?.repairAttempts, 0);
+    assert.deepEqual(result.modelEscalationEvidence, {
+      schemaVersion: 1,
+      reason: "validation_failed",
+      outcome: "escalated",
+      maxCalls: 2,
+      callsUsed: 2,
+      from: {
+        profileId: "economy",
+        provider: "openai",
+        runtime: "codex",
+        model: "economy-model",
+        economicTier: "economy",
+      },
+      to: {
+        profileId: "standard",
+        provider: "openai",
+        runtime: "codex",
+        model: "standard-model",
+        economicTier: "standard",
+      },
+      detail: null,
+    });
+    assert.deepEqual(
+      result.steps.map((step) => step.name),
+      [
+        "planning",
+        "ready",
+        "executing",
+        "validating",
+        "escalating",
+        "validating",
+        "completed",
+      ],
+    );
+  });
+
+  it("never performs more than one model escalation even when the second validation also fails", async () => {
+    const registry = createAgentRegistry([
+      escalationProfile({
+        id: "economy",
+        model: "economy-model",
+        economicTier: "economy",
+      }),
+      escalationProfile({
+        id: "standard",
+        model: "standard-model",
+        economicTier: "standard",
+      }),
+      escalationProfile({
+        id: "advanced",
+        model: "advanced-model",
+        economicTier: "advanced",
+      }),
+    ]);
+    let executorCalls = 0;
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: {
+        ...DEFAULT_AGENT_POLICY,
+        allowEscalation: true,
+      },
+      agentRegistry: registry,
+      maxRepairs: 0,
+      readModifiedWorktreeFiles: async () => ["src/feature.ts"],
+      executor: async () => {
+        executorCalls += 1;
+        return {
+          status: "completed",
+          modifiedFiles: ["src/feature.ts"],
+          details: [],
+        };
+      },
+      validator: async () => ({
+        status: "failed",
+        failedCommand: "pnpm run test",
+        exitCode: 1,
+        details: ["Still failing."],
+      }),
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "validation_failed");
+    assert.equal(executorCalls, 2);
+    assert.equal(result.validation?.attempts, 2);
+    assert.equal(result.modelEscalationEvidence?.outcome, "escalated");
+    assert.equal(result.modelEscalationEvidence?.callsUsed, 2);
+  });
+
+  it("does not stack model escalation on top of multi-attempt provider failover", async () => {
+    const registry = createAgentRegistry([
+      escalationProfile({
+        id: "economy",
+        model: "economy-model",
+        economicTier: "economy",
+      }),
+      escalationProfile({
+        id: "standard",
+        model: "standard-model",
+        economicTier: "standard",
+      }),
+    ]);
+    let executorCalls = 0;
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: {
+        ...DEFAULT_AGENT_POLICY,
+        allowEscalation: true,
+      },
+      agentRegistry: registry,
+      maxRepairs: 0,
+      readModifiedWorktreeFiles: async () => ["src/feature.ts"],
+      executor: async (plan) => {
+        executorCalls += 1;
+        return {
+          status: "completed",
+          modifiedFiles: ["src/feature.ts"],
+          details: [],
+          providerFailoverEvidence: {
+            schemaVersion: 1,
+            maxAttempts: 2,
+            attemptedProviders: ["openai"],
+            selectedProvider: "openai",
+            attempts: [
+              {
+                attempt: 1,
+                provider: "openai",
+                runtime: "codex",
+                profileId: plan.profileId,
+                model: plan.model,
+                status: "completed",
+                failureCode: null,
+                recoverable: false,
+              },
+            ],
+          },
+        };
+      },
+      validator: async () => ({
+        status: "failed",
+        failedCommand: "pnpm run test",
+        exitCode: 1,
+        details: ["Validation failed."],
+      }),
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "validation_failed");
+    assert.equal(executorCalls, 1);
+    assert.deepEqual(result.modelEscalationEvidence, {
+      schemaVersion: 1,
+      reason: "validation_failed",
+      outcome: "not_authorized",
+      maxCalls: 2,
+      callsUsed: 1,
+      from: {
+        profileId: "economy",
+        provider: "openai",
+        runtime: "codex",
+        model: "economy-model",
+        economicTier: "economy",
+      },
+      to: null,
+      detail: "provider_failover_already_controls_attempt_budget",
+    });
   });
 
   it("fails closed when no concrete executor is configured", async () => {

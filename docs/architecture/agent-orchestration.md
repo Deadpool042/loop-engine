@@ -150,7 +150,11 @@ L'ordre de déclaration du registry n'est pas une entrée de décision : les rej
 
 ## Stratégie d'escalade
 
-`escalateAgentProfile(input)` ne s'invoque **jamais automatiquement** : elle exige en entrée un `previousProfileId` et une `failureReason` explicite (`budget_exceeded`, `capability_gap`, `runtime_error`, `validation_failed`), fournis par l'appelant après un échec réel ou simulé. Elle réapplique les mêmes critères de filtrage que `selectAgentProfile`, exclut le profil précédent et tout profil d'effort inférieur ou égal, puis retient — toujours selon "smallest capable agent first" — le profil du plus faible effort restant strictement supérieur à celui du profil précédent. Si aucun profil ne reste, le résultat est `exhausted` (pas d'escalade possible), jamais une erreur silencieuse.
+`escalateAgentProfile(input)` conserve son contrat historique V7/V13 : elle ne s'invoque **jamais automatiquement**, exige un `previousProfileId` et une `failureReason` explicite (`budget_exceeded`, `capability_gap`, `runtime_error`, `validation_failed`), puis recherche un profil d'effort strictement supérieur en réappliquant les hard gates. Cette primitive reste utilisée par les anciens pipelines Runtime et n'est pas redéfinie par le routage économique V48.
+
+V48.5 ajoute une primitive distincte, `selectIntraProviderModelEscalation`, au niveau `src/loop/`. Elle ne change pas l'effort historique : elle traite uniquement l'escalade du **tier économique du modèle** après un signal gouverné. Les seules raisons autorisant cette montée sont `validation_failed` et un `capability_gap` effectivement démontré. `runtime_error` doit être traité par la frontière runtime/provider existante, et `budget_exceeded` interdit une tentative plus coûteuse. Le provider et le runtime restent identiques, le tier économique doit strictement augmenter, les capacités/permissions/disponibilité/budgets sont réévalués, et un seul profil est sélectionné directement — jamais une cascade exhaustive.
+
+Le `LoopRunner` n'autorise cette seconde tentative que lorsque `policy.allowEscalation` est explicitement activé et que le budget `maxCalls` effectif le permet. Le chemin historique reste à un appel par défaut ; l'opt-in V48.5 porte le plafond à deux appels top-level au maximum. Le runner rejoue ensuite observation du worktree, scope guard, content policy et validation sur le même workspace. L'escalade modèle ne se cumule pas avec un failover provider multi-tentatives dans le même cycle.
 
 ## Position de n8n et des runtimes externes
 
