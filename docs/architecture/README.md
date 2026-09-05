@@ -45,7 +45,8 @@ d'entrée existants comprennent notamment :
 - [LoopRunner](autonomous-loop-runner.md) et son
   [cycle execute/validate/repair](looprunner-execute-validation-repair.md) ;
 - [Architecture d'exécution](execution-architecture-rfc.md) ;
-- [plateforme durable d'exécution](durable-execution-control-plane.md).
+- [plateforme durable d'exécution](durable-execution-control-plane.md) ;
+- [frontière de maintenance n8n](n8n-maintenance-boundary.md) pour les automatisations périphériques.
 
 Les documents créés à partir de V18.0a indiquent ce rôle dans leurs métadonnées.
 Les documents existants ne sont pas migrés par cet index et conservent leurs
