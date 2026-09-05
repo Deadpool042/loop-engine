@@ -7,6 +7,7 @@ import {
   compareAgentEffort,
   type AgentBudget,
   type AgentEffort,
+  type AgentFundingMode,
   type AgentPermission,
   type AgentProvider,
   type AgentRuntime,
@@ -153,6 +154,18 @@ export function mergeAllowedRuntimes(
   }
 
   return global.filter((runtime) => requested.includes(runtime));
+}
+
+// Paid funding can only be introduced by the policy itself. A caller request
+// may restrict that explicit set but can never create a paid authorization
+// when the policy omitted funding configuration.
+export function mergeAllowedFundingModes(
+  global: readonly AgentFundingMode[] | undefined,
+  requested: readonly AgentFundingMode[] | undefined,
+): readonly AgentFundingMode[] | undefined {
+  if (!global) return undefined;
+  if (!requested) return global;
+  return global.filter((mode) => requested.includes(mode));
 }
 
 // A requested maximum effort can only lower the global ceiling, never raise

@@ -2,6 +2,7 @@ import type {
   AgentBudget,
   AgentCapability,
   AgentEffort,
+  AgentFundingMode,
   AgentPermission,
   AgentProfile,
   AgentProvider,
@@ -66,6 +67,7 @@ export type LoopExecutionPlan = Readonly<{
     status: "resolved";
     requiredCapabilities: readonly AgentCapability[];
     requiredPermissions: readonly AgentPermission[];
+    allowedFundingModes?: readonly AgentFundingMode[];
     rationale: readonly string[];
   }>;
 }>;
@@ -148,6 +150,13 @@ export function createLoopExecutionPlan(
       requiredPermissions: Object.freeze([
         ...input.agentPolicy.requirements.requiredPermissions,
       ]),
+      ...(input.agentPolicy.selectionRequest.allowedFundingModes === undefined
+        ? {}
+        : {
+            allowedFundingModes: Object.freeze([
+              ...input.agentPolicy.selectionRequest.allowedFundingModes,
+            ]),
+          }),
       rationale: Object.freeze([
         ...input.agentPolicy.requirements.rationale,
         ...input.agentPolicy.reasons,

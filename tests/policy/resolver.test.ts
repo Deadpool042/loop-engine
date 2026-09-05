@@ -488,4 +488,63 @@ describe("resolvePolicy — gates, in order", () => {
       );
     }
   });
+
+  it("does not let a caller authorize metered API when the policy omitted paid funding", () => {
+    const registry = createAgentRegistry([
+      profile({ id: "paid-api", fundingMode: "metered_api" }),
+    ]);
+
+    const result = resolvePolicy({
+      policy: policy(),
+      registry,
+      candidate: candidate({ text: "- [ ] Implement the new feature" }),
+      mode: "execute",
+      request: { requestedFundingModes: ["metered_api"] },
+    });
+
+    assert.equal(result.status, "no_compatible_agent");
+    assert.equal(result.selection?.outcome, "no_match");
+    assert.equal(result.selectionRequest.allowedFundingModes, undefined);
+    assert.match(result.reasons.join("\n"), /requires explicit authorization/);
+  });
+
+  it("allows paid funding only when policy opt-in exists and the caller can still narrow it", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "credits",
+        fundingMode: "additional_credits",
+      }),
+      profile({
+        id: "api",
+        fundingMode: "metered_api",
+      }),
+    ]);
+
+    const result = resolvePolicy({
+      policy: policy({
+        allowedFundingModes: ["additional_credits", "metered_api"],
+      }),
+      registry,
+      candidate: candidate({ text: "- [ ] Implement the new feature" }),
+      mode: "execute",
+      request: { requestedFundingModes: ["additional_credits"] },
+    });
+
+    assert.equal(result.status, "resolved");
+    assert.deepEqual(result.selectionRequest.allowedFundingModes, [
+      "additional_credits",
+    ]);
+    assert.equal(
+      result.selection?.outcome === "selected"
+        ? result.selection.profile.id
+        : null,
+      "credits",
+    );
+    assert.deepEqual(
+      result.selection?.outcome === "selected"
+        ? result.selection.rejected
+        : null,
+      [{ profileId: "api", reason: "funding mode metered_api is not allowed" }],
+    );
+  });
 });

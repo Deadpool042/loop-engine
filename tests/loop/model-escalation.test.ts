@@ -57,9 +57,15 @@ const CANDIDATE: RoadmapCandidate = {
 function resolved(
   registry: ReturnType<typeof createAgentRegistry>,
   maxCalls = 2,
+  allowedFundingModes?: NonNullable<
+    typeof DEFAULT_AGENT_POLICY.allowedFundingModes
+  >,
 ) {
   const resolution = resolvePolicy({
-    policy: DEFAULT_AGENT_POLICY,
+    policy: {
+      ...DEFAULT_AGENT_POLICY,
+      ...(allowedFundingModes === undefined ? {} : { allowedFundingModes }),
+    },
     registry,
     candidate: CANDIDATE,
     mode: "execute",
@@ -107,6 +113,12 @@ function planFromResolution(
       status: "resolved",
       requiredCapabilities: resolution.requirements.requiredCapabilities,
       requiredPermissions: resolution.requirements.requiredPermissions,
+      ...(resolution.selectionRequest.allowedFundingModes === undefined
+        ? {}
+        : {
+            allowedFundingModes:
+              resolution.selectionRequest.allowedFundingModes,
+          }),
       rationale: resolution.reasons,
     },
   };
@@ -235,6 +247,64 @@ describe("bounded intra-provider model escalation", () => {
       outcome: "not_applicable",
       reason: "attempt_budget_exhausted",
     });
+  });
+
+  it("does not escalate from included subscription usage into paid credits without policy approval", () => {
+    const registry = createAgentRegistry([
+      profile("codex.economy", "luna", "economy", {
+        fundingMode: "included_subscription",
+      }),
+      profile("codex.standard", "terra", "standard", {
+        fundingMode: "additional_credits",
+      }),
+    ]);
+    const resolution = resolved(registry);
+
+    const decision = resolveIntraProviderModelEscalation({
+      registry,
+      resolution,
+      currentPlan: planFromResolution(resolution),
+      allowEscalation: true,
+      completedAttempts: 1,
+      maxAttempts: 2,
+      failureCode: "validation_failed",
+    });
+
+    assert.deepEqual(decision, {
+      outcome: "not_applicable",
+      reason: "no_higher_profile",
+    });
+  });
+
+  it("permits a paid intra-provider escalation only when policy explicitly admits that funding mode", () => {
+    const registry = createAgentRegistry([
+      profile("codex.economy", "luna", "economy", {
+        fundingMode: "included_subscription",
+      }),
+      profile("codex.standard", "terra", "standard", {
+        fundingMode: "additional_credits",
+      }),
+    ]);
+    const resolution = resolved(registry, 2, [
+      "included_subscription",
+      "additional_credits",
+    ]);
+
+    const decision = resolveIntraProviderModelEscalation({
+      registry,
+      resolution,
+      currentPlan: planFromResolution(resolution),
+      allowEscalation: true,
+      completedAttempts: 1,
+      maxAttempts: 2,
+      failureCode: "validation_failed",
+    });
+
+    assert.equal(decision.outcome, "escalated");
+    assert.equal(
+      decision.outcome === "escalated" ? decision.profile.id : null,
+      "codex.standard",
+    );
   });
 
   it("never selects a higher tier that cannot satisfy the admitted hard requirements", () => {

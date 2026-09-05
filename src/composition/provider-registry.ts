@@ -7,8 +7,10 @@ import type {
   AgentCapability,
   AgentEconomicTier,
   AgentEffort,
+  AgentFundingMode,
   AgentPermission,
   AgentProfile,
+  AgentQuotaSnapshot,
 } from "../agents/types.js";
 import type { LoopExecutor } from "../core/index.js";
 import { createClaudeCodeCliLoopExecutor } from "../loop/claude-code-cli-executor.js";
@@ -37,6 +39,8 @@ export type LoopProviderModelProfileConfiguration = Readonly<{
   model: string;
   economicTier: AgentEconomicTier;
   availability?: AgentAvailabilityState;
+  fundingMode?: AgentFundingMode;
+  quota?: AgentQuotaSnapshot;
   // Ranking baseline only. Invocation effort is still resolved by policy.
   effort?: AgentEffort;
   // Capabilities are explicit configuration evidence, not inferred from the
@@ -49,6 +53,8 @@ export type CodexProviderConfiguration = Readonly<{
   executable: string;
   model?: string;
   profiles?: readonly LoopProviderModelProfileConfiguration[];
+  fundingMode?: AgentFundingMode;
+  quota?: AgentQuotaSnapshot;
   timeoutMs?: number;
 }>;
 
@@ -57,6 +63,8 @@ export type ClaudeCodeProviderConfiguration = Readonly<{
   executable: string;
   model?: string;
   profiles?: readonly LoopProviderModelProfileConfiguration[];
+  fundingMode?: AgentFundingMode;
+  quota?: AgentQuotaSnapshot;
   timeoutMs?: number;
   maxTurns?: number;
 }>;
@@ -164,6 +172,12 @@ function configuredProfiles(
           effort: profile.effort ?? "low",
           economicTier: profile.economicTier,
           availability: profile.availability ?? "available",
+          ...(profile.fundingMode === undefined
+            ? {}
+            : { fundingMode: profile.fundingMode }),
+          ...(profile.quota === undefined
+            ? {}
+            : { quota: Object.freeze({ ...profile.quota }) }),
           capabilities: Object.freeze([
             ...new Set(profile.capabilities),
           ]),
@@ -184,6 +198,12 @@ function configuredProfiles(
       model: configuredModel(configuration),
       effort: "low",
       availability: "available",
+      ...(configuration.fundingMode === undefined
+        ? {}
+        : { fundingMode: configuration.fundingMode }),
+      ...(configuration.quota === undefined
+        ? {}
+        : { quota: Object.freeze({ ...configuration.quota }) }),
       capabilities: EXECUTABLE_PROVIDER_CAPABILITIES,
       permissions: EXECUTABLE_PROVIDER_PERMISSIONS,
       budget: configuredBudget(configuration),

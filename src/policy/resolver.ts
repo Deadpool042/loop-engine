@@ -20,6 +20,7 @@ import {
   getAllowedPermissionsForMode,
   getForecastSelectionBudgetForMode,
   getContextBudgetForEffort,
+  mergeAllowedFundingModes,
   mergeAllowedProviders,
   mergeAllowedRuntimes,
   mergeBudgetsRestrictively,
@@ -329,6 +330,10 @@ export function resolvePolicy(
     policy.allowedRuntimes,
     request.requestedRuntimes,
   );
+  const allowedFundingModes = mergeAllowedFundingModes(
+    policy.allowedFundingModes,
+    request.requestedFundingModes,
+  );
 
   if (allowedRuntimes && allowedRuntimes.length === 0) {
     return resolution(policy, mode, requirements, "runtime_not_allowed", [
@@ -383,6 +388,9 @@ export function resolvePolicy(
     ...(allowedRuntimes === undefined
       ? {}
       : { allowedRuntimes: sortedUnique(allowedRuntimes) }),
+    ...(allowedFundingModes === undefined
+      ? {}
+      : { allowedFundingModes: sortedUnique(allowedFundingModes) }),
     budgetCeiling: {
       maxTokens: budget.maxTokens,
       maxCostUsd: budget.maxCostUsd,

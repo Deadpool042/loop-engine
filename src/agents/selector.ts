@@ -2,10 +2,12 @@ import type { AgentRegistry } from "./registry.js";
 import {
   AGENT_ECONOMIC_TIERS,
   agentEconomicTierRank,
+  agentFundingModeRank,
   compareAgentEffort,
   type AgentBudget,
   type AgentCapability,
   type AgentEffort,
+  type AgentFundingMode,
   type AgentPermission,
   type AgentProfile,
   type AgentProvider,
@@ -27,6 +29,7 @@ export type AgentSelectionRequest = Readonly<{
   budgetCeiling?: AgentBudgetCeiling;
   allowedProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
+  allowedFundingModes?: readonly AgentFundingMode[];
 }>;
 
 export type AgentRejection = Readonly<{
@@ -39,6 +42,7 @@ export type AgentRejection = Readonly<{
 export type AgentNonSelection = Readonly<{
   profileId: string;
   reason:
+    | "less_preferred_funding_than_selected"
     | "higher_economic_tier_than_selected"
     | "economic_tier_unranked"
     | "higher_effort_than_selected"
@@ -89,6 +93,32 @@ export function evaluateAgentProfile(
     return {
       ok: false,
       reason: "profile is explicitly unavailable",
+    };
+  }
+
+  if (profile.quota?.state === "exhausted") {
+    return {
+      ok: false,
+      reason: `profile quota is exhausted (source: ${profile.quota.source})`,
+    };
+  }
+
+  const fundingMode = profile.fundingMode ?? "unknown";
+  const paidFunding =
+    fundingMode === "additional_credits" || fundingMode === "metered_api";
+  if (request.allowedFundingModes === undefined && paidFunding) {
+    return {
+      ok: false,
+      reason: `paid funding mode ${fundingMode} requires explicit authorization`,
+    };
+  }
+  if (
+    request.allowedFundingModes !== undefined &&
+    !request.allowedFundingModes.includes(fundingMode)
+  ) {
+    return {
+      ok: false,
+      reason: `funding mode ${fundingMode} is not allowed`,
     };
   }
 
@@ -159,6 +189,10 @@ export function evaluateAgentProfile(
   return { ok: true };
 }
 
+function fundingModeRank(profile: AgentProfile): number {
+  return agentFundingModeRank(profile.fundingMode ?? "unknown");
+}
+
 function economicTierRank(profile: AgentProfile): number {
   return profile.economicTier === undefined
     ? AGENT_ECONOMIC_TIERS.length
@@ -170,6 +204,7 @@ function compareEligibleProfiles(
   b: AgentProfile,
 ): number {
   return (
+    fundingModeRank(a) - fundingModeRank(b) ||
     economicTierRank(a) - economicTierRank(b) ||
     compareAgentEffort(a.effort, b.effort) ||
     a.id.localeCompare(b.id)
@@ -192,6 +227,9 @@ function canonicalizeSelectedProfile(profile: AgentProfile): AgentProfile {
     ...(profile.tiers === undefined
       ? {}
       : { tiers: Object.freeze([...new Set(profile.tiers)].sort()) }),
+    ...(profile.quota === undefined
+      ? {}
+      : { quota: Object.freeze({ ...profile.quota }) }),
     budget: Object.freeze({ ...profile.budget }),
   });
 }
@@ -218,15 +256,19 @@ export function selectAgentProfile(
   const selected = pickSmallestCapable(eligible);
   if (!selected) return { outcome: "no_match", rejected };
 
+  const selectedFundingModeRank = fundingModeRank(selected);
   const selectedEconomicTierRank = economicTierRank(selected);
   const notSelected: AgentNonSelection[] = eligible
     .filter((profile) => profile.id !== selected.id)
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((profile) => {
+      const profileFundingModeRank = fundingModeRank(profile);
       const profileEconomicTierRank = economicTierRank(profile);
       let reason: AgentNonSelection["reason"];
 
-      if (
+      if (profileFundingModeRank > selectedFundingModeRank) {
+        reason = "less_preferred_funding_than_selected";
+      } else if (
         selected.economicTier !== undefined &&
         profile.economicTier === undefined
       ) {

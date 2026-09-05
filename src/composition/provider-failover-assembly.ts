@@ -1,4 +1,5 @@
 import { createAgentRegistry, type AgentRegistry } from "../agents/registry.js";
+import { selectAgentProfile } from "../agents/selector.js";
 import type { AgentBudget, AgentProfile } from "../agents/types.js";
 import type {
   LoopExecutor,
@@ -52,13 +53,20 @@ function selectFallbackProfile(
   assembly: LoopProviderAssembly,
   primaryPlan: LoopExecutionPlan,
 ): AgentProfile | null {
-  return (
-    assembly.agentRegistry.profiles.find(
-      (profile) =>
-        profile.availability !== "unavailable" &&
-        supportsPrimaryPolicy(profile, primaryPlan),
-    ) ?? null
+  const compatibleRegistry = createAgentRegistry(
+    assembly.agentRegistry.profiles.filter((profile) =>
+      supportsPrimaryPolicy(profile, primaryPlan),
+    ),
   );
+  const selection = selectAgentProfile(compatibleRegistry, {
+    requiredCapabilities: primaryPlan.policy.requiredCapabilities,
+    requiredPermissions: primaryPlan.policy.requiredPermissions,
+    ...(primaryPlan.policy.allowedFundingModes === undefined
+      ? {}
+      : { allowedFundingModes: primaryPlan.policy.allowedFundingModes }),
+  });
+
+  return selection.outcome === "selected" ? selection.profile : null;
 }
 
 export function createFallbackExecutionPlan(

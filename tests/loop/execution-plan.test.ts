@@ -104,6 +104,28 @@ describe("createLoopExecutionPlan", () => {
     assert.equal(Object.isFrozen(plan.policy), true);
   });
 
+  it("carries explicit funding authorization into the immutable execution policy", () => {
+    const input = admittedInput();
+    const funded = {
+      ...input,
+      agentPolicy: {
+        ...input.agentPolicy,
+        selectionRequest: {
+          ...input.agentPolicy.selectionRequest,
+          allowedFundingModes: ["included_subscription", "metered_api"],
+        },
+      },
+    } as unknown as LoopExecutorInput;
+
+    const plan = createLoopExecutionPlan(funded);
+
+    assert.deepEqual(plan.policy.allowedFundingModes, [
+      "included_subscription",
+      "metered_api",
+    ]);
+    assert.equal(Object.isFrozen(plan.policy.allowedFundingModes), true);
+  });
+
   it("derives direct-preferred delegation for low-effort plans", () => {
     const input = admittedInput();
     const lowEffort = {

@@ -23,7 +23,7 @@ Ce lot relie la couche [`src/agents/`](agent-orchestration.md) (types, registry,
 
 - **Local first, retrieval first, smallest capable agent first, escalation only on failure** — les principes du [moteur d'orchestration d'agents](agent-orchestration.md) s'appliquent intégralement ici et ne sont jamais contournés.
 - **Aucune permission implicite** — une capacité ne confère jamais une permission ; une permission de mode ne confère jamais `git_tag` (voir "Politique Git" ci-dessous).
-- **Fusion toujours restrictive** — un appelant (y compris n8n) ne peut que réduire un plafond de politique (budget, effort, fournisseurs, runtimes), jamais l'élargir. Voir "Fusion restrictive" ci-dessous.
+- **Fusion toujours restrictive** — un appelant (y compris n8n) ne peut que réduire un plafond de politique (budget, effort, fournisseurs, runtimes, financement), jamais l'élargir. Voir "Fusion restrictive" ci-dessous.
 - **Sélection prévisionnelle, jamais d'exécution** — même en mode `plan`, une résolution de politique peut produire un profil d'agent "sélectionné" ; cela reste une prévision (forecast), jamais un appel réel. Voir "Intégration au LoopRunner" ci-dessous.
 
 ## Placement dans le layering
@@ -88,6 +88,7 @@ interface AgentPolicy {
   contextBudget: ContextBudget;
   allowedProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
+  allowedFundingModes?: readonly AgentFundingMode[];
   deniedPermissions?: readonly AgentPermission[];
   allowTagCreation?: boolean;
   allowEscalation: boolean;
@@ -260,7 +261,7 @@ sérialisé et ne déplace pas les responsabilités du Policy Engine.
 
 ## Position de n8n
 
-n8n peut fournir, via `AgentPolicyRequest` (`src/policy/types.ts`) : `requestedBudget` (partiel), `requestedMaxEffort`, `requestedProviders`, `requestedRuntimes` — plus, au niveau de l'appel `run`, le projet, l'objectif, et le mode demandé (voir `autonomous-loop-runner.md`).
+n8n peut fournir, via `AgentPolicyRequest` (`src/policy/types.ts`) : `requestedBudget` (partiel), `requestedMaxEffort`, `requestedProviders`, `requestedRuntimes`, `requestedFundingModes` — plus, au niveau de l'appel `run`, le projet, l'objectif, et le mode demandé (voir `autonomous-loop-runner.md`). `requestedFundingModes` ne peut jamais créer une autorisation payante : si la policy n'a pas explicitement déclaré `additional_credits` ou `metered_api`, la demande caller est ignorée comme source d'élargissement et le selector reste fail-closed.
 
 Loop Engine applique une **fusion restrictive** systématique (voir ci-dessus) : n8n ne peut jamais élargir le budget global, l'effort maximum, ajouter une permission interdite, transformer `execute` en `commit` ou `commit` en `publish`, contourner le sélecteur, choisir un profil incompatible, ignorer une CI échouée, ou déclencher un force-push. Aucune de ces garanties ne dépend de la confiance en n8n : elles sont appliquées côté Loop Engine, par construction (fusion à sens unique, plafonds de permissions par mode, sélecteur pur).
 
@@ -272,7 +273,7 @@ Agent          -> exécutera dans un futur lot (LoopExecutor, non implémenté i
 
 ## Position d'OpenClaw, Codex, Claude Code et autres
 
-Inchangée par rapport à `agent-orchestration.md` : aucune hiérarchie fixe. La politique ne connaît que provider/runtime/modèle/effort/capacités/permissions/budget/disponibilité, jamais un statut privilégié pour un runtime particulier.
+Inchangée par rapport à `agent-orchestration.md` : aucune hiérarchie fixe. La politique ne connaît que provider/runtime/modèle/effort/capacités/permissions/budget/disponibilité/financement/quota, jamais un statut privilégié pour un runtime particulier. Un quota inconnu n'est pas converti en estimation et ne bloque pas à lui seul la résolution ; un quota explicitement épuisé est un hard gate du selector.
 
 ## Portée du lot V7.4
 
