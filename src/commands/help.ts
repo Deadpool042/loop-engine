@@ -46,6 +46,12 @@ export function printHelp(): void {
     "pnpm loop roadmap status <project> --json — état de planning en JSON",
   );
   terminal.info(
+    "pnpm loop roadmap overview <project> [--json] — projection bornée des lots et clés de détail",
+  );
+  terminal.info(
+    "pnpm loop roadmap detail <project> --candidate-key <key> [--json] — détail borné d’un lot canonique",
+  );
+  terminal.info(
     "pnpm loop roadmap objective <project> — source canonique d’objectif",
   );
   terminal.info(

@@ -65,6 +65,7 @@ import {
   MAX_PROPOSAL_CONTEXT_VALIDATION_COMMANDS,
   projectRoadmapProposalCandidate,
   projectRoadmapProposalStringCollection,
+  roadmapCandidateDetailKey,
 } from "../intelligence/proposal-context.js";
 import {
   changedPathsFromGitDiff,
@@ -72,7 +73,10 @@ import {
   mergeChangedPaths,
   untrackedPathsFromGitStatus,
 } from "../documentation/index.js";
-import { resolveSelectedLotDetail } from "./selected-lot-detail.js";
+import {
+  resolveRoadmapCandidateDetail,
+  resolveSelectedLotDetail,
+} from "./selected-lot-detail.js";
 
 export function generateProjectReport(project: ProjectConfig) {
   return buildProjectSnapshot(project);
@@ -161,6 +165,66 @@ export function generateRoadmapOverviewReport(project: ProjectConfig) {
       summary: snapshot.roadmap.summary,
     }),
     health: snapshot.health,
+  });
+}
+
+export function generateRoadmapCandidateDetailReport(
+  project: ProjectConfig,
+  candidateKey: string,
+) {
+  const snapshot = generateProjectReport(project);
+  const projectIdentity = Object.freeze({ name: snapshot.project.name });
+
+  if (!snapshot.roadmap.available) {
+    return Object.freeze({
+      schemaVersion: 1 as const,
+      project: projectIdentity,
+      status: "unavailable" as const,
+      reason: "roadmap_unavailable",
+    });
+  }
+
+  if (!/^[a-f0-9]{32}$/.test(candidateKey)) {
+    return Object.freeze({
+      schemaVersion: 1 as const,
+      project: projectIdentity,
+      status: "not_found" as const,
+      reason: "invalid_candidate_key",
+    });
+  }
+
+  const candidate = snapshot.roadmap.candidates.find(
+    (item) => roadmapCandidateDetailKey(item) === candidateKey,
+  );
+
+  if (!candidate) {
+    return Object.freeze({
+      schemaVersion: 1 as const,
+      project: projectIdentity,
+      status: "not_found" as const,
+      reason: "candidate_not_found",
+    });
+  }
+
+  const projectedCandidate = projectRoadmapProposalCandidate(candidate);
+  const detail = resolveRoadmapCandidateDetail(snapshot.project.path, candidate);
+
+  if (!detail) {
+    return Object.freeze({
+      schemaVersion: 1 as const,
+      project: projectIdentity,
+      status: "not_documented" as const,
+      reason: "candidate_detail_not_documented",
+      candidate: projectedCandidate,
+    });
+  }
+
+  return Object.freeze({
+    schemaVersion: 1 as const,
+    project: projectIdentity,
+    status: "ok" as const,
+    candidate: projectedCandidate,
+    detail,
   });
 }
 
