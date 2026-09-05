@@ -46,7 +46,7 @@ describe("LoopRunner execute validation repair audit", () => {
   });
 
   it("requires model escalation to remain policy-bounded", () => {
-    const runner = readFileSync(RUNNER_FILE, "utf8").replace(
+    const runner = readFileSync(RUNNER_FILE, "utf8").replaceAll(
       "maxAttempts: modelAttemptBudget",
       "maxAttempts: Number.MAX_SAFE_INTEGER",
     );
