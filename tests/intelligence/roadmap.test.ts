@@ -645,7 +645,7 @@ describe("execution projection contract", () => {
 });
 
 describe("loop-engine roadmap state", () => {
-  it("keeps historical delivered lots through V43 done and leaves no active candidate", () => {
+  it("keeps historical delivered lots through V43 done and selects V48.0", () => {
     const currentDir = dirname(fileURLToPath(import.meta.url));
     const repoRoot = resolve(currentDir, "..", "..");
     const project: ProjectConfig = {
@@ -714,12 +714,26 @@ describe("loop-engine roadmap state", () => {
     assert.equal(v43Candidates.length, 1);
     assert.equal(v43Candidates[0]?.status, "done");
 
+    const v48Candidates = candidates.filter((candidate) =>
+      /V48\.[0-6]/.test(candidate.text),
+    );
+    assert.equal(v48Candidates.length, 7);
+    assert.ok(
+      v48Candidates.every((candidate) => candidate.status === "todo"),
+      "expected V48.0 through V48.6 to remain active",
+    );
+
     const activeCandidates = candidates.filter(
       (candidate) => candidate.status !== "done",
     );
-    assert.equal(activeCandidates.length, 0);
+    assert.equal(activeCandidates.length, 7);
+    assert.ok(
+      activeCandidates.every((candidate) => /V48\.[0-6]/.test(candidate.text)),
+      "expected only V48.0 through V48.6 to remain active",
+    );
 
     const selected = selectRoadmapCandidate(candidates);
-    assert.equal(selected, null);
+    assert.match(selected?.text ?? "", /V48\.0/);
+    assert.equal(selected?.priority, "p1");
   });
 });
