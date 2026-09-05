@@ -156,6 +156,27 @@ function providerExecutableName(provider: LoopProviderId): string {
   return provider === "claude_code" ? "claude" : "codex";
 }
 
+function buildProviderConfiguration(
+  providerId: LoopProviderId,
+  executable: string,
+  model: string | undefined,
+  timeoutMs: number | undefined,
+): LoopProviderConfiguration {
+  return providerId === "codex"
+    ? {
+        id: "codex",
+        executable,
+        ...(model ? { model } : {}),
+        ...(timeoutMs ? { timeoutMs } : {}),
+      }
+    : {
+        id: "claude_code",
+        executable,
+        ...(model ? { model } : {}),
+        ...(timeoutMs ? { timeoutMs } : {}),
+      };
+}
+
 function failOption(
   json: boolean,
   code: Parameters<typeof printJsonError>[0],
@@ -643,6 +664,54 @@ else if (command === "review") {
 
   const providerExecutable = optionValue("--provider-executable");
   const providerModel = optionValue("--provider-model");
+
+  const fallbackProviderValue = optionValue("--fallback-provider");
+  if (hasOption("--fallback-provider") && fallbackProviderValue === undefined) {
+    failOption(
+      json,
+      "unsupported_provider",
+      "Missing value for --fallback-provider",
+    );
+  }
+  const fallbackProviderId =
+    fallbackProviderValue === undefined
+      ? undefined
+      : isLoopProviderId(fallbackProviderValue)
+        ? fallbackProviderValue
+        : failOption(
+            json,
+            "unsupported_provider",
+            `Unsupported fallback provider: ${fallbackProviderValue}`,
+          );
+  const fallbackProviderExecutable = optionValue(
+    "--fallback-provider-executable",
+  );
+  const fallbackProviderModel = optionValue("--fallback-provider-model");
+  const fallbackTimeoutValue = optionValue("--fallback-provider-timeout-ms");
+  if (
+    hasOption("--fallback-provider-timeout-ms") &&
+    fallbackTimeoutValue === undefined
+  ) {
+    failOption(
+      json,
+      "invalid_provider_timeout",
+      "Missing value for --fallback-provider-timeout-ms",
+    );
+  }
+  const fallbackProviderTimeoutMs =
+    fallbackTimeoutValue === undefined ? undefined : Number(fallbackTimeoutValue);
+  if (
+    fallbackProviderTimeoutMs !== undefined &&
+    (!Number.isInteger(fallbackProviderTimeoutMs) ||
+      fallbackProviderTimeoutMs <= 0)
+  ) {
+    failOption(
+      json,
+      "invalid_provider_timeout",
+      `Invalid --fallback-provider-timeout-ms value: ${fallbackTimeoutValue}`,
+    );
+  }
+
   const candidateId = optionValue("--candidate");
   const commitMessage = optionValue("--commit-message");
   const exportPatchPath = optionValue("--export-patch");
@@ -708,30 +777,94 @@ else if (command === "review") {
     );
   }
 
+  const hasFallbackSpecificOption =
+    hasOption("--fallback-provider-executable") ||
+    hasOption("--fallback-provider-model") ||
+    hasOption("--fallback-provider-timeout-ms");
+  if (fallbackProviderId === undefined && hasFallbackSpecificOption) {
+    failOption(
+      json,
+      "unsupported_provider",
+      "Fallback provider options require --fallback-provider.",
+    );
+  }
+  if (fallbackProviderId !== undefined && providerId === undefined) {
+    failOption(
+      json,
+      "unsupported_provider",
+      "--fallback-provider requires an explicit primary --provider.",
+    );
+  }
+  if (
+    fallbackProviderId !== undefined &&
+    fallbackProviderId === providerId
+  ) {
+    failOption(
+      json,
+      "unsupported_provider",
+      "Fallback provider must differ from the primary provider.",
+    );
+  }
+  if (
+    fallbackProviderId !== undefined &&
+    fallbackProviderExecutable === undefined
+  ) {
+    failOption(
+      json,
+      "missing_provider_executable",
+      `${providerLabel(fallbackProviderId)} fallback provider requires --fallback-provider-executable.`,
+    );
+  }
+  if (
+    fallbackProviderId !== undefined &&
+    mode !== "execute" &&
+    mode !== "publish"
+  ) {
+    failOption(
+      json,
+      "unsupported_provider",
+      "--fallback-provider is only supported in execute or publish mode.",
+    );
+  }
+
   let runApplication: LoopApplicationAssembly = application;
   if (providerId !== undefined && providerExecutable !== undefined) {
-    const provider: LoopProviderConfiguration =
-      providerId === "codex"
-        ? {
-            id: "codex",
-            executable: providerExecutable,
-            ...(providerModel ? { model: providerModel } : {}),
-            ...(providerTimeoutMs ? { timeoutMs: providerTimeoutMs } : {}),
-          }
-        : {
-            id: "claude_code",
-            executable: providerExecutable,
-            ...(providerModel ? { model: providerModel } : {}),
-            ...(providerTimeoutMs ? { timeoutMs: providerTimeoutMs } : {}),
-          };
+    const provider = buildProviderConfiguration(
+      providerId,
+      providerExecutable,
+      providerModel,
+      providerTimeoutMs,
+    );
+    const fallbackProvider =
+      fallbackProviderId !== undefined &&
+      fallbackProviderExecutable !== undefined
+        ? buildProviderConfiguration(
+            fallbackProviderId,
+            fallbackProviderExecutable,
+            fallbackProviderModel,
+            fallbackProviderTimeoutMs,
+          )
+        : undefined;
 
     try {
-      runApplication = createLoopApplicationAssembly({ provider });
+      runApplication =
+        fallbackProvider === undefined
+          ? createLoopApplicationAssembly({ provider })
+          : createLoopApplicationAssembly({
+              providers: [provider, fallbackProvider],
+              maxProviderAttempts: 2,
+            });
     } catch {
+      const primaryRequirement =
+        `${providerLabel(providerId)} provider executable must resolve to a command named ${providerExecutableName(providerId)}.`;
+      const fallbackRequirement =
+        fallbackProviderId === undefined
+          ? ""
+          : ` ${providerLabel(fallbackProviderId)} fallback executable must resolve to a command named ${providerExecutableName(fallbackProviderId)}.`;
       failOption(
         json,
         "invalid_provider_executable",
-        `${providerLabel(providerId)} provider executable must resolve to a command named ${providerExecutableName(providerId)}.`,
+        `${primaryRequirement}${fallbackRequirement}`,
       );
     }
   }

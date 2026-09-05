@@ -86,6 +86,8 @@ Travail :
 
 Critère de réussite : les deux runtimes produisent des résultats gouvernés comparables et le failover existant reste l'unique mécanisme inter-provider.
 
+Preuve du 2026-09-05 : Claude Code / Haiku 4.5 a été invoqué réellement sur V48.1. Le run `6777fa8c-d667-427d-99e7-bcfd38115c67` a terminé en `provider_timeout` à 120 s ; le run `07cdaca2-770b-4c5f-a7a9-c7978475ad99`, avec borne portée à 300 s, a atteint `provider_max_turns` après 20 tours. Dans les deux cas, les effets sont restés dans le worktree isolé et aucun delta n'a atteint le dépôt source. Le chemin public `loop run` expose désormais un fallback explicite mais délègue au mécanisme canonique `providers + maxProviderAttempts`, sans second router. Le run terminal `95e7560f-7e19-4515-995d-439ad2708b79` a qualifié ce chemin : première tentative Anthropic `provider_unavailable` récupérable, seconde tentative OpenAI / Codex / GPT-5.6 Luna `completed`, validation `pnpm run validate` exit 0, 0 réparation, 0 fichier modifié. Conclusion : Claude Code est bien exercé comme runtime gouverné mais Haiku 4.5 n'est pas qualifié comme executor autonome suffisant pour ce candidat générique ; le failover inter-provider est qualifié.
+
 ### V48.2 [P2] — Portefeuille de modèles configurable
 
 Objectif : représenter plusieurs niveaux de modèles par provider sans figer la gamme actuelle dans le Core.

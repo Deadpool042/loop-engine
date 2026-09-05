@@ -94,6 +94,12 @@ export function printHelp(): void {
     "Options provider: --provider-model <model> --provider-timeout-ms <ms>",
   );
   terminal.info(
+    "Fallback explicite execute/publish: --fallback-provider <codex|claude_code> --fallback-provider-executable <path>",
+  );
+  terminal.info(
+    "Options fallback: --fallback-provider-model <model> --fallback-provider-timeout-ms <ms>",
+  );
+  terminal.info(
     "pnpm loop runs <project>           — historique des runs terminés (le plus récent d'abord)",
   );
   terminal.info(
