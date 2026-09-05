@@ -18,6 +18,9 @@ const REQUIRED_RUNNER_TOKENS = Object.freeze([
   "agentPolicy.selectionRequest.budgetCeiling?.maxRepairs",
   "Math.min(dependencies.maxRepairs, policyRepairCeiling)",
   "await dependencies.executor(",
+  "resolveModelAttemptBudget(",
+  "resolveIntraProviderModelEscalation({",
+  "modelAttemptBudget",
   'transition("validating"',
   'transition("repairing"',
   "repairAttempts >= effectiveMaxRepairs",
@@ -49,7 +52,8 @@ export function inspectLoopRunnerExecuteInvariant(
 ): Readonly<{
   missing: readonly string[];
   forbidden: readonly string[];
-  executorCallCount: number;
+  executorCallSites: number;
+  boundedModelEscalation: boolean;
   repairBeforeRevalidation: boolean;
 }> {
   const missing = [
@@ -97,10 +101,17 @@ export function inspectLoopRunnerExecuteInvariant(
   return Object.freeze({
     missing: Object.freeze(missing),
     forbidden: Object.freeze(forbidden),
-    executorCallCount: countOccurrences(
+    executorCallSites: countOccurrences(
       runnerSource,
       "await dependencies.executor(",
     ),
+    boundedModelEscalation:
+      sourceIncludesToken(runnerSource, "modelAttemptBudget = resolveModelAttemptBudget(") &&
+      sourceIncludesToken(
+        runnerSource,
+        "completedAttempts: completedModelAttempts",
+      ) &&
+      sourceIncludesToken(runnerSource, "maxAttempts: modelAttemptBudget"),
     repairBeforeRevalidation:
       repairIndex !== -1 &&
       followingValidationIndex !== -1 &&
@@ -116,7 +127,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
     title:
       "LoopRunner execute mode validates and repairs within a finite budget",
     description:
-      "The V14.4 execute runner must require policy admission, call one injected executor, validate after execution, clamp the caller repair request to the resolved policy ceiling, repair only within that effective finite budget, revalidate after repair, report modified files, and never commit or publish itself.",
+      "The execute runner must require policy admission, keep top-level model attempts bounded by policy, validate after execution, clamp the caller repair request to the resolved policy ceiling, repair only within that effective finite budget, revalidate after repair, report modified files, and never commit or publish itself.",
     metadata: {
       introducedIn: "V14.4",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -151,11 +162,14 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
         ...result.forbidden.map(
           (token) => `${RUNNER_FILE} -> forbidden: ${token}`,
         ),
-        ...(result.executorCallCount === 1
+        ...(result.executorCallSites >= 1 && result.executorCallSites <= 3
           ? []
           : [
-              `${RUNNER_FILE} -> expected one executor call site, found ${result.executorCallCount}`,
+              `${RUNNER_FILE} -> unexpected executor call-site count: ${result.executorCallSites}`,
             ]),
+        ...(result.boundedModelEscalation
+          ? []
+          : [`${RUNNER_FILE} -> model escalation must be policy-bounded`]),
         ...(result.repairBeforeRevalidation
           ? []
           : [`${RUNNER_FILE} -> repair must precede revalidation`]),
@@ -166,7 +180,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Keep V14.4 as one fail-closed execute/validate/repair boundary: admit policy before execution, clamp the requested repair count to the resolved policy ceiling, invoke one injected executor, revalidate after each bounded repair, and leave commit/publication null inside the execute runner; route explicit candidate publication outside it.",
+            "Keep one fail-closed execute/validate/repair boundary: admit policy before execution, bound top-level model attempts through the resolved policy, clamp the requested repair count to the resolved repair ceiling, revalidate after each bounded repair or admitted model escalation, and leave commit/publication null inside the execute runner; route explicit publication outside it.",
           )
         : pass(
             rule,

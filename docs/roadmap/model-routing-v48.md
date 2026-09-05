@@ -165,6 +165,8 @@ Règles :
 
 Critère de réussite : une tentative supplémentaire est toujours justifiable par la raison d'échec précédente et reste bornée par la policy.
 
+Preuve V48.5 : `src/loop/model-escalation.ts` centralise la décision pure de montée de profil. Le défaut global autorise au plus deux appels top-level en mode exécutable — tentative initiale + une seule escalade — et une requête restrictive peut ramener ce plafond à 1. Le runner ne déclenche cette seconde tentative que sur `provider_max_turns` ou sur un `validation_failed` arrivé au bout du budget de réparation. La sélection reste sur le même provider/runtime, réapplique les hard requirements et choisit le plus petit profil strictement supérieur admissible ; aucune erreur de timeout, rate-limit, disponibilité ou runtime n'est transformée en achat de capacité. L'ancien helper `escalateAgentProfile` a été aligné sur la même frontière. L'evidence `modelEscalationEvidence` enregistre le trigger et la transition de profil. Qualification locale : TypeScript vert, `json-check` vert, `git diff --check` vert, audit strict 635/635 et audit profiles vert ; la CI de PR reste le gate de livraison finale.
+
 ### V48.6 [P3] — Stratégie abonnement / crédits / API
 
 Objectif : optimiser le coût total réel plutôt que le seul tarif API nominal.

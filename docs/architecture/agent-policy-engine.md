@@ -165,14 +165,34 @@ Invariants garantis par construction (pas d'exécution réelle dans ce lot, donc
 
 ```text
 plan    -> maxCalls: 0, maxRepairs: 0   (jamais d'appel réel)
-execute -> maxCalls: 1, maxRepairs: 1
-commit  -> maxCalls: 1, maxRepairs: 1
-publish -> maxCalls: 1, maxRepairs: 1
+execute -> maxCalls: 2, maxRepairs: 1
+commit  -> maxCalls: 2, maxRepairs: 1
+publish -> maxCalls: 2, maxRepairs: 1
 ```
 
-Cette valeur reste `requirements.executionBudget` — un champ purement informatif, jamais utilisé pour filtrer les profils d'agents pendant une résolution en mode `plan`. Si elle l'était, **tout** profil serait rejeté (aucun profil réel n'annonce `maxCalls: 0`), rendant la prévision inutilisable.
+Cette valeur reste `requirements.executionBudget` — un champ purement informatif en mode `plan`. Pour les modes exécutables, `maxCalls: 2` borne V48.5 à une tentative initiale plus au plus une escalade intra-provider ; une requête plus restrictive peut ramener ce plafond à 1. Si le budget `plan` était utilisé pour filtrer la prévision, **tout** profil serait rejeté (aucun profil réel n'annonce `maxCalls: 0`), rendant la prévision inutilisable.
 
 `getForecastSelectionBudgetForMode(mode)` répond à ce problème. Son nom est délibérément explicite : ce n'est **pas** un budget exécutable, seulement une **simulation de compatibilité** — elle fournit le budget utilisé pour filtrer les profils candidats pendant `resolvePolicy` — celui du mode `execute` lorsque le mode courant est `plan` (on prévisualise "que se passerait-il si ce candidat passait à l'exécution réelle ?"), et le budget propre du mode sinon. Elle n'autorise jamais un appel : la garantie "le mode `plan` ne fait jamais d'appel réel" reste portée uniquement par le flux de contrôle du `LoopRunner` (aucun code n'appelle jamais un agent), jamais par la valeur retournée par cette fonction.
+
+## Escalade intra-provider bornée (V48.5)
+
+Le runner consomme `AgentPolicy.allowEscalation` et le plafond
+`selectionRequest.budgetCeiling.maxCalls` uniquement après une vraie tentative.
+Le défaut autorise **au plus deux tentatives top-level** : le modèle initial puis
+une seule montée de niveau.
+
+L'escalade est fail-closed et ne s'applique qu'à des causes structurées liées au
+modèle : `provider_max_turns`, ou `validation_failed` après épuisement du
+cycle de réparation. Les erreurs de runtime, timeout, rate-limit ou
+indisponibilité ne montent pas de modèle : elles restent du ressort du failover
+inter-provider existant ou d'un arrêt explicite.
+
+Le profil suivant doit appartenir au **même provider et au même runtime**,
+rester disponible, satisfaire exactement les hard requirements déjà admis et
+être strictement supérieur dans le portefeuille configuré. Le plan reconstruit
+conserve le même candidat, contexte, `allowedPaths`, permissions et validations.
+L'evidence `modelEscalationEvidence` expose le trigger et la transition de profil
+sans diagnostic fournisseur sensible.
 
 ## Politique de contexte
 

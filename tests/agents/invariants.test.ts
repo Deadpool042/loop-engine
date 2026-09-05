@@ -309,7 +309,7 @@ describe("invariant: escalation requires an explicit failure, respects budgets, 
           requiredPermissions: [],
         },
         previousProfileId: currentId,
-        failureReason: "runtime_error",
+        failureReason: "validation_failed",
       });
 
       if (result.outcome === "exhausted") {

@@ -84,7 +84,7 @@ const escalationRequest: AgentEscalationRequest = Object.freeze({
   registry: escalationRegistry,
   request: escalationRequestWithoutBudgetCeiling,
   previousProfileId: "agent-low",
-  failureReason: "runtime_error",
+  failureReason: "validation_failed",
 });
 
 function runtimeResult(status: RuntimeResult["status"]): RuntimeResult {
@@ -159,7 +159,7 @@ function buildInput(
     registry,
     request,
     previousProfileId: "agent-low",
-    failureReason: "runtime_error",
+    failureReason: "validation_failed",
   }) satisfies CreateAgentEscalationRequestFromRuntimeDecisionInput;
 }
 
@@ -192,7 +192,7 @@ describe("createAgentEscalationRequestFromRuntimeDecision", () => {
       registry,
       request,
       previousProfileId: "agent-low",
-      failureReason: "runtime_error",
+      failureReason: "validation_failed",
     } satisfies AgentEscalationRequest);
     assert.ok(result);
     assert.ok(Object.isFrozen(result));
@@ -361,7 +361,7 @@ describe("evaluateLoopRuntimeAgentEscalation", () => {
     });
   });
 
-  it("performs the pure agent escalation path when the failure is eligible", () => {
+  it("does not convert an eligible runtime timeout into a model escalation", () => {
     const result = evaluateLoopRuntimeAgentEscalation(
       buildInput(executedResult("timed_out"), eligiblePolicy),
     );
@@ -381,22 +381,8 @@ describe("evaluateLoopRuntimeAgentEscalation", () => {
         failureKind: "timed_out",
         runtimeStatus: "timed_out",
       },
-      agentRequest: {
-        registry: escalationRegistry,
-        request: escalationRequestWithoutBudgetCeiling,
-        previousProfileId: "agent-low",
-        failureReason: "runtime_error",
-      },
-      agentEscalationResult: {
-        outcome: "escalated",
-        profile: escalationRegistry.profiles[1],
-        rejected: [
-          {
-            profileId: "agent-low",
-            reason: "excluded: this is the profile that just failed",
-          },
-        ],
-      },
+      agentRequest: null,
+      agentEscalationResult: null,
     });
   });
 
@@ -430,21 +416,8 @@ describe("evaluateLoopRuntimeAgentEscalation", () => {
       }) satisfies Parameters<typeof evaluateLoopRuntimeAgentEscalation>[0],
     );
 
-    assert.deepEqual(result.agentRequest, {
-      registry: exhaustedRegistry,
-      request: escalationRequestWithoutBudgetCeiling,
-      previousProfileId: "agent-only",
-      failureReason: "runtime_error",
-    });
-    assert.deepEqual(result.agentEscalationResult, {
-      outcome: "exhausted",
-      rejected: [
-        {
-          profileId: "agent-only",
-          reason: "excluded: this is the profile that just failed",
-        },
-      ],
-    });
+    assert.equal(result.agentRequest, null);
+    assert.equal(result.agentEscalationResult, null);
   });
 
   it("preserves the full five-step composition without mutating inputs", () => {
@@ -600,16 +573,8 @@ describe("evaluatePolicyBoundRuntimeExecutionEscalation", () => {
         buildInput(bridge, eligiblePolicy),
       ),
     );
-    assert.deepEqual(result.agentEscalationResult, {
-      outcome: "escalated",
-      profile: escalationRegistry.profiles[1],
-      rejected: [
-        {
-          profileId: "agent-low",
-          reason: "excluded: this is the profile that just failed",
-        },
-      ],
-    });
+    assert.equal(result.agentRequest, null);
+    assert.equal(result.agentEscalationResult, null);
   });
 
   it("ignores receipt payloads and keeps the runtime output out of the adapter result", () => {
@@ -732,7 +697,7 @@ describe("createAgentEscalationRequestFromRuntimeDecision safety boundary", () =
     });
 
     assert.equal(decision.action, "escalate");
-    assert.ok(escalation);
+    assert.equal(escalation, null);
   });
 });
 
@@ -780,7 +745,7 @@ describe("evaluateRuntimeAgentEscalation", () => {
         registry: exhaustedRegistry,
         request,
         previousProfileId: "agent-only",
-        failureReason: "runtime_error",
+        failureReason: "validation_failed",
       }),
     );
 

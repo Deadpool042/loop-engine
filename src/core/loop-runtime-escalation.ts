@@ -2,7 +2,10 @@ import type {
   AgentEscalationRequest,
   AgentEscalationResult,
 } from "../agents/escalation.js";
-import { escalateAgentProfile } from "../agents/escalation.js";
+import {
+  escalateAgentProfile,
+  isAgentFailureReasonModelEscalationEligible,
+} from "../agents/escalation.js";
 import type { AgentRegistry } from "../agents/registry.js";
 import type { AgentSelectionRequest } from "../agents/selector.js";
 
@@ -56,7 +59,10 @@ export type CreateAgentEscalationRequestFromRuntimeDecisionInput = Readonly<{
 export function createAgentEscalationRequestFromRuntimeDecision(
   input: CreateAgentEscalationRequestFromRuntimeDecisionInput,
 ): AgentEscalationRequest | null {
-  if (input.decision.action !== "escalate") {
+  if (
+    input.decision.action !== "escalate" ||
+    !isAgentFailureReasonModelEscalationEligible(input.failureReason)
+  ) {
     return null;
   }
 
