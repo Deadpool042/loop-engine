@@ -87,7 +87,7 @@ Deterministic, keyword-based, intentionally naive — no NLP, no dependency reso
   - `blocked`: `production finale`, `mise en production`, `paiement`, `migration`, `delete`, `supprimer`. Note `prod` alone is _not_ blocking (avoids false positives on `produit`).
   - `warning`: `déploiement`/`deploiement`, `vps`, `dns`, `bascule`, `sécurité`/`securite`.
   - otherwise `safe`.
-- `selectRoadmapCandidate` ignores `done` candidates, then prefers `safe` > `warning` > `blocked` (a `blocked`-only result should never be presented as a safe next micro-lot — the `next` command must make that distinction, not silently recommend it).
+- `selectRoadmapCandidate` preserves the canonical declaration order: it ignores completed candidates, examines the first remaining candidate only, and never skips it because a later lot is safer or has a higher priority marker. If that first open candidate is not admissible, no later candidate is selected. `kind` and `priority` remain descriptive/risk metadata, not a license to reorder the roadmap.
 
 When adjusting keyword lists, favor precision (avoid blocking ordinary work) over recall, and keep any new pattern covered by a test in `tests/intelligence/roadmap.test.ts`.
 

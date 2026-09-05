@@ -428,45 +428,20 @@ export function findRoadmapCandidates(
   return analyzeRoadmaps(project, projectPath).candidates;
 }
 
-const PRIORITY_ORDER: readonly RoadmapPriority[] = [
-  "p1",
-  "p2",
-  "p3",
-  "default",
-];
-
-function selectByPriority(
-  candidates: readonly RoadmapCandidate[],
-): RoadmapCandidate | null {
-  for (const priority of PRIORITY_ORDER) {
-    const candidate = candidates.find((item) => item.priority === priority);
-
-    if (candidate) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
 export function selectRoadmapCandidate(
   candidates: readonly RoadmapCandidate[],
 ): RoadmapCandidate | null {
-  const activeCandidates = candidates.filter(
-    (candidate) =>
-      candidate.status !== "done" &&
-      candidate.admissibility?.state !== "not_admissible",
+  const firstOpenCandidate = candidates.find(
+    (candidate) => candidate.status !== "done",
   );
 
-  const safeCandidate = selectByPriority(
-    activeCandidates.filter((candidate) => candidate.kind === "safe"),
-  );
-  const warningCandidate = selectByPriority(
-    activeCandidates.filter((candidate) => candidate.kind === "warning"),
-  );
-  const blockedCandidate = selectByPriority(
-    activeCandidates.filter((candidate) => candidate.kind === "blocked"),
-  );
+  if (!firstOpenCandidate) {
+    return null;
+  }
 
-  return safeCandidate ?? warningCandidate ?? blockedCandidate ?? null;
+  if (firstOpenCandidate.admissibility?.state === "not_admissible") {
+    return null;
+  }
+
+  return firstOpenCandidate;
 }

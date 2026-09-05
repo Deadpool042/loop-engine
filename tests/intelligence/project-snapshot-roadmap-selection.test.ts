@@ -109,6 +109,28 @@ describe("project snapshot roadmap selection", () => {
     }
   });
 
+  it("does not skip a gated first lot to select later admissible work", () => {
+    const { project, cleanup } = setupProject(
+      [
+        "<!-- loop-engine:phase-gate phase=H1 state=closed blockedBy=H0-RC -->",
+        "| H1-L1 | Current gated lot | ⬜ À faire |",
+        "| H2-L1 | Later admissible lot | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    try {
+      const snapshot = buildProjectSnapshot(project);
+
+      assert.equal(snapshot.roadmap.stats.todo, 2);
+      assert.equal(snapshot.roadmap.summary.selectable, 0);
+      assert.equal(snapshot.roadmap.selectedCandidate, null);
+      assert.equal(snapshot.planning.recommendation, "gated_no_work");
+      assert.equal(snapshot.roadmap.candidates[1]?.admissibility?.state, "admissible");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("selects the first remaining structured-table lot", () => {
     const currentDir = fileURLToPath(new URL(".", import.meta.url));
     const roadmap = readFileSync(
@@ -124,7 +146,7 @@ describe("project snapshot roadmap selection", () => {
       assert.equal(snapshot.roadmap.stats.done, 10);
       assert.equal(snapshot.roadmap.stats.todo, 16);
       assert.equal(snapshot.roadmap.stats.unknown, 0);
-      assert.equal(snapshot.roadmap.summary.selectable, 16);
+      assert.equal(snapshot.roadmap.summary.selectable, 1);
       assert.match(snapshot.roadmap.selectedCandidate?.text ?? "", /H1-L4/);
       assert.equal(snapshot.roadmap.selectedCandidate?.status, "todo");
       assert.deepEqual(snapshot.roadmap.selectedCandidate?.admissibility, {
