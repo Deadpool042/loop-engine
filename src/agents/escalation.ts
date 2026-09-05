@@ -16,6 +16,12 @@ export const AGENT_FAILURE_REASONS = [
 
 export type AgentFailureReason = (typeof AGENT_FAILURE_REASONS)[number];
 
+export function isAgentFailureReasonModelEscalationEligible(
+  reason: AgentFailureReason,
+): boolean {
+  return reason === "capability_gap" || reason === "validation_failed";
+}
+
 export type AgentEscalationRequest = Readonly<{
   registry: AgentRegistry;
   request: AgentSelectionRequest;
@@ -53,10 +59,7 @@ export function escalateAgentProfile(
   const rejected: AgentRejection[] = [];
   const eligible: AgentProfile[] = [];
 
-  if (
-    input.failureReason === "runtime_error" ||
-    input.failureReason === "budget_exceeded"
-  ) {
+  if (!isAgentFailureReasonModelEscalationEligible(input.failureReason)) {
     return {
       outcome: "exhausted",
       rejected: input.registry.profiles.map((profile) => ({

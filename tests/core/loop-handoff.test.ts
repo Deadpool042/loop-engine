@@ -963,22 +963,8 @@ describe("executeLoopPolicyBoundLocalProcessWithEscalationEvaluation", () => {
 
       assert.equal(calls, 1);
       assert.equal(eligible.escalationEvaluation.decision.action, "escalate");
-      assert.deepEqual(eligible.escalationEvaluation.agentRequest, {
-        registry: escalationRegistry,
-        request: escalationRequest,
-        previousProfileId: "agent-low",
-        failureReason: "runtime_error",
-      });
-      assert.deepEqual(eligible.escalationEvaluation.agentEscalationResult, {
-        outcome: "escalated",
-        profile: escalationRegistry.profiles[1],
-        rejected: [
-          {
-            profileId: "agent-low",
-            reason: "excluded: this is the profile that just failed",
-          },
-        ],
-      });
+      assert.equal(eligible.escalationEvaluation.agentRequest, null);
+      assert.equal(eligible.escalationEvaluation.agentEscalationResult, null);
 
       const ineligible = await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
         project.name,
@@ -1177,7 +1163,9 @@ describe("projectLoopRuntimeEscalationResult", () => {
       const selected = await executeLoopPolicyBoundLocalProcessWithEscalationEvaluation(
         project.name,
         bridgeInput(loopRunResult, root),
-        defaultEscalationInput(),
+        defaultEscalationInput({
+          failureReason: "validation_failed",
+        }),
         {
           ...options,
           executePolicyBoundLocalProcessWithReceipt: async () =>
@@ -1196,6 +1184,7 @@ describe("projectLoopRuntimeEscalationResult", () => {
         bridgeInput(loopRunResult, root),
         defaultEscalationInput({
           registry: singleProfileRegistry,
+          failureReason: "validation_failed",
         }),
         {
           ...options,
