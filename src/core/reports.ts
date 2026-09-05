@@ -131,6 +131,50 @@ export function generateRoadmapPlanningStatusReport(project: ProjectConfig) {
   };
 }
 
+function buildRoadmapCompletionEvent(
+  snapshot: ReturnType<typeof buildProjectSnapshot>,
+) {
+  const sequencedCandidates = snapshot.roadmap.candidates.filter(
+    (candidate) => candidate.status !== "unknown",
+  );
+  const firstOpenIndex = sequencedCandidates.findIndex(
+    (candidate) => candidate.status !== "done",
+  );
+  const completedIndex =
+    firstOpenIndex === -1
+      ? sequencedCandidates.length - 1
+      : firstOpenIndex - 1;
+  const completedCandidate = sequencedCandidates[completedIndex];
+
+  if (!completedCandidate || completedCandidate.status !== "done") {
+    return null;
+  }
+
+  const stableCandidateIdentity =
+    completedCandidate.id ??
+    `${completedCandidate.path}:${completedCandidate.line}`;
+  const eventId = createHash("sha256")
+    .update("lot.completed")
+    .update("\0")
+    .update(snapshot.project.name)
+    .update("\0")
+    .update(stableCandidateIdentity)
+    .digest("hex")
+    .slice(0, 32);
+
+  return Object.freeze({
+    schemaVersion: 1 as const,
+    type: "lot.completed" as const,
+    eventId,
+    project: Object.freeze({ name: snapshot.project.name }),
+    candidate: projectRoadmapProposalCandidate(completedCandidate),
+    nextCandidate:
+      snapshot.roadmap.selectedCandidate === null
+        ? null
+        : projectRoadmapProposalCandidate(snapshot.roadmap.selectedCandidate),
+  });
+}
+
 /**
  * Deterministic, bounded roadmap projection for external/read-only cockpits.
  * It is intentionally independent from objective/proposal eligibility: a
@@ -159,6 +203,7 @@ export function generateRoadmapOverviewReport(project: ProjectConfig) {
         snapshot.project.path,
         snapshot.roadmap.selectedCandidate,
       ),
+      completionEvent: buildRoadmapCompletionEvent(snapshot),
       candidates: projected.candidates,
       phaseGates: projected.phaseGates,
       stats: snapshot.roadmap.stats,

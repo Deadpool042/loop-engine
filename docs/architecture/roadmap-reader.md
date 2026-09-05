@@ -303,4 +303,25 @@ Aucun provider n'est appelé.
 
 Cette surface est destinée notamment aux cockpits read-only : le résumé reste
 léger et le détail peut être chargé à la demande.
+
+## Événement déterministe de frontière terminée
+
+La projection `roadmap overview` expose également `roadmap.completionEvent`.
+
+Ce champ est calculé sans état externe et sans horloge à partir de la séquence
+canonique courante :
+
+- le premier candidat non terminé reste la frontière active ;
+- le candidat immédiatement précédent constitue la frontière terminée la plus récente ;
+- si cette frontière est bien `done`, l'événement vaut `lot.completed` ;
+- sinon le champ vaut `null`.
+
+L'`eventId` est un hash borné du type d'événement, du projet et de l'identité
+stable du lot (`candidate.id` lorsqu'il existe, sinon `path + line`). Il ne
+contient aucun secret et reste identique entre deux lectures du même état.
+
+Le contrat sert aux consommateurs périphériques comme n8n : ils peuvent
+dédupliquer et notifier sans reparsing de roadmap, sans réordonner les lots et
+sans devenir source de vérité. Le premier passage d'un poller doit établir une
+baseline plutôt que notifier tout l'historique existant.
 ```
