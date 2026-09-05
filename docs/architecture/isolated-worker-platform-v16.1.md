@@ -54,6 +54,17 @@ The adapter cannot clean up descendants left behind by a crashed provider. GUI-d
 
 Allocation uses `git worktree add --detach` from an explicit repository and defaults to `HEAD` unless a `baseRef` is injected. Release uses `git worktree remove --force` and performs defensive filesystem cleanup. The adapter does not create, commit, or push a branch.
 
+Before a provider is invoked, the composition layer honors the project's
+`workspace.dependencies` policy. `none` and `on_demand` do not trigger any
+implicit dependency action. For `production`, a pnpm project with a pinned
+`packageManager` and committed `pnpm-lock.yaml` is rehydrated inside the
+disposable worktree with `pnpm install --offline --frozen-lockfile --ignore-scripts`.
+`COREPACK_ENABLE_NETWORK=0` prevents Corepack from fetching a missing package
+manager. The source checkout's `node_modules` is never shared writable with the
+isolated worktree, lifecycle scripts are not run implicitly, and an unavailable
+local store fails closed before the provider with
+`workspace_dependency_preparation_failed`.
+
 The existing controlled `commit` mode deliberately remains outside this first
 composition step: it still commits its validated source-worktree delta. No
 automatic cherry-pick, merge, copy or promotion is performed from an isolated
