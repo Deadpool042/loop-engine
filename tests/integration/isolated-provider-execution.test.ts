@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { chmodSync, copyFileSync } from "node:fs";
 import {
   mkdir,
   mkdtemp,
@@ -132,8 +133,12 @@ function application(
     workspacePath: string,
   ) => Promise<void>,
 ) {
+  const executable = join(root, "claude");
+  copyFileSync(FAKE_CLAUDE, executable);
+  chmodSync(executable, 0o755);
+
   return createLoopApplicationAssembly({
-    provider: { id: "claude_code", executable: FAKE_CLAUDE, timeoutMs: 5_000 },
+    provider: { id: "claude_code", executable, timeoutMs: 5_000 },
     isolatedProviderExecution: {
       lockRoot: join(root, "locks"),
       workspaceRoot: join(root, "workspaces"),

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -18,12 +24,24 @@ const FAKE_CLAUDE = resolve(
   "claude",
 );
 
-function setupCleanWorktree(): { cwd: string; cleanup: () => void } {
-  const cwd = mkdtempSync(join(tmpdir(), "loop-claude-executor-"));
-  execFileSync("git", ["init", "-q"], { cwd });
+function setupCleanWorktree(): {
+  cwd: string;
+  executable: string;
+  cleanup: () => void;
+} {
+  const root = mkdtempSync(join(tmpdir(), "loop-claude-executor-"));
+  const cwd = join(root, "worktree");
+  const executable = join(root, "claude");
+  copyFileSync(FAKE_CLAUDE, executable);
+  chmodSync(executable, 0o755);
+  execFileSync("git", ["init", "-q", cwd]);
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
   execFileSync("git", ["config", "user.name", "Test"], { cwd });
-  return { cwd, cleanup: () => rmSync(cwd, { recursive: true, force: true }) };
+  return {
+    cwd,
+    executable,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
 }
 
 function fakePlan(_cwd: string): LoopExecutionPlan {
@@ -117,10 +135,10 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("classifies a successful Claude Code JSON response", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const executor = createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       });
       const result = await executor(fakePlan(cwd), cwd);
@@ -131,10 +149,10 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("fails with provider_reported_error when Claude reports is_error", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const executor = createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       });
       process.env.FAKE_CLAUDE_MODE = "is_error";
@@ -151,10 +169,10 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("classifies max-turn exhaustion before generic non-zero exit failure", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const executor = createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       });
       process.env.FAKE_CLAUDE_MODE = "max_turns";
@@ -175,10 +193,10 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("fails with provider_invalid_output on unparsable JSON", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const executor = createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       });
       process.env.FAKE_CLAUDE_MODE = "invalid_json";
@@ -195,10 +213,10 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("fails with provider_failed on a non-zero exit code", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const executor = createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       });
       process.env.FAKE_CLAUDE_MODE = "nonzero_exit_with_file";
@@ -222,10 +240,10 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("fails with provider_timeout when the process exceeds the configured timeout", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const executor = createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 200,
       });
       process.env.FAKE_CLAUDE_MODE = "hang";
@@ -242,10 +260,10 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("never leaks raw stdout, stderr or prompt content in the failure details", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const executor = createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       });
       process.env.FAKE_CLAUDE_MODE = "nonzero_exit";
@@ -260,14 +278,14 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("passes the governed brief and every declared deliverable to Claude Code", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     const capturePath = join(cwd, "claude-arguments.json");
 
     try {
       process.env.FAKE_CLAUDE_MODE = "success";
       process.env.FAKE_CLAUDE_CAPTURE_ARGS = capturePath;
       const executor = createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       });
 
@@ -305,8 +323,57 @@ describe("createClaudeCodeCliLoopExecutor", () => {
     }
   });
 
+  it("restricts Claude Code tools/MCP and strips unrelated credentials", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    const captureArgs = join(cwd, "claude-args-security.json");
+    const captureEnv = join(cwd, "claude-env-security.json");
+
+    try {
+      process.env.FAKE_CLAUDE_CAPTURE_ARGS = captureArgs;
+      process.env.FAKE_CLAUDE_CAPTURE_ENV = captureEnv;
+      process.env.OPENAI_API_KEY = "should-not-reach-claude";
+      process.env.ANTHROPIC_API_KEY = "should-not-reach-claude";
+      process.env.GITHUB_TOKEN = "should-not-reach-claude";
+      process.env.SSH_AUTH_SOCK = "/tmp/should-not-reach-claude";
+
+      const result = await createClaudeCodeCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(fakePlan(cwd), cwd);
+
+      assert.equal(result.status, "completed");
+      const args = JSON.parse(readFileSync(captureArgs, "utf8")) as string[];
+      assert.ok(args.includes("--restricted"));
+      assert.ok(args.includes("--tools"));
+      assert.equal(args[args.indexOf("--tools") + 1], "Read,Edit,Write,Glob,Grep");
+      assert.ok(args.includes("--strict-mcp-config"));
+      assert.equal(args[args.indexOf("--mcp-config") + 1], "{}");
+      assert.equal(args.includes("Bash"), false);
+
+      const childEnv = JSON.parse(readFileSync(captureEnv, "utf8")) as Record<
+        string,
+        string
+      >;
+      assert.equal(childEnv.OPENAI_API_KEY, undefined);
+      assert.equal(childEnv.ANTHROPIC_API_KEY, undefined);
+      assert.equal(childEnv.GITHUB_TOKEN, undefined);
+      assert.equal(childEnv.SSH_AUTH_SOCK, undefined);
+      assert.equal(childEnv.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, "1");
+      assert.equal(childEnv.HOME, process.env.HOME);
+      assert.equal(childEnv.PATH, process.env.PATH);
+    } finally {
+      delete process.env.FAKE_CLAUDE_CAPTURE_ARGS;
+      delete process.env.FAKE_CLAUDE_CAPTURE_ENV;
+      delete process.env.OPENAI_API_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.GITHUB_TOKEN;
+      delete process.env.SSH_AUTH_SOCK;
+      cleanup();
+    }
+  });
+
   it("passes roadmap protection constraints to Claude Code", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     const capturePath = join(cwd, "claude-arguments.json");
 
     try {
@@ -314,7 +381,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
       process.env.FAKE_CLAUDE_CAPTURE_ARGS = capturePath;
 
       const executor = createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       });
 
@@ -353,14 +420,14 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("allows bounded runtime-managed delegation above low effort", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     const capturePath = join(cwd, "claude-delegation-arguments.json");
 
     try {
       process.env.FAKE_CLAUDE_MODE = "success";
       process.env.FAKE_CLAUDE_CAPTURE_ARGS = capturePath;
       const executor = createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       });
 
@@ -408,11 +475,11 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("fails closed when Claude Code generates a forbidden governed content term", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       process.env.FAKE_CLAUDE_MODE = "success_with_forbidden_content";
       const result = await createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       })(
         {
@@ -439,11 +506,11 @@ describe("createClaudeCodeCliLoopExecutor", () => {
   });
 
   it("keeps a Claude Code execution successful when generated content is compliant", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       process.env.FAKE_CLAUDE_MODE = "success_with_file";
       const result = await createClaudeCodeCliLoopExecutor({
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       })(
         {

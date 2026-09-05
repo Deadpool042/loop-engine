@@ -5,6 +5,7 @@ import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
 import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
 import { buildLoopRuntimeDelegationGuidance } from "./runtime-delegation.js";
+import { buildSubscriptionCliEnvironment } from "./subscription-cli-environment.js";
 import { readModifiedWorktreeFiles } from "./worktree-status.js";
 
 export type CodexCliLoopExecutorOptions = Readonly<{
@@ -87,6 +88,7 @@ function runProcess(
       cwd,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
+      env: buildSubscriptionCliEnvironment(),
     });
     let stdout = "";
     let observedBytes = 0;
@@ -170,8 +172,11 @@ export function createCodexCliLoopExecutor(
 
     const args = [
       "exec",
+      "--ignore-user-config",
       "--sandbox",
       "workspace-write",
+      "-c",
+      'approval_policy="never"',
       "--model",
       plan.model,
       "--json",

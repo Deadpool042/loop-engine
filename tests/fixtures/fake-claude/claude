@@ -37,6 +37,10 @@ const captureCwdPath = process.env.FAKE_CLAUDE_CAPTURE_CWD;
 if (captureCwdPath) {
   writeFileSync(captureCwdPath, cwd);
 }
+const captureEnvPath = process.env.FAKE_CLAUDE_CAPTURE_ENV;
+if (captureEnvPath) {
+  writeFileSync(captureEnvPath, JSON.stringify(process.env));
+}
 
 const descendantPidPath = process.env.FAKE_CLAUDE_DESCENDANT_PID_PATH;
 if (descendantPidPath) {

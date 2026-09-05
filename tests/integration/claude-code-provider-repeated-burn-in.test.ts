@@ -16,6 +16,8 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+  chmodSync,
+  copyFileSync,
   existsSync,
   mkdtempSync,
   readFileSync,
@@ -39,12 +41,24 @@ const FAKE_CLAUDE = resolve(
   "claude",
 );
 
-function setupCleanWorktree(): { cwd: string; cleanup: () => void } {
-  const cwd = mkdtempSync(join(tmpdir(), "loop-repeated-burn-in-"));
-  execFileSync("git", ["init", "-q"], { cwd });
+function setupCleanWorktree(): {
+  cwd: string;
+  executable: string;
+  cleanup: () => void;
+} {
+  const root = mkdtempSync(join(tmpdir(), "loop-repeated-burn-in-"));
+  const cwd = join(root, "worktree");
+  const executable = join(root, "claude");
+  copyFileSync(FAKE_CLAUDE, executable);
+  chmodSync(executable, 0o755);
+  execFileSync("git", ["init", "-q", cwd]);
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
   execFileSync("git", ["config", "user.name", "Test"], { cwd });
-  return { cwd, cleanup: () => rmSync(cwd, { recursive: true, force: true }) };
+  return {
+    cwd,
+    executable,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
+  };
 }
 
 function commitAllInTempRepoOnly(cwd: string, message: string): void {
@@ -121,12 +135,12 @@ function clearFakeClaudeEnv(): void {
 
 describe("claude code provider repeated burn-in", () => {
   it("isolates the delta between two successive runs once the worktree is re-baselined via commit", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const application = createLoopApplicationAssembly({
         provider: {
           id: "claude_code",
-          executable: FAKE_CLAUDE,
+          executable,
           timeoutMs: 5_000,
         },
       });
@@ -166,14 +180,14 @@ describe("claude code provider repeated burn-in", () => {
   });
 
   it("refuses the run when a preexisting untracked file leaves the worktree unclean, instead of blending it into the delta", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       writeFileSync(join(cwd, "preexisting.txt"), "dirty\n");
 
       const application = createLoopApplicationAssembly({
         provider: {
           id: "claude_code",
-          executable: FAKE_CLAUDE,
+          executable,
           timeoutMs: 5_000,
         },
       });
@@ -207,12 +221,12 @@ describe("claude code provider repeated burn-in", () => {
   });
 
   it("a failing run after a prior successful, re-baselined run reports no invented delta and no leftover contamination from that prior run", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const application = createLoopApplicationAssembly({
         provider: {
           id: "claude_code",
-          executable: FAKE_CLAUDE,
+          executable,
           timeoutMs: 5_000,
         },
       });
@@ -257,12 +271,12 @@ describe("claude code provider repeated burn-in", () => {
   });
 
   it("FAKE_CLAUDE_OUTPUT_FILE rejects an absolute path or a '..' traversal, and the default output file stays unchanged when unset", async () => {
-    const { cwd, cleanup } = setupCleanWorktree();
+    const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       const application = createLoopApplicationAssembly({
         provider: {
           id: "claude_code",
-          executable: FAKE_CLAUDE,
+          executable,
           timeoutMs: 5_000,
         },
       });

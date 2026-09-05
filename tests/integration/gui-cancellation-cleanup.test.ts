@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import {
   access,
+  chmod,
+  copyFile,
   mkdir,
   mkdtemp,
   readFile,
@@ -108,6 +110,9 @@ describe("GUI cancellation cleanup", () => {
     async () => {
       const root = await mkdtemp(join(tmpdir(), "loop-gui-cancel-"));
       const projectRoot = await createExecutionFixture(root);
+      const executable = join(root, "claude");
+      await copyFile(FAKE_CLAUDE, executable);
+      await chmod(executable, 0o755);
       const descendantPidPath = join(root, "descendant.pid");
       const previousTmpdir = process.env.TMPDIR;
       const previousPidPath = process.env.FAKE_CLAUDE_DESCENDANT_PID_PATH;
@@ -143,7 +148,7 @@ describe("GUI cancellation cleanup", () => {
             "--provider",
             "claude_code",
             "--provider-executable",
-            FAKE_CLAUDE,
+            executable,
             "--provider-model",
             "claude-sonnet-5",
             "--provider-timeout-ms",

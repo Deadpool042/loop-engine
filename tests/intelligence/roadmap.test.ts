@@ -758,11 +758,9 @@ describe("loop-engine roadmap state", () => {
       /V49\.0/.test(candidate.text),
     );
     assert.equal(v49Candidates.length, 1);
-    assert.equal(v49Candidates[0]?.status, "todo");
-    assert.equal(v49Candidates[0]?.priority, "p1");
+    assert.equal(v49Candidates[0]?.status, "done");
 
     const selected = selectRoadmapCandidate(candidates);
-    assert.match(selected?.text ?? "", /V49\.0/);
-    assert.equal(selected?.priority, "p1");
+    assert.equal(selected, null);
   });
 });

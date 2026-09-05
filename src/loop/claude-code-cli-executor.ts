@@ -5,6 +5,7 @@ import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
 import { buildLoopRuntimeDelegationGuidance } from "./runtime-delegation.js";
 import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
+import { buildSubscriptionCliEnvironment } from "./subscription-cli-environment.js";
 import { readModifiedWorktreeFiles } from "./worktree-status.js";
 
 export type ClaudeCodeCliLoopExecutorOptions = Readonly<{
@@ -95,10 +96,9 @@ function runProcess(
       cwd,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
-      env: {
-        ...process.env,
+      env: buildSubscriptionCliEnvironment(process.env, {
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
-      },
+      }),
     });
     let stdout = "";
     let observedBytes = 0;
@@ -209,11 +209,17 @@ export function createClaudeCodeCliLoopExecutor(
     }
 
     const args = [
+      "--restricted",
       "--print",
       "--output-format",
       "json",
       "--permission-mode",
       "acceptEdits",
+      "--tools",
+      "Read,Edit,Write,Glob,Grep",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "{}",
       "--max-turns",
       String(maxTurns),
       "--model",

@@ -13,9 +13,7 @@ de `src/providers/` et n'en dépendent pas :
   `tool_choice: { type: "none" }`, pas d'outil, pas de capacité projet, pas
   d'accès fichier. Voir `docs/roadmap/anthropic-provider-evolution.md` pour la
   frontière exacte avec Claude Code.
-- `src/loop/claude-code-cli-executor.ts` — un `LoopExecutor` réel qui spawn le
-  CLI officiel `claude` via `node:child_process`, utilisé comme runtime de
-  développement interactif en mode `execute` (jamais activé par défaut).
+- `src/loop/claude-code-cli-executor.ts` et `src/loop/codex-cli-executor.ts` — des `LoopExecutor` réels qui spawn les CLI officiels dans le worktree gouverné. Depuis V49.0, leur environnement subprocess est allowlisté au lieu d'hériter de `process.env` : aucune clé API/provider, token GitHub ou agent SSH n'est injecté implicitement. Claude Code utilise `--restricted`, expose uniquement les outils fichier nécessaires et une config MCP vide stricte ; il est le seul spécialiste qualifié pour un futur portefeuille AUTO à cette étape. Codex ignore la config utilisateur et reste sous `workspace-write` sans approbation, mais ce mode ne démontre pas une isolation de lecture équivalente au périmètre DW : Codex reste donc explicit-only jusqu'à qualification d'une frontière plus stricte sans complexité disproportionnée.
 
 Un lecteur de ce seul document pourrait conclure à tort qu'aucune intégration
 Anthropic n'est câblée dans le dépôt : c'est faux pour les deux chemins de
