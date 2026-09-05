@@ -209,6 +209,22 @@ Contexte initial du 2026-09-05 : Codex CLI et Claude Code étaient intégrés co
 - le failover, Run History, evidence, scope guards et validations existants restent les primitives canoniques ;
 - Astra et Fable restent des profils frontier optionnels tant que leur valeur n'est pas démontrée sur nos propres lots.
 
+
+## Cycle V49 — Durcissement de l'exécution CLI par abonnement
+
+Objectif : réutiliser les executors Codex CLI / Claude Code existants pour la délégation spécialiste sans créer de launcher concurrent dans Development Workspace, tout en empêchant une exécution autonome d'hériter de credentials API ou d'élargir silencieusement ses permissions.
+
+- [ ] [P1] V49.0 — Durcir l'exécution CLI abonnement : construire un environnement enfant allowlisté qui conserve uniquement les variables système/auth locale nécessaires et exclut les clés API/fournisseur non nécessaires ; maintenir Codex sous `workspace-write` sans voie d'approbation hors sandbox ; limiter Claude Code aux outils fichier nécessaires à la mission, sans Bash/MCP/Chrome implicite ; conserver worktree isolé, scope, validation, content policy, failover et funding policy existants. Aucun nouveau runner, scheduler, selector ou provider API.
+
+### Gates V49
+
+- l'authentification par abonnement reste utilisable via les stores locaux du CLI ; aucune clé API fournisseur n'est injectée ou héritée implicitement ;
+- aucune exécution spécialiste ne reçoit une capacité supérieure à la mission gouvernée ;
+- le réseau, les commandes shell, MCP externes, commit, push, publication et déploiement ne sont pas ajoutés à l'executor ;
+- les validations/tests restent exécutés par Loop Engine après la modification du worktree ;
+- une incompatibilité réelle de CLI doit échouer explicitement, jamais élargir les permissions en fallback ;
+- Development Workspace ne crée pas de second launcher si Loop Engine satisfait le besoin.
+
 ## Gel architectural
 
 - Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).
