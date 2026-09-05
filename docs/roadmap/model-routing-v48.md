@@ -165,6 +165,8 @@ Règles :
 
 Critère de réussite : une tentative supplémentaire est toujours justifiable par la raison d'échec précédente et reste bornée par la policy.
 
+Preuve V48.5 : l'escalade historique `escalateAgentProfile` reste inchangée pour les pipelines V7/V13 et continue de raisonner sur l'effort. Le LoopRunner utilise une primitive distincte `selectIntraProviderModelEscalation`, dédiée au tier économique du modèle. `validation_failed` peut sélectionner le plus petit tier supérieur admissible ; `capability_gap` n'est accepté que si le profil précédent échoue réellement sur une capacité requise et saute directement vers le plus petit tier qui la fournit. `runtime_error` renvoie vers le failover runtime/provider existant et `budget_exceeded` interdit une montée de coût. L'opt-in `allowEscalation` porte le plafond d'appel de 1 à 2 au maximum ; une demande plus restrictive reste prioritaire. Le second plan conserve provider, runtime, effort, délégation, capacités/permissions exigées et intersecte les budgets ; le même worktree est réobservé, scope/content policy sont rejoués et la validation est relancée. L'escalade n'est pas cumulée avec un executor de failover multi-provider. L'audit `AUDIT-495` exige désormais exactement deux sites d'appel bornés dans le runner (primaire + escalade optionnelle), et la suite complète passe à 2635/2635 tests.
+
 ### V48.6 [P3] — Stratégie abonnement / crédits / API
 
 Objectif : optimiser le coût total réel plutôt que le seul tarif API nominal.
