@@ -3,6 +3,7 @@ import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import type { AgentPolicyResolution } from "../policy/types.js";
 import type { LoopExecutionPlanEvidence } from "./execution-plan-evidence.js";
 import type { LoopExecutionPlanFingerprint } from "./execution-plan-evidence-fingerprint.js";
+import type { LoopModelEscalationEvidence } from "./model-escalation.js";
 import type { LoopProviderFailoverEvidence } from "./provider-failover.js";
 import type { LoopProviderFailoverEvidenceFingerprint } from "./provider-failover-evidence-integrity.js";
 
@@ -83,6 +84,7 @@ export type LoopRunResult = Readonly<{
   }> | null;
   executionPlanEvidence?: LoopExecutionPlanEvidence | null;
   executionPlanFingerprint?: LoopExecutionPlanFingerprint | null;
+  modelEscalationEvidence?: LoopModelEscalationEvidence | null;
   providerFailoverEvidence?: LoopProviderFailoverEvidence | null;
   providerFailoverFingerprint?: LoopProviderFailoverEvidenceFingerprint | null;
 }>;

@@ -16,7 +16,8 @@ V14.4 turns one selected roadmap candidate into one bounded application cycle:
 plan candidate
 -> resolve execute policy
 -> build bounded context
--> call one injected LoopExecutor
+-> call the selected injected LoopExecutor
+-> optionally escalate once inside the same provider/runtime on an admitted structured failure
 -> collect reported modified files
 -> enforce the governed writable file scope
 -> run configured validations and audit commands
@@ -54,11 +55,15 @@ It returns either:
 - `completed`, with stable details and reported modified file paths; or
 - `failed`, with a structured `LoopRunFailure` and any files already modified.
 
-The runner calls this port at most once per cycle.
+The runner calls this port once for the initially selected model. Since V48.5,
+the policy may authorize **one additional top-level call** when a structured
+model-related failure justifies a strictly higher profile inside the same
+provider/runtime. The global default is therefore bounded to two model attempts
+and a restrictive request can reduce the ceiling to one.
 
-The selected Codex or Claude Code runtime may organize that single top-level
-invocation with runtime-native skills or sub-agents. This does not create
-additional `LoopExecutor` calls and does not create a Loop Engine task graph.
+The selected Codex or Claude Code runtime may organize each top-level
+invocation with runtime-native skills or sub-agents. This does not create a
+Loop Engine task graph or bypass the top-level attempt budget.
 Low-effort plans are instructed to work directly; higher-effort plans may
 delegate only when independent work or an independent review materially
 improves speed or safety. The prompt requires delegated work to respect the
@@ -129,6 +134,18 @@ idle -> planning -> ready -> executing -> validating
      -> repairing -> validating -> completed
 ```
 
+One admitted model escalation after executor failure:
+
+```text
+idle -> planning -> ready -> executing -> executing -> validating -> completed
+```
+
+One admitted model escalation after exhausted validation/repair:
+
+```text
+... -> validating -> executing -> validating -> completed
+```
+
 Budget exhaustion:
 
 ```text
@@ -153,6 +170,13 @@ The resolved `selectionRequest.budgetCeiling` is also an execution ceiling where
 the runner has a matching local control. In particular,
 `selectionRequest.budgetCeiling.maxRepairs` bounds the repair cycle after
 admission; the caller cannot widen it with `--max-repairs`.
+`selectionRequest.budgetCeiling.maxCalls`, combined with
+`AgentPolicy.allowEscalation`, bounds the top-level model attempts. The V48.5
+default permits one initial call plus at most one intra-provider escalation.
+The escalation trigger is restricted to `provider_max_turns` or an exhausted
+`validation_failed` path; timeout, rate limit, provider/runtime unavailability
+and generic runtime errors remain failover/stop concerns rather than reasons to
+buy more model capability.
 
 ## Validation result
 
@@ -251,12 +275,13 @@ V14.4 does not add:
 ## Acceptance invariants
 
 1. Policy rejection causes zero executor calls.
-2. The top-level executor port is called at most once; runtime-internal delegation creates neither another LoopExecutor call nor a second execution plan.
-3. Validation runs only after a completed executor result.
-4. Each repair is followed by validation, never by commit.
-5. The finite repair budget is the most restrictive of caller request and resolved policy ceiling, and the same effective value reaches the repairer.
-6. Modified files include executor and repairer reports without duplicates.
-7. Exceptions fail closed without exposing raw stack traces.
-8. `commit` and `publication` remain `null` for every result.
-9. Plan mode behavior and JSON schema version remain unchanged.
-10. CI, strict audit and all audit profiles pass.
+2. The top-level executor port is called once initially and at most once more when policy admits a structured intra-provider model escalation; runtime-internal delegation does not consume another top-level attempt.
+3. Every model escalation stays on the same provider/runtime, preserves candidate/scope/permissions/validations and is observable through bounded evidence.
+4. Validation runs only after a completed executor result.
+5. Each repair is followed by validation, never by commit.
+6. The finite repair budget is the most restrictive of caller request and resolved policy ceiling, and the same effective value reaches the repairer.
+7. Modified files include executor and repairer reports without duplicates.
+8. Exceptions fail closed without exposing raw stack traces.
+9. `commit` and `publication` remain `null` for every result.
+10. Plan mode behavior and JSON schema version remain unchanged.
+11. CI, strict audit and all audit profiles pass.

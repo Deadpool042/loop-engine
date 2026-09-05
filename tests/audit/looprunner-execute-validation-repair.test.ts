@@ -33,14 +33,26 @@ describe("LoopRunner execute validation repair audit", () => {
     );
   });
 
-  it("detects duplicate executor call sites and forbidden effects", () => {
+  it("keeps executor call sites bounded and detects forbidden effects", () => {
     const runner = readFileSync(RUNNER_FILE, "utf8");
+    const baseline = inspect(runner);
     const result = inspect(
       `${runner}\nawait dependencies.executor({});\nprocess.env.SECRET;`,
     );
 
-    assert.equal(result.executorCallCount, 2);
+    assert.equal(baseline.executorCallSites, 3);
+    assert.equal(result.executorCallSites, 4);
     assert.deepEqual(result.forbidden, ["process.env"]);
+  });
+
+  it("requires model escalation to remain policy-bounded", () => {
+    const runner = readFileSync(RUNNER_FILE, "utf8").replace(
+      "maxAttempts: modelAttemptBudget",
+      "maxAttempts: Number.MAX_SAFE_INTEGER",
+    );
+    const result = inspect(runner);
+
+    assert.equal(result.boundedModelEscalation, false);
   });
 
   it("fails closed when the resolved policy repair ceiling is no longer enforced", () => {

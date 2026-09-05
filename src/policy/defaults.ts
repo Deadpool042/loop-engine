@@ -41,17 +41,17 @@ export function getAllowedPermissionsForMode(
   return MODE_PERMISSION_CEILINGS[mode];
 }
 
-// Budget defaults per mode. Only maxCalls/maxRepairs carry real meaning here
-// — plan never calls an agent (maxCalls: 0), execute/commit/publish share
-// the same conservative single-call default. Callers restrict further via
-// mergeBudgetsRestrictively; they can never raise these defaults.
+// Budget defaults per mode. Only maxCalls/maxRepairs carry real meaning here.
+// Plan never calls an agent (maxCalls: 0). Execute/commit/publish allow at
+// most two top-level model attempts: one initial call plus one bounded
+// intra-provider escalation. Callers can only restrict these ceilings.
 export const DEFAULT_MODE_BUDGETS: Readonly<
   Record<AgentPolicyMode, AgentBudget>
 > = {
   plan: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 0, maxRepairs: 0 },
-  execute: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 1, maxRepairs: 1 },
-  commit: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 1, maxRepairs: 1 },
-  publish: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 1, maxRepairs: 1 },
+  execute: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 2, maxRepairs: 1 },
+  commit: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 2, maxRepairs: 1 },
+  publish: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 2, maxRepairs: 1 },
 };
 
 // NOT an executable budget — never authorizes a real agent call. It is only
@@ -240,5 +240,5 @@ export const DEFAULT_AGENT_POLICY: AgentPolicy = {
   maximumEffort: "high",
   defaultBudget: UNBOUNDED_AGENT_BUDGET,
   contextBudget: CONTEXT_BUDGET_BY_EFFORT.medium,
-  allowEscalation: false,
+  allowEscalation: true,
 };

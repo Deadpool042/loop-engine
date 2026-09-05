@@ -113,7 +113,7 @@ describe("escalateAgentProfile", () => {
       registry,
       request: { requiredCapabilities: ["code_edit"], requiredPermissions: [] },
       previousProfileId: "low",
-      failureReason: "runtime_error",
+      failureReason: "capability_gap",
     });
 
     assert.equal(result.outcome, "exhausted");
@@ -121,6 +121,58 @@ describe("escalateAgentProfile", () => {
       (entry) => entry.profileId === "high-missing-cap",
     );
     assert.match(rejection?.reason ?? "", /missing capabilities: code_edit/);
+  });
+
+  it("never treats a runtime failure as a reason to increase the model", () => {
+    const registry = createAgentRegistry([
+      profile({ id: "low", effort: "low" }),
+      profile({ id: "high", effort: "high" }),
+    ]);
+
+    const result = escalateAgentProfile({
+      registry,
+      request: { requiredCapabilities: ["code_edit"], requiredPermissions: [] },
+      previousProfileId: "low",
+      failureReason: "runtime_error",
+    });
+
+    assert.equal(result.outcome, "exhausted");
+    assert.ok(
+      result.rejected.every((entry) =>
+        entry.reason.includes("does not justify intra-provider model escalation"),
+      ),
+    );
+  });
+
+  it("never crosses provider/runtime boundaries during escalation", () => {
+    const registry = createAgentRegistry([
+      profile({ id: "low", effort: "low" }),
+      profile({
+        id: "other-provider",
+        effort: "medium",
+        provider: "openai",
+        runtime: "codex",
+      }),
+      profile({ id: "same-provider", effort: "high" }),
+    ]);
+
+    const result = escalateAgentProfile({
+      registry,
+      request: { requiredCapabilities: ["code_edit"], requiredPermissions: [] },
+      previousProfileId: "low",
+      failureReason: "validation_failed",
+    });
+
+    assert.equal(result.outcome, "escalated");
+    assert.equal(
+      result.outcome === "escalated" ? result.profile.id : null,
+      "same-provider",
+    );
+    assert.match(
+      result.rejected.find((entry) => entry.profileId === "other-provider")
+        ?.reason ?? "",
+      /provider\/runtime differs/,
+    );
   });
 
   it("is deterministic and requires an explicit failure signal — never triggered implicitly", () => {
@@ -138,7 +190,7 @@ describe("escalateAgentProfile", () => {
           requiredPermissions: [],
         },
         previousProfileId: "low",
-        failureReason: "runtime_error",
+        failureReason: "validation_failed",
       });
 
     const first = runOnce();

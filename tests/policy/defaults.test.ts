@@ -78,9 +78,9 @@ describe("DEFAULT_MODE_BUDGETS", () => {
     assert.equal(DEFAULT_MODE_BUDGETS.plan.maxRepairs, 0);
   });
 
-  it("execute/commit/publish share a conservative single-call default", () => {
+  it("execute/commit/publish allow one initial call plus one bounded escalation", () => {
     for (const mode of ["execute", "commit", "publish"] as const) {
-      assert.equal(DEFAULT_MODE_BUDGETS[mode].maxCalls, 1);
+      assert.equal(DEFAULT_MODE_BUDGETS[mode].maxCalls, 2);
     }
   });
 });

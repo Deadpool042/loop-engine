@@ -5,9 +5,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { createAgentRegistry } from "../../src/agents/registry.js";
+import type { AgentProfile } from "../../src/agents/types.js";
 import type { Config, ProjectConfig } from "../../src/core/config.js";
 import type { RoadmapCandidate } from "../../src/intelligence/roadmap.js";
 import type { ProjectSnapshot } from "../../src/intelligence/snapshot.js";
+import { DEFAULT_AGENT_POLICY } from "../../src/policy/defaults.js";
 import { runLoopExecute } from "../../src/loop/execute-runner.js";
 import { readModifiedWorktreeFiles } from "../../src/loop/worktree-status.js";
 
@@ -100,6 +103,40 @@ function deterministicOptions() {
       truncated: false,
     }),
     readModifiedWorktreeFiles: async () => [],
+    agentPolicy: Object.freeze({
+      ...DEFAULT_AGENT_POLICY,
+      allowEscalation: false,
+    }),
+  };
+}
+
+function routingProfile(
+  id: string,
+  model: string,
+  economicTier: AgentProfile["economicTier"],
+): AgentProfile {
+  return {
+    id,
+    runtime: "codex",
+    provider: "openai",
+    model,
+    effort:
+      economicTier === "economy"
+        ? "low"
+        : economicTier === "standard"
+          ? "medium"
+          : "high",
+    economicTier,
+    availability: "available",
+    capabilities: ["code_edit", "shell_exec", "test_execution"],
+    permissions: ["read_only", "write_worktree", "shell_exec"],
+    budget: {
+      maxTokens: null,
+      maxCostUsd: null,
+      maxDurationMs: 300_000,
+      maxCalls: 1,
+      maxRepairs: 1,
+    },
   };
 }
 
@@ -748,6 +785,206 @@ describe("runLoopExecute", () => {
     assert.equal(result.failure?.code, "agent_policy_rejected");
     assert.equal(result.validation, null);
     assert.deepEqual(result.modifiedFiles, []);
+  });
+
+  it("escalates once to the next model after provider_max_turns", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+      routingProfile("codex.advanced", "sol", "advanced"),
+    ]);
+    const observedModels: string[] = [];
+    let executorCalls = 0;
+    let validatorCalls = 0;
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      readModifiedWorktreeFiles: async () => ["src/feature.ts"],
+      executor: async (plan) => {
+        observedModels.push(plan.model);
+        executorCalls += 1;
+        if (executorCalls === 1) {
+          return {
+            status: "failed" as const,
+            modifiedFiles: ["src/feature.ts"],
+            failure: {
+              code: "provider_max_turns",
+              message: "The economic model exhausted its turn budget.",
+              details: [],
+            },
+          };
+        }
+        return {
+          status: "completed" as const,
+          modifiedFiles: ["src/feature.ts"],
+          details: ["Escalated model completed."],
+        };
+      },
+      validator: async () => {
+        validatorCalls += 1;
+        return {
+          status: "passed" as const,
+          failedCommand: null,
+          exitCode: 0,
+          details: ["Validation passed."],
+        };
+      },
+    });
+
+    assert.equal(result.status, "completed");
+    assert.equal(executorCalls, 2);
+    assert.equal(validatorCalls, 1);
+    assert.deepEqual(observedModels, ["luna", "terra"]);
+    assert.equal(
+      result.agentPolicy?.selection?.outcome === "selected"
+        ? result.agentPolicy.selection.profile.model
+        : null,
+      "terra",
+    );
+    assert.deepEqual(result.modelEscalationEvidence?.attempts, [
+      {
+        attempt: 2,
+        trigger: "provider_max_turns",
+        provider: "openai",
+        runtime: "codex",
+        fromProfileId: "codex.economy",
+        fromModel: "luna",
+        toProfileId: "codex.standard",
+        toModel: "terra",
+      },
+    ]);
+  });
+
+  it("escalates after validation failure only after the repair budget is exhausted", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+    ]);
+    const observedModels: string[] = [];
+    let validatorCalls = 0;
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      maxRepairs: 0,
+      readModifiedWorktreeFiles: async () => ["src/feature.ts"],
+      executor: async (plan) => {
+        observedModels.push(plan.model);
+        return {
+          status: "completed" as const,
+          modifiedFiles: ["src/feature.ts"],
+          details: [`Execution with ${plan.model} completed.`],
+        };
+      },
+      validator: async () => {
+        validatorCalls += 1;
+        return validatorCalls === 1
+          ? {
+              status: "failed" as const,
+              failedCommand: "pnpm run typecheck",
+              exitCode: 1,
+              details: ["Validation failed on the first model."],
+            }
+          : {
+              status: "passed" as const,
+              failedCommand: null,
+              exitCode: 0,
+              details: ["Validation passed after escalation."],
+            };
+      },
+    });
+
+    assert.equal(result.status, "completed");
+    assert.deepEqual(observedModels, ["luna", "terra"]);
+    assert.equal(validatorCalls, 2);
+    assert.equal(result.validation?.attempts, 2);
+    assert.equal(result.modelEscalationEvidence?.attempts[0]?.trigger, "validation_failed");
+    assert.deepEqual(
+      result.steps.map((step) => step.name),
+      [
+        "planning",
+        "ready",
+        "executing",
+        "validating",
+        "model_escalation",
+        "validating",
+        "completed",
+      ],
+    );
+  });
+
+  it("does not use model escalation for provider/runtime failures handled by failover", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+    ]);
+    let executorCalls = 0;
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      readModifiedWorktreeFiles: async () => [],
+      executor: async () => {
+        executorCalls += 1;
+        return {
+          status: "failed" as const,
+          modifiedFiles: [],
+          failure: {
+            code: "provider_timeout",
+            message: "Provider timed out.",
+            details: [],
+          },
+        };
+      },
+    });
+
+    assert.equal(executorCalls, 1);
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "provider_timeout");
+    assert.equal(result.modelEscalationEvidence, null);
+  });
+
+  it("respects a restrictive one-call policy even when escalation is enabled", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+    ]);
+    let executorCalls = 0;
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: Object.freeze({
+        ...DEFAULT_AGENT_POLICY,
+        defaultBudget: Object.freeze({
+          ...DEFAULT_AGENT_POLICY.defaultBudget,
+          maxCalls: 1,
+        }),
+        allowEscalation: true,
+      }),
+      agentRegistry: registry,
+      readModifiedWorktreeFiles: async () => [],
+      executor: async () => {
+        executorCalls += 1;
+        return {
+          status: "failed" as const,
+          modifiedFiles: [],
+          failure: {
+            code: "provider_max_turns",
+            message: "Model exhausted its turn budget.",
+            details: [],
+          },
+        };
+      },
+    });
+
+    assert.equal(executorCalls, 1);
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "provider_max_turns");
+    assert.equal(result.modelEscalationEvidence, null);
   });
 
   it("fails closed when no concrete executor is configured", async () => {

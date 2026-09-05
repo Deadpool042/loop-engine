@@ -12,9 +12,11 @@ const VALID_TRANSITIONS: readonly [LoopRunStatus, LoopRunStatus][] = [
   ["ready", "executing"],
   ["ready", "completed"],
   ["ready", "cancelled"],
+  ["executing", "executing"],
   ["executing", "validating"],
   ["executing", "failed"],
   ["executing", "cancelled"],
+  ["validating", "executing"],
   ["validating", "completed"],
   ["validating", "repairing"],
   ["validating", "failed"],
@@ -48,9 +50,13 @@ describe("canTransition", () => {
     }
   });
 
-  it("never allows a transition to the same status", () => {
+  it("allows only executing -> executing for a bounded model retry", () => {
     for (const status of LOOP_RUN_STATUSES) {
-      assert.equal(canTransition(status, status), false);
+      assert.equal(
+        canTransition(status, status),
+        status === "executing",
+        status,
+      );
     }
   });
 

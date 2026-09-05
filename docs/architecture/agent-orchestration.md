@@ -15,7 +15,7 @@ Donner à Loop Engine un vocabulaire typé pour raisonner sur "quel agent d'exé
 - **Local first** — toute décision de sélection se prend à partir de données locales (`AgentRegistry`), jamais d'un appel réseau.
 - **Retrieval first** — avant d'escalader vers un agent plus coûteux, préférer réduire le contexte nécessaire (ex. `rag-search`) plutôt que d'augmenter l'effort. Ce lot documente le principe ; son application concrète appartient à un futur `LoopExecutor`, pas au code de ce lot.
 - **Smallest capable agent first** — parmi les profils satisfaisant les capacités, permissions, contraintes provider/runtime et plafonds requis, le sélecteur retient toujours le profil dont l'effort est le plus faible.
-- **Escalation only on failure** — l'escalade n'est jamais automatique ni implicite : `escalateAgentProfile` exige en entrée une raison d'échec explicite fournie par l'appelant. Sans échec signalé, il n'y a pas d'escalade.
+- **Escalation only on failure** — aucune montée de modèle n'est autorisée sans raison d'échec structurée. V48.5 permet au runner d'appliquer automatiquement au plus une escalade **dans le même provider/runtime** après un échec admissible ; le helper pur `escalateAgentProfile` reste explicite et applique la même frontière.
 
 Ces principes s'ajoutent à ceux de `CLAUDE.md` (aucun appel IA automatique par défaut, zéro consommation de tokens par défaut) ; ils ne les remplacent pas.
 
@@ -150,7 +150,9 @@ L'ordre de déclaration du registry n'est pas une entrée de décision : les rej
 
 ## Stratégie d'escalade
 
-`escalateAgentProfile(input)` ne s'invoque **jamais automatiquement** : elle exige en entrée un `previousProfileId` et une `failureReason` explicite (`budget_exceeded`, `capability_gap`, `runtime_error`, `validation_failed`), fournis par l'appelant après un échec réel ou simulé. Elle réapplique les mêmes critères de filtrage que `selectAgentProfile`, exclut le profil précédent et tout profil d'effort inférieur ou égal, puis retient — toujours selon "smallest capable agent first" — le profil du plus faible effort restant strictement supérieur à celui du profil précédent. Si aucun profil ne reste, le résultat est `exhausted` (pas d'escalade possible), jamais une erreur silencieuse.
+`escalateAgentProfile(input)` exige toujours un `previousProfileId` et une `failureReason` explicite. `capability_gap` et `validation_failed` peuvent justifier une montée de profil ; `runtime_error` et `budget_exceeded` ne sont pas convertis en montée de modèle. Le helper réapplique les mêmes critères hard que `selectAgentProfile`, reste dans le **même provider/runtime**, exclut le profil précédent et tout profil d'effort inférieur ou égal, puis retient le plus petit profil supérieur admissible. Si aucun profil ne reste, le résultat est `exhausted`.
+
+V48.5 ajoute dans le runner une consommation bornée de cette doctrine pour les exécutions réelles : `provider_max_turns` ou un `validation_failed` arrivé au bout du budget de réparation peuvent déclencher une seule tentative supplémentaire, toujours sous `selectionRequest.budgetCeiling.maxCalls`. Les erreurs de disponibilité, rate-limit, timeout et runtime restent du ressort du failover inter-provider ou d'un arrêt explicite.
 
 ## Position de n8n et des runtimes externes
 

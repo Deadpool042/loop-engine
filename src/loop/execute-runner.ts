@@ -12,6 +12,12 @@ import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
 import { createLoopExecutionPlan } from "./execution-plan.js";
 import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import { findOutOfScopeFiles } from "./file-scope.js";
+import {
+  createModelEscalationEvidence,
+  resolveIntraProviderModelEscalation,
+  resolveModelAttemptBudget,
+  type LoopModelEscalationAttemptEvidence,
+} from "./model-escalation.js";
 import { readModifiedWorktreeFiles } from "./worktree-status.js";
 import { planLoopCycle, type LoopPlan } from "./planner.js";
 import { canTransition } from "./state-machine.js";
@@ -155,6 +161,8 @@ export async function runLoopExecute(
   let contextPackage: MinimalContextPackage | null = null;
   let writableFileScope: readonly string[] | null = null;
   let brief: NonNullable<LoopRunResult["brief"]> | null = null;
+  const modelEscalationAttempts: LoopModelEscalationAttemptEvidence[] = [];
+  let modelAttemptBudget = 1;
 
   function transition(
     to: LoopRunStatus,
@@ -207,6 +215,13 @@ export async function runLoopExecute(
       contextPackage,
       writableFileScope,
       brief,
+      modelEscalationEvidence:
+        modelEscalationAttempts.length === 0
+          ? null
+          : createModelEscalationEvidence(
+              modelAttemptBudget,
+              modelEscalationAttempts,
+            ),
     });
   }
 
@@ -296,6 +311,11 @@ export async function runLoopExecute(
     );
   }
 
+  modelAttemptBudget = resolveModelAttemptBudget(
+    agentPolicy,
+    dependencies.agentPolicy.allowEscalation,
+  );
+
   const policyRepairCeiling =
     agentPolicy.selectionRequest.budgetCeiling?.maxRepairs;
   const effectiveMaxRepairs =
@@ -315,19 +335,23 @@ export async function runLoopExecute(
     cycle.snapshot,
     agentPolicy.requirements.contextBudget,
   );
-  const executionPlan = createLoopExecutionPlan(
-    Object.freeze({
-      runId,
-      project: Object.freeze({ name: executionProject.name }),
-      candidate: cycle.candidate,
-      agentPolicy,
-      contextPackage,
-      ...(cycle.allowedPaths === undefined
-        ? {}
-        : { allowedPaths: cycle.allowedPaths }),
-      ...(cycle.brief === undefined ? {} : { brief: cycle.brief }),
-    }),
-  );
+  const buildExecutionPlan = (
+    resolution: AgentPolicyResolution,
+  ) =>
+    createLoopExecutionPlan(
+      Object.freeze({
+        runId,
+        project: Object.freeze({ name: executionProject.name }),
+        candidate: cycle.candidate,
+        agentPolicy: resolution,
+        contextPackage,
+        ...(cycle.allowedPaths === undefined
+          ? {}
+          : { allowedPaths: cycle.allowedPaths }),
+        ...(cycle.brief === undefined ? {} : { brief: cycle.brief }),
+      }),
+    );
+  let executionPlan = buildExecutionPlan(agentPolicy);
   writableFileScope = executionPlan.allowedPaths ?? null;
 
   transition("ready", "ready", "completed", [
@@ -335,11 +359,13 @@ export async function runLoopExecute(
     `Selected executor profile: ${executionPlan.profileId}`,
     `Execution plan: ${executionPlan.provider}/${executionPlan.runtime}/${executionPlan.model}`,
     `Repair budget: requested=${dependencies.maxRepairs}, effective=${effectiveMaxRepairs}`,
+    `Model attempt budget: ${modelAttemptBudget}`,
   ]);
   transition("executing", "executing", "completed", [
     "Calling the injected LoopExecutor once with the immutable execution plan.",
   ]);
 
+  let completedModelAttempts = 1;
   let executionResult;
   try {
     executionResult = await dependencies.executor(
@@ -458,8 +484,58 @@ export async function runLoopExecute(
   if (initialScopeFailure !== null) return initialScopeFailure;
 
   if (executionResult.status === "failed") {
-    transition("failed", "failed", "failed", [executionResult.failure.message]);
-    return finalize(cycle.candidate, executionResult.failure);
+    const escalation = resolveIntraProviderModelEscalation({
+      registry: dependencies.agentRegistry,
+      resolution: agentPolicy,
+      currentPlan: executionPlan,
+      allowEscalation: dependencies.agentPolicy.allowEscalation,
+      completedAttempts: completedModelAttempts,
+      maxAttempts: modelAttemptBudget,
+      failureCode: executionResult.failure.code,
+    });
+
+    if (escalation.outcome === "escalated") {
+      agentPolicy = escalation.resolution;
+      executionPlan = buildExecutionPlan(agentPolicy);
+      modelEscalationAttempts.push(escalation.evidence);
+      completedModelAttempts += 1;
+      transition("executing", "model_escalation", "completed", [
+        `Escalating model after ${escalation.evidence.trigger}: ${escalation.evidence.fromProfileId} -> ${escalation.evidence.toProfileId}`,
+        `Attempt ${completedModelAttempts}/${modelAttemptBudget}`,
+      ]);
+
+      try {
+        executionResult = await dependencies.executor(
+          executionPlan,
+          executionProject.path,
+        );
+      } catch {
+        transition("failed", "failed", "failed", [
+          "The escalated LoopExecutor threw an error.",
+        ]);
+        return finalize(
+          cycle.candidate,
+          internalFailure(
+            "executor_failed",
+            "The escalated LoopExecutor failed.",
+            "Executor errors are redacted from the public result.",
+          ),
+        );
+      }
+
+      const escalatedWorktreeFailure =
+        await refreshModifiedFilesFromWorktree();
+      if (escalatedWorktreeFailure !== null) return escalatedWorktreeFailure;
+      const escalatedScopeFailure = failForScopeViolation();
+      if (escalatedScopeFailure !== null) return escalatedScopeFailure;
+    }
+
+    if (executionResult.status === "failed") {
+      transition("failed", "failed", "failed", [
+        executionResult.failure.message,
+      ]);
+      return finalize(cycle.candidate, executionResult.failure);
+    }
   }
 
   const initialCompletionFailure = failForMissingGovernedDelta();
@@ -527,14 +603,85 @@ export async function runLoopExecute(
     }
 
     if (repairAttempts >= effectiveMaxRepairs) {
+      const escalation = resolveIntraProviderModelEscalation({
+        registry: dependencies.agentRegistry,
+        resolution: agentPolicy,
+        currentPlan: executionPlan,
+        allowEscalation: dependencies.agentPolicy.allowEscalation,
+        completedAttempts: completedModelAttempts,
+        maxAttempts: modelAttemptBudget,
+        failureCode: "validation_failed",
+      });
+
+      if (escalation.outcome === "escalated") {
+        agentPolicy = escalation.resolution;
+        executionPlan = buildExecutionPlan(agentPolicy);
+        modelEscalationAttempts.push(escalation.evidence);
+        completedModelAttempts += 1;
+        transition("executing", "model_escalation", "completed", [
+          `Escalating model after validation_failed: ${escalation.evidence.fromProfileId} -> ${escalation.evidence.toProfileId}`,
+          `Attempt ${completedModelAttempts}/${modelAttemptBudget}`,
+        ]);
+
+        try {
+          executionResult = await dependencies.executor(
+            executionPlan,
+            executionProject.path,
+          );
+        } catch {
+          transition("failed", "failed", "failed", [
+            "The escalated LoopExecutor threw an error.",
+          ]);
+          return finalize(
+            cycle.candidate,
+            internalFailure(
+              "executor_failed",
+              "The escalated LoopExecutor failed.",
+              "Executor errors are redacted from the public result.",
+            ),
+          );
+        }
+
+        const escalatedWorktreeFailure =
+          await refreshModifiedFilesFromWorktree();
+        if (escalatedWorktreeFailure !== null) return escalatedWorktreeFailure;
+        const escalatedScopeFailure = failForScopeViolation();
+        if (escalatedScopeFailure !== null) return escalatedScopeFailure;
+
+        if (executionResult.status === "failed") {
+          transition("failed", "failed", "failed", [
+            executionResult.failure.message,
+          ]);
+          return finalize(cycle.candidate, executionResult.failure);
+        }
+
+        const escalatedCompletionFailure = failForMissingGovernedDelta();
+        if (escalatedCompletionFailure !== null)
+          return escalatedCompletionFailure;
+
+        const escalatedContentPolicyFailure =
+          await failForContentPolicyViolation();
+        if (escalatedContentPolicyFailure !== null)
+          return escalatedContentPolicyFailure;
+
+        transition(
+          "validating",
+          "validating",
+          "completed",
+          executionResult.details,
+        );
+        continue;
+      }
+
       transition("failed", "failed", "failed", [
-        "Validation failed and the repair budget is exhausted.",
+        "Validation failed and the repair/model attempt budget is exhausted.",
       ]);
       return finalize(
         cycle.candidate,
         Object.freeze({
           code: "validation_failed",
-          message: "Validation failed after the bounded repair cycle.",
+          message:
+            "Validation failed after the bounded repair and model escalation cycle.",
           details: Object.freeze([...validationAttempt.details]),
         }),
       );

@@ -20,10 +20,9 @@ export type AgentEscalationRequest = Readonly<{
   registry: AgentRegistry;
   request: AgentSelectionRequest;
   previousProfileId: string;
-  // Captured for explainability and for a future LoopExecutor journal.
-  // This lot's algorithm does not branch on the reason — every failure
-  // escalates the same way, to the smallest strictly-more-capable eligible
-  // profile. Reason-specific escalation policy is left to a later lot.
+  // Structured trigger. Only capability/validation failures justify
+  // increasing the model/profile inside the same provider/runtime. Runtime
+  // and budget failures belong to failover or an explicit stop decision.
   failureReason: AgentFailureReason;
 }>;
 
@@ -54,11 +53,35 @@ export function escalateAgentProfile(
   const rejected: AgentRejection[] = [];
   const eligible: AgentProfile[] = [];
 
+  if (
+    input.failureReason === "runtime_error" ||
+    input.failureReason === "budget_exceeded"
+  ) {
+    return {
+      outcome: "exhausted",
+      rejected: input.registry.profiles.map((profile) => ({
+        profileId: profile.id,
+        reason: `failure ${input.failureReason} does not justify intra-provider model escalation`,
+      })),
+    };
+  }
+
   for (const profile of input.registry.profiles) {
     if (profile.id === previousProfile.id) {
       rejected.push({
         profileId: profile.id,
         reason: "excluded: this is the profile that just failed",
+      });
+      continue;
+    }
+
+    if (
+      profile.provider !== previousProfile.provider ||
+      profile.runtime !== previousProfile.runtime
+    ) {
+      rejected.push({
+        profileId: profile.id,
+        reason: "provider/runtime differs from the failed profile",
       });
       continue;
     }
