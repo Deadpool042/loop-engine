@@ -97,7 +97,19 @@ describe("V39 governed candidate publication cockpit burn-in", () => {
       const provider = assembleLoopProvider(defaultLoopProviderRegistry, {
         id: "claude_code",
         executable: FAKE_CLAUDE,
-        model: ANTHROPIC_SONNET_5_MODEL,
+        profiles: [
+          {
+            id: "architecture",
+            model: ANTHROPIC_SONNET_5_MODEL,
+            economicTier: "standard",
+            capabilities: [
+              "code_edit",
+              "shell_exec",
+              "test_execution",
+              "long_context",
+            ],
+          },
+        ],
         timeoutMs: 5_000,
       });
       const runExecute = createIsolatedProviderRunExecute({
