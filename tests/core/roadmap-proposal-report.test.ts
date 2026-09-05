@@ -330,10 +330,10 @@ test("genuine active-candidate overflow remains deep and fail-closed before prov
   }
 });
 
-test("30. the real loop-engine repository uses exhausted-roadmap routing with a fully accounted estimate", () => {
+test("30. the real loop-engine repository uses bounded-open-work routing with a fully accounted estimate", () => {
   // Mirrors the `loop-engine` entry in projects.yaml (path: .) and validates
-  // invariants of the current repository state. V40 is fully delivered, so
-  // deterministic renewal routing uses the economy profile.
+  // invariants of the current repository state. V48 reopens bounded work, so
+  // deterministic proposal routing uses the balanced profile.
   const loopEngineProject: ProjectConfig = {
     name: "loop-engine",
     path: process.cwd(),
@@ -350,8 +350,8 @@ test("30. the real loop-engine repository uses exhausted-roadmap routing with a 
   const estimate = generateRoadmapProposalEstimateReport(loopEngineProject);
   assert.equal(estimate.estimate.status, "available");
   if (estimate.estimate.status !== "available") return;
-  assert.equal(estimate.estimate.profile, "economy");
-  assert.equal(estimate.estimate.model, "claude-haiku-4-5");
+  assert.equal(estimate.estimate.profile, "balanced");
+  assert.equal(estimate.estimate.model, "claude-sonnet-5");
 
   const schemaJson = JSON.stringify(
     toAnthropicOutputSchema(ROADMAP_PROPOSAL_OUTPUT_SCHEMA),
