@@ -209,6 +209,7 @@ export function createClaudeCodeCliLoopExecutor(
     }
 
     const args = [
+      "--restricted",
       "--print",
       "--output-format",
       "json",

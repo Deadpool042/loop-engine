@@ -343,6 +343,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
 
       assert.equal(result.status, "completed");
       const args = JSON.parse(readFileSync(captureArgs, "utf8")) as string[];
+      assert.ok(args.includes("--restricted"));
       assert.ok(args.includes("--tools"));
       assert.equal(args[args.indexOf("--tools") + 1], "Read,Edit,Write,Glob,Grep");
       assert.ok(args.includes("--strict-mcp-config"));
