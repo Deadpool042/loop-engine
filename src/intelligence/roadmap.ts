@@ -58,6 +58,20 @@ const WARNING_PATTERNS = [
   "securite",
 ] as const;
 
+function detectCandidateId(line: string): string | undefined {
+  const normalized = line
+    .trim()
+    .replace(/^-\s*\[[ xX]\]\s*/, "")
+    .replace(/^⏳\s*/, "")
+    .replace(/^\[\s*P[0-3]\s*\]\s*/i, "");
+
+  const match = normalized.match(
+    /^([A-Z][A-Z0-9]*(?:[.-][A-Z0-9]+)+)\s*(?:[—–:]|$)/i,
+  );
+
+  return match?.[1];
+}
+
 function detectCandidatePriority(line: string): RoadmapPriority {
   const match = line.match(/\[\s*(p[1-3])\s*\]/i);
   const priority = match?.[1]?.toLowerCase();
@@ -352,8 +366,12 @@ export function analyzeRoadmaps(
         ? collectCandidateText(lines, index)
         : { text: trimmed, endIndex: index };
       const classification = classifyCandidateLine(collected.text);
+      const candidateId = explicitCandidate
+        ? detectCandidateId(trimmed)
+        : undefined;
 
       candidates.push({
+        ...(candidateId === undefined ? {} : { id: candidateId }),
         path: roadmapPath,
         line: index + 1,
         text: collected.text,

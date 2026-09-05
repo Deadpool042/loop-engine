@@ -88,6 +88,63 @@ describe("selected lot detail", () => {
     }
   });
 
+  it("resolves a bounded same-directory heading when the candidate has a stable id", () => {
+    const root = mkdtempSync(join(tmpdir(), "loop-selected-lot-"));
+    try {
+      const roadmapDir = join(root, "docs", "roadmap");
+      mkdirSync(roadmapDir, { recursive: true });
+      writeFileSync(join(roadmapDir, "README.md"), "# Roadmap\n");
+      writeFileSync(
+        join(roadmapDir, "cycle.md"),
+        [
+          "# Cycle",
+          "",
+          "## VNEXT3-G1 — Social drafts admin",
+          "",
+          "### État observé",
+          "",
+          "Code livré, recette UI manquante.",
+          "",
+          "### Objectif V1",
+          "",
+          "Rendre les brouillons sociaux exploitables.",
+          "",
+          "### Critère restant",
+          "",
+          "Recette UI staging.",
+          "",
+          "## VNEXT3-G2 — Autre lot",
+          "",
+          "Ne doit pas être inclus.",
+        ].join("\n"),
+      );
+
+      const detail = resolveSelectedLotDetail(root, {
+        id: "VNEXT3-G1",
+        path: "docs/roadmap/README.md",
+        text: "⏳ [P1] VNEXT3-G1 — Social drafts admin",
+      });
+
+      assert.ok(detail);
+      assert.equal(detail.path, "docs/roadmap/cycle.md");
+      assert.equal(detail.title, "VNEXT3-G1 — Social drafts admin");
+      assert.deepEqual(
+        detail.sections.map((section) => section.title),
+        ["État observé", "Objectif V1", "Critère restant"],
+      );
+      assert.deepEqual(
+        detail.sections.map((section) => section.kind),
+        ["status", "objective", "acceptance"],
+      );
+      assert.doesNotMatch(
+        detail.sections.map((section) => section.content).join("\n"),
+        /Autre lot/,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("returns null when the candidate has no linked markdown detail", () => {
     const root = mkdtempSync(join(tmpdir(), "loop-selected-lot-"));
     try {

@@ -62,8 +62,11 @@ explicites ne sont pas ajoutées à l'inventaire des lots.
 
 Les lots de tableau structurés exposent leur première cellule `H<n>-L<n>`
 (suffixe alphabétique optionnel) comme identifiant stable `candidate.id`.
-Les formats historiques sans cette cellule restent lisibles, mais ne sont pas
-adressables explicitement.
+
+Les lignes Markdown explicites peuvent aussi exposer un identifiant stable
+lorsque le libellé commence, après les marqueurs de statut/priorité, par un
+token borné de type `VNEXT3-G1`, `OC-8` ou `V48.0`. Les formats historiques
+sans identifiant restent lisibles, mais ne sont pas adressables explicitement.
 
 ### Gates de phase opt-in
 
@@ -263,4 +266,40 @@ Elle ne remplace pas :
 - `reason` pour l'explication.
 
 Les commandes `next` et `prompt` affichent la priorité du candidat sélectionné.
+
+## Détail borné d'un candidat — V1.7
+
+La projection `roadmap overview` expose pour chaque candidat une `detailKey`
+opaque, stable tant que `path + line + text` ne changent pas. Cette clé permet
+à une façade externe de demander le détail d'un lot sans fournir de chemin
+arbitraire.
+
+La commande :
+
+`pnpm loop roadmap detail <project> --candidate-key <key> --json`
+
+résout d'abord le candidat canonique dans le snapshot courant, puis cherche son
+détail selon un ordre déterministe :
+
+1. lien Markdown explicite porté par la ligne du candidat ;
+2. document Markdown du même répertoire contenant un titre correspondant
+   exactement à `candidate.id`.
+
+La recherche de repli est bornée en nombre de fichiers et chaque fichier est
+lu avec des limites fixes de taille, sections et caractères. Les chemins
+résolus doivent rester sous la racine réelle du projet, y compris après
+résolution des symlinks.
+
+Le détail projeté conserve les titres et contenus documentaires existants et
+ajoute seulement une catégorie déterministe de section parmi :
+`status`, `objective`, `context`, `scope`, `out_of_scope`,
+`acceptance`, `dependencies`, `evidence`, `next_check`, `future`,
+`other`.
+
+Aucun texte métier n'est généré. Un lot sans détail documenté retourne
+`not_documented`; une clé invalide ou inconnue retourne `not_found`.
+Aucun provider n'est appelé.
+
+Cette surface est destinée notamment aux cockpits read-only : le résumé reste
+léger et le détail peut être chargé à la demande.
 ```
