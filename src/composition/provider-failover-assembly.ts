@@ -53,8 +53,10 @@ function selectFallbackProfile(
   primaryPlan: LoopExecutionPlan,
 ): AgentProfile | null {
   return (
-    assembly.agentRegistry.profiles.find((profile) =>
-      supportsPrimaryPolicy(profile, primaryPlan),
+    assembly.agentRegistry.profiles.find(
+      (profile) =>
+        profile.availability !== "unavailable" &&
+        supportsPrimaryPolicy(profile, primaryPlan),
     ) ?? null
   );
 }

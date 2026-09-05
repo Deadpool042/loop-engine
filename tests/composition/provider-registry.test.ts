@@ -84,21 +84,215 @@ describe("LoopProviderRegistry", () => {
     );
   });
 
-  it("adds verified long-context capability for the exact Claude Sonnet 5 model", () => {
+  it("takes enriched capabilities from explicit profile configuration instead of commercial model names", () => {
     const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
       id: "claude_code",
       executable: "/usr/local/bin/claude",
-      model: "claude-sonnet-5",
+      profiles: [
+        {
+          id: "standard",
+          model: "claude-sonnet-5",
+          economicTier: "standard",
+          capabilities: [
+            "code_edit",
+            "shell_exec",
+            "test_execution",
+            "long_context",
+          ],
+        },
+      ],
     });
 
     const [profile] = assembly.agentRegistry.profiles;
     assert.ok(profile);
+    assert.equal(profile.id, "configured.claude_code.standard");
+    assert.equal(profile.economicTier, "standard");
+    assert.equal(profile.availability, "available");
     assert.deepEqual(profile.capabilities, [
       "code_edit",
       "shell_exec",
       "test_execution",
       "long_context",
     ]);
+  });
+
+  it("represents the current four-level OpenAI and Anthropic portfolios as configurable data", () => {
+    const codex = assembleLoopProvider(defaultLoopProviderRegistry, {
+      id: "codex",
+      executable: "/usr/local/bin/codex",
+      profiles: [
+        {
+          id: "economy",
+          model: "gpt-5.6-luna",
+          economicTier: "economy",
+          capabilities: ["code_edit", "shell_exec", "test_execution"],
+        },
+        {
+          id: "standard",
+          model: "gpt-5.6-terra",
+          economicTier: "standard",
+          capabilities: ["code_edit", "shell_exec", "test_execution"],
+        },
+        {
+          id: "advanced",
+          model: "gpt-5.6-sol",
+          economicTier: "advanced",
+          capabilities: [
+            "code_edit",
+            "shell_exec",
+            "test_execution",
+            "long_context",
+            "multi_file_refactor",
+          ],
+        },
+        {
+          id: "frontier",
+          model: "gpt-6-astra",
+          economicTier: "frontier",
+          availability: "unavailable",
+          capabilities: [
+            "code_edit",
+            "shell_exec",
+            "test_execution",
+            "long_context",
+            "multi_file_refactor",
+          ],
+        },
+      ],
+    });
+    const claude = assembleLoopProvider(defaultLoopProviderRegistry, {
+      id: "claude_code",
+      executable: "/usr/local/bin/claude",
+      profiles: [
+        {
+          id: "economy",
+          model: "claude-haiku-4-5",
+          economicTier: "economy",
+          capabilities: ["code_edit", "shell_exec", "test_execution"],
+        },
+        {
+          id: "standard",
+          model: "claude-sonnet-5",
+          economicTier: "standard",
+          capabilities: [
+            "code_edit",
+            "shell_exec",
+            "test_execution",
+            "long_context",
+          ],
+        },
+        {
+          id: "advanced",
+          model: "claude-opus-5",
+          economicTier: "advanced",
+          capabilities: [
+            "code_edit",
+            "shell_exec",
+            "test_execution",
+            "long_context",
+            "multi_file_refactor",
+          ],
+        },
+        {
+          id: "frontier",
+          model: "claude-fable-5-1",
+          economicTier: "frontier",
+          capabilities: [
+            "code_edit",
+            "shell_exec",
+            "test_execution",
+            "long_context",
+            "multi_file_refactor",
+          ],
+        },
+      ],
+    });
+
+    assert.deepEqual(
+      codex.agentRegistry.profiles.map((profile) => ({
+        id: profile.id,
+        model: profile.model,
+        economicTier: profile.economicTier,
+        availability: profile.availability,
+      })),
+      [
+        {
+          id: "configured.codex.economy",
+          model: "gpt-5.6-luna",
+          economicTier: "economy",
+          availability: "available",
+        },
+        {
+          id: "configured.codex.standard",
+          model: "gpt-5.6-terra",
+          economicTier: "standard",
+          availability: "available",
+        },
+        {
+          id: "configured.codex.advanced",
+          model: "gpt-5.6-sol",
+          economicTier: "advanced",
+          availability: "available",
+        },
+        {
+          id: "configured.codex.frontier",
+          model: "gpt-6-astra",
+          economicTier: "frontier",
+          availability: "unavailable",
+        },
+      ],
+    );
+    assert.deepEqual(
+      claude.agentRegistry.profiles.map((profile) => profile.model),
+      [
+        "claude-haiku-4-5",
+        "claude-sonnet-5",
+        "claude-opus-5",
+        "claude-fable-5-1",
+      ],
+    );
+  });
+
+  it("rejects ambiguous model/profile configuration and duplicate profile ids", () => {
+    assert.throws(
+      () =>
+        assembleLoopProvider(defaultLoopProviderRegistry, {
+          id: "codex",
+          executable: "/usr/local/bin/codex",
+          model: "gpt-5.6-luna",
+          profiles: [
+            {
+              id: "economy",
+              model: "gpt-5.6-luna",
+              economicTier: "economy",
+              capabilities: ["code_edit", "shell_exec", "test_execution"],
+            },
+          ],
+        }),
+      /either model or profiles/,
+    );
+    assert.throws(
+      () =>
+        assembleLoopProvider(defaultLoopProviderRegistry, {
+          id: "codex",
+          executable: "/usr/local/bin/codex",
+          profiles: [
+            {
+              id: "same",
+              model: "model-a",
+              economicTier: "economy",
+              capabilities: ["code_edit", "shell_exec", "test_execution"],
+            },
+            {
+              id: "same",
+              model: "model-b",
+              economicTier: "standard",
+              capabilities: ["code_edit", "shell_exec", "test_execution"],
+            },
+          ],
+        }),
+      /Duplicate configured provider profile id: same/,
+    );
   });
 
   it("keeps an unknown enterprise model alias inside the same conservative provider-bound envelope", () => {

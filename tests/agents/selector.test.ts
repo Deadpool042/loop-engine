@@ -85,6 +85,40 @@ describe("selectAgentProfile", () => {
     );
   });
 
+  it("rejects an explicitly unavailable profile before other ranking", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "offline",
+        capabilities: ["code_edit"],
+        economicTier: "economy",
+        availability: "unavailable",
+      }),
+      profile({
+        id: "online",
+        capabilities: ["code_edit"],
+        economicTier: "frontier",
+        availability: "available",
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit"],
+      requiredPermissions: [],
+    });
+
+    assert.equal(result.outcome, "selected");
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "online",
+    );
+    assert.deepEqual(result.rejected, [
+      {
+        profileId: "offline",
+        reason: "profile is explicitly unavailable",
+      },
+    ]);
+  });
+
   it("enforces provider and runtime allow-lists as hard constraints", () => {
     const registry = createAgentRegistry([
       profile({

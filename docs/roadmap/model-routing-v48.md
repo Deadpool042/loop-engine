@@ -103,6 +103,8 @@ Travail :
 
 Critère de réussite : Luna/Terra/Sol/Astra et Haiku/Sonnet/Opus/Fable peuvent être représentés comme profils configurables sans ajouter de logique métier dépendante de leurs noms.
 
+Preuve V48.2 : `AgentProfile` porte désormais les métadonnées optionnelles `economicTier` et `availability`, avec un ordre économique centralisé indépendant de `AgentEffort`. `provider-registry` accepte un portefeuille `profiles` pour un même executable et construit des profils `configured.<provider>.<id>` sans verrouiller l'executor sur un seul modèle. Les capacités enrichies proviennent exclusivement de la configuration explicite ; l'ancienne inférence codée en dur sur `claude-sonnet-5` a été supprimée. Un profil `unavailable` est un hard gate du selector et n'est jamais pris comme fallback. Les tests de registre démontrent que les quatre niveaux OpenAI et les quatre niveaux Anthropic peuvent être décrits comme données révisables, y compris un profil frontier explicitement indisponible. V48.2 n'utilise pas encore `economicTier` pour classer les candidats : ce choix appartient à V48.3.
+
 ### V48.3 [P2] — Sélection coût/capacité déterministe
 
 Objectif : choisir le plus petit profil admissible sans faire exploser le nombre de tentatives.

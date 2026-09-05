@@ -139,6 +139,48 @@ test("executes the configured fallback through one application executor", async 
   assert.equal(dependency.agentRegistry.profiles.length, 2);
 });
 
+test("skips explicitly unavailable fallback profiles", async () => {
+  const primary = profile("configured.codex", "openai", "codex", 2);
+  const unavailable = Object.freeze({
+    ...profile(
+      "configured.claude.economy",
+      "anthropic",
+      "claude_code",
+      2,
+    ),
+    availability: "unavailable" as const,
+  });
+  const available = Object.freeze({
+    ...profile(
+      "configured.claude.standard",
+      "anthropic",
+      "claude_code",
+      2,
+    ),
+    availability: "available" as const,
+  });
+  let observedProfileId: string | null = null;
+  const fallbackExecutor: LoopExecutor = async (fallbackPlan) => {
+    observedProfileId = fallbackPlan.profileId;
+    return completed("src/fallback.ts")(fallbackPlan);
+  };
+  const dependency = createLoopProviderFailoverAssembly(
+    [
+      assembly("codex", primary, failed("provider_timeout")),
+      Object.freeze({
+        id: "claude_code",
+        agentRegistry: createAgentRegistry([unavailable, available]),
+        executor: fallbackExecutor,
+      }),
+    ],
+    2,
+  );
+
+  const result = await dependency.executor(plan(primary));
+  assert.equal(result.status, "completed");
+  assert.equal(observedProfileId, "configured.claude.standard");
+});
+
 test("skips fallback profiles that cannot satisfy admitted permissions", async () => {
   const primary = profile("configured.codex", "openai", "codex", 2);
   const incompatible = Object.freeze({
