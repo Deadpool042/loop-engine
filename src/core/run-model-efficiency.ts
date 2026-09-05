@@ -1,4 +1,8 @@
 import { AGENT_EFFORTS, type AgentEffort } from "../agents/types.js";
+import {
+  LOOP_TASK_CATEGORIES,
+  type LoopTaskCategory,
+} from "../policy/types.js";
 import { findOutOfScopeFiles } from "../loop/file-scope.js";
 import type {
   LoopProviderFailoverAttemptEvidence,
@@ -31,6 +35,7 @@ export type LoopRunModelObservation = Readonly<{
   profileId: string;
   model: string;
   effort: AgentEffort | null;
+  taskCategory: LoopTaskCategory | null;
   selectedAfterFailover: boolean;
   providerAttempt: Readonly<{
     attempt: number;
@@ -62,6 +67,10 @@ export type LoopRunModelAggregate = Readonly<{
     failedRuns: number;
     totalRepairAttempts: number;
   }>;
+  taskCategories: readonly Readonly<{
+    category: LoopTaskCategory;
+    count: number;
+  }>[];
   duration: Readonly<{
     observedRuns: number;
     totalMs: number;
@@ -303,6 +312,16 @@ function projectedValidation(
   });
 }
 
+function taskCategory(result: LoopRunResult): LoopTaskCategory | null {
+  const resolution = result.agentPolicy as unknown;
+  if (!isRecord(resolution) || !isRecord(resolution.requirements)) return null;
+  const category = resolution.requirements.category;
+  return typeof category === "string" &&
+    (LOOP_TASK_CATEGORIES as readonly string[]).includes(category)
+    ? (category as LoopTaskCategory)
+    : null;
+}
+
 export function projectRunModelObservation(
   result: LoopRunResult,
 ): LoopRunModelObservation | null {
@@ -323,6 +342,7 @@ export function projectRunModelObservation(
     profileId: identity.profileId,
     model: identity.model,
     effort: identity.effort,
+    taskCategory: taskCategory(result),
     selectedAfterFailover: (identity.attempt?.attempt ?? 1) > 1,
     providerAttempt:
       identity.attempt === null
@@ -351,6 +371,7 @@ type MutableModelAggregate = {
   validationPassedRuns: number;
   validationFailedRuns: number;
   totalRepairAttempts: number;
+  taskCategories: Map<LoopTaskCategory, number>;
   durationObservedRuns: number;
   durationTotalMs: number;
   durationMinMs: number | null;
@@ -388,6 +409,7 @@ function aggregateModels(
         validationPassedRuns: 0,
         validationFailedRuns: 0,
         totalRepairAttempts: 0,
+        taskCategories: new Map<LoopTaskCategory, number>(),
         durationObservedRuns: 0,
         durationTotalMs: 0,
         durationMinMs: null,
@@ -413,6 +435,13 @@ function aggregateModels(
       } else {
         group.validationFailedRuns += 1;
       }
+    }
+
+    if (observation.taskCategory !== null) {
+      group.taskCategories.set(
+        observation.taskCategory,
+        (group.taskCategories.get(observation.taskCategory) ?? 0) + 1,
+      );
     }
 
     if (observation.durationMs !== null) {
@@ -457,6 +486,14 @@ function aggregateModels(
             failedRuns: group.validationFailedRuns,
             totalRepairAttempts: group.totalRepairAttempts,
           }),
+          taskCategories: Object.freeze(
+            LOOP_TASK_CATEGORIES.flatMap((category) => {
+              const count = group.taskCategories.get(category) ?? 0;
+              return count === 0
+                ? []
+                : [Object.freeze({ category, count })];
+            }),
+          ),
           duration: Object.freeze({
             observedRuns: group.durationObservedRuns,
             totalMs: group.durationTotalMs,

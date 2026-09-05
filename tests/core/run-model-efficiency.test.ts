@@ -92,6 +92,14 @@ function history(entries: readonly LoopRunResult[]): LoopRunHistoryReport {
   };
 }
 
+function policyCategory(
+  category: "code" | "architecture",
+): LoopRunResult["agentPolicy"] {
+  return {
+    requirements: { category },
+  } as unknown as LoopRunResult["agentPolicy"];
+}
+
 describe("run model efficiency evidence", () => {
   it("compares terminal model outcomes while preserving every failover attempt", () => {
     const directLuna = run({
@@ -127,6 +135,7 @@ describe("run model efficiency evidence", () => {
       },
       modifiedFiles: ["src/a.ts"],
       writableFileScope: ["src/**"],
+      agentPolicy: policyCategory("code"),
     });
 
     const failoverToLuna = run({
@@ -173,6 +182,7 @@ describe("run model efficiency evidence", () => {
         failedCommand: null,
         exitCode: 0,
       },
+      agentPolicy: policyCategory("architecture"),
     });
 
     const failedHaiku = run({
@@ -208,6 +218,7 @@ describe("run model efficiency evidence", () => {
         message: "bounded fixture failure",
         details: [],
       },
+      agentPolicy: policyCategory("architecture"),
     });
 
     const unattributedExecute = run({
@@ -242,6 +253,7 @@ describe("run model efficiency evidence", () => {
         runId: observation.runId,
         model: observation.model,
         effort: observation.effort,
+        taskCategory: observation.taskCategory,
         selectedAfterFailover: observation.selectedAfterFailover,
         durationMs: observation.durationMs,
         outOfScopeFileCount: observation.outOfScopeFileCount,
@@ -251,6 +263,7 @@ describe("run model efficiency evidence", () => {
           runId: "failed-haiku",
           model: "claude-haiku-4-5",
           effort: "low",
+          taskCategory: "architecture",
           selectedAfterFailover: false,
           durationMs: 300_000,
           outOfScopeFileCount: 1,
@@ -259,6 +272,7 @@ describe("run model efficiency evidence", () => {
           runId: "haiku-to-luna",
           model: "gpt-5.6-luna",
           effort: null,
+          taskCategory: "architecture",
           selectedAfterFailover: true,
           durationMs: 10_000,
           outOfScopeFileCount: null,
@@ -267,6 +281,7 @@ describe("run model efficiency evidence", () => {
           runId: "direct-luna",
           model: "gpt-5.6-luna",
           effort: "low",
+          taskCategory: "code",
           selectedAfterFailover: false,
           durationMs: 5_000,
           outOfScopeFileCount: 0,
@@ -288,6 +303,7 @@ describe("run model efficiency evidence", () => {
           failedRuns: 0,
           totalRepairAttempts: 0,
         },
+        taskCategories: [{ category: "architecture", count: 1 }],
         duration: {
           observedRuns: 1,
           totalMs: 300_000,
@@ -313,6 +329,10 @@ describe("run model efficiency evidence", () => {
           failedRuns: 0,
           totalRepairAttempts: 1,
         },
+        taskCategories: [
+          { category: "code", count: 1 },
+          { category: "architecture", count: 1 },
+        ],
         duration: {
           observedRuns: 2,
           totalMs: 15_000,

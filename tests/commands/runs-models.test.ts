@@ -43,6 +43,7 @@ const report: LoopRunModelEfficiencyReport = {
         failedRuns: 0,
         totalRepairAttempts: 0,
       },
+      taskCategories: [{ category: "code", count: 2 }],
       duration: {
         observedRuns: 2,
         totalMs: 2_000,

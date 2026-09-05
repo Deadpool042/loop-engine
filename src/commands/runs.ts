@@ -52,8 +52,14 @@ export function printRunHistory(
 
     terminal.section("Terminal model outcomes");
     for (const model of report.models) {
+      const categories =
+        model.taskCategories.length === 0
+          ? "unknown"
+          : model.taskCategories
+              .map((entry) => `${entry.category}:${entry.count}`)
+              .join(",");
       terminal.info(
-        `${model.provider}/${model.runtime} • ${model.model} — runs=${model.terminalRuns}, completed=${model.outcomes.completed}, failed=${model.outcomes.failed}, validation=${model.validation.passedRuns}/${model.validation.observedRuns}, repairs=${model.validation.totalRepairAttempts}, durationMs=${model.duration.totalMs}, modifiedFiles=${model.files.modifiedTotal}, outOfScope=${model.files.outOfScopeTotal}/${model.files.outOfScopeObservedRuns}`,
+        `${model.provider}/${model.runtime} • ${model.model} — runs=${model.terminalRuns}, completed=${model.outcomes.completed}, failed=${model.outcomes.failed}, validation=${model.validation.passedRuns}/${model.validation.observedRuns}, repairs=${model.validation.totalRepairAttempts}, durationMs=${model.duration.totalMs}, categories=${categories}, modifiedFiles=${model.files.modifiedTotal}, outOfScope=${model.files.outOfScopeTotal}/${model.files.outOfScopeObservedRuns}`,
       );
     }
 
