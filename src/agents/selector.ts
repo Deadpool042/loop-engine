@@ -1,5 +1,7 @@
 import type { AgentRegistry } from "./registry.js";
 import {
+  AGENT_ECONOMIC_TIERS,
+  agentEconomicTierRank,
   compareAgentEffort,
   type AgentBudget,
   type AgentCapability,
@@ -36,7 +38,11 @@ export type AgentRejection = Readonly<{
 // deterministic ranking. It deliberately repeats no profile configuration.
 export type AgentNonSelection = Readonly<{
   profileId: string;
-  reason: "higher_effort_than_selected" | "deterministic_tiebreak";
+  reason:
+    | "higher_economic_tier_than_selected"
+    | "economic_tier_unranked"
+    | "higher_effort_than_selected"
+    | "deterministic_tiebreak";
 }>;
 
 export type AgentSelectionResult =
@@ -153,17 +159,29 @@ export function evaluateAgentProfile(
   return { ok: true };
 }
 
+function economicTierRank(profile: AgentProfile): number {
+  return profile.economicTier === undefined
+    ? AGENT_ECONOMIC_TIERS.length
+    : agentEconomicTierRank(profile.economicTier);
+}
+
+function compareEligibleProfiles(
+  a: AgentProfile,
+  b: AgentProfile,
+): number {
+  return (
+    economicTierRank(a) - economicTierRank(b) ||
+    compareAgentEffort(a.effort, b.effort) ||
+    a.id.localeCompare(b.id)
+  );
+}
+
 export function pickSmallestCapable(
   profiles: readonly AgentProfile[],
 ): AgentProfile | null {
   if (profiles.length === 0) return null;
 
-  return (
-    [...profiles].sort(
-      (a, b) =>
-        compareAgentEffort(a.effort, b.effort) || a.id.localeCompare(b.id),
-    )[0] ?? null
-  );
+  return [...profiles].sort(compareEligibleProfiles)[0] ?? null;
 }
 
 function canonicalizeSelectedProfile(profile: AgentProfile): AgentProfile {
@@ -200,16 +218,29 @@ export function selectAgentProfile(
   const selected = pickSmallestCapable(eligible);
   if (!selected) return { outcome: "no_match", rejected };
 
+  const selectedEconomicTierRank = economicTierRank(selected);
   const notSelected: AgentNonSelection[] = eligible
     .filter((profile) => profile.id !== selected.id)
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((profile) => ({
-      profileId: profile.id,
-      reason:
-        compareAgentEffort(profile.effort, selected.effort) > 0
-          ? "higher_effort_than_selected"
-          : "deterministic_tiebreak",
-    }));
+    .map((profile) => {
+      const profileEconomicTierRank = economicTierRank(profile);
+      let reason: AgentNonSelection["reason"];
+
+      if (
+        selected.economicTier !== undefined &&
+        profile.economicTier === undefined
+      ) {
+        reason = "economic_tier_unranked";
+      } else if (profileEconomicTierRank > selectedEconomicTierRank) {
+        reason = "higher_economic_tier_than_selected";
+      } else if (compareAgentEffort(profile.effort, selected.effort) > 0) {
+        reason = "higher_effort_than_selected";
+      } else {
+        reason = "deterministic_tiebreak";
+      }
+
+      return { profileId: profile.id, reason };
+    });
 
   return {
     outcome: "selected",

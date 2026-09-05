@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
+import { selectAgentProfile } from "../../src/agents/selector.js";
 import {
   assembleLoopProvider,
   codexProviderRegistration,
@@ -249,6 +250,120 @@ describe("LoopProviderRegistry", () => {
         "claude-sonnet-5",
         "claude-opus-5",
         "claude-fable-5-1",
+      ],
+    );
+  });
+
+
+  it("selects the cheapest admissible configured profile independently of declaration order", () => {
+    const profiles = [
+      {
+        id: "economy",
+        model: "gpt-5.6-luna",
+        economicTier: "economy" as const,
+        capabilities: ["code_edit", "shell_exec", "test_execution"] as const,
+      },
+      {
+        id: "standard",
+        model: "gpt-5.6-terra",
+        economicTier: "standard" as const,
+        capabilities: ["code_edit", "shell_exec", "test_execution"] as const,
+      },
+      {
+        id: "advanced",
+        model: "gpt-5.6-sol",
+        economicTier: "advanced" as const,
+        capabilities: [
+          "code_edit",
+          "shell_exec",
+          "test_execution",
+          "long_context",
+        ] as const,
+      },
+    ];
+
+    const first = assembleLoopProvider(defaultLoopProviderRegistry, {
+      id: "codex",
+      executable: "/usr/local/bin/codex",
+      profiles,
+    });
+    const second = assembleLoopProvider(defaultLoopProviderRegistry, {
+      id: "codex",
+      executable: "/usr/local/bin/codex",
+      profiles: [...profiles].reverse(),
+    });
+
+    const request = {
+      requiredCapabilities: ["code_edit", "shell_exec"] as const,
+      requiredPermissions: ["write_worktree"] as const,
+    };
+    const firstSelection = selectAgentProfile(first.agentRegistry, request);
+    const secondSelection = selectAgentProfile(second.agentRegistry, request);
+
+    assert.equal(
+      firstSelection.outcome === "selected"
+        ? firstSelection.profile.model
+        : null,
+      "gpt-5.6-luna",
+    );
+    assert.deepEqual(firstSelection, secondSelection);
+  });
+
+  it("falls back to the next configured economic tier when the cheaper model is unavailable", () => {
+    const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
+      id: "codex",
+      executable: "/usr/local/bin/codex",
+      profiles: [
+        {
+          id: "economy",
+          model: "gpt-5.6-luna",
+          economicTier: "economy",
+          availability: "unavailable",
+          capabilities: ["code_edit", "shell_exec", "test_execution"],
+        },
+        {
+          id: "standard",
+          model: "gpt-5.6-terra",
+          economicTier: "standard",
+          capabilities: ["code_edit", "shell_exec", "test_execution"],
+        },
+        {
+          id: "advanced",
+          model: "gpt-5.6-sol",
+          economicTier: "advanced",
+          capabilities: [
+            "code_edit",
+            "shell_exec",
+            "test_execution",
+            "long_context",
+          ],
+        },
+      ],
+    });
+
+    const selection = selectAgentProfile(assembly.agentRegistry, {
+      requiredCapabilities: ["code_edit", "shell_exec"],
+      requiredPermissions: ["write_worktree"],
+    });
+
+    assert.equal(selection.outcome, "selected");
+    assert.equal(
+      selection.outcome === "selected" ? selection.profile.model : null,
+      "gpt-5.6-terra",
+    );
+    assert.deepEqual(selection.rejected, [
+      {
+        profileId: "configured.codex.economy",
+        reason: "profile is explicitly unavailable",
+      },
+    ]);
+    assert.deepEqual(
+      selection.outcome === "selected" ? selection.notSelected : null,
+      [
+        {
+          profileId: "configured.codex.advanced",
+          reason: "higher_economic_tier_than_selected",
+        },
       ],
     );
   });

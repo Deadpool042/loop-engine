@@ -123,6 +123,8 @@ Le coût n'est donc qu'un critère après admission fonctionnelle.
 
 Critère de réussite : deux configurations sémantiquement identiques produisent la même décision ; supprimer ou rendre indisponible un modèle entraîne un fallback explicable vers le prochain profil admissible, jamais vers un modèle arbitraire.
 
+Preuve V48.3 : `selectAgentProfile` reste l'unique selector. `evaluateAgentProfile` conserve l'admission dure sur disponibilité, allow-lists, capacités, permissions, plafond d'effort et budget. Le ranking des profils déjà admissibles utilise ensuite l'ordre économique central `economy < standard < advanced < frontier`, puis seulement `effort` et `id` comme tie-breaks. Un profil legacy sans `economicTier` n'est jamais assimilé à un coût bas : il reste admissible mais est classé après les tiers explicites ; si tous les profils sont legacy, le comportement historique `effort -> id` est préservé. Les tests couvrent l'indépendance à l'ordre de déclaration, le rejet d'un profil economy incapable, le fallback `economy unavailable -> standard`, les tiers inconnus et l'evidence des alternatives non retenues. Une intégration sur un portefeuille Codex configurable démontre qu'un même ensemble sérialisé dans un ordre différent choisit toujours le même modèle économique admissible.
+
 ### V48.4 [P2] — Evidence d'efficacité par modèle
 
 Objectif : accumuler suffisamment de données locales pour éviter un routage fondé uniquement sur les benchmarks fournisseurs.
