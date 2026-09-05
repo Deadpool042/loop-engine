@@ -897,6 +897,7 @@ else if (command === "review") {
   const json = process.argv.includes("--json");
   const limitValue = optionValue("--limit");
   const runId = optionValue("--run-id");
+  const models = hasOption("--models");
   if (hasOption("--limit") && limitValue === undefined) {
     failOption(
       json,
@@ -907,11 +908,14 @@ else if (command === "review") {
   if (hasOption("--run-id") && runId === undefined) {
     failOption(json, "missing_run_history_run_id", "Missing value for --run-id");
   }
-  if (runId !== undefined && limitValue !== undefined) {
+  if (
+    runId !== undefined &&
+    (limitValue !== undefined || models)
+  ) {
     failOption(
       json,
       "run_history_lookup_with_limit",
-      "--run-id cannot be combined with --limit.",
+      "--run-id cannot be combined with --limit or --models.",
     );
   }
   const limit =
@@ -930,6 +934,7 @@ else if (command === "review") {
     printRunHistory(application, project.name, {
       ...(json ? { json } : {}),
       ...(limit !== undefined ? { limit } : {}),
+      ...(models ? { models: true } : {}),
     });
   }
 } else if (command === "candidate" && process.argv[3] === "review") {
