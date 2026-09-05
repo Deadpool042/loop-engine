@@ -175,13 +175,10 @@ export function buildPlanningStatus(options: Readonly<{
     (candidate) =>
       candidate.status === "todo" || candidate.status === "in_progress",
   );
+  const firstOpenCandidate = knownOpenCandidates[0];
   if (
-    knownOpenCandidates.length > 0 &&
-    knownOpenCandidates.every(
-      (candidate) =>
-        candidate.admissibility?.state === "not_admissible" &&
-        candidate.admissibility.reason === "phase_closed",
-    )
+    firstOpenCandidate?.admissibility?.state === "not_admissible" &&
+    firstOpenCandidate.admissibility.reason === "phase_closed"
   ) {
     return Object.freeze({
       mode,

@@ -146,6 +146,34 @@ L'inventaire suivant est obligatoire avant de faire évoluer un runtime n8n exis
 
 Cet inventaire doit être fondé sur le runtime ou ses exports réels. Une absence d'accès doit être déclarée comme telle plutôt que remplacée par une hypothèse.
 
+## Cas concret désormais qualifié : notification de fin de lot
+
+Le besoin suivant est désormais suffisamment précis pour justifier une intégration n8n bornée lorsque le runtime réel sera de nouveau inventorié :
+
+```text
+Loop Engine roadmap overview
+        ↓
+roadmap.completionEvent
+        ↓
+n8n — déduplication / retry
+        ↓
+notification iPhone / Mac
+        ↓
+OpenClaw
+```
+
+Contraintes :
+
+- Loop Engine produit uniquement la projection déterministe ;
+- n8n conserve l'état de déduplication et ajoute l'horodatage d'observation si nécessaire ;
+- le premier poll établit une baseline sans renvoyer tout l'historique ;
+- une panne n8n ne modifie ni la roadmap ni l'état du projet ;
+- aucune notification ne constitue une autorisation d'exécuter un lot ;
+- le transport push et ses credentials restent configurés hors dépôt ;
+- le workflow réel ne doit pas être créé ou modifié tant que l'inventaire du runtime n8n déployé n'est pas disponible.
+
+Ce cas d'usage ne transforme pas n8n en projet à roadmap permanente. Une fois le workflow livré et qualifié, le projet retourne en maintenance.
+
 ## Politique de planification
 
 Par défaut :

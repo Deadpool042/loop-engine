@@ -124,12 +124,13 @@ Chaque candidat doit exposer une reason.
 
 Sélection
 
-La sélection doit rester prudente :
+La sélection doit rester prudente et séquentielle :
 
-1. préférer un candidat safe ;
-2. sinon préférer un candidat warning ;
-3. sinon afficher le candidat blocked sans le recommander directement ;
-4. si aucun candidat n’est trouvé, inviter à ouvrir la roadmap.
+1. ignorer uniquement les candidats terminés ;
+2. examiner le premier candidat restant dans l'ordre canonique des roadmaps configurées ;
+3. ne jamais le dépasser parce qu'un lot ultérieur est `safe`, plus prioritaire ou plus facile ;
+4. s'il est non admissible, ne sélectionner aucun lot ultérieur ;
+5. s'il est `blocked`, le conserver comme candidat courant pour information, sans le présenter comme un micro-lot sûr.
 
 ⸻
 
@@ -163,18 +164,18 @@ Le Roadmap Reader ne doit pas :
 pnpm run validate
 git status –short
 
-## Sélection V1.2
+## Sélection séquentielle
 
-La sélection ignore les candidats dont le `status` est `done`.
+La sélection ignore les candidats dont le `status` est `done`, puis conserve strictement l'ordre de déclaration.
 
-Parmi les candidats restants, l'ordre de préférence est :
+Le premier candidat restant constitue la frontière de séquence :
 
-1. premier candidat `safe` ;
-2. sinon premier candidat `warning` ;
-3. sinon premier candidat `blocked` ;
-4. sinon aucun candidat sélectionné.
+1. s'il est admissible, il est le seul candidat sélectionnable, indépendamment de `kind` ou `priority` ;
+2. s'il est non admissible, aucun candidat ultérieur n'est sélectionné ;
+3. un candidat `blocked` reste visible comme frontière courante mais ne doit pas être présenté comme un micro-lot sûr ;
+4. le résumé `roadmap.summary.selectable` vaut donc au plus `1`.
 
-Un candidat `blocked` peut être affiché pour information, mais il ne doit pas être présenté comme un micro-lot sûr.
+Cette règle empêche un consommateur, un agent ou un cockpit de prendre de l'avance sur la roadmap en choisissant un travail ultérieur plus simple.
 
 ---
 
@@ -257,7 +258,7 @@ Valeurs V1.6 :
 
 La priorité est détectée depuis les marqueurs Markdown `[P1]`, `[P2]` et `[P3]`.
 
-Elle sert uniquement à départager des candidats de même `kind`.
+Elle reste une métadonnée de pilotage et d'affichage. Elle ne réordonne jamais les candidats dans le séquencement canonique.
 
 Elle ne remplace pas :
 
@@ -302,4 +303,25 @@ Aucun provider n'est appelé.
 
 Cette surface est destinée notamment aux cockpits read-only : le résumé reste
 léger et le détail peut être chargé à la demande.
+
+## Événement déterministe de frontière terminée
+
+La projection `roadmap overview` expose également `roadmap.completionEvent`.
+
+Ce champ est calculé sans état externe et sans horloge à partir de la séquence
+canonique courante :
+
+- le premier candidat non terminé reste la frontière active ;
+- le candidat immédiatement précédent constitue la frontière terminée la plus récente ;
+- si cette frontière est bien `done`, l'événement vaut `lot.completed` ;
+- sinon le champ vaut `null`.
+
+L'`eventId` est un hash borné du type d'événement, du projet et de l'identité
+stable du lot (`candidate.id` lorsqu'il existe, sinon `path + line`). Il ne
+contient aucun secret et reste identique entre deux lectures du même état.
+
+Le contrat sert aux consommateurs périphériques comme n8n : ils peuvent
+dédupliquer et notifier sans reparsing de roadmap, sans réordonner les lots et
+sans devenir source de vérité. Le premier passage d'un poller doit établir une
+baseline plutôt que notifier tout l'historique existant.
 ```

@@ -54,6 +54,40 @@ test("exposes a roadmap deterministically without requiring an objective source"
     assert.equal(report.roadmap.stats.todo, 2);
     assert.equal(report.roadmap.selectedCandidate?.priority, "p1");
     assert.match(report.roadmap.selectedCandidate?.text ?? "", /Next lot/);
+    assert.equal(report.roadmap.completionEvent?.type, "lot.completed");
+    assert.match(report.roadmap.completionEvent?.eventId ?? "", /^[a-f0-9]{32}$/);
+    assert.match(
+      report.roadmap.completionEvent?.candidate.text ?? "",
+      /Delivered lot/,
+    );
+    assert.match(
+      report.roadmap.completionEvent?.nextCandidate?.text ?? "",
+      /Next lot/,
+    );
+
+    const repeated = generateRoadmapOverviewReport(project(fixture.path));
+    assert.equal(
+      repeated.roadmap.completionEvent?.eventId,
+      report.roadmap.completionEvent?.eventId,
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("does not fabricate a completion event before the first lot is completed", () => {
+  const fixture = setupProject(
+    [
+      "- [ ] [P1] First lot",
+      "- [ ] [P2] Later lot",
+    ].join("\n"),
+  );
+
+  try {
+    const report = generateRoadmapOverviewReport(project(fixture.path));
+
+    assert.equal(report.roadmap.completionEvent, null);
+    assert.match(report.roadmap.selectedCandidate?.text ?? "", /First lot/);
   } finally {
     fixture.cleanup();
   }

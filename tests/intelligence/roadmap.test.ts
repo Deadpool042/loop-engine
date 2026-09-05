@@ -54,87 +54,81 @@ function setupRoadmap(content: string): {
 }
 
 describe("selectRoadmapCandidate", () => {
-  it("prefers safe candidates over warning and blocked candidates", () => {
+  it("preserves declaration order instead of skipping warning work for a later safe lot", () => {
     const selected = selectRoadmapCandidate([
-      candidate("blocked", "migration"),
-      candidate("warning", "bascule"),
-      candidate("safe", "simple docs update"),
-    ]);
-
-    assert.equal(selected?.kind, "safe");
-    assert.equal(selected?.text, "simple docs update");
-  });
-
-  it("falls back to warning when no safe candidate exists", () => {
-    const selected = selectRoadmapCandidate([
-      candidate("blocked", "migration"),
-      candidate("warning", "bascule"),
+      {
+        ...candidate("warning", "deploy current lot"),
+        status: "todo",
+      },
+      {
+        ...candidate("safe", "later docs update"),
+        status: "todo",
+      },
     ]);
 
     assert.equal(selected?.kind, "warning");
+    assert.equal(selected?.text, "deploy current lot");
   });
 
-  it("falls back to blocked when only blocked candidates exist", () => {
+  it("preserves declaration order even when a later lot has higher priority", () => {
     const selected = selectRoadmapCandidate([
-      candidate("blocked", "production finale"),
+      {
+        ...candidate("safe", "current p3"),
+        status: "todo",
+        priority: "p3",
+      },
+      {
+        ...candidate("safe", "later p1"),
+        status: "todo",
+        priority: "p1",
+      },
+    ]);
+
+    assert.equal(selected?.priority, "p3");
+    assert.equal(selected?.text, "current p3");
+  });
+
+  it("keeps a blocked first lot visible instead of advancing to later work", () => {
+    const selected = selectRoadmapCandidate([
+      {
+        ...candidate("blocked", "production finale"),
+        status: "todo",
+      },
+      {
+        ...candidate("safe", "later docs update"),
+        status: "todo",
+      },
     ]);
 
     assert.equal(selected?.kind, "blocked");
+    assert.equal(selected?.text, "production finale");
   });
 
-  it("prefers higher priority within the same kind", () => {
+  it("returns null when the first open lot is not admissible instead of skipping it", () => {
     const selected = selectRoadmapCandidate([
       {
-        ...candidate("safe", "default safe"),
-        priority: "default",
+        ...candidate("safe", "gated current lot"),
+        status: "todo",
+        admissibility: {
+          state: "not_admissible",
+          reason: "phase_closed",
+          blockedBy: "external-gate",
+        },
       },
       {
-        ...candidate("safe", "p2 safe"),
-        priority: "p2",
-      },
-      {
-        ...candidate("safe", "p1 safe"),
-        priority: "p1",
+        ...candidate("safe", "later admissible lot"),
+        status: "todo",
+        admissibility: {
+          state: "admissible",
+          reason: "no_phase_gate",
+        },
       },
     ]);
 
-    assert.equal(selected?.priority, "p1");
-    assert.equal(selected?.text, "p1 safe");
+    assert.equal(selected, null);
   });
 
-  it("does not let warning p1 beat safe default", () => {
-    const selected = selectRoadmapCandidate([
-      {
-        ...candidate("warning", "p1 warning"),
-        priority: "p1",
-      },
-      {
-        ...candidate("safe", "default safe"),
-        priority: "default",
-      },
-    ]);
-
-    assert.equal(selected?.kind, "safe");
-    assert.equal(selected?.priority, "default");
-  });
-
-  it("does not let blocked p1 beat warning default", () => {
-    const selected = selectRoadmapCandidate([
-      {
-        ...candidate("blocked", "p1 blocked"),
-        priority: "p1",
-      },
-      {
-        ...candidate("warning", "default warning"),
-        priority: "default",
-      },
-    ]);
-
-    assert.equal(selected?.kind, "warning");
-    assert.equal(selected?.priority, "default");
-  });
-
-  it("ignores done candidates when selecting the next roadmap candidate", () => {
+  it("ignores completed lots and selects the first remaining one", () => {
     const selected = selectRoadmapCandidate([
       {
         ...candidate("safe", "done docs update"),
@@ -142,6 +136,10 @@ describe("selectRoadmapCandidate", () => {
       },
       {
         ...candidate("warning", "bascule DNS"),
+        status: "todo",
+      },
+      {
+        ...candidate("safe", "later safe work"),
         status: "todo",
       },
     ]);

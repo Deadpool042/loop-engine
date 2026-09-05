@@ -144,15 +144,29 @@ Tant que cet inventaire du runtime réel n'est pas accessible, aucune migration,
 
 ## Notification Loop Engine
 
-Une automation read-only peut notifier, par exemple, lorsqu'une projection stable indique :
+Le premier cas d'usage concret retenu est la notification de fin de lot.
 
-- un projet dirty ;
-- un candidat bloqué ;
-- un candidat prioritaire ;
-- une validation absente ;
-- une documentation requise absente.
+La projection `roadmap overview` expose un champ optionnel `roadmap.completionEvent` calculé exclusivement à partir du snapshot Loop Engine courant. Il représente la frontière séquentielle terminée la plus récente et contient :
 
-Ces notifications restent informatives. Elles ne constituent pas une autorisation d'exécution.
+- `schemaVersion: 1` ;
+- `type: "lot.completed"` ;
+- un `eventId` déterministe et stable pour le couple projet / identité du lot ;
+- l'identité du projet ;
+- le lot terminé projeté par Loop Engine ;
+- le `nextCandidate` canonique, ou `null` si aucun lot suivant n'est sélectionnable.
+
+Aucun timestamp d'observation, secret, token, URL privée ou état n8n n'est injecté dans cet événement. Si aucun lot n'est encore terminé dans la séquence connue, `completionEvent` vaut `null`.
+
+Le workflow n8n cible doit rester read-only côté Loop Engine :
+
+1. lire périodiquement la projection ;
+2. au premier passage, enregistrer l'`eventId` courant comme baseline sans notifier l'historique ;
+3. aux passages suivants, comparer l'`eventId` à la dernière valeur traitée ;
+4. si une nouvelle valeur apparaît, envoyer une notification iPhone/Mac ;
+5. enregistrer l'`eventId` seulement après traitement réussi, afin de permettre un retry idempotent ;
+6. le lien de notification ouvre OpenClaw ; il n'exécute aucun lot.
+
+n8n peut aussi notifier d'autres états observables (projet dirty, candidat bloqué, validation absente), mais ces notifications restent informatives. Elles ne constituent jamais une autorisation d'exécution et n8n ne recalcule ni ordre, ni priorité, ni admissibilité.
 
 ## Décision actuelle
 

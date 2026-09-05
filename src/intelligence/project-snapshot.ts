@@ -38,13 +38,11 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
 
   const roadmapAnalysis = analyzeRoadmaps(project, projectPath);
   const roadmapCandidates = roadmapAnalysis.candidates;
-  const selectableRoadmapCandidates = roadmapCandidates.filter(
-    (candidate) =>
-      candidate.status !== "unknown" &&
-      candidate.admissibility?.state !== "not_admissible",
+  const sequencedRoadmapCandidates = roadmapCandidates.filter(
+    (candidate) => candidate.status !== "unknown",
   );
   const selectedRoadmapCandidate = selectRoadmapCandidate(
-    selectableRoadmapCandidates,
+    sequencedRoadmapCandidates,
   );
 
   const roadmapStats = {
@@ -72,9 +70,7 @@ export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
   const roadmapSummary = {
     active: roadmapStats.total - roadmapStats.done,
     done: roadmapStats.done,
-    selectable: selectableRoadmapCandidates.filter(
-      (candidate) => candidate.status !== "done",
-    ).length,
+    selectable: selectedRoadmapCandidate === null ? 0 : 1,
     hasBlocked: roadmapStats.blocked > 0,
   };
 
