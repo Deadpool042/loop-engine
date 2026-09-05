@@ -37,7 +37,7 @@ Loop Engine sait notamment :
 - produire des candidates/reports/evidences sans modifier implicitement une branche utilisateur ;
 - exposer des contrats JSON stables à OpenClaw et aux autres consommateurs.
 
-La roadmap interne est actuellement épuisée : **55 lots terminés, aucun lot actif**. Un nouveau cycle ne doit être ouvert qu’à partir d’un besoin réel ou d’un objectif explicitement renouvelé.
+La roadmap interne contient désormais un cycle V48 actif consacré à la qualification des executors réels et au routage multi-modèles orienté capacité, coût et quota. L’état courant doit être lu depuis `pnpm loop roadmap status loop-engine --json` plutôt que recopié ici sous forme de compteurs susceptibles de devenir obsolètes.
 
 ## Principes
 
