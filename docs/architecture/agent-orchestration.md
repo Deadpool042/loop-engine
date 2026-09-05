@@ -128,19 +128,23 @@ ou le nombre de sous-agents internes. Les executors consomment le mode comme
 consigne commune ; le runtime principal reste responsable d'un seul delta final,
 et les scope guards puis validations Loop Engine restent l'autorité mécanique.
 
-Aucun profil par défaut n'a de priorité fixe sur un autre : le registry ne trie pas, ne classe pas — c'est au sélecteur de décider, uniquement à partir de capacités/permissions/budget/effort.
+Aucun profil par défaut n'a de priorité fixe sur un autre : le registry ne trie pas et ne classe pas. Le sélecteur applique d'abord les contraintes hard, puis seulement une préférence économique explicite lorsqu'elle existe.
 
 ## `AgentSelector`
 
 `selectAgentProfile(registry, request)` est une fonction pure et déterministe :
 
-1. filtre les profils du registry qui couvrent toutes les capacités et permissions requises par `request`, respectent les allow-lists provider/runtime et le plafond d'effort et de budget éventuellement fournis ;
-2. parmi les profils restants, retient celui dont l'`effort` est le plus faible (« smallest capable agent first ») ;
-3. départage les ex æquo de façon déterministe (ordre d'`id` croissant) — jamais aléatoire ;
-4. retourne aussi la liste des profils rejetés avec leur raison (**explicabilité**), qu'un profil ait été sélectionné ou non ;
-5. lorsque plusieurs profils passent les gates, retourne une projection compacte `notSelected` (`profileId`, `higher_effort_than_selected` ou `deterministic_tiebreak`) sans dupliquer le registry.
+1. filtre les profils qui couvrent toutes les capacités et permissions requises, respectent les allow-lists provider/runtime, sont disponibles et satisfont les plafonds d'effort et de budget ;
+2. parmi les profils admissibles, classe d'abord le `economicTier` explicite selon l'ordre central `economy < standard < advanced < frontier` ;
+3. un profil sans `economicTier` reste admissible pour compatibilité, mais il est classé après tout tier explicite : le sélecteur ne lui invente jamais un coût ;
+4. à tier économique égal — ou lorsque tous les profils admissibles sont legacy sans tier — conserve le tie-break historique `effort` puis `id` croissant ;
+5. retourne les hard rejections séparément des alternatives admissibles non retenues.
 
-Les allow-lists provider/runtime sont des contraintes hard issues de la policy, jamais une préférence implicite. Hors de ces contraintes, aucune hiérarchie entre runtimes ou providers n'intervient : deux profils de même effort couvrant les mêmes exigences sont départagés uniquement par leur `id`.
+Le coût ne participe donc jamais à l'admission fonctionnelle : un profil `economy` qui manque une capacité, une permission, est indisponible ou dépasse un budget est rejeté avant tout classement. Inversement, un profil plus économique admissible peut être retenu même si son `effort` de profil est supérieur, car l'effort d'invocation reste une décision distincte résolue par la policy.
+
+La projection `notSelected` reste compacte et explicable avec les raisons `higher_economic_tier_than_selected`, `economic_tier_unranked`, `higher_effort_than_selected` ou `deterministic_tiebreak`, sans dupliquer le registry.
+
+Les allow-lists provider/runtime sont des contraintes hard issues de la policy, jamais une préférence implicite. Hors de ces contraintes, aucune hiérarchie codée en dur entre runtimes, providers ou noms commerciaux de modèles n'intervient.
 
 L'ordre de déclaration du registry n'est pas une entrée de décision : les rejets et les alternatives non retenues sont ordonnés par `profileId`. Un même registry sémantique, même sérialisé dans un ordre différent, produit donc la même décision observable.
 
