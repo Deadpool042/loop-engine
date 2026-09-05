@@ -754,7 +754,15 @@ describe("loop-engine roadmap state", () => {
     );
     assert.equal(activeV48Candidates.length, 0);
 
+    const v49Candidates = candidates.filter((candidate) =>
+      /V49\.0/.test(candidate.text),
+    );
+    assert.equal(v49Candidates.length, 1);
+    assert.equal(v49Candidates[0]?.status, "todo");
+    assert.equal(v49Candidates[0]?.priority, "p1");
+
     const selected = selectRoadmapCandidate(candidates);
-    assert.equal(selected, null);
+    assert.match(selected?.text ?? "", /V49\.0/);
+    assert.equal(selected?.priority, "p1");
   });
 });
