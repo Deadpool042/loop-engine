@@ -148,6 +148,8 @@ Ne pas construire de système analytics séparé : réutiliser Run History / evi
 
 Critère de réussite : on peut comparer des exécutions réelles sans journal parallèle ni métrique inventée.
 
+Preuve V48.4 : le même Run History alimente désormais `runs --models` en texte ou JSON. La projection conserve l'identité provider/runtime/modèle/profil, l'effort uniquement lorsqu'il est prouvé pour le modèle terminal, la catégorie de tâche issue de `agentPolicy.requirements.category`, les statuts, validations, réparations, durées, fichiers modifiés/hors scope et toutes les tentatives de failover avec codes d'échec. Les données malformées ou historiques non attribuables sont comptées comme telles au lieu de casser le rapport. Sur le journal réel observé lors du lot, la fenêtre contenait 5 entrées dont 3 runs d'exécution ; 1 run était attribuable à Codex / GPT-5.6 Luna avec catégorie `validation`, échec `provider_limit_exceeded` et durée observée d'environ 120 s, tandis que 2 runs d'exécution ne disposaient pas d'evidence modèle suffisante. Ce faible échantillon ne permet aucune conclusion de supériorité entre modèles. La télémétrie tokens/coût/quota est explicitement `unavailable` avec la raison `no_reliable_provider_usage_or_quota_source`. Cette vue read-only constitue désormais le contrat à projeter dans OpenClaw plutôt que de recalculer l'usage côté cockpit.
+
 ### V48.5 [P3] — Escalade intra-provider bornée
 
 Objectif : permettre une escalade Luna -> Terra -> Sol -> Astra ou Haiku -> Sonnet -> Opus -> Fable lorsque la cause de l'échec le justifie, sans essayer systématiquement tous les niveaux.

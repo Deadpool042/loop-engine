@@ -106,6 +106,9 @@ export function printHelp(): void {
     "pnpm loop runs <project> --json [--limit N] — historique des runs en JSON, lecture bornée",
   );
   terminal.info(
+    "pnpm loop runs <project> --models [--json] [--limit N] — comparaison read-only des modèles depuis le même Run History",
+  );
+  terminal.info(
     "pnpm loop runs <project> --run-id <id> [--json] — ouvre un run exact hors fenêtre récente",
   );
   terminal.info(
