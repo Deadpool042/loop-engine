@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -21,9 +28,17 @@ const FAKE_CLAUDE = resolve(
   "claude",
 );
 
-function setupProject(): { project: ProjectConfig; cleanup: () => void } {
-  const cwd = mkdtempSync(join(tmpdir(), "loop-controlled-commit-"));
-  execFileSync("git", ["init", "-q"], { cwd });
+function setupProject(): {
+  project: ProjectConfig;
+  executable: string;
+  cleanup: () => void;
+} {
+  const root = mkdtempSync(join(tmpdir(), "loop-controlled-commit-"));
+  const cwd = join(root, "worktree");
+  const executable = join(root, "claude");
+  copyFileSync(FAKE_CLAUDE, executable);
+  chmodSync(executable, 0o755);
+  execFileSync("git", ["init", "-q", cwd]);
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd });
   execFileSync("git", ["config", "user.name", "Test"], { cwd });
   writeFileSync(join(cwd, "README.md"), "controlled commit burn-in\n");
@@ -39,7 +54,8 @@ function setupProject(): { project: ProjectConfig; cleanup: () => void } {
       validation: [],
       roadmap: ["roadmap.md"],
     },
-    cleanup: () => rmSync(cwd, { recursive: true, force: true }),
+    executable,
+    cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
 }
 
@@ -91,11 +107,11 @@ function snapshot(project: ProjectConfig): ProjectSnapshot {
 
 describe("controlled commit burn-in", () => {
   it("executes, validates, and commits exactly the provider-created file in a real Git worktree", async () => {
-    const { project, cleanup } = setupProject();
+    const { project, executable, cleanup } = setupProject();
     const application = createLoopApplicationAssembly({
       provider: {
         id: "claude_code",
-        executable: FAKE_CLAUDE,
+        executable,
         timeoutMs: 5_000,
       },
     });

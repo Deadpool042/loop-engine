@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -50,6 +57,9 @@ function sourceState(cwd: string): readonly string[] {
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "loop-v39-cockpit-publish-"));
   const source = join(root, "source");
+  const executable = join(root, "claude");
+  copyFileSync(FAKE_CLAUDE, executable);
+  chmodSync(executable, 0o755);
   execFileSync("git", ["init", "-q", source]);
   git(source, ["config", "user.email", "test@example.com"]);
   git(source, ["config", "user.name", "Test"]);
@@ -83,6 +93,7 @@ function setup() {
     source,
     project,
     config,
+    executable,
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
 }
@@ -96,7 +107,7 @@ describe("V39 governed candidate publication cockpit burn-in", () => {
     try {
       const provider = assembleLoopProvider(defaultLoopProviderRegistry, {
         id: "claude_code",
-        executable: FAKE_CLAUDE,
+        executable: fixture.executable,
         profiles: [
           {
             id: "architecture",
