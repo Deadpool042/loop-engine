@@ -3,17 +3,17 @@ import {
   type AgentRegistry,
 } from "../agents/registry.js";
 import type {
+  AgentAvailabilityState,
   AgentCapability,
+  AgentEconomicTier,
+  AgentEffort,
   AgentPermission,
   AgentProfile,
 } from "../agents/types.js";
 import type { LoopExecutor } from "../core/index.js";
 import { createClaudeCodeCliLoopExecutor } from "../loop/claude-code-cli-executor.js";
 import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";
-import {
-  ANTHROPIC_HAIKU_4_5_MODEL,
-  ANTHROPIC_SONNET_5_MODEL,
-} from "../text-only-provider/pricing.js";
+import { ANTHROPIC_HAIKU_4_5_MODEL } from "../text-only-provider/pricing.js";
 
 export const LOOP_PROVIDER_IDS = ["codex", "claude_code"] as const;
 export type LoopProviderId = (typeof LOOP_PROVIDER_IDS)[number];
@@ -32,10 +32,23 @@ const EXECUTABLE_PROVIDER_CAPABILITIES: readonly AgentCapability[] =
 const EXECUTABLE_PROVIDER_PERMISSIONS: readonly AgentPermission[] =
   Object.freeze(["read_only", "write_worktree", "shell_exec"]);
 
+export type LoopProviderModelProfileConfiguration = Readonly<{
+  id: string;
+  model: string;
+  economicTier: AgentEconomicTier;
+  availability?: AgentAvailabilityState;
+  // Ranking baseline only. Invocation effort is still resolved by policy.
+  effort?: AgentEffort;
+  // Capabilities are explicit configuration evidence, not inferred from the
+  // commercial model name.
+  capabilities: readonly AgentCapability[];
+}>;
+
 export type CodexProviderConfiguration = Readonly<{
   id: "codex";
   executable: string;
   model?: string;
+  profiles?: readonly LoopProviderModelProfileConfiguration[];
   timeoutMs?: number;
 }>;
 
@@ -43,6 +56,7 @@ export type ClaudeCodeProviderConfiguration = Readonly<{
   id: "claude_code";
   executable: string;
   model?: string;
+  profiles?: readonly LoopProviderModelProfileConfiguration[];
   timeoutMs?: number;
   maxTurns?: number;
 }>;
@@ -73,61 +87,108 @@ function configuredModel(configuration: LoopProviderConfiguration): string {
     : ANTHROPIC_HAIKU_4_5_MODEL;
 }
 
-function configuredCapabilities(
+function configuredBudget(
   configuration: LoopProviderConfiguration,
-  model: string,
-): readonly AgentCapability[] {
-  // Only exact model ids whose capability has been verified against the
-  // provider's current public contract may extend the executable envelope.
-  // Unknown/custom aliases deliberately remain conservative.
-  if (
-    configuration.id === "claude_code" &&
-    model === ANTHROPIC_SONNET_5_MODEL
-  ) {
-    return Object.freeze([
-      ...EXECUTABLE_PROVIDER_CAPABILITIES,
-      "long_context",
-    ]);
-  }
-
-  return EXECUTABLE_PROVIDER_CAPABILITIES;
+): AgentProfile["budget"] {
+  return Object.freeze({
+    // The CLI executors do not enforce token or monetary ceilings. Reporting
+    // invented values here would make policy admission appear stricter than
+    // the executable boundary really is.
+    maxTokens: null,
+    maxCostUsd: null,
+    // Only an explicitly configured timeout is reflected here. If no timeout
+    // is provided, the executor owns its internal default and the registry
+    // does not pretend to know an independently enforced policy ceiling.
+    maxDurationMs: configuration.timeoutMs ?? null,
+    maxCalls: 1,
+    maxRepairs: 1,
+  });
 }
 
-function configuredProfile(
+function validateConfiguredProfiles(
   configuration: LoopProviderConfiguration,
-): AgentProfile {
-  const isCodex = configuration.id === "codex";
-  const model = configuredModel(configuration);
+): readonly LoopProviderModelProfileConfiguration[] | null {
+  if (configuration.model && configuration.profiles !== undefined) {
+    throw new TypeError(
+      "Provider configuration must use either model or profiles, not both.",
+    );
+  }
+  if (configuration.profiles === undefined) return null;
+  if (configuration.profiles.length === 0) {
+    throw new TypeError("Configured provider profiles must not be empty.");
+  }
 
-  // A configured execution profile is derived only from the concrete provider
-  // registration and its explicit configuration. In particular, it never
-  // copies capabilities, permissions, effort, or budgets from
-  // DEFAULT_AGENT_PROFILES/defaultAgentRegistry, which are forecast examples.
-  return Object.freeze({
-    id: `configured.${configuration.id}`,
-    runtime: isCodex ? "codex" : "claude_code",
-    provider: isCodex ? "openai" : "anthropic",
-    model,
-    // A provider-bound registry contains one executable profile per configured
-    // provider. Profile effort is therefore only a deterministic ranking
-    // baseline; invocation effort remains policy.requirements.minimumEffort.
-    effort: "low",
-    capabilities: configuredCapabilities(configuration, model),
-    permissions: EXECUTABLE_PROVIDER_PERMISSIONS,
-    budget: Object.freeze({
-      // The CLI executors do not enforce token or monetary ceilings. Reporting
-      // invented values here would make policy admission appear stricter than
-      // the executable boundary really is.
-      maxTokens: null,
-      maxCostUsd: null,
-      // Only an explicitly configured timeout is reflected here. If no timeout
-      // is provided, the executor owns its internal default and the registry
-      // does not pretend to know an independently enforced policy ceiling.
-      maxDurationMs: configuration.timeoutMs ?? null,
-      maxCalls: 1,
-      maxRepairs: 1,
+  const ids = new Set<string>();
+  for (const profile of configuration.profiles) {
+    const id = profile.id.trim();
+    const model = profile.model.trim();
+    if (id.length === 0 || model.length === 0) {
+      throw new TypeError(
+        "Configured provider profiles require non-empty id and model values.",
+      );
+    }
+    if (ids.has(id)) {
+      throw new TypeError(`Duplicate configured provider profile id: ${id}`);
+    }
+    ids.add(id);
+
+    const missingBaseCapabilities = EXECUTABLE_PROVIDER_CAPABILITIES.filter(
+      (capability) => !profile.capabilities.includes(capability),
+    );
+    if (missingBaseCapabilities.length > 0) {
+      throw new TypeError(
+        `Configured provider profile ${id} is missing executable capabilities: ${missingBaseCapabilities.join(", ")}`,
+      );
+    }
+  }
+
+  return configuration.profiles;
+}
+
+function configuredProfiles(
+  configuration: LoopProviderConfiguration,
+): readonly AgentProfile[] {
+  const isCodex = configuration.id === "codex";
+  const runtime = isCodex ? "codex" : "claude_code";
+  const provider = isCodex ? "openai" : "anthropic";
+  const configured = validateConfiguredProfiles(configuration);
+
+  if (configured !== null) {
+    return Object.freeze(
+      configured.map((profile) =>
+        Object.freeze({
+          id: `configured.${configuration.id}.${profile.id.trim()}`,
+          runtime,
+          provider,
+          model: profile.model.trim(),
+          effort: profile.effort ?? "low",
+          economicTier: profile.economicTier,
+          availability: profile.availability ?? "available",
+          capabilities: Object.freeze([
+            ...new Set(profile.capabilities),
+          ]),
+          permissions: EXECUTABLE_PROVIDER_PERMISSIONS,
+          budget: configuredBudget(configuration),
+        }),
+      ),
+    );
+  }
+
+  // Backwards-compatible single-model configuration. It remains deliberately
+  // conservative: commercial model names never grant extra capabilities.
+  return Object.freeze([
+    Object.freeze({
+      id: `configured.${configuration.id}`,
+      runtime,
+      provider,
+      model: configuredModel(configuration),
+      effort: "low",
+      availability: "available",
+      capabilities: EXECUTABLE_PROVIDER_CAPABILITIES,
+      permissions: EXECUTABLE_PROVIDER_PERMISSIONS,
+      budget: configuredBudget(configuration),
     }),
-  });
+  ]);
 }
 
 export const codexProviderRegistration: LoopProviderRegistration = Object.freeze({
@@ -138,15 +199,18 @@ export const codexProviderRegistration: LoopProviderRegistration = Object.freeze
         "Codex registration received another provider configuration.",
       );
     }
+    const profiles = configuredProfiles(configuration);
     const executor = createCodexCliLoopExecutor({
       executable: configuration.executable,
-      ...(configuration.model ? { model: configuration.model } : {}),
+      ...(configuration.profiles === undefined && configuration.model
+        ? { model: configuration.model }
+        : {}),
       ...(configuration.timeoutMs ? { timeoutMs: configuration.timeoutMs } : {}),
     });
     return Object.freeze({
       id: "codex",
       executor,
-      agentRegistry: createAgentRegistry([configuredProfile(configuration)]),
+      agentRegistry: createAgentRegistry(profiles),
     });
   },
 });
@@ -160,16 +224,19 @@ export const claudeCodeProviderRegistration: LoopProviderRegistration =
           "Claude Code registration received another provider configuration.",
         );
       }
+      const profiles = configuredProfiles(configuration);
       const executor = createClaudeCodeCliLoopExecutor({
         executable: configuration.executable,
-        ...(configuration.model ? { model: configuration.model } : {}),
+        ...(configuration.profiles === undefined && configuration.model
+          ? { model: configuration.model }
+          : {}),
         ...(configuration.timeoutMs ? { timeoutMs: configuration.timeoutMs } : {}),
         ...(configuration.maxTurns ? { maxTurns: configuration.maxTurns } : {}),
       });
       return Object.freeze({
         id: "claude_code",
         executor,
-        agentRegistry: createAgentRegistry([configuredProfile(configuration)]),
+        agentRegistry: createAgentRegistry(profiles),
       });
     },
   });

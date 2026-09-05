@@ -79,6 +79,13 @@ export function evaluateAgentProfile(
   profile: AgentProfile,
   request: AgentSelectionRequest,
 ): Readonly<{ ok: true } | { ok: false; reason: string }> {
+  if (profile.availability === "unavailable") {
+    return {
+      ok: false,
+      reason: "profile is explicitly unavailable",
+    };
+  }
+
   if (
     request.allowedProviders !== undefined &&
     !request.allowedProviders.includes(profile.provider)

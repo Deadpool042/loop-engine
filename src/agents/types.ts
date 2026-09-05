@@ -64,6 +64,27 @@ export const AGENT_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 
 export type AgentEffort = (typeof AGENT_EFFORTS)[number];
 
+export const AGENT_ECONOMIC_TIERS = [
+  "economy",
+  "standard",
+  "advanced",
+  "frontier",
+] as const;
+
+export type AgentEconomicTier = (typeof AGENT_ECONOMIC_TIERS)[number];
+
+export function agentEconomicTierRank(tier: AgentEconomicTier): number {
+  return AGENT_ECONOMIC_TIERS.indexOf(tier);
+}
+
+export const AGENT_AVAILABILITY_STATES = [
+  "available",
+  "unavailable",
+] as const;
+
+export type AgentAvailabilityState =
+  (typeof AGENT_AVAILABILITY_STATES)[number];
+
 export function agentEffortRank(effort: AgentEffort): number {
   return AGENT_EFFORTS.indexOf(effort);
 }
@@ -98,6 +119,12 @@ export type AgentProfile = Readonly<{
   // never on the list of possible model strings.
   model: string;
   effort: AgentEffort;
+  // Optional portfolio metadata. Economic tier is deliberately separate from
+  // invocation effort; V48.3 may rank on it only after hard admission gates.
+  economicTier?: AgentEconomicTier;
+  // Undefined remains backwards-compatible with "available". An explicit
+  // unavailable state is a hard admission signal, never a silent alias.
+  availability?: AgentAvailabilityState;
   capabilities: readonly AgentCapability[];
   // Optional descriptive tiers used by policy preferences only.
   // They never grant capabilities or permissions and never affect selector
