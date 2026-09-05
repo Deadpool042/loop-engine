@@ -12,6 +12,7 @@ import type {
   AgentBudget,
   AgentCapability,
   AgentEffort,
+  AgentFundingMode,
   AgentPermission,
   AgentProfileTier,
   AgentProvider,
@@ -99,6 +100,9 @@ export type AgentPolicy = Readonly<{
   contextBudget: ContextBudget;
   allowedProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
+  // Paid funding modes are never implicitly authorized. When omitted, the
+  // resolver falls back to the safe included/unknown set from defaults.ts.
+  allowedFundingModes?: readonly AgentFundingMode[];
   deniedPermissions?: readonly AgentPermission[];
   // Never grants git_tag implicitly (see AGENT_PERMISSIONS in
   // src/agents/types.ts). Only consulted in mode "publish"; false by default.
@@ -116,6 +120,7 @@ export type AgentPolicyRequest = Readonly<{
   requestedMaxEffort?: AgentEffort;
   requestedProviders?: readonly AgentProvider[];
   requestedRuntimes?: readonly AgentRuntime[];
+  requestedFundingModes?: readonly AgentFundingMode[];
 }>;
 
 export const AGENT_POLICY_STATUS_CODES = [

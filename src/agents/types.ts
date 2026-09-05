@@ -85,6 +85,40 @@ export const AGENT_AVAILABILITY_STATES = [
 export type AgentAvailabilityState =
   (typeof AGENT_AVAILABILITY_STATES)[number];
 
+export const AGENT_FUNDING_MODES = [
+  "included_subscription",
+  "additional_credits",
+  "metered_api",
+  "unknown",
+] as const;
+
+export type AgentFundingMode = (typeof AGENT_FUNDING_MODES)[number];
+
+export function agentFundingModeRank(mode: AgentFundingMode): number {
+  return AGENT_FUNDING_MODES.indexOf(mode);
+}
+
+export const AGENT_QUOTA_STATES = [
+  "available",
+  "exhausted",
+  "unknown",
+] as const;
+
+export type AgentQuotaState = (typeof AGENT_QUOTA_STATES)[number];
+
+export const AGENT_QUOTA_SOURCES = [
+  "runtime_report",
+  "operator_assertion",
+  "unavailable",
+] as const;
+
+export type AgentQuotaSource = (typeof AGENT_QUOTA_SOURCES)[number];
+
+export type AgentQuotaSnapshot = Readonly<{
+  state: AgentQuotaState;
+  source: AgentQuotaSource;
+}>;
+
 export function agentEffortRank(effort: AgentEffort): number {
   return AGENT_EFFORTS.indexOf(effort);
 }
@@ -122,6 +156,12 @@ export type AgentProfile = Readonly<{
   // Optional portfolio metadata. Economic tier is deliberately separate from
   // invocation effort; V48.3 may rank on it only after hard admission gates.
   economicTier?: AgentEconomicTier;
+  // Funding is explicit configuration evidence. Undefined is treated as
+  // "unknown" and is never silently assumed to be free or paid.
+  fundingMode?: AgentFundingMode;
+  // Optional quota evidence. Undefined is equivalent to an unknown quota.
+  // No percentage or remaining count is inferred by Loop Engine.
+  quota?: AgentQuotaSnapshot;
   // Undefined remains backwards-compatible with "available". An explicit
   // unavailable state is a hard admission signal, never a silent alias.
   availability?: AgentAvailabilityState;

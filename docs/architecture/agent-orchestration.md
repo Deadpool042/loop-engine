@@ -14,7 +14,7 @@ Donner à Loop Engine un vocabulaire typé pour raisonner sur "quel agent d'exé
 
 - **Local first** — toute décision de sélection se prend à partir de données locales (`AgentRegistry`), jamais d'un appel réseau.
 - **Retrieval first** — avant d'escalader vers un agent plus coûteux, préférer réduire le contexte nécessaire (ex. `rag-search`) plutôt que d'augmenter l'effort. Ce lot documente le principe ; son application concrète appartient à un futur `LoopExecutor`, pas au code de ce lot.
-- **Smallest capable agent first** — parmi les profils satisfaisant les capacités, permissions, contraintes provider/runtime et plafonds requis, le sélecteur retient toujours le profil dont l'effort est le plus faible.
+- **Smallest capable agent first** — parmi les profils satisfaisant les capacités, permissions, contraintes provider/runtime, financement autorisé, quota explicite et plafonds requis, le sélecteur privilégie d'abord l'usage déjà inclus, puis le tier économique minimal et enfin les tie-breaks effort/id.
 - **Escalation only on failure** — aucune montée de modèle n'est autorisée sans raison d'échec structurée. V48.5 permet au runner d'appliquer automatiquement au plus une escalade **dans le même provider/runtime** après un échec admissible ; le helper pur `escalateAgentProfile` reste explicite et applique la même frontière.
 
 Ces principes s'ajoutent à ceux de `CLAUDE.md` (aucun appel IA automatique par défaut, zéro consommation de tokens par défaut) ; ils ne les remplacent pas.
@@ -73,6 +73,14 @@ Métadonnée de portefeuille révisable, indépendante du nom commercial du mod�
 
 État explicite `available | unavailable`. Une indisponibilité déclarée est un hard gate du sélecteur et du failover ; elle n'est jamais masquée par un alias ou un remplacement silencieux. L'absence historique du champ reste compatible avec `available`.
 
+### `AgentFundingMode`
+
+Mode de financement explicite et indépendant du modèle : `included_subscription | additional_credits | metered_api | unknown`. L'absence historique du champ vaut `unknown` et n'est jamais assimilée à un coût nul. Les modes `additional_credits` et `metered_api` sont refusés sans autorisation explicite dans la requête de sélection ; lorsqu'ils sont autorisés, `included_subscription` reste prioritaire à capacité comparable.
+
+### `AgentQuotaSnapshot`
+
+Evidence bornée `{ state, source }` avec `state = available | exhausted | unknown` et une provenance fermée (`runtime_report | operator_assertion | unavailable`). Un quota explicitement `exhausted` est un hard gate. Un quota `unknown` reste admissible : Loop Engine ne déduit jamais un pourcentage restant, un nombre de crédits ou une fenêtre temporelle à partir du temps écoulé. Les pourcentages 5h/semaine ne doivent être projetés que lorsqu'un runtime externe fournit réellement cette donnée.
+
 ### `AgentBudget`
 
 Limites optionnelles associées à un profil : `maxTokens`, `maxCostUsd`, `maxDurationMs`, `maxCalls`, `maxRepairs`. Chaque champ est `number | null` — `null` signifie "non borné". Un budget n'est jamais appliqué dans ce lot (pas d'exécution) ; il sert de critère de filtrage pour le sélecteur lorsqu'un appelant fournit un plafond (`budgetCeiling`).
@@ -81,13 +89,13 @@ Règle stricte du filtrage : si l'appelant fixe un plafond explicite sur une dim
 
 ### `AgentProfile`
 
-Combinaison concrète et sélectionnable : `id`, `runtime`, `provider`, `model`, `effort`, `capabilities`, `permissions`, `budget`, avec les métadonnées optionnelles `economicTier` et `availability`. Le modèle reste une chaîne libre ; les capacités enrichies sont déclarées par configuration vérifiée et ne sont jamais déduites du nom commercial du modèle. C'est l'unité que manipulent le registry, le sélecteur et la stratégie d'escalade.
+Combinaison concrète et sélectionnable : `id`, `runtime`, `provider`, `model`, `effort`, `capabilities`, `permissions`, `budget`, avec les métadonnées optionnelles `economicTier`, `availability`, `fundingMode` et `quota`. Le modèle reste une chaîne libre ; les capacités enrichies sont déclarées par configuration vérifiée et ne sont jamais déduites du nom commercial du modèle. C'est l'unité que manipulent le registry, le sélecteur et la stratégie d'escalade.
 
 ## `AgentRegistry`
 
 Collection locale et déclarative de profils, construite en mémoire (pas de lecture réseau, pas d'appel SDK). `createAgentRegistry` refuse les identifiants dupliqués. Les profils par défaut fournis (`DEFAULT_AGENT_PROFILES`) sont **explicitement illustratifs** : ils couvrent plusieurs runtimes/providers/niveaux d'effort pour permettre de tester le sélecteur et l'escalade, mais leurs capacités/permissions/budgets sont des exemples de configuration, pas des affirmations vérifiées sur ce que chaque outil tiers sait réellement faire. Toute intégration réelle doit remplacer ou compléter ces profils avec des données vérifiées.
 
-Depuis V48.2, les providers réellement configurés pour `execute` respectent cette séparation sans dépendre des noms commerciaux. `src/composition/provider-registry.ts` accepte soit le mode historique à modèle unique `configured.<provider>`, soit un portefeuille explicite `profiles` donnant plusieurs profils `configured.<provider>.<id>` pour un même executable. Chaque profil déclare son modèle libre, son `economicTier`, son `availability`, son effort de classement et ses capacités vérifiées. Le Core n'ajoute plus de capacité sur la base d'un `if` lié à `Luna`, `Sonnet` ou tout autre nom de modèle. Les permissions restent celles garanties par l'intégration Loop Engine et aucun plafond token/coût non contrôlé par l'exécuteur n'est fabriqué. Le mode historique reste volontairement conservateur ; les capacités enrichies passent par la configuration de portefeuille.
+Depuis V48.2, les providers réellement configurés pour `execute` respectent cette séparation sans dépendre des noms commerciaux. `src/composition/provider-registry.ts` accepte soit le mode historique à modèle unique `configured.<provider>`, soit un portefeuille explicite `profiles` donnant plusieurs profils `configured.<provider>.<id>` pour un même executable. Chaque profil déclare son modèle libre, son `economicTier`, son `availability`, éventuellement son `fundingMode` et son snapshot `quota`, son effort de classement et ses capacités vérifiées. Le Core n'ajoute plus de capacité sur la base d'un `if` lié à `Luna`, `Sonnet` ou tout autre nom de modèle. Les permissions restent celles garanties par l'intégration Loop Engine et aucun plafond token/coût non contrôlé par l'exécuteur n'est fabriqué. Le mode historique reste volontairement conservateur ; les capacités enrichies passent par la configuration de portefeuille.
 
 L'`effort` d'un `AgentProfile` reste l'axe de classement du sélecteur ; l'effort réellement demandé à une invocation est `AgentPolicyResolution.requirements.minimumEffort` et est projeté tel quel dans `LoopExecutionPlan.effort`. Les deux valeurs peuvent légitimement différer et doivent rester distinguées dans les surfaces d'observabilité.
 

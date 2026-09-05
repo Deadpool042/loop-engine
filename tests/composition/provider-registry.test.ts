@@ -117,6 +117,46 @@ describe("LoopProviderRegistry", () => {
     ]);
   });
 
+  it("propagates explicit funding and quota evidence without inventing missing values", () => {
+    const configured = assembleLoopProvider(defaultLoopProviderRegistry, {
+      id: "codex",
+      executable: "/usr/local/bin/codex",
+      profiles: [
+        {
+          id: "included",
+          model: "gpt-5.6-terra",
+          economicTier: "standard",
+          fundingMode: "included_subscription",
+          quota: { state: "unknown", source: "unavailable" },
+          capabilities: ["code_edit", "shell_exec", "test_execution"],
+        },
+      ],
+    });
+    const legacy = assembleLoopProvider(defaultLoopProviderRegistry, {
+      id: "claude_code",
+      executable: "/usr/local/bin/claude",
+      model: "claude-sonnet-5",
+    });
+
+    assert.deepEqual(
+      configured.agentRegistry.profiles.map((profile) => ({
+        fundingMode: profile.fundingMode,
+        quota: profile.quota,
+      })),
+      [
+        {
+          fundingMode: "included_subscription",
+          quota: { state: "unknown", source: "unavailable" },
+        },
+      ],
+    );
+
+    const [legacyProfile] = legacy.agentRegistry.profiles;
+    assert.ok(legacyProfile);
+    assert.equal(legacyProfile.fundingMode, undefined);
+    assert.equal(legacyProfile.quota, undefined);
+  });
+
   it("represents the current four-level OpenAI and Anthropic portfolios as configurable data", () => {
     const codex = assembleLoopProvider(defaultLoopProviderRegistry, {
       id: "codex",

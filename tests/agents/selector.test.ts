@@ -559,6 +559,121 @@ describe("selectAgentProfile", () => {
 
     assert.deepEqual(first, second);
   });
+
+  it("requires explicit authorization before selecting additional credits or metered API", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "paid-api",
+        fundingMode: "metered_api",
+        capabilities: ["code_edit"],
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit"],
+      requiredPermissions: [],
+    });
+
+    assert.equal(result.outcome, "no_match");
+    assert.deepEqual(result.rejected, [
+      {
+        profileId: "paid-api",
+        reason: "paid funding mode metered_api requires explicit authorization",
+      },
+    ]);
+  });
+
+  it("prefers included subscription usage over authorized paid usage at otherwise equal capability", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "paid",
+        fundingMode: "additional_credits",
+        economicTier: "economy",
+        capabilities: ["code_edit"],
+      }),
+      profile({
+        id: "included",
+        fundingMode: "included_subscription",
+        economicTier: "economy",
+        capabilities: ["code_edit"],
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit"],
+      requiredPermissions: [],
+      allowedFundingModes: ["included_subscription", "additional_credits"],
+    });
+
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "included",
+    );
+    assert.deepEqual(
+      result.outcome === "selected" ? result.notSelected : null,
+      [
+        {
+          profileId: "paid",
+          reason: "less_preferred_funding_than_selected",
+        },
+      ],
+    );
+  });
+
+  it("keeps an unknown quota admissible without inventing remaining usage", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "unknown-quota",
+        fundingMode: "included_subscription",
+        quota: { state: "unknown", source: "unavailable" },
+        capabilities: ["code_edit"],
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit"],
+      requiredPermissions: [],
+    });
+
+    assert.equal(result.outcome, "selected");
+    assert.deepEqual(
+      result.outcome === "selected" ? result.profile.quota : null,
+      { state: "unknown", source: "unavailable" },
+    );
+  });
+
+  it("rejects only a quota explicitly evidenced as exhausted", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "exhausted",
+        fundingMode: "included_subscription",
+        quota: { state: "exhausted", source: "runtime_report" },
+        capabilities: ["code_edit"],
+      }),
+      profile({
+        id: "unknown",
+        fundingMode: "included_subscription",
+        quota: { state: "unknown", source: "unavailable" },
+        capabilities: ["code_edit"],
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit"],
+      requiredPermissions: [],
+    });
+
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "unknown",
+    );
+    assert.deepEqual(result.rejected, [
+      {
+        profileId: "exhausted",
+        reason: "profile quota is exhausted (source: runtime_report)",
+      },
+    ]);
+  });
 });
 
 describe("evaluateAgentProfile", () => {

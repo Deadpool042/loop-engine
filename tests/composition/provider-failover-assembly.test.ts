@@ -35,7 +35,10 @@ function profile(
   });
 }
 
-function plan(selected: AgentProfile): LoopExecutionPlan {
+function plan(
+  selected: AgentProfile,
+  allowedFundingModes?: LoopExecutionPlan["policy"]["allowedFundingModes"],
+): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1,
     runId: "run-multi-provider-1",
@@ -66,6 +69,9 @@ function plan(selected: AgentProfile): LoopExecutionPlan {
       status: "resolved",
       requiredCapabilities: Object.freeze(["code_edit", "test_execution"]),
       requiredPermissions: Object.freeze(["write_worktree", "shell_exec"]),
+      ...(allowedFundingModes === undefined
+        ? {}
+        : { allowedFundingModes: Object.freeze([...allowedFundingModes]) }),
       rationale: Object.freeze(["selected smallest capable provider"]),
     }),
   }) as LoopExecutionPlan;
@@ -203,6 +209,56 @@ test("skips fallback profiles that cannot satisfy admitted permissions", async (
   const result = await dependency.executor(plan(primary));
   assert.equal(result.status, "failed");
   assert.equal(fallbackCalls, 0);
+});
+
+test("does not use a paid fallback without explicit funding authorization", async () => {
+  const primary = profile("configured.codex", "openai", "codex", 2);
+  const paidFallback = Object.freeze({
+    ...profile("configured.claude.api", "anthropic", "claude_code", 2),
+    fundingMode: "metered_api" as const,
+  });
+  let fallbackCalls = 0;
+  const fallbackExecutor: LoopExecutor = async () => {
+    fallbackCalls += 1;
+    return completed("never.ts")(plan(primary));
+  };
+  const dependency = createLoopProviderFailoverAssembly(
+    [
+      assembly("codex", primary, failed("provider_timeout")),
+      assembly("claude", paidFallback, fallbackExecutor),
+    ],
+    2,
+  );
+
+  const result = await dependency.executor(plan(primary));
+  assert.equal(result.status, "failed");
+  assert.equal(fallbackCalls, 0);
+});
+
+test("uses a paid fallback only when the admitted policy explicitly allows it", async () => {
+  const primary = profile("configured.codex", "openai", "codex", 2);
+  const paidFallback = Object.freeze({
+    ...profile("configured.claude.api", "anthropic", "claude_code", 2),
+    fundingMode: "metered_api" as const,
+  });
+  let observedProfileId: string | null = null;
+  const fallbackExecutor: LoopExecutor = async (fallbackPlan) => {
+    observedProfileId = fallbackPlan.profileId;
+    return completed("src/paid-fallback.ts")(fallbackPlan);
+  };
+  const dependency = createLoopProviderFailoverAssembly(
+    [
+      assembly("codex", primary, failed("provider_timeout")),
+      assembly("claude", paidFallback, fallbackExecutor),
+    ],
+    2,
+  );
+
+  const result = await dependency.executor(
+    plan(primary, ["included_subscription", "unknown", "metered_api"]),
+  );
+  assert.equal(result.status, "completed");
+  assert.equal(observedProfileId, "configured.claude.api");
 });
 
 test("rejects duplicate provider assembly ids before execution", () => {
