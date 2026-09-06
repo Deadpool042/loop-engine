@@ -35,6 +35,7 @@ export type JsonErrorCode =
   | "auto_subscription_candidate_mismatch"
   | "auto_subscription_requires_brief"
   | "auto_subscription_requires_detailed_brief"
+  | "auto_subscription_requires_detailed_scope"
   | "auto_subscription_decision_timeout"
   | "auto_subscription_decision_output_limit"
   | "auto_subscription_decision_provider_failed"

@@ -7,6 +7,7 @@ import {
   generateProjectReport,
   generateRoadmapOverviewReport,
 } from "../core/reports.js";
+import { resolveSelectedLotWritablePaths } from "../core/selected-lot-detail.js";
 import {
   createExecutionDecisionDraft,
   type ExecutionDecisionDraft,
@@ -31,6 +32,7 @@ import {
   type AutoSubscriptionAdmission,
 } from "./auto-subscription-admission.js";
 import { buildSubscriptionCliEnvironment } from "../loop/subscription-cli-environment.js";
+import { isPathAllowed, parseAllowedPaths } from "../loop/file-scope.js";
 
 export const AUTO_SUBSCRIPTION_DECISION_MODEL = "claude-haiku-4-5";
 export const AUTO_SUBSCRIPTION_DECISION_TIMEOUT_MS = 60_000;
@@ -56,6 +58,7 @@ type ClaudeDecisionProcessResult = Readonly<{
 export type AutoSubscriptionDecisionRenewalErrorCode =
   | Exclude<AutoSubscriptionAdmission, { ok: true }>["code"]
   | "auto_subscription_requires_detailed_brief"
+  | "auto_subscription_requires_detailed_scope"
   | "auto_subscription_decision_timeout"
   | "auto_subscription_decision_output_limit"
   | "auto_subscription_decision_provider_failed"
@@ -160,14 +163,23 @@ function parseClaudeStructuredOutput(stdout: string): unknown | null {
   }
 }
 
+type AutoDecisionContext =
+  | Readonly<{
+      ok: true;
+      current: ProductionCurrent;
+      contextJson: string;
+      governedAllowedPaths: readonly string[];
+    }>
+  | Readonly<{
+      ok: false;
+      reason: "brief" | "scope";
+    }>;
+
 function buildDecisionContext(
   project: ProjectConfig,
   currentGitHead: string,
   candidateId: string,
-): Readonly<{
-  current: ProductionCurrent;
-  contextJson: string;
-}> | null {
+): AutoDecisionContext {
   const snapshot = generateProjectReport(project);
   const overview = generateRoadmapOverviewReport(project);
   const candidate = overview.roadmap.selectedCandidate;
@@ -179,12 +191,36 @@ function buildDecisionContext(
     candidate.admissibility?.state === "not_admissible" ||
     !candidate.path
   ) {
-    return null;
+    return Object.freeze({ ok: false as const, reason: "brief" as const });
   }
 
   const detail = overview.roadmap.selectedLotDetail;
   if (detail === null) {
-    return null;
+    return Object.freeze({ ok: false as const, reason: "brief" as const });
+  }
+
+  const documentedPaths = resolveSelectedLotWritablePaths(
+    detail,
+    candidate.path,
+  );
+  const parsedScope = parseAllowedPaths(documentedPaths ?? undefined);
+  if (!parsedScope.ok) {
+    return Object.freeze({ ok: false as const, reason: "scope" as const });
+  }
+
+  const decisionPath = project.execution_decision!;
+  const protectedScope =
+    parsedScope.allowedPaths.some(
+      (path) =>
+        path === ".git" ||
+        path.startsWith(".git/") ||
+        path === ".governance" ||
+        path.startsWith(".governance/") ||
+        path === ".loop-engine" ||
+        path.startsWith(".loop-engine/"),
+    ) || isPathAllowed(decisionPath, parsedScope.allowedPaths);
+  if (protectedScope) {
+    return Object.freeze({ ok: false as const, reason: "scope" as const });
   }
 
   const projectPath = resolve(project.path);
@@ -206,26 +242,29 @@ function buildDecisionContext(
       authorizationAction: "explicit_continue",
       sourceGitHead: currentGitHead,
       decisionPath: project.execution_decision,
+      governedAllowedPaths: parsedScope.allowedPaths,
       noProviderChoice: true,
       noCommitPushMergeDeploy: true,
     },
   };
   const contextJson = JSON.stringify(context);
   if (Buffer.byteLength(contextJson, "utf8") > MAX_CONTEXT_BYTES) {
-    return null;
+    return Object.freeze({ ok: false as const, reason: "brief" as const });
   }
 
   return Object.freeze({
+    ok: true as const,
     current: Object.freeze({
       project: project.name,
       projectPath,
       candidateId,
       gitHead: currentGitHead,
       sourceDocument: candidate.path,
-      executionDecisionPath: project.execution_decision!,
+      executionDecisionPath: decisionPath,
       projectConfig: project,
     }),
     contextJson,
+    governedAllowedPaths: parsedScope.allowedPaths,
   });
 }
 
@@ -261,6 +300,7 @@ function buildClaudeArgs(contextJson: string): readonly string[] {
 async function prepareDecisionDraft(
   current: ProductionCurrent,
   contextJson: string,
+  governedAllowedPaths: readonly string[],
   runClaude: NonNullable<AutoSubscriptionDecisionRenewalDependencies["runClaude"]>,
 ): Promise<
   | Readonly<{ ok: true; draft: ExecutionDecisionDraft }>
@@ -291,7 +331,10 @@ async function prepareDecisionDraft(
       gitHead: current.gitHead,
       executionDecisionPath: current.executionDecisionPath,
     },
-    proposal,
+    Object.freeze({
+      ...proposal,
+      allowedPaths: governedAllowedPaths,
+    }),
   );
   if (!draft.ok) {
     return failure(
@@ -454,11 +497,16 @@ export async function ensureAutoSubscriptionExecutionDecision(
   }
 
   const context = buildDecisionContext(project, currentGitHead, candidateId);
-  if (context === null) {
-    return failure(
-      "auto_subscription_requires_detailed_brief",
-      "Autonomous execution decision renewal requires a documented canonical lot detail.",
-    );
+  if (!context.ok) {
+    return context.reason === "scope"
+      ? failure(
+          "auto_subscription_requires_detailed_scope",
+          "Autonomous execution decision renewal requires an explicit deterministic writable scope in the canonical lot detail.",
+        )
+      : failure(
+          "auto_subscription_requires_detailed_brief",
+          "Autonomous execution decision renewal requires a documented canonical lot detail.",
+        );
   }
 
   const directoryFailure = ensureLocalDecisionDirectory(context.current);
@@ -467,6 +515,7 @@ export async function ensureAutoSubscriptionExecutionDecision(
   const prepared = await prepareDecisionDraft(
     context.current,
     context.contextJson,
+    context.governedAllowedPaths,
     dependencies.runClaude ?? runClaudeProcess,
   );
   if (!prepared.ok) return prepared;

@@ -24,6 +24,7 @@ export type SelectedLotDetailSectionKind =
   | "status"
   | "objective"
   | "context"
+  | "write_scope"
   | "scope"
   | "out_of_scope"
   | "acceptance"
@@ -104,6 +105,7 @@ function classifySectionKind(title: string): SelectedLotDetailSectionKind {
   if (/\b(etat|statut)\b/.test(normalized)) return "status";
   if (/\bobjectif\b/.test(normalized)) return "objective";
   if (/\b(contexte|justification|raison|valeur)\b/.test(normalized)) return "context";
+  if (/\bperimetre d[’']ecriture\b/.test(normalized) || /\bwritable paths?\b/.test(normalized)) return "write_scope";
   if (/\bhors perimetre\b/.test(normalized)) return "out_of_scope";
   if (/\bperimetre\b/.test(normalized)) return "scope";
   if (/\b(critere|acceptation|cloture|fin)\b/.test(normalized)) return "acceptance";
@@ -322,6 +324,42 @@ function resolveHeadingDetail(
   }
 
   return null;
+}
+
+const MAX_SELECTED_LOT_WRITABLE_PATHS = 20;
+
+export function resolveSelectedLotWritablePaths(
+  detail: SelectedLotDetail | null,
+  sourceDocument: string,
+): readonly string[] | null {
+  if (detail === null || detail.truncated) return null;
+
+  const sections = detail.sections.filter(
+    (section) => section.kind === "write_scope",
+  );
+  const section = sections[0];
+  if (sections.length !== 1 || section === undefined || section.truncated) {
+    return null;
+  }
+
+  const lines = section.content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0 || lines.length > MAX_SELECTED_LOT_WRITABLE_PATHS) {
+    return null;
+  }
+
+  const paths: string[] = [];
+  for (const line of lines) {
+    const match = /^-\s+`([^`]+)`$/.exec(line);
+    if (!match?.[1]) return null;
+    paths.push(match[1]);
+  }
+
+  const unique = [...new Set(paths)];
+  if (!unique.includes(sourceDocument)) return null;
+  return Object.freeze(unique);
 }
 
 /**

@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import {
   resolveRoadmapCandidateDetail,
   resolveSelectedLotDetail,
+  resolveSelectedLotWritablePaths,
 } from "../../src/core/selected-lot-detail.js";
 
 describe("selected lot detail", () => {
@@ -142,6 +143,51 @@ describe("selected lot detail", () => {
       assert.doesNotMatch(
         detail.sections.map((section) => section.content).join("\n"),
         /Autre lot/,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("extracts only an explicit deterministic writable scope that includes the roadmap source", () => {
+    const root = mkdtempSync(join(tmpdir(), "loop-selected-lot-"));
+    try {
+      const roadmapDir = join(root, "docs", "roadmap");
+      mkdirSync(roadmapDir, { recursive: true });
+      writeFileSync(join(roadmapDir, "README.md"), "# Roadmap\n");
+      writeFileSync(
+        join(roadmapDir, "lot.md"),
+        [
+          "# Lot",
+          "",
+          "## Objectif",
+          "",
+          "Produire une preuve bornée.",
+          "",
+          "## Périmètre d’écriture",
+          "",
+          "- `docs/audits/proof.md`",
+          "- `docs/roadmap/README.md`",
+        ].join("\n"),
+      );
+
+      const detail = resolveSelectedLotDetail(root, {
+        path: "docs/roadmap/README.md",
+        text: "- [ ] H1-L1 — Lot. [Détail](./lot.md)",
+      });
+
+      assert.ok(detail);
+      assert.equal(
+        detail.sections.find((section) => section.kind === "write_scope")?.title,
+        "Périmètre d’écriture",
+      );
+      assert.deepEqual(
+        resolveSelectedLotWritablePaths(detail, "docs/roadmap/README.md"),
+        ["docs/audits/proof.md", "docs/roadmap/README.md"],
+      );
+      assert.equal(
+        resolveSelectedLotWritablePaths(detail, "docs/roadmap/other.md"),
+        null,
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
