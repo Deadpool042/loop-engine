@@ -23,6 +23,7 @@ projects:
   - name: creatyss
     path: ../CREATYSS
     repository: Deadpool042/CREATYSS
+    execution_decision: .loop-engine/execution-decision.yaml
     workspace:
       mode: source_only
       dependencies: on_demand
