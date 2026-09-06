@@ -94,6 +94,7 @@ import { terminal } from "./ui/terminal.js";
 import { buildAutoSubscriptionProviderConfigurations } from "./composition/auto-subscription-execution.js";
 import { ensureAutoSubscriptionExecutionDecision } from "./composition/auto-subscription-decision-renewal.js";
 import { printJsonError } from "./commands/json-error.js";
+import { printCompletionEventsJson } from "./commands/completion-events.js";
 import { printExecutionDecisionProposalJson } from "./commands/execution-decision-propose.js";
 import { printExecutionDecisionCurrentJson } from "./commands/execution-decision-current.js";
 import {
@@ -198,6 +199,12 @@ else if (command === "status")
   printStatus(application, application.loadConfig());
 else if (command === "summary")
   printWorkspaceSummary(application, application.loadConfig());
+else if (command === "completion-events" && process.argv.includes("--json"))
+  printCompletionEventsJson(application, application.loadConfig());
+else if (command === "completion-events") {
+  terminal.error("completion-events requires --json");
+  process.exit(1);
+}
 else if (command === "json-check") runJsonCheck();
 else if (command === "rag-index") runRagIndex(application);
 else if (command === "rag-search") {
