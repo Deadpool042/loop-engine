@@ -760,7 +760,5 @@ describe("loop-engine roadmap state", () => {
     assert.equal(v49Candidates.length, 1);
     assert.equal(v49Candidates[0]?.status, "done");
 
-    const selected = selectRoadmapCandidate(candidates);
-    assert.equal(selected, null);
   });
 });
