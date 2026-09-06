@@ -92,6 +92,62 @@ describe("selected lot detail", () => {
     }
   });
 
+  it("scopes an explicitly linked shared cycle document to the exact candidate heading", () => {
+    const root = mkdtempSync(join(tmpdir(), "loop-selected-lot-"));
+    try {
+      const roadmapDir = join(root, "docs", "roadmap");
+      mkdirSync(roadmapDir, { recursive: true });
+      writeFileSync(join(roadmapDir, "README.md"), "# Roadmap\n");
+      writeFileSync(
+        join(roadmapDir, "cycle.md"),
+        [
+          "# Cycle",
+          "",
+          "## V51.0 — Previous lot",
+          "",
+          "### Périmètre d’écriture",
+          "",
+          "- `docs/previous.md`",
+          "- `docs/roadmap/README.md`",
+          "",
+          "## V51.1 — Burn-in",
+          "",
+          "### Objectif",
+          "",
+          "Prouver la continuation.",
+          "",
+          "### Périmètre d’écriture",
+          "",
+          "- `docs/audits/burnin.md`",
+          "- `docs/roadmap/README.md`",
+          "",
+          "### Hors périmètre",
+          "",
+          "- Aucun déploiement.",
+        ].join("\n"),
+      );
+
+      const detail = resolveRoadmapCandidateDetail(root, {
+        id: "V51.1",
+        path: "docs/roadmap/README.md",
+        text: "- [ ] V51.1 — Burn-in. [Détail](./cycle.md)",
+      });
+
+      assert.ok(detail);
+      assert.equal(detail.title, "V51.1 — Burn-in");
+      assert.deepEqual(
+        resolveSelectedLotWritablePaths(detail, "docs/roadmap/README.md"),
+        ["docs/audits/burnin.md", "docs/roadmap/README.md"],
+      );
+      assert.doesNotMatch(
+        detail.sections.map((section) => section.content).join("\n"),
+        /previous\.md/,
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("resolves a bounded same-directory heading when the candidate has a stable id", () => {
     const root = mkdtempSync(join(tmpdir(), "loop-selected-lot-"));
     try {
