@@ -97,9 +97,24 @@ Le spécialiste ne doit produire qu'une preuve documentaire :
 - aucun appel Codex AUTO ;
 - aucune notification n8n dans ce sous-lot : la notification reste la fermeture OC-9 distincte.
 
+### Transport durable
+
+Le burn-in réel a montré qu'un publish autonome peut légitimement dépasser le timeout d'une requête MCP synchrone : renouvellement de décision, exécution, validation complète et éventuelle escalade de modèle ne doivent pas rester attachés au transport HTTP/UI.
+
+Le CTA doit donc démarrer un publish durable et idempotent :
+
+- clé stable dérivée de `projet + candidat + SHA` ;
+- store fichier existant `.loop-engine/durable-executions` ;
+- lease empêchant deux exécutions concurrentes ;
+- replay terminal sans second appel provider ;
+- worker long exécuté hors de la requête OpenClaw ;
+- Run History reste la preuve terminale canonique ;
+- un timeout ou une reconnexion de la façade ne doit pas annuler ni dupliquer le run.
+
 ### Critères de fin
 
-- `Continuer` ne retourne plus `mcp_tool_reported_error` pour absence/staleness de décision ;
+- `Continuer` accuse réception du démarrage durable sans attendre la fin du provider ;
+- `Continuer` ne retourne plus `mcp_tool_reported_error` ni `transport_error` pour absence/staleness de décision ou durée d'exécution ;
 - un fichier `.loop-engine/execution-decision.yaml` est renouvelé localement et reste ignoré par Git ;
 - le Run History identifie le provider/runtime/modèle retenu ;
 - le résultat terminal contient une `candidate_ref` et un commit SHA ;

@@ -81,6 +81,11 @@ import {
 } from "./candidate-publication-review.js";
 import { materializeWorkspaceProject } from "../workspace/materialization.js";
 import { registerProjectEnvelope } from "../workspace/project-registration.js";
+import {
+  runDurableAutoSubscriptionPublish,
+  type DurableAutoPublishInput,
+  type DurableAutoPublishResult,
+} from "./durable-auto-publish.js";
 
 export type LoopApplicationCodexProviderOptions = Omit<
   CodexProviderConfiguration,
@@ -186,6 +191,9 @@ export type LoopApplicationAssembly = Readonly<{
   runLoopCommit: typeof runLoopCommit;
   runLoopExecute: typeof runLoopExecuteWithProviderFailoverEvidence;
   runLoopPublish: IsolatedProviderRunPublish;
+  runDurableAutoSubscriptionPublish: (
+    input: DurableAutoPublishInput,
+  ) => Promise<DurableAutoPublishResult>;
   runLoopPlan: typeof runLoopPlan;
   runExecutionDecisionProposal: (
     input: ExecutionDecisionProposeInput,
@@ -362,6 +370,20 @@ export function createLoopApplicationAssembly(
     runLoopExecute:
       isolatedRunExecute ?? runLoopExecuteWithProviderFailoverEvidence,
     runLoopPublish: isolatedRunPublish,
+    runDurableAutoSubscriptionPublish: (input) =>
+      runDurableAutoSubscriptionPublish(
+        {
+          runLoopPublish: isolatedRunPublish,
+          recordLoopRunHistory,
+          ...(providerDependency === undefined
+            ? {}
+            : {
+                loopExecutor: providerDependency.executor,
+                loopAgentRegistry: providerDependency.agentRegistry,
+              }),
+        },
+        input,
+      ),
     runLoopPlan,
     runExecutionDecisionProposal: (input) =>
       runExecutionDecisionProposal(
