@@ -347,7 +347,7 @@ describe("createClaudeCodeCliLoopExecutor", () => {
       assert.ok(args.includes("--tools"));
       assert.equal(args[args.indexOf("--tools") + 1], "Read,Edit,Write,Glob,Grep");
       assert.ok(args.includes("--strict-mcp-config"));
-      assert.equal(args[args.indexOf("--mcp-config") + 1], "{}");
+      assert.equal(args[args.indexOf("--mcp-config") + 1], '{"mcpServers":{}}');
       assert.equal(args.includes("Bash"), false);
 
       const childEnv = JSON.parse(readFileSync(captureEnv, "utf8")) as Record<
