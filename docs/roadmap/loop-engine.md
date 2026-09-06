@@ -246,7 +246,7 @@ Objectif : permettre à une façade externe déjà gouvernée de demander l'exé
 Le durcissement #257 a confirmé qu'une exécution AUTO doit posséder un brief et un scope liés au SHA. V51 raccorde ce garde-fou au CTA `Continuer` sans API payante. Détail : [auto-subscription-decision-renewal-v51.md](auto-subscription-decision-renewal-v51.md).
 
 - [x] [P0] V51.0 — Renouvellement abonnement de `execution_decision` : une action AUTO explicitement admise réutilise une décision fraîche ou, si elle est absente/périmée et que le lot possède un détail canonique, fait proposer un brouillon JSON par Claude Code / Haiku en mode restreint sans outils/MCP. Loop Engine valide scope/brief/protected paths puis publie le fichier local SHA-bound avant de réappliquer l'admission. Un état explicitement BLOCKED n'est jamais écrasé.
-- [ ] [P1] V51.1 — Burn-in réel du CTA `Continuer` : lancer depuis OpenClaw le candidat canonique Loop Engine, renouveler le contrat sans API, laisser l'executor produire uniquement la preuve documentaire bornée, vérifier Run History + candidate ref et confirmer que le dépôt source reste propre. [Détail](auto-subscription-decision-renewal-v51.md)
+- [x] [P1] V51.1 — Burn-in réel du CTA `Continuer` réconcilié : run `802a5cc6-d6ca-4de9-be53-594faeb27546` terminé, validation complète passée après escalade Haiku → Sonnet, candidate ref locale `fa3dbb5e` revue et dépôt source resté propre ; le transport durable a ensuite été durci et mergé par #263. [Preuve](../audits/auto-continuation-burnin.md) · [Détail](auto-subscription-decision-renewal-v51.md)
 
 ### Gates V51
 

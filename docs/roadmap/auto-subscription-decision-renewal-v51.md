@@ -59,7 +59,7 @@ L'action humaine `Continuer` constitue l'autorisation explicite d'exécuter le c
 - [x] implémentation du renouvellement ;
 - [x] opt-in explicite pour `loop-engine` et `openclaw-control` ;
 - [x] tests adversariaux ciblés ;
-- [ ] CI complète et merge.
+- [x] CI complète et merge.
 
 ## V51.1 — Burn-in réel du CTA Continuer
 
@@ -119,4 +119,6 @@ Le CTA doit donc démarrer un publish durable et idempotent :
 - le Run History identifie le provider/runtime/modèle retenu ;
 - le résultat terminal contient une `candidate_ref` et un commit SHA ;
 - le dépôt source reste propre et `main` inchangé ;
-- la preuve du burn-in est ensuite réconciliée humainement dans la roadmap.
+- [x] la preuve du burn-in est ensuite réconciliée humainement dans la roadmap.
+
+Preuve réconciliée : `docs/audits/auto-continuation-burnin.md` ; run `802a5cc6-d6ca-4de9-be53-594faeb27546` ; candidate commit `fa3dbb5eae8a6e51f87cd4999d7f11737bf0b895` ; transport durable mergé par la PR #263 (`788ebcb`).
