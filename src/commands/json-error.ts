@@ -45,6 +45,7 @@ export type JsonErrorCode =
   | "auto_subscription_decision_post_write_invalid"
   | "auto_subscription_decision_recovery_failed"
   | "auto_subscription_decision_commit_failed"
+  | "durable_requires_auto_subscription_publish"
   | "missing_run_history_limit_value"
   | "invalid_run_history_limit"
   | "missing_run_history_run_id"

@@ -103,6 +103,7 @@ import {
   printWorkspaceProjectStatusJson,
 } from "./commands/workspace.js";
 import { registerProjectEnvelopeCommand } from "./commands/project-register.js";
+import { runDurableAutoSubscriptionPublish } from "./commands/durable-auto-publish.js";
 
 const application = createLoopApplicationAssembly();
 
@@ -716,6 +717,7 @@ else if (command === "review") {
 
   const candidateId = optionValue("--candidate");
   const autoSubscription = hasOption("--auto-subscription");
+  const durable = hasOption("--durable");
   const expectedGitHead = optionValue("--expected-git-head");
   const commitMessage = optionValue("--commit-message");
   const exportPatchPath = optionValue("--export-patch");
@@ -817,6 +819,14 @@ else if (command === "review") {
     if (!admission.ok) {
       failOption(json, admission.code, admission.message);
     }
+  }
+
+  if (durable && (!autoSubscription || mode !== "publish")) {
+    failOption(
+      json,
+      "durable_requires_auto_subscription_publish",
+      "--durable requires publish mode with --auto-subscription.",
+    );
   }
 
   if (hasOption("--export-patch") && exportPatchPath === undefined) {
@@ -965,33 +975,55 @@ else if (command === "review") {
     }
   }
 
-  const exitCode = await runLoopRunCommand(
-    runApplication,
-    project,
-    mode,
-    json,
-    {
-      ...(candidateId !== undefined ? { candidateId } : {}),
-      maxRepairs,
-      ...(autoSubscription
-        ? { provider: "claude_code" as const }
-        : providerId !== undefined
-          ? { provider: providerId }
+  if (durable) {
+    const durableResult = await runDurableAutoSubscriptionPublish(
+      runApplication,
+      {
+        project: project.name,
+        candidateId: candidateId!,
+        expectedGitHead: expectedGitHead!,
+        maxRepairs,
+      },
+    );
+    if (json) {
+      console.log(JSON.stringify(durableResult.report));
+    } else {
+      terminal.info(
+        `Durable publication: ${durableResult.report.status} (${durableResult.report.idempotencyKey})`,
+      );
+    }
+    if (durableResult.exitCode !== 0) {
+      process.exitCode = durableResult.exitCode;
+    }
+  } else {
+    const exitCode = await runLoopRunCommand(
+      runApplication,
+      project,
+      mode,
+      json,
+      {
+        ...(candidateId !== undefined ? { candidateId } : {}),
+        maxRepairs,
+        ...(autoSubscription
+          ? { provider: "claude_code" as const }
+          : providerId !== undefined
+            ? { provider: providerId }
+            : {}),
+        ...(commitMessage !== undefined ? { commitMessage } : {}),
+        ...(exportPatchPath !== undefined ? { exportPatchPath } : {}),
+        ...(progressEvents
+          ? {
+              onProgress(event) {
+                process.stderr.write(
+                  `LOOP_EXECUTION_EVENT:${JSON.stringify({ status: event.status })}\n`,
+                );
+              },
+            }
           : {}),
-      ...(commitMessage !== undefined ? { commitMessage } : {}),
-      ...(exportPatchPath !== undefined ? { exportPatchPath } : {}),
-      ...(progressEvents
-        ? {
-            onProgress(event) {
-              process.stderr.write(
-                `LOOP_EXECUTION_EVENT:${JSON.stringify({ status: event.status })}\n`,
-              );
-            },
-          }
-        : {}),
-    },
-  );
-  if (exitCode !== 0) process.exitCode = exitCode;
+      },
+    );
+    if (exitCode !== 0) process.exitCode = exitCode;
+  }
 } else if (command === "runs") {
   const project = resolveProjectOrExit("runs");
   const json = process.argv.includes("--json");
