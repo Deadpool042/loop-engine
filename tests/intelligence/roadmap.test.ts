@@ -213,6 +213,42 @@ describe("findRoadmapCandidates", () => {
     }
   });
 
+  it("supports an exact gate bound to a non-H canonical candidate id", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "<!-- loop-engine:phase-gate phase=VNEXT3-G1B3B state=closed blockedBy=meta-staging-readiness -->",
+        "- [ ] [P1] VNEXT3-G1B3B — Worker Meta via n8n",
+        "- [ ] [P1] VNEXT3-G1B4 — Newsletter depuis les intents",
+      ].join("\n"),
+    );
+
+    try {
+      const analysis = analyzeRoadmaps(project, projectPath);
+
+      assert.deepEqual(analysis.phaseGates, [
+        {
+          path: "roadmap.md",
+          line: 1,
+          phaseId: "VNEXT3-G1B3B",
+          state: "closed",
+          blockedBy: "meta-staging-readiness",
+        },
+      ]);
+      assert.equal(analysis.candidates[0]?.phaseId, "VNEXT3-G1B3B");
+      assert.deepEqual(analysis.candidates[0]?.admissibility, {
+        state: "not_admissible",
+        reason: "phase_closed",
+        blockedBy: "meta-staging-readiness",
+      });
+      assert.deepEqual(analysis.candidates[1]?.admissibility, {
+        state: "admissible",
+        reason: "no_phase_gate",
+      });
+    } finally {
+      cleanup();
+    }
+  });
+
   it("fails closed when a phase gate declaration is invalid or ambiguous", () => {
     const cases = [
       {

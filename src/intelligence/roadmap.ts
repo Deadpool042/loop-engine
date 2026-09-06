@@ -145,10 +145,12 @@ function parsePhaseGate(line: string): ParsedPhaseGate | null {
   if (!line.includes("loop-engine:phase-gate")) return null;
 
   const match = line.match(
-    /^<!--\s*loop-engine:phase-gate\s+phase=(H\d+)\s+state=(open|closed)(?:\s+blockedBy=([A-Za-z0-9][A-Za-z0-9-]*))?\s*-->$/,
+    /^<!--\s*loop-engine:phase-gate\s+phase=([A-Z][A-Z0-9]*(?:[.-][A-Z0-9]+)*)\s+state=(open|closed)(?:\s+blockedBy=([A-Za-z0-9][A-Za-z0-9-]*))?\s*-->$/,
   );
   if (!match) {
-    const phaseMatch = line.match(/\bphase=(H\d+)\b/);
+    const phaseMatch = line.match(
+      /\bphase=([A-Z][A-Z0-9]*(?:[.-][A-Z0-9]+)*)\b/,
+    );
     return phaseMatch?.[1]
       ? { outcome: "invalid", phaseId: phaseMatch[1] }
       : { outcome: "invalid" };
@@ -399,7 +401,15 @@ export function analyzeRoadmaps(
 
   const phaseGates = gates.filter((gate) => !invalidPhases.has(gate.phaseId));
   const analyzedCandidates = candidates.map((candidate) => {
-    const phaseId = candidate.phaseId ?? phaseIdFromCandidateId(candidate.id);
+    const hierarchicalPhaseId =
+      candidate.phaseId ?? phaseIdFromCandidateId(candidate.id);
+    const exactCandidateGateId =
+      hierarchicalPhaseId === undefined &&
+      candidate.id !== undefined &&
+      (gatesByPhase.has(candidate.id) || invalidPhases.has(candidate.id))
+        ? candidate.id
+        : undefined;
+    const phaseId = hierarchicalPhaseId ?? exactCandidateGateId;
     const candidateWithPhase = Object.freeze({
       ...candidate,
       ...(phaseId === undefined ? {} : { phaseId }),
