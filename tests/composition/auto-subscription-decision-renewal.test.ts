@@ -28,7 +28,7 @@ function git(root: string, args: readonly string[]): string {
   }).trim();
 }
 
-function fixture(options: { detail?: boolean } = {}): {
+function fixture(options: { detail?: boolean; writeScope?: boolean } = {}): {
   root: string;
   project: ProjectConfig;
   head: string;
@@ -59,6 +59,15 @@ function fixture(options: { detail?: boolean } = {}): {
         "- Add docs/continuation-proof.md.",
         "- Mark H1-L1 complete in docs/roadmap/README.md.",
         "",
+        ...(options.writeScope === false
+          ? []
+          : [
+              "## Périmètre d’écriture",
+              "",
+              "- `docs/continuation-proof.md`",
+              "- `docs/roadmap/README.md`",
+              "",
+            ]),
         "## Hors périmètre",
         "",
         "- No deployment.",
@@ -320,6 +329,31 @@ test("refuses autonomous renewal when the canonical lot has no detailed brief", 
   }
 });
 
+test("refuses autonomous renewal when the canonical lot has no deterministic writable scope", async () => {
+  const { root, project, head } = fixture({ writeScope: false });
+  try {
+    let calls = 0;
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      project,
+      head,
+      "H1-L1",
+      {
+        runClaude: async () => {
+          calls += 1;
+          return claudeSuccess();
+        },
+      },
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.code, "auto_subscription_requires_detailed_scope");
+    }
+    assert.equal(calls, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("refuses a symlinked local decision directory before calling Claude", async () => {
   const { root, project, head } = fixture();
   const outside = mkdtempSync(join(tmpdir(), "loop-auto-decision-outside-"));
@@ -349,7 +383,7 @@ test("refuses a symlinked local decision directory before calling Claude", async
   }
 });
 
-test("mechanically rejects a proposal that tries to write Loop Engine internal state", async () => {
+test("ignores provider writable scope and enforces the documented canonical scope", async () => {
   const { root, project, head } = fixture();
   try {
     const result = await ensureAutoSubscriptionExecutionDecision(
@@ -359,16 +393,29 @@ test("mechanically rejects a proposal that tries to write Loop Engine internal s
       {
         runClaude: async () =>
           claudeSuccess({
-            objective: "Bad scope.",
-            deliverables: ["Write internal state."],
-            outOfScope: ["Nothing."],
-            allowedPaths: [".loop-engine/**", "docs/roadmap/README.md"],
+            objective: "Document the bounded continuation result.",
+            deliverables: [
+              "Add docs/continuation-proof.md.",
+              "Mark H1-L1 complete.",
+            ],
+            outOfScope: ["No deployment."],
+            allowedPaths: [".loop-engine/**", "docs/**"],
           }),
       },
     );
-    assert.equal(result.ok, false);
-    if (!result.ok) {
-      assert.equal(result.code, "auto_subscription_decision_invalid_scope");
+    assert.equal(result.ok, true);
+    const parsed = parseExecutionDecisionFile(
+      readFileSync(
+        join(root, ".loop-engine", "execution-decision.yaml"),
+        "utf8",
+      ),
+    );
+    assert.equal(parsed.ok, true);
+    if (parsed.ok) {
+      assert.deepEqual(parsed.decision.decision.candidate?.allowedPaths, [
+        "docs/continuation-proof.md",
+        "docs/roadmap/README.md",
+      ]);
     }
   } finally {
     rmSync(root, { recursive: true, force: true });

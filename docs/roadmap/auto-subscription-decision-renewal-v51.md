@@ -43,11 +43,12 @@ La préparation utilise Claude Code avec l'abonnement local :
 - `--permission-mode plan` ;
 - JSON Schema strict.
 
-Claude ne peut que proposer le brouillon. Loop Engine valide ensuite mécaniquement :
+Claude ne peut que proposer le brief du brouillon. Le périmètre d’écriture AUTO ne dépend pas de sa sortie : il est lu mécaniquement depuis l’unique section `Périmètre d’écriture` du détail canonique, sous forme de chemins exacts en backticks, puis imposé à la décision. Loop Engine valide ensuite mécaniquement :
 
 - identité projet/candidat/SHA ;
 - chemin source de roadmap ;
 - brief non vide ;
+- présence du chemin source de roadmap dans le périmètre documenté ;
 - scope exact ou terminal `/**` ;
 - exclusion de `.git/**`, `.governance/**`, `.loop-engine/**` et du fichier de décision.
 
@@ -80,6 +81,11 @@ Le spécialiste ne doit produire qu'une preuve documentaire :
 
 - créer `docs/audits/auto-continuation-burnin.md` avec le résultat borné du burn-in ;
 - mettre à jour le statut V51.1 dans `docs/roadmap/loop-engine.md` seulement si le run lui-même fournit une preuve terminale exploitable.
+
+### Périmètre d’écriture
+
+- `docs/audits/auto-continuation-burnin.md`
+- `docs/roadmap/loop-engine.md`
 
 ### Hors périmètre
 
