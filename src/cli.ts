@@ -92,6 +92,7 @@ import {
 } from "./composition/index.js";
 import { terminal } from "./ui/terminal.js";
 import { buildAutoSubscriptionProviderConfigurations } from "./composition/auto-subscription-execution.js";
+import { evaluateAutoSubscriptionAdmission } from "./composition/auto-subscription-admission.js";
 import { printJsonError } from "./commands/json-error.js";
 import { printExecutionDecisionProposalJson } from "./commands/execution-decision-propose.js";
 import { printExecutionDecisionCurrentJson } from "./commands/execution-decision-current.js";
@@ -806,6 +807,15 @@ else if (command === "review") {
         "git_head_changed",
         "Project Git HEAD changed after the verified handoff.",
       );
+    }
+
+    const admission = evaluateAutoSubscriptionAdmission(
+      project,
+      currentGitHead,
+      candidateId,
+    );
+    if (!admission.ok) {
+      failOption(json, admission.code, admission.message);
     }
   }
 
