@@ -41,6 +41,34 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || isNonEmptyString(value);
 }
 
+function isProgress(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (!isRecord(value)) return false;
+  const executor = value.executor;
+  if (
+    !isNonEmptyString(value.status) ||
+    !isNonEmptyString(value.at) ||
+    !isNonEmptyString(value.runId) ||
+    !isNonEmptyString(value.step)
+  ) {
+    return false;
+  }
+  if (executor === null) return true;
+  if (!isRecord(executor)) return false;
+  return (
+    isNonEmptyString(executor.profileId) &&
+    isNonEmptyString(executor.provider) &&
+    isNonEmptyString(executor.runtime) &&
+    isNonEmptyString(executor.model) &&
+    isNonEmptyString(executor.effort) &&
+    (executor.fundingMode === null || isNonEmptyString(executor.fundingMode)) &&
+    Number.isInteger(executor.attempt) &&
+    Number(executor.attempt) >= 1 &&
+    Number.isInteger(executor.maxAttempts) &&
+    Number(executor.maxAttempts) >= Number(executor.attempt)
+  );
+}
+
 function isFailure(value: unknown): boolean {
   return (
     value === null ||
@@ -60,6 +88,7 @@ function isEvent(value: unknown, index: number): value is DurableExecutionEvent 
     [
       "lease_acquired",
       "lease_recovered",
+      "lease_renewed",
       "cancellation_requested",
       "completed",
       "failed",
@@ -87,6 +116,7 @@ function isDurableExecutionRecord(value: unknown): value is DurableExecutionReco
     typeof value.cancellationRequested !== "boolean" ||
     !isNonEmptyString(value.createdAt) ||
     !isNonEmptyString(value.updatedAt) ||
+    !isProgress(value.progress) ||
     !isFailure(value.failure) ||
     !Array.isArray(value.events) ||
     !value.events.every(isEvent)
@@ -99,6 +129,9 @@ function isDurableExecutionRecord(value: unknown): value is DurableExecutionReco
   }
   if (value.status === "completed") {
     return isRecord(value.result) && value.failure === null;
+  }
+  if (value.status === "failed") {
+    return isRecord(value.result) && isRecord(value.failure);
   }
   return value.result === null && isRecord(value.failure);
 }

@@ -42,6 +42,45 @@ export type FileDurableExecutionStoreOptions = Readonly<{
   nowMs?: () => number;
 }>;
 
+/**
+ * Reads verified durable execution records without creating directories,
+ * locks or files. Intended for read-only status/reporting surfaces.
+ */
+export async function readFileDurableExecutionRecords(
+  directoryInput: string,
+  project?: string,
+): Promise<readonly DurableExecutionRecord[]> {
+  const directory = resolve(directoryInput);
+  let names: string[];
+  try {
+    names = (await readdir(directory))
+      .filter((name) => /^[a-f0-9]{64}\.json$/.test(name))
+      .sort();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return Object.freeze([]);
+    }
+    throw error;
+  }
+
+  const records: DurableExecutionRecord[] = [];
+  for (const name of names) {
+    const record = await readRecord(join(directory, name));
+    if (record === null || (project !== undefined && record.project !== project)) {
+      continue;
+    }
+    records.push(record);
+  }
+
+  return Object.freeze(
+    records.sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        left.idempotencyKey.localeCompare(right.idempotencyKey),
+    ),
+  );
+}
+
 function positiveInteger(value: number, name: string): number {
   if (!Number.isInteger(value) || value <= 0) {
     throw new TypeError(`${name} must be a positive integer.`);

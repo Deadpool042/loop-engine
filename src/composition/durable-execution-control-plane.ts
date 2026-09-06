@@ -42,7 +42,21 @@ export function createDurableExecutionControlPlane(
       const outcome = await runDurableLoopExecution(
         store,
         request,
-        () => runLoopExecute(request.project, options),
+        (persistProgress) =>
+          runLoopExecute(
+            request.project,
+            Object.freeze({
+              ...options,
+              onProgress(event) {
+                try {
+                  options.onProgress?.(event);
+                } catch {
+                  // Caller observation stays auxiliary.
+                }
+                persistProgress(event);
+              },
+            }),
+          ),
         now,
       );
       return Object.freeze({

@@ -69,8 +69,26 @@ test("active lease rejects concurrent owner without invoking provider", async ()
   let calls = 0;
   const control = createDurableExecutionControlPlane(store, {
     now: () => "2026-07-31T00:00:00.000Z",
-    runLoopExecute: async (project) => {
+    runLoopExecute: async (project, options) => {
       calls += 1;
+      options?.onProgress?.(
+        Object.freeze({
+          status: "executing",
+          at: "2026-07-31T00:00:00.500Z",
+          runId: "run-durable-active",
+          step: "executing",
+          executor: Object.freeze({
+            profileId: "configured.claude_code.economy",
+            provider: "anthropic",
+            runtime: "claude_code",
+            model: "claude-haiku-4-5",
+            effort: "low",
+            fundingMode: "included_subscription",
+            attempt: 1,
+            maxAttempts: 2,
+          }),
+        }),
+      );
       await pending;
       return completedResult(project);
     },
@@ -83,6 +101,12 @@ test("active lease rejects concurrent owner without invoking provider", async ()
     leaseDurationMs: 60_000,
   });
   await new Promise((resolve) => setImmediate(resolve));
+  const activeRecord = await store.load("cycle:concurrent");
+  assert.equal(activeRecord?.status, "running");
+  assert.equal(activeRecord?.progress?.status, "executing");
+  assert.equal(activeRecord?.progress?.executor?.runtime, "claude_code");
+  assert.equal(activeRecord?.progress?.executor?.model, "claude-haiku-4-5");
+
   const second = await control.execute({
     idempotencyKey: "cycle:concurrent",
     project: "loop-engine",
