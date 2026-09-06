@@ -51,6 +51,12 @@ export type LoopRunExecuteOptions = LoopRunPlanOptions &
     exportPatchPath?: string;
     /** Test-only seam; production always uses the local Git worktree inventory. */
     readModifiedWorktreeFiles?: typeof readModifiedWorktreeFiles;
+    /**
+     * Composition-only reset for an already isolated execution workspace.
+     * When provided, model escalation restarts from the immutable source HEAD
+     * instead of inheriting an unvalidated delta from the previous model.
+     */
+    resetExecutionWorkspace?: (executionProjectPath: string) => Promise<void>;
     /** Optional, public-safe observation hook for real runner transitions. */
     onProgress?: (event: LoopRunExecuteProgressEvent) => void;
   }>;
@@ -79,6 +85,9 @@ type ExecuteDependencies = Readonly<{
   repairer: LoopRepairer | null;
   maxRepairs: number;
   readModifiedWorktreeFiles: typeof readModifiedWorktreeFiles;
+  resetExecutionWorkspace:
+    | ((executionProjectPath: string) => Promise<void>)
+    | null;
 }>;
 
 function resolveDependencies(
@@ -99,6 +108,7 @@ function resolveDependencies(
     maxRepairs: options.maxRepairs ?? 0,
     readModifiedWorktreeFiles:
       options.readModifiedWorktreeFiles ?? readModifiedWorktreeFiles,
+    resetExecutionWorkspace: options.resetExecutionWorkspace ?? null,
   };
 }
 
@@ -478,6 +488,46 @@ export async function runLoopExecute(
     );
   }
 
+  async function resetWorkspaceForModelEscalation(): Promise<LoopRunResult | null> {
+    if (dependencies.resetExecutionWorkspace === null) return null;
+
+    try {
+      await dependencies.resetExecutionWorkspace(executionProject.path);
+    } catch {
+      transition("failed", "failed", "failed", [
+        "Unable to restore the isolated worktree before model escalation.",
+      ]);
+      return finalize(
+        cycle.candidate,
+        internalFailure(
+          "model_escalation_workspace_reset_failed",
+          "Unable to restore the isolated worktree before model escalation.",
+          "Workspace reset diagnostics are redacted from the public result.",
+        ),
+      );
+    }
+
+    const resetModifiedFiles = await dependencies.readModifiedWorktreeFiles(
+      executionProject.path,
+    );
+    if (resetModifiedFiles === null || resetModifiedFiles.length > 0) {
+      transition("failed", "failed", "failed", [
+        "The isolated worktree is not clean after model escalation reset.",
+      ]);
+      return finalize(
+        cycle.candidate,
+        internalFailure(
+          "model_escalation_workspace_reset_failed",
+          "The isolated worktree is not clean after model escalation reset.",
+          "Model escalation never starts from an unverified worktree delta.",
+        ),
+      );
+    }
+
+    modifiedFiles.clear();
+    return null;
+  }
+
   const initialWorktreeFailure = await refreshModifiedFilesFromWorktree();
   if (initialWorktreeFailure !== null) return initialWorktreeFailure;
   const initialScopeFailure = failForScopeViolation();
@@ -503,6 +553,9 @@ export async function runLoopExecute(
         `Escalating model after ${escalation.evidence.trigger}: ${escalation.evidence.fromProfileId} -> ${escalation.evidence.toProfileId}`,
         `Attempt ${completedModelAttempts}/${modelAttemptBudget}`,
       ]);
+
+      const escalationResetFailure = await resetWorkspaceForModelEscalation();
+      if (escalationResetFailure !== null) return escalationResetFailure;
 
       try {
         executionResult = await dependencies.executor(
@@ -622,6 +675,10 @@ export async function runLoopExecute(
           `Escalating model after validation_failed: ${escalation.evidence.fromProfileId} -> ${escalation.evidence.toProfileId}`,
           `Attempt ${completedModelAttempts}/${modelAttemptBudget}`,
         ]);
+
+        const escalationResetFailure =
+          await resetWorkspaceForModelEscalation();
+        if (escalationResetFailure !== null) return escalationResetFailure;
 
         try {
           executionResult = await dependencies.executor(

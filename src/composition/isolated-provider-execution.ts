@@ -55,6 +55,23 @@ async function runOfflinePnpmInstall(
   });
 }
 
+export async function resetIsolatedProviderWorkspace(
+  workspacePath: string,
+): Promise<void> {
+  await execFileAsync("git", ["reset", "--hard", "HEAD"], {
+    cwd: workspacePath,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+    timeout: 30_000,
+  });
+  await execFileAsync("git", ["clean", "-fd", "--"], {
+    cwd: workspacePath,
+    encoding: "utf8",
+    maxBuffer: 1024 * 1024,
+    timeout: 30_000,
+  });
+}
+
 export async function prepareIsolatedWorkspaceDependencies(
   project: ProjectConfig,
   workspacePath: string,
@@ -236,6 +253,9 @@ export function createIsolatedProviderRunExecute(
             executor,
             agentRegistry: runOptions.agentRegistry ?? options.agentRegistry,
             executionProjectPath: workspace.path,
+            resetExecutionWorkspace:
+              runOptions.resetExecutionWorkspace ??
+              resetIsolatedProviderWorkspace,
           });
 
           if (
