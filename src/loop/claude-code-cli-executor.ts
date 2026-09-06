@@ -219,7 +219,7 @@ export function createClaudeCodeCliLoopExecutor(
       "Read,Edit,Write,Glob,Grep",
       "--strict-mcp-config",
       "--mcp-config",
-      "{}",
+      '{"mcpServers":{}}',
       "--max-turns",
       String(maxTurns),
       "--model",
