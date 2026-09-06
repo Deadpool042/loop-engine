@@ -7,7 +7,7 @@ import { test } from "node:test";
 import {
   durableAutoSubscriptionKey,
   runDurableAutoSubscriptionPublish,
-} from "../../src/commands/durable-auto-publish.js";
+} from "../../src/composition/durable-auto-publish.js";
 import type { LoopRunResult } from "../../src/loop/types.js";
 
 function completedResult(runId = "run-1"): LoopRunResult {

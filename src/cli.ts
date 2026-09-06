@@ -103,7 +103,6 @@ import {
   printWorkspaceProjectStatusJson,
 } from "./commands/workspace.js";
 import { registerProjectEnvelopeCommand } from "./commands/project-register.js";
-import { runDurableAutoSubscriptionPublish } from "./commands/durable-auto-publish.js";
 
 const application = createLoopApplicationAssembly();
 
@@ -976,15 +975,13 @@ else if (command === "review") {
   }
 
   if (durable) {
-    const durableResult = await runDurableAutoSubscriptionPublish(
-      runApplication,
-      {
+    const durableResult =
+      await runApplication.runDurableAutoSubscriptionPublish({
         project: project.name,
         candidateId: candidateId!,
         expectedGitHead: expectedGitHead!,
         maxRepairs,
-      },
-    );
+      });
     if (json) {
       console.log(JSON.stringify(durableResult.report));
     } else {

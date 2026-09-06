@@ -1,19 +1,21 @@
 import { resolve } from "node:path";
 
-import type { LoopApplicationAssembly } from "../composition/index.js";
-import { createDurableExecutionControlPlane } from "../composition/durable-execution-control-plane.js";
+import type { AgentRegistry } from "../agents/registry.js";
+import type { LoopRunHistoryWriteOutcome } from "../core/run-history.js";
 import { createFileDurableExecutionStore } from "../loop/file-durable-execution-store.js";
+import type { LoopExecutor } from "../loop/execution.js";
+import { createDurableExecutionControlPlane } from "./durable-execution-control-plane.js";
+import type { IsolatedProviderRunPublish } from "./isolated-provider-publication.js";
 
 const DURABLE_EXECUTION_DIRECTORY = ".loop-engine/durable-executions";
 const DURABLE_LEASE_DURATION_MS = 30 * 60_000;
 
-type DurablePublishApplication = Pick<
-  LoopApplicationAssembly,
-  | "loopAgentRegistry"
-  | "loopExecutor"
-  | "recordLoopRunHistory"
-  | "runLoopPublish"
->;
+export type DurablePublishApplication = Readonly<{
+  loopAgentRegistry?: AgentRegistry;
+  loopExecutor?: LoopExecutor;
+  recordLoopRunHistory: (result: Awaited<ReturnType<IsolatedProviderRunPublish>>) => LoopRunHistoryWriteOutcome;
+  runLoopPublish: IsolatedProviderRunPublish;
+}>;
 
 export type DurableAutoPublishReport = Readonly<{
   schemaVersion: 1;
@@ -53,16 +55,18 @@ export function durableAutoSubscriptionKey(
   return `auto-subscription:${project}:${candidateId}:${expectedGitHead.toLowerCase()}`;
 }
 
+export type DurableAutoPublishInput = Readonly<{
+  project: string;
+  candidateId: string;
+  expectedGitHead: string;
+  maxRepairs: number;
+  storeDirectory?: string;
+  owner?: string;
+}>;
+
 export async function runDurableAutoSubscriptionPublish(
   application: DurablePublishApplication,
-  input: Readonly<{
-    project: string;
-    candidateId: string;
-    expectedGitHead: string;
-    maxRepairs: number;
-    storeDirectory?: string;
-    owner?: string;
-  }>,
+  input: DurableAutoPublishInput,
 ): Promise<DurableAutoPublishResult> {
   const idempotencyKey = durableAutoSubscriptionKey(
     input.project,
