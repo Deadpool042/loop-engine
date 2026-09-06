@@ -91,6 +91,7 @@ import {
   type LoopProviderId,
 } from "./composition/index.js";
 import { terminal } from "./ui/terminal.js";
+import { buildAutoSubscriptionProviderConfigurations } from "./composition/auto-subscription-execution.js";
 import { printJsonError } from "./commands/json-error.js";
 import { printExecutionDecisionProposalJson } from "./commands/execution-decision-propose.js";
 import { printExecutionDecisionCurrentJson } from "./commands/execution-decision-current.js";
@@ -713,6 +714,8 @@ else if (command === "review") {
   }
 
   const candidateId = optionValue("--candidate");
+  const autoSubscription = hasOption("--auto-subscription");
+  const expectedGitHead = optionValue("--expected-git-head");
   const commitMessage = optionValue("--commit-message");
   const exportPatchPath = optionValue("--export-patch");
   const progressEvents = hasOption("--progress-events");
@@ -735,6 +738,75 @@ else if (command === "review") {
       "candidate_plan_or_execute_only",
       "--candidate is only supported in plan, execute or publish mode.",
     );
+  }
+
+  if (autoSubscription) {
+    if (mode !== "execute" && mode !== "publish") {
+      failOption(
+        json,
+        "auto_subscription_requires_execute",
+        "--auto-subscription is only supported in execute or publish mode.",
+      );
+    }
+    if (candidateId === undefined) {
+      failOption(
+        json,
+        "auto_subscription_requires_candidate",
+        "--auto-subscription requires an explicit canonical --candidate.",
+      );
+    }
+    if (
+      expectedGitHead === undefined ||
+      !/^[a-f0-9]{40}$/i.test(expectedGitHead)
+    ) {
+      failOption(
+        json,
+        "auto_subscription_requires_git_head",
+        "--auto-subscription requires --expected-git-head with the verified 40-hex source HEAD.",
+      );
+    }
+    const conflictingProviderOption = [
+      "--provider",
+      "--provider-executable",
+      "--provider-model",
+      "--provider-timeout-ms",
+      "--fallback-provider",
+      "--fallback-provider-executable",
+      "--fallback-provider-model",
+      "--fallback-provider-timeout-ms",
+    ].some((option) => hasOption(option));
+    if (conflictingProviderOption) {
+      failOption(
+        json,
+        "auto_subscription_conflict",
+        "--auto-subscription cannot be combined with explicit provider or fallback options.",
+      );
+    }
+    const canonicalCandidate =
+      application.generateRoadmapOverviewReport(project).roadmap.selectedCandidate;
+    if (
+      canonicalCandidate === null ||
+      canonicalCandidate.id === undefined ||
+      canonicalCandidate.id !== candidateId
+    ) {
+      failOption(
+        json,
+        "candidate_not_canonical",
+        "Requested candidate is not the current canonical roadmap candidate.",
+      );
+    }
+    const currentGitHead =
+      application.generateProjectReport(project).git.lastCommit?.hash ?? null;
+    if (
+      currentGitHead === null ||
+      currentGitHead.toLowerCase() !== expectedGitHead.toLowerCase()
+    ) {
+      failOption(
+        json,
+        "git_head_changed",
+        "Project Git HEAD changed after the verified handoff.",
+      );
+    }
   }
 
   if (hasOption("--export-patch") && exportPatchPath === undefined) {
@@ -828,7 +900,21 @@ else if (command === "review") {
   }
 
   let runApplication: LoopApplicationAssembly = application;
-  if (providerId !== undefined && providerExecutable !== undefined) {
+  if (autoSubscription) {
+    try {
+      const providers = buildAutoSubscriptionProviderConfigurations();
+      runApplication = createLoopApplicationAssembly({
+        providers,
+        maxProviderAttempts: 1,
+      });
+    } catch {
+      failOption(
+        json,
+        "invalid_provider_executable",
+        "Autonomous subscription provider configuration is unavailable.",
+      );
+    }
+  } else if (providerId !== undefined && providerExecutable !== undefined) {
     const provider = buildProviderConfiguration(
       providerId,
       providerExecutable,
@@ -877,7 +963,11 @@ else if (command === "review") {
     {
       ...(candidateId !== undefined ? { candidateId } : {}),
       maxRepairs,
-      ...(providerId !== undefined ? { provider: providerId } : {}),
+      ...(autoSubscription
+        ? { provider: "claude_code" as const }
+        : providerId !== undefined
+          ? { provider: providerId }
+          : {}),
       ...(commitMessage !== undefined ? { commitMessage } : {}),
       ...(exportPatchPath !== undefined ? { exportPatchPath } : {}),
       ...(progressEvents

@@ -225,6 +225,22 @@ Objectif : réutiliser les executors Codex CLI / Claude Code existants pour la d
 - une incompatibilité réelle de CLI doit échouer explicitement, jamais élargir les permissions en fallback ;
 - Development Workspace ne crée pas de second launcher si Loop Engine satisfait le besoin.
 
+## Cycle V50 — Continuation canonique autonome par abonnement
+
+Objectif : permettre à une façade externe déjà gouvernée de demander l'exécution du **candidat roadmap canonique exact** sans choisir elle-même le provider, le modèle, l'exécutable, le financement ou le chemin de travail.
+
+- [x] [P0] V50.0 — Publication canonique AUTO : `loop run <project> --mode publish --candidate <id> --expected-git-head <sha> --auto-subscription --json` vérifie le candidat canonique courant et le SHA Git observé au handoff, refuse toute option provider/fallback concurrente, puis réutilise le sélecteur coût/capacité existant sur un portefeuille abonnement inclus. Claude Code est l'unique runtime AUTO tant que la frontière de lecture Codex n'est pas qualifiée simplement ; Haiku/Sonnet/Opus restent des profils configurés par capacités, sans API ni crédits additionnels. Le résultat validé est conservé par la publication candidate existante ; aucun commit sur `main`, push, PR, merge ou déploiement n'est implicite.
+
+### Gates V50
+
+- le caller ne fournit que projet, candidat canonique et SHA Git préalablement vérifiés ;
+- un changement de candidat ou de SHA entre handoff et exécution refuse le run ;
+- aucun provider, modèle, executable, timeout, fallback ou funding mode n'est contrôlable par la façade ;
+- financement autorisé : abonnement inclus uniquement ;
+- Codex reste explicit-only tant que son isolation de lecture autonome n'est pas démontrée ;
+- le mode AUTO réutilise le selector, les worktrees isolés, le scope guard, les validations, Run History et la publication candidate existants ;
+- aucune publication GitHub ni modification de `main` n'est déclenchée par V50.0.
+
 ## Gel architectural
 
 - Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).
