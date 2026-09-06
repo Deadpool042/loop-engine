@@ -916,6 +916,107 @@ describe("runLoopExecute", () => {
     );
   });
 
+  it("resets an isolated worktree before validation-triggered model escalation", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+    ]);
+    const observedModels: string[] = [];
+    let validatorCalls = 0;
+    let resetCalls = 0;
+    let dirty = false;
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      maxRepairs: 0,
+      readModifiedWorktreeFiles: async () =>
+        dirty ? ["src/feature.ts"] : [],
+      resetExecutionWorkspace: async () => {
+        resetCalls += 1;
+        dirty = false;
+      },
+      executor: async (plan) => {
+        observedModels.push(plan.model);
+        assert.equal(
+          dirty,
+          false,
+          "each model attempt must start from a clean isolated worktree",
+        );
+        dirty = true;
+        return {
+          status: "completed" as const,
+          modifiedFiles: ["src/feature.ts"],
+          details: [`Execution with ${plan.model} completed.`],
+        };
+      },
+      validator: async () => {
+        validatorCalls += 1;
+        return validatorCalls === 1
+          ? {
+              status: "failed" as const,
+              failedCommand: "pnpm run typecheck",
+              exitCode: 1,
+              details: ["Validation failed on the first model."],
+            }
+          : {
+              status: "passed" as const,
+              failedCommand: null,
+              exitCode: 0,
+              details: ["Validation passed after clean escalation."],
+            };
+      },
+    });
+
+    assert.equal(result.status, "completed");
+    assert.deepEqual(observedModels, ["luna", "terra"]);
+    assert.equal(resetCalls, 1);
+    assert.equal(validatorCalls, 2);
+    assert.deepEqual(result.modifiedFiles, ["src/feature.ts"]);
+  });
+
+  it("fails closed when an isolated worktree cannot be reset before escalation", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+    ]);
+    let executorCalls = 0;
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      maxRepairs: 0,
+      readModifiedWorktreeFiles: async () => ["src/feature.ts"],
+      resetExecutionWorkspace: async () => {
+        throw new Error("private reset diagnostic");
+      },
+      executor: async () => {
+        executorCalls += 1;
+        return {
+          status: "completed" as const,
+          modifiedFiles: ["src/feature.ts"],
+          details: ["Execution completed."],
+        };
+      },
+      validator: async () => ({
+        status: "failed" as const,
+        failedCommand: "pnpm run typecheck",
+        exitCode: 1,
+        details: ["Validation failed."],
+      }),
+    });
+
+    assert.equal(executorCalls, 1);
+    assert.equal(result.status, "failed");
+    assert.equal(
+      result.failure?.code,
+      "model_escalation_workspace_reset_failed",
+    );
+    assert.equal(JSON.stringify(result).includes("private reset diagnostic"), false);
+  });
+
   it("does not use model escalation for provider/runtime failures handled by failover", async () => {
     const registry = createAgentRegistry([
       routingProfile("codex.economy", "luna", "economy"),
