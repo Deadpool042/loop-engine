@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { resolveContextPath } from "../context/path.js";
 import type { ExecutionDecisionCurrent, ExecutionDecisionPublicationFailureCode, ExecutionDecisionPublicationResult } from "./execution-decision-service.js";
@@ -56,7 +56,6 @@ export function createTransactionalDecisionPublisher(options: Readonly<{ writeFi
     const destination = resolveContextPath(projectPath, relativePath); if (!destination.insideProject) return publicationFailure("decision_draft_write_failed");
     let previous: string | undefined; if (exists(destination.absolutePath)) { try { previous = read(destination.absolutePath, "utf8"); } catch (error) { return publicationFailure("decision_draft_read_previous_failed", error); } }
     const destinationDirectory = dirname(destination.absolutePath);
-    try { mkdirSync(destinationDirectory, { recursive: true, mode: 0o700 }); } catch (error) { return publicationFailure("decision_draft_write_temp_failed", error); }
     const temporary = join(destinationDirectory, `.${randomUUID()}.tmp`);
     try { write(temporary, contents, { mode: 0o600 }); } catch (error) { try { remove(temporary, { force: true }); } catch {} return publicationFailure("decision_draft_write_temp_failed", error); }
     try { rename(temporary, destination.absolutePath); } catch (error) { try { remove(temporary, { force: true }); } catch {} return publicationFailure("decision_draft_rename_failed", error); }

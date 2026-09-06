@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
+import { lstatSync, mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 import type { ProjectConfig } from "../core/config.js";
 import {
@@ -302,6 +303,47 @@ async function prepareDecisionDraft(
   return Object.freeze({ ok: true as const, draft: draft.draft });
 }
 
+function ensureLocalDecisionDirectory(
+  current: ProductionCurrent,
+): AutoSubscriptionDecisionFailure | null {
+  if (dirname(current.executionDecisionPath) !== ".loop-engine") {
+    return null;
+  }
+
+  const directory = resolve(current.projectPath, ".loop-engine");
+  try {
+    const stat = lstatSync(directory);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) {
+      return failure(
+        "auto_subscription_decision_write_failed",
+        "Local execution decision directory is not a real directory.",
+      );
+    }
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !("code" in error) ||
+      error.code !== "ENOENT"
+    ) {
+      return failure(
+        "auto_subscription_decision_write_failed",
+        "Local execution decision directory could not be inspected.",
+      );
+    }
+
+    try {
+      mkdirSync(directory, { mode: 0o700 });
+    } catch {
+      return failure(
+        "auto_subscription_decision_write_failed",
+        "Local execution decision directory could not be created.",
+      );
+    }
+  }
+
+  return null;
+}
+
 async function publishDecision(
   current: ProductionCurrent,
   draft: ExecutionDecisionDraft,
@@ -418,6 +460,9 @@ export async function ensureAutoSubscriptionExecutionDecision(
       "Autonomous execution decision renewal requires a documented canonical lot detail.",
     );
   }
+
+  const directoryFailure = ensureLocalDecisionDirectory(context.current);
+  if (directoryFailure !== null) return directoryFailure;
 
   const prepared = await prepareDecisionDraft(
     context.current,

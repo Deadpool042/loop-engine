@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -315,6 +317,35 @@ test("refuses autonomous renewal when the canonical lot has no detailed brief", 
     assert.equal(calls, 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("refuses a symlinked local decision directory before calling Claude", async () => {
+  const { root, project, head } = fixture();
+  const outside = mkdtempSync(join(tmpdir(), "loop-auto-decision-outside-"));
+  try {
+    symlinkSync(outside, join(root, ".loop-engine"), "dir");
+    let calls = 0;
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      project,
+      head,
+      "H1-L1",
+      {
+        runClaude: async () => {
+          calls += 1;
+          return claudeSuccess();
+        },
+      },
+    );
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.code, "auto_subscription_decision_write_failed");
+    }
+    assert.equal(calls, 0);
+    assert.equal(existsSync(join(outside, "execution-decision.yaml")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });
 
