@@ -131,6 +131,33 @@ describe("project snapshot roadmap selection", () => {
     }
   });
 
+  it("does not skip an exact-gated non-H candidate to later work", () => {
+    const { project, cleanup } = setupProject(
+      [
+        "<!-- loop-engine:phase-gate phase=VNEXT3-G1B3B state=closed blockedBy=meta-staging-readiness -->",
+        "- [ ] [P1] VNEXT3-G1B3B — Worker Meta via n8n",
+        "- [ ] [P1] VNEXT3-G1B4 — Newsletter depuis les intents",
+      ].join("\n"),
+    );
+
+    try {
+      const snapshot = buildProjectSnapshot(project);
+
+      assert.equal(snapshot.roadmap.stats.todo, 2);
+      assert.equal(snapshot.roadmap.summary.selectable, 0);
+      assert.equal(snapshot.roadmap.selectedCandidate, null);
+      assert.equal(snapshot.planning.recommendation, "gated_no_work");
+      assert.deepEqual(snapshot.roadmap.candidates[0]?.admissibility, {
+        state: "not_admissible",
+        reason: "phase_closed",
+        blockedBy: "meta-staging-readiness",
+      });
+      assert.equal(snapshot.roadmap.candidates[1]?.admissibility?.state, "admissible");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("selects the first remaining structured-table lot", () => {
     const currentDir = fileURLToPath(new URL(".", import.meta.url));
     const roadmap = readFileSync(
