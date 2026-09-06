@@ -41,7 +41,7 @@ export function createExecutionDecisionDraft(
   if (!isText(provider.objective) || deliverables === null || outOfScope === null) return invalid("provider_fields_invalid", "Provider draft fields are invalid or unbounded.");
   const scope = parseAllowedPaths(provider.allowedPaths);
   if (!scope.ok) return invalid("allowed_paths_invalid", scope.reason);
-  if (scope.allowedPaths.some((path) => path === ".git" || path.startsWith(".git/") || path === ".governance" || path.startsWith(".governance/")) || isPathAllowed(local.executionDecisionPath, scope.allowedPaths)) return invalid("protected_path", "Provider draft contains a protected path.");
+  if (scope.allowedPaths.some((path) => path === ".git" || path.startsWith(".git/") || path === ".governance" || path.startsWith(".governance/") || path === ".loop-engine" || path.startsWith(".loop-engine/")) || isPathAllowed(local.executionDecisionPath, scope.allowedPaths)) return invalid("protected_path", "Provider draft contains a protected path.");
   const forbiddenContentTerms = provider.forbiddenContentTerms === undefined ? undefined : strings(provider.forbiddenContentTerms);
   if (provider.forbiddenContentTerms !== undefined && forbiddenContentTerms === null) return invalid("forbidden_terms_invalid", "Provider forbidden content terms are invalid or unbounded.");
   const optionalTerms = forbiddenContentTerms === null || forbiddenContentTerms === undefined ? {} : { forbiddenContentTerms };

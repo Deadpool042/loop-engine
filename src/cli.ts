@@ -92,7 +92,7 @@ import {
 } from "./composition/index.js";
 import { terminal } from "./ui/terminal.js";
 import { buildAutoSubscriptionProviderConfigurations } from "./composition/auto-subscription-execution.js";
-import { evaluateAutoSubscriptionAdmission } from "./composition/auto-subscription-admission.js";
+import { ensureAutoSubscriptionExecutionDecision } from "./composition/auto-subscription-decision-renewal.js";
 import { printJsonError } from "./commands/json-error.js";
 import { printExecutionDecisionProposalJson } from "./commands/execution-decision-propose.js";
 import { printExecutionDecisionCurrentJson } from "./commands/execution-decision-current.js";
@@ -809,7 +809,7 @@ else if (command === "review") {
       );
     }
 
-    const admission = evaluateAutoSubscriptionAdmission(
+    const admission = await ensureAutoSubscriptionExecutionDecision(
       project,
       currentGitHead,
       candidateId,

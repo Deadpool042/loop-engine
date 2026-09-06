@@ -86,6 +86,7 @@ projects:
   - name: loop-engine
     path: .
     repository: Deadpool042/loop-engine
+    execution_decision: .loop-engine/execution-decision.yaml
     workspace:
       mode: permanent
       dependencies: production
@@ -102,6 +103,8 @@ projects:
       - docs/roadmap/loop-engine.md
   - name: openclaw-control
     path: ../openclaw-control
+    repository: Deadpool042/openclaw-control
+    execution_decision: .loop-engine/execution-decision.yaml
     type: openclaw-extension
     workspace:
       mode: source_only
