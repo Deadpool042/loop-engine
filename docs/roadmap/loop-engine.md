@@ -241,6 +241,23 @@ Objectif : permettre à une façade externe déjà gouvernée de demander l'exé
 - le mode AUTO réutilise le selector, les worktrees isolés, le scope guard, les validations, Run History et la publication candidate existants ;
 - aucune publication GitHub ni modification de `main` n'est déclenchée par V50.0.
 
+## Cycle V51 — renouvellement autonome du contrat d'exécution
+
+Le durcissement #257 a confirmé qu'une exécution AUTO doit posséder un brief et un scope liés au SHA. V51 raccorde ce garde-fou au CTA `Continuer` sans API payante. Détail : [auto-subscription-decision-renewal-v51.md](auto-subscription-decision-renewal-v51.md).
+
+- [x] [P0] V51.0 — Renouvellement abonnement de `execution_decision` : une action AUTO explicitement admise réutilise une décision fraîche ou, si elle est absente/périmée et que le lot possède un détail canonique, fait proposer un brouillon JSON par Claude Code / Haiku en mode restreint sans outils/MCP. Loop Engine valide scope/brief/protected paths puis publie le fichier local SHA-bound avant de réappliquer l'admission. Un état explicitement BLOCKED n'est jamais écrasé.
+- [ ] [P1] V51.1 — Burn-in réel du CTA `Continuer` : lancer depuis OpenClaw le candidat canonique Loop Engine, renouveler le contrat sans API, laisser l'executor produire uniquement la preuve documentaire bornée, vérifier Run History + candidate ref et confirmer que le dépôt source reste propre.
+
+### Gates V51
+
+- projet opt-in obligatoire via `execution_decision` ;
+- aucun renouvellement autonome pour un candidat sans détail de lot canonique ;
+- Claude de préparation : abonnement, Haiku, low, restricted, zéro outil, zéro MCP ;
+- `BLOCKED` / `NO_ACTIONABLE_WORK` ne sont jamais remplacés automatiquement ;
+- `.git/**`, `.governance/**`, `.loop-engine/**` et le fichier de décision sont interdits au scope ;
+- aucune modification de main, push, PR, merge ou déploiement n'est ajoutée ;
+- V51.1 est un burn-in documentaire et ne peut pas modifier `src/**` ou `projects.yaml`.
+
 ## Gel architectural
 
 - Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).

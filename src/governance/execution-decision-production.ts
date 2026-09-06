@@ -55,7 +55,8 @@ export function createTransactionalDecisionPublisher(options: Readonly<{ writeFi
   return (projectPath: string, relativePath: string, contents: string): Readonly<{ ok: true; publication: DecisionPublication }> | Extract<ExecutionDecisionPublicationResult, { ok: false }> => {
     const destination = resolveContextPath(projectPath, relativePath); if (!destination.insideProject) return publicationFailure("decision_draft_write_failed");
     let previous: string | undefined; if (exists(destination.absolutePath)) { try { previous = read(destination.absolutePath, "utf8"); } catch (error) { return publicationFailure("decision_draft_read_previous_failed", error); } }
-    const temporary = join(dirname(destination.absolutePath), `.${randomUUID()}.tmp`);
+    const destinationDirectory = dirname(destination.absolutePath);
+    const temporary = join(destinationDirectory, `.${randomUUID()}.tmp`);
     try { write(temporary, contents, { mode: 0o600 }); } catch (error) { try { remove(temporary, { force: true }); } catch {} return publicationFailure("decision_draft_write_temp_failed", error); }
     try { rename(temporary, destination.absolutePath); } catch (error) { try { remove(temporary, { force: true }); } catch {} return publicationFailure("decision_draft_rename_failed", error); }
     return { ok: true, publication: { commit: () => true, recover: () => { try { if (previous === undefined) remove(destination.absolutePath, { force: true }); else { const rollback = join(dirname(destination.absolutePath), `.${randomUUID()}.tmp`); write(rollback, previous, { mode: 0o600 }); rename(rollback, destination.absolutePath); } return true; } catch { return false; } } } };
