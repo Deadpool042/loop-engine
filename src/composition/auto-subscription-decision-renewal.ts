@@ -7,7 +7,10 @@ import {
   generateProjectReport,
   generateRoadmapOverviewReport,
 } from "../core/reports.js";
-import { resolveSelectedLotWritablePaths } from "../core/selected-lot-detail.js";
+import {
+  resolveRoadmapCandidateDetail,
+  resolveSelectedLotWritablePaths,
+} from "../core/selected-lot-detail.js";
 import {
   createExecutionDecisionDraft,
   type ExecutionDecisionDraft,
@@ -194,7 +197,7 @@ function buildDecisionContext(
     return Object.freeze({ ok: false as const, reason: "brief" as const });
   }
 
-  const detail = overview.roadmap.selectedLotDetail;
+  const detail = resolveRoadmapCandidateDetail(project.path, candidate);
   if (detail === null) {
     return Object.freeze({ ok: false as const, reason: "brief" as const });
   }

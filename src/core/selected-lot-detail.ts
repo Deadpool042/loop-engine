@@ -250,6 +250,7 @@ function resolveExplicitLinkedDetail(
   projectRoot: string,
   realProjectRoot: string,
   candidate: SelectedCandidateReference,
+  candidateScoped = false,
 ): SelectedLotDetail | null {
   const linkedPath = linkedMarkdownPath(candidate.text);
   if (linkedPath === null) return null;
@@ -265,6 +266,22 @@ function resolveExplicitLinkedDetail(
   if (!stat.isFile()) return null;
 
   const bounded = readBoundedUtf8(realTargetPath);
+  const extracted =
+    candidateScoped && candidate.id
+      ? extractCandidateHeadingMarkdown(bounded.content, candidate.id)
+      : null;
+  if (extracted !== null) {
+    return Object.freeze({
+      path: relative(projectRoot, targetPath).split(sep).join("/"),
+      title: extracted.title,
+      sections: extracted.sections,
+      truncated:
+        bounded.truncated ||
+        extracted.sectionsTruncated ||
+        extracted.sections.some((section) => section.truncated),
+    });
+  }
+
   const parsed = parseSelectedLotMarkdown(bounded.content);
   return Object.freeze({
     path: relative(projectRoot, targetPath).split(sep).join("/"),
@@ -381,7 +398,12 @@ export function resolveRoadmapCandidateDetail(
   if (realProjectRoot === null) return null;
 
   return (
-    resolveExplicitLinkedDetail(projectRoot, realProjectRoot, candidate) ??
+    resolveExplicitLinkedDetail(
+      projectRoot,
+      realProjectRoot,
+      candidate,
+      true,
+    ) ??
     resolveHeadingDetail(projectRoot, realProjectRoot, candidate)
   );
 }
