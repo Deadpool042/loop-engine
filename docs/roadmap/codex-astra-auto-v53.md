@@ -12,7 +12,8 @@ Mettre à niveau le portefeuille AUTO abonnement sans ajouter de fournisseur API
 - Le portefeuille AUTO actuel contient :
   - Codex economy : `gpt-5.6-luna` ;
   - Codex standard : `gpt-5.6-sol` ;
-  - Codex advanced : `gpt-5.6-terra`.
+  - Codex advanced : `gpt-5.6-terra` ;
+  - Codex frontier : `gpt-6-astra`.
 - Le failover provider actuel exécute plusieurs providers dans le même cwd sans reset intermédiaire.
 - Codex refuse volontairement un worktree non propre via `worktree_not_clean`.
 - Le runner peut recevoir `maxRepairs > 0` alors que `repairer === null`, ce qui produit `repairer_unavailable`.
@@ -21,7 +22,7 @@ Mettre à niveau le portefeuille AUTO abonnement sans ajouter de fournisseur API
 
 ### V53.0 — Astra
 
-- Remplacer uniquement `gpt-5.6-terra` par `gpt-6-astra` dans le profil Codex `advanced`.
+- Conserver `gpt-5.6-terra` comme profil Codex `advanced` et ajouter `gpt-6-astra` comme profil `frontier`, au-dessus de Terra.
 - Ne pas rendre Astra modèle par défaut pour les tâches simples.
 - Conserver Claude primaire à rang économique équivalent selon la politique existante.
 - Aucun provider API payant ni crédit additionnel implicite.
@@ -45,7 +46,7 @@ Mettre à niveau le portefeuille AUTO abonnement sans ajouter de fournisseur API
 
 - Codex CLI VPS : `0.153.4`.
 - Probe abonnement réel : `gpt-6-astra` invoqué avec succès sans clé API.
-- Tests V53 ciblés : 31/31 verts.
+- Tests V53 initiaux : 31/31 verts ; correction Terra/Astra requalifiée avec 11/11 tests ciblés verts, dont l’escalade `gpt-5.6-terra` → `gpt-6-astra`.
 - `pnpm run typecheck` : vert.
 - `pnpm run json-check` : vert.
 - `pnpm run audit:strict` : vert.
@@ -70,7 +71,7 @@ Cette décision évite un second système de suivi et conserve OpenClaw comme si
 
 
 
-1. Les tests AUTO attendent `gpt-6-astra` comme profil Codex advanced — **validé**.
+1. Les tests AUTO conservent `gpt-5.6-terra` en `advanced` et ajoutent `gpt-6-astra` en `frontier` — **validé**.
 2. Le fallback Claude → Codex repart d’un worktree propre même si Claude a laissé des fichiers modifiés avant une erreur récupérable — **validé**.
 3. Un échec du reset empêche le fallback et expose un code borné/redacted — **validé**.
 4. Les fichiers d’une tentative primaire rejetée ne remontent pas dans le résultat final après fallback — **validé**.

@@ -86,8 +86,20 @@ export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProv
         }),
         Object.freeze({
           id: "advanced",
-          model: "gpt-6-astra",
+          model: "gpt-5.6-terra",
           economicTier: "advanced" as const,
+          fundingMode: "included_subscription" as const,
+          quota: INCLUDED_QUOTA_UNKNOWN,
+          capabilities: Object.freeze([
+            ...BASE_CAPABILITIES,
+            "long_context" as const,
+            "multi_file_refactor" as const,
+          ]),
+        }),
+        Object.freeze({
+          id: "frontier",
+          model: "gpt-6-astra",
+          economicTier: "frontier" as const,
           fundingMode: "included_subscription" as const,
           quota: INCLUDED_QUOTA_UNKNOWN,
           capabilities: Object.freeze([
