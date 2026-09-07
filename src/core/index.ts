@@ -165,6 +165,8 @@ export {
   type LoopProviderFailoverEvidence,
   type LoopProviderFailoverOptions,
   type LoopProviderFailoverResult,
+  type LoopProviderWorkspaceReset,
+  type LoopProviderWorkspaceResetFactory,
 } from "../loop/provider-failover.js";
 export {
   createEvidenceAwareProviderFailoverLoopExecutor,

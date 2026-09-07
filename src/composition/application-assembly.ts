@@ -53,6 +53,7 @@ import {
 import { createLoopProviderFailoverAssembly } from "./provider-failover-assembly.js";
 import {
   createIsolatedProviderRunExecute,
+  createIsolatedProviderWorkspaceReset,
   type IsolatedProviderExecutionOptions,
 } from "./isolated-provider-execution.js";
 import {
@@ -266,6 +267,7 @@ export function createLoopApplicationAssembly(
       : createLoopProviderFailoverAssembly(
           providerAssemblies,
           options.maxProviderAttempts ?? providerAssemblies.length,
+          { createWorkspaceReset: createIsolatedProviderWorkspaceReset },
         );
   const isolatedRunExecute =
     providerDependency === undefined

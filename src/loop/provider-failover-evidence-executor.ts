@@ -4,6 +4,7 @@ import {
   executeLoopProviderFailover,
   type LoopProviderFailureClassifier,
   type LoopProviderFailoverAttempt,
+  type LoopProviderWorkspaceResetFactory,
 } from "./provider-failover.js";
 
 export type LoopProviderFailoverAttemptResolver = (
@@ -35,6 +36,7 @@ export function createEvidenceAwareProviderFailoverLoopExecutor(
   options: Readonly<{
     maxAttempts: number;
     isRecoverableFailure?: LoopProviderFailureClassifier;
+    createWorkspaceReset?: LoopProviderWorkspaceResetFactory;
   }>,
 ): LoopExecutor {
   return async (primaryPlan, cwd) => {
@@ -48,6 +50,9 @@ export function createEvidenceAwareProviderFailoverLoopExecutor(
       ...(options.isRecoverableFailure === undefined
         ? {}
         : { isRecoverableFailure: options.isRecoverableFailure }),
+      ...(options.createWorkspaceReset === undefined
+        ? {}
+        : { createWorkspaceReset: options.createWorkspaceReset }),
     });
 
     return Object.freeze({

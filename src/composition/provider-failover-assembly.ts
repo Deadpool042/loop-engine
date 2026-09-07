@@ -4,6 +4,7 @@ import type { AgentBudget, AgentProfile } from "../agents/types.js";
 import type {
   LoopExecutor,
   LoopProviderFailoverAttempt,
+  LoopProviderWorkspaceResetFactory,
 } from "../core/index.js";
 import type { LoopExecutionPlan } from "../loop/execution-plan.js";
 import { createEvidenceAwareProviderFailoverLoopExecutor } from "../loop/provider-failover-evidence-executor.js";
@@ -155,6 +156,9 @@ function resolveAttempts(
 export function createLoopProviderFailoverAssembly(
   assemblies: readonly LoopProviderAssembly[],
   maxAttempts: number,
+  options: Readonly<{
+    createWorkspaceReset?: LoopProviderWorkspaceResetFactory;
+  }> = {},
 ): LoopProviderFailoverAssembly {
   if (!Number.isInteger(maxAttempts) || maxAttempts <= 0) {
     throw new TypeError("maxAttempts must be a positive integer.");
@@ -175,7 +179,12 @@ export function createLoopProviderFailoverAssembly(
   const boundedMaxAttempts = Math.min(maxAttempts, assemblies.length);
   const executor = createEvidenceAwareProviderFailoverLoopExecutor(
     (primaryPlan) => resolveAttempts(assemblies, primaryPlan),
-    { maxAttempts: boundedMaxAttempts },
+    {
+      maxAttempts: boundedMaxAttempts,
+      ...(options.createWorkspaceReset === undefined
+        ? {}
+        : { createWorkspaceReset: options.createWorkspaceReset }),
+    },
   );
 
   return Object.freeze({

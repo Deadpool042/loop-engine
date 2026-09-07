@@ -15,6 +15,7 @@ import type { LoopRunExecuteOptions } from "../loop/execute-runner.js";
 import type { LoopExecutor } from "../loop/execution.js";
 import { runLoopExecuteWithProviderFailoverEvidence } from "../loop/provider-failover-runner.js";
 import type { LoopRunResult } from "../loop/types.js";
+import { readModifiedWorktreeFiles } from "../loop/worktree-status.js";
 import type { AgentRegistry } from "../agents/registry.js";
 import { loadConfig, type ProjectConfig } from "../core/config.js";
 import { findProject } from "../core/project.js";
@@ -70,6 +71,45 @@ export async function resetIsolatedProviderWorkspace(
     maxBuffer: 1024 * 1024,
     timeout: 30_000,
   });
+}
+
+export async function createIsolatedProviderWorkspaceReset(
+  workspacePath: string,
+): Promise<() => Promise<void>> {
+  const baseline = (
+    await execFileAsync("git", ["rev-parse", "--verify", "HEAD"], {
+      cwd: workspacePath,
+      encoding: "utf8",
+      maxBuffer: 1024,
+      timeout: 30_000,
+    })
+  ).stdout.trim();
+
+  if (!/^[a-f0-9]{40,64}$/i.test(baseline)) {
+    throw new Error("Unable to capture the isolated provider baseline.");
+  }
+
+  return async () => {
+    await execFileAsync("git", ["reset", "--hard", baseline], {
+      cwd: workspacePath,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024,
+      timeout: 30_000,
+    });
+    await execFileAsync("git", ["clean", "-fd", "--"], {
+      cwd: workspacePath,
+      encoding: "utf8",
+      maxBuffer: 1024 * 1024,
+      timeout: 30_000,
+    });
+
+    const modified = await readModifiedWorktreeFiles(workspacePath);
+    if (modified === null || modified.length > 0) {
+      throw new Error(
+        "The isolated provider worktree is not clean after baseline reset.",
+      );
+    }
+  };
 }
 
 export async function prepareIsolatedWorkspaceDependencies(

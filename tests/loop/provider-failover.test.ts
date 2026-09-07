@@ -41,11 +41,15 @@ function completed(file: string): LoopExecutor {
     });
 }
 
+const cleanResetFactory = async () => async (): Promise<void> => undefined;
+
 test("falls back after a recoverable provider failure", async () => {
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
+    cwd: "/tmp",
+    createWorkspaceReset: cleanResetFactory,
     attempts: [
-      { plan: plan("openai", "gpt-5.6-terra"), executor: failed("provider_timeout") },
+      { plan: plan("openai", "gpt-6-astra"), executor: failed("provider_timeout") },
       { plan: plan("anthropic", "claude-sonnet"), executor: completed("src/result.ts") },
     ],
   });
@@ -62,9 +66,116 @@ test("falls back after a recoverable provider failure", async () => {
   );
 });
 
+test("resets the workspace and discards rejected primary modifications before fallback", async () => {
+  let resetCalls = 0;
+  let fallbackSawReset = false;
+
+  const primary: LoopExecutor = async () =>
+    Object.freeze({
+      status: "failed" as const,
+      modifiedFiles: Object.freeze(["src/partial.ts"]),
+      failure: Object.freeze({
+        code: "provider_max_turns",
+        message: "primary exhausted",
+        details: Object.freeze([]),
+      }),
+    });
+  const fallback: LoopExecutor = async () => {
+    fallbackSawReset = resetCalls === 1;
+    return Object.freeze({
+      status: "completed" as const,
+      modifiedFiles: Object.freeze(["src/final.ts"]),
+      details: Object.freeze(["fallback completed"]),
+    });
+  };
+
+  const outcome = await executeLoopProviderFailover({
+    maxAttempts: 2,
+    cwd: "/tmp",
+    createWorkspaceReset: async () => async () => {
+      resetCalls += 1;
+    },
+    attempts: [
+      { plan: plan("anthropic", "claude-sonnet"), executor: primary },
+      { plan: plan("openai", "gpt-5.6-sol"), executor: fallback },
+    ],
+  });
+
+  assert.equal(outcome.result.status, "completed");
+  assert.equal(resetCalls, 1);
+  assert.equal(fallbackSawReset, true);
+  assert.deepEqual(outcome.result.modifiedFiles, ["src/final.ts"]);
+});
+
+test("fails closed when the fallback workspace reset cannot be prepared", async () => {
+  let fallbackCalls = 0;
+  const fallback: LoopExecutor = async () => {
+    fallbackCalls += 1;
+    return completed("never.ts")({} as LoopExecutionPlan, "/tmp");
+  };
+
+  const outcome = await executeLoopProviderFailover({
+    maxAttempts: 2,
+    cwd: "/tmp",
+    createWorkspaceReset: async () => {
+      throw new Error("sensitive reset diagnostic");
+    },
+    attempts: [
+      {
+        plan: plan("anthropic", "claude-sonnet"),
+        executor: failed("provider_max_turns"),
+      },
+      {
+        plan: plan("openai", "gpt-5.6-sol"),
+        executor: fallback,
+      },
+    ],
+  });
+
+  assert.equal(outcome.result.status, "failed");
+  assert.equal(fallbackCalls, 0);
+  if (outcome.result.status === "failed") {
+    assert.equal(
+      outcome.result.failure.code,
+      "provider_failover_workspace_reset_failed",
+    );
+    assert.equal(
+      JSON.stringify(outcome).includes("sensitive reset diagnostic"),
+      false,
+    );
+  }
+});
+
+test("fails closed when no workspace reset is configured for a fallback", async () => {
+  const outcome = await executeLoopProviderFailover({
+    maxAttempts: 2,
+    cwd: "/tmp",
+    attempts: [
+      {
+        plan: plan("anthropic", "claude-sonnet"),
+        executor: failed("provider_max_turns"),
+      },
+      {
+        plan: plan("openai", "gpt-5.6-sol"),
+        executor: completed("never.ts"),
+      },
+    ],
+  });
+
+  assert.equal(outcome.result.status, "failed");
+  if (outcome.result.status === "failed") {
+    assert.equal(
+      outcome.result.failure.code,
+      "provider_failover_workspace_reset_unavailable",
+    );
+  }
+});
+
 test("falls back after a provider turn-budget exhaustion", async () => {
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
+    cwd: "/tmp",
+    createWorkspaceReset: cleanResetFactory,
     attempts: [
       {
         plan: plan("anthropic", "claude-sonnet"),
@@ -95,6 +206,8 @@ test("falls back after a provider turn-budget exhaustion", async () => {
 test("falls back after a provider process limit", async () => {
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
+    cwd: "/tmp",
+    createWorkspaceReset: cleanResetFactory,
     attempts: [
       {
         plan: plan("anthropic", "claude-sonnet"),
@@ -181,6 +294,8 @@ test("redacts thrown provider errors and permits reviewed recovery", async () =>
 
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
+    cwd: "/tmp",
+    createWorkspaceReset: cleanResetFactory,
     isRecoverableFailure: (failure) => failure.code === "provider_executor_exception",
     attempts: [
       { plan: plan("openai", "a"), executor: throwing },
