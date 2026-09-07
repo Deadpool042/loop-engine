@@ -156,6 +156,15 @@ function claudeSuccess(proposal?: Record<string, unknown>) {
   } as const;
 }
 
+function claudeTimeout() {
+  return {
+    exitCode: null,
+    timedOut: true,
+    outputLimited: false,
+    stdout: "",
+  } as const;
+}
+
 test("reuses a fresh SHA-bound decision without calling Claude", async () => {
   const { root, project, head } = fixture();
   try {
@@ -232,6 +241,77 @@ test("renews a missing decision through read-only Claude subscription proposal",
       assert.ok(parsed.decision.decision.brief);
     }
     assert.equal(git(root, ["status", "--short"]), "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("retries once with Sonnet when the Haiku decision proposal times out", async () => {
+  const { root, project, head } = fixture();
+  try {
+    const observedCalls: string[][] = [];
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      project,
+      head,
+      "H1-L1",
+      {
+        runClaude: async (args) => {
+          observedCalls.push([...args]);
+          return observedCalls.length === 1 ? claudeTimeout() : claudeSuccess();
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(result.ok ? result.status : null, "renewed");
+    assert.equal(
+      result.ok ? result.model : null,
+      AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL,
+    );
+    assert.equal(observedCalls.length, 2);
+
+    const firstModelIndex = observedCalls[0]?.indexOf("--model") ?? -1;
+    const secondModelIndex = observedCalls[1]?.indexOf("--model") ?? -1;
+    assert.ok(firstModelIndex >= 0);
+    assert.ok(secondModelIndex >= 0);
+    assert.equal(
+      observedCalls[0]?.[firstModelIndex + 1],
+      AUTO_SUBSCRIPTION_DECISION_MODEL,
+    );
+    assert.equal(
+      observedCalls[1]?.[secondModelIndex + 1],
+      AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("returns a terminal timeout after Haiku and Sonnet both time out", async () => {
+  const { root, project, head } = fixture();
+  try {
+    const observedCalls: string[][] = [];
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      project,
+      head,
+      "H1-L1",
+      {
+        runClaude: async (args) => {
+          observedCalls.push([...args]);
+          return claudeTimeout();
+        },
+      },
+    );
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.code, "auto_subscription_decision_timeout");
+      assert.match(
+        result.message,
+        new RegExp(AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL),
+      );
+    }
+    assert.equal(observedCalls.length, 2);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

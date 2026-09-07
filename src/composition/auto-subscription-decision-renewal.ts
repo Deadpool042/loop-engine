@@ -436,10 +436,11 @@ async function prepareDecisionDraft(
       current.projectPath,
     );
     if (result.timedOut) {
-      return failure(
+      lastFailure = failure(
         "auto_subscription_decision_timeout",
-        "Execution decision preparation timed out.",
+        `Execution decision preparation timed out for ${profile.model}.`,
       );
+      continue;
     }
     if (result.outputLimited) {
       return failure(
