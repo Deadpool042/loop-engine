@@ -53,6 +53,7 @@ Règles :
 
 - `src/commands/completion-events.ts`
 - `tests/commands/completion-events.test.ts`
+- `tests/core/roadmap-proposal-report.test.ts`
 - `docs/roadmap/loop-engine.md`
 - `docs/roadmap/actionable-notifications-v52.md`
 
@@ -75,6 +76,7 @@ Règles :
 - vérifier l’idempotence du `eventId` ;
 - vérifier qu’une condition non bloquante n’émet rien ;
 - vérifier que `lot.completed` et `execution.failed` restent inchangés ;
+- aligner le test d’estimation du dépôt réel sur le profil `balanced` attendu tant que V52 constitue du travail ouvert borné ;
 - `pnpm run ci` vert.
 
 ## Critères de clôture
