@@ -66,8 +66,6 @@ Règles :
 - `docs/roadmap/loop-engine.md`
 - `docs/roadmap/actionable-notifications-v52.md`
 
-Aucun autre fichier ne doit être créé ou modifié.
-
 ## Frontière provider / validation
 
 Claude Code produit uniquement le delta borné dans le worktree isolé.
