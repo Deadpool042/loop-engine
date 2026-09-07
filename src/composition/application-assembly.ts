@@ -81,6 +81,7 @@ import {
 } from "./candidate-publication-review.js";
 import { materializeWorkspaceProject } from "../workspace/materialization.js";
 import { registerProjectEnvelope } from "../workspace/project-registration.js";
+import { buildExecutionStatusReport } from "./execution-status.js";
 import {
   runDurableAutoSubscriptionPublish,
   type DurableAutoPublishInput,
@@ -125,6 +126,7 @@ export type LoopApplicationAssembly = Readonly<{
   generateAuditRuleManifest: typeof generateAuditRuleManifest;
   generateDoctorReport: typeof generateDoctorReport;
   generateExecutionReport: typeof generateExecutionReportWithEvidence;
+  generateExecutionStatusReport: typeof buildExecutionStatusReport;
   generateNextProjectActionReport: typeof generateNextProjectActionReport;
   generateProjectContextReport: typeof generateProjectContextReport;
   generateProjectHandoffReport: typeof generateProjectHandoffReport;
@@ -300,6 +302,7 @@ export function createLoopApplicationAssembly(
     generateAuditRuleManifest,
     generateDoctorReport,
     generateExecutionReport: generateExecutionReportWithEvidence,
+    generateExecutionStatusReport: buildExecutionStatusReport,
     generateNextProjectActionReport,
     generateProjectContextReport,
     generateProjectHandoffReport,

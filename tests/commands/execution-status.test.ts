@@ -4,16 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { buildExecutionStatusReport } from "../../src/commands/execution-status.js";
+import { buildExecutionStatusReport } from "../../src/composition/execution-status.js";
 import { createFileDurableExecutionStore } from "../../src/loop/file-durable-execution-store.js";
 import type { DurableExecutionRecord } from "../../src/loop/durable-execution.js";
 import type { LoopRunResult } from "../../src/loop/types.js";
-
-const fakeApplication = {
-  generateRunHistoryReport() {
-    throw new Error("history should be overridden in this test");
-  },
-} as const;
 
 function runningRecord(): DurableExecutionRecord {
   return Object.freeze({
@@ -194,7 +188,6 @@ test("execution status persists active progress and estimates ETA without invent
     assert.equal(await store.save(runningRecord(), null), true);
 
     const report = await buildExecutionStatusReport(
-      fakeApplication,
       "creatyss",
       {
         directory: root,
@@ -225,7 +218,6 @@ test("execution status exposes a terminal failure instead of making the same can
     assert.equal(await store.save(failedRecord(), null), true);
 
     const report = await buildExecutionStatusReport(
-      fakeApplication,
       "creatyss",
       {
         directory: root,
