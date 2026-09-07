@@ -262,7 +262,8 @@ Le durcissement #257 a confirmé qu'une exécution AUTO doit posséder un brief 
 
 Contexte vérifié le 2026-09-07 : `completion-events --json` couvre déjà `lot.completed` et `execution.failed`. Le burn-in OpenClaw a qualifié la séparation provider/validation, le rejet des briefs exploration-only, le scope machine-readable strict et l’escalade de préparation Haiku → Sonnet en cas de timeout.
 
-- [ ] [P0] V52.0 — Implémenter `gate.blocked` dans `completion-events --json` en le dérivant exclusivement de l’état canonique existant. L’événement doit être stable/idempotent pour un même projet + candidat + état de gate, ne rien émettre pour maintenance/roadmap épuisée/absence volontaire de travail, ne contenir aucun secret ou log brut et ne modifier ni la sélection roadmap ni les événements `lot.completed` / `execution.failed`. [Détail](actionable-notifications-v52.md)
+- [x] [P0] V52.0 — `gate.blocked` est projeté dans `completion-events --json` depuis le snapshot canonique complet : candidat bloqué par une phase gate fermée, fingerprint et `eventId` stables en 32 hex, aucun texte libre/log/secret exposé, aucune émission pour maintenance ou roadmap épuisée, événements existants inchangés. Validation complète verte sur la PR #282 (CI run `34150858465`). [Détail](actionable-notifications-v52.md)
+- [x] [P1] V52.1 — Nettoyage de la surface de tests déclenché par la validation réelle : suppression de `src/automation/**` et `src/service/**`, confirmés sans consommateur runtime, retrait de leurs 37 fichiers de tests et des audits exclusivement associés, suppression de 4 micro-tests `inbound-security` redondants et séparation de 4 burn-ins historiques via `test:burnin`. Suite standard : 372 → 326 fichiers ; audit strict ramené à 560 règles actives, CI #282 verte.
 
 ### Gates V52
 
