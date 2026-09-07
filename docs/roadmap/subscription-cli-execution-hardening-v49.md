@@ -78,3 +78,54 @@ Claude Code est lancé avec :
 Le contrôle mécanique existant reste inchangé : worktree Git propre et isolé, observation du delta réel, scope guard, content policy, validations Loop Engine, timeout/output limits et aucune capacité commit/push/publish/deploy dans les executors.
 
 Qualification locale avant clôture : 37/37 tests V49 ciblés, groupe Core/frontières 635/635, TypeScript, `json-check`, audit strict 635/635, audit profiles et `git diff --check` verts. Les tests couvrent explicitement l'absence de `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GITHUB_TOKEN` et `SSH_AUTH_SOCK` dans les deux subprocesses. La CI complète reste le gate final de livraison.
+
+## Qualification complémentaire Codex AUTO — 2026-09-07
+
+La restriction `explicit-only` de V49 reste l'historique correct de la livraison initiale. Elle est levée pour le runtime AUTO après une qualification dédiée sur le VPS Ubuntu 24.04 servant OpenClaw/Loop Engine.
+
+### Runtime qualifié
+
+- Codex CLI `0.153.4` ;
+- authentification locale `chatgpt` confirmée par `codex doctor --json` ;
+- aucun `OPENAI_API_KEY` stocké ou transmis ;
+- modèles abonnement vérifiés par exécution réelle : `gpt-5.6-luna`, `gpt-5.6-sol`, `gpt-5.6-terra`.
+
+### Frontière filesystem et réseau
+
+Le précédent `--sandbox workspace-write` est remplacé pour AUTO par un permission profile strict :
+
+- `:root = deny` ;
+- `:minimal = read` ;
+- worktree courant rouvert en `write` ;
+- répertoire d'installation Codex rouvert en `read` uniquement pour permettre au helper runtime de s'exécuter ;
+- `:tmpdir` et `:slash_tmp` refusés ;
+- réseau des commandes sandboxées désactivé ;
+- `--ignore-user-config`, `--ignore-rules`, `--ephemeral`, `--strict-config` et `approval_policy="never"`.
+
+Ubuntu 24.04 bloque les user namespaces non profilés via AppArmor. La protection globale reste activée. Le prérequis hôte est le profil ciblé versionné dans `ops/apparmor/codex-auto-userns`, qui accorde uniquement `userns,` au binaire natif Codex ; bwrap reste responsable de l'isolation filesystem/réseau.
+
+### Preuves adversariales
+
+Canary mécanique sans modèle, sous le profil exact :
+
+- lecture d'un fichier dans le worktree : autorisée ;
+- lecture de `../outside-canary.txt` : masquée/refusée ;
+- écriture dans le worktree : autorisée et persistée ;
+- écriture hors worktree : aucune modification de l'hôte.
+
+Canary end-to-end avec le vrai `codex exec` abonnement :
+
+- Codex crée le fichier demandé dans le worktree ;
+- une commande shell réelle `cat ../outside-canary.txt` termine en erreur ;
+- aucun fichier `leaked.txt` n'est créé ;
+- le canary externe reste inchangé.
+
+### Portefeuille AUTO
+
+Codex est donc admissible comme second provider autonome subscription-only :
+
+- `gpt-5.6-luna` : economy ;
+- `gpt-5.6-sol` : standard + `long_context` ;
+- `gpt-5.6-terra` : advanced + `long_context` + `multi_file_refactor`.
+
+Claude reste primaire à tier/effort/funding égal par le classement déterministe existant. Le failover AUTO est borné à deux providers et peut passer de Claude à Codex sur timeout, limite de process ou épuisement de tours. Aucun fallback API payant n'est ajouté.

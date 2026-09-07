@@ -50,6 +50,8 @@ const DEFAULT_RECOVERABLE_FAILURE_CODES = new Set([
   "provider_unavailable",
   "provider_rate_limited",
   "provider_timeout",
+  "provider_limit_exceeded",
+  "provider_max_turns",
   "runtime_unavailable",
 ]);
 

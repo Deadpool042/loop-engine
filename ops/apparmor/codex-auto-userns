@@ -1,0 +1,10 @@
+abi <abi/4.0>,
+include <tunables/global>
+
+# Ubuntu 24.04 restricts unprivileged user namespaces globally.
+# Codex builds its own bwrap sandbox, so only the native Codex runtime is
+# allowed to create the user namespace. Filesystem/network confinement remains
+# enforced by the Codex permission profile inside that namespace.
+profile codex-auto-userns /home/ubuntu/.local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/bin/codex flags=(unconfined) {
+  userns,
+}

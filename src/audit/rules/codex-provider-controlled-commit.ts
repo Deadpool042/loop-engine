@@ -14,8 +14,15 @@ const ARCHITECTURE_FILE =
 const REQUIRED_PROVIDER_TOKENS = Object.freeze([
   'basename(options.executable.trim()) !== "codex"',
   "return async (plan, executionCwd)",
-  '"--sandbox"',
-  '"workspace-write"',
+  '"--ignore-user-config"',
+  '"--ignore-rules"',
+  '"--ephemeral"',
+  '"--strict-config"',
+  '":root"="deny"',
+  '":workspace_roots"={"."="write"}',
+  "network={enabled=false}",
+  'default_permissions="',
+  'approval_policy="never"',
   '"--json"',
   'plan.provider !== "openai" || plan.runtime !== "codex"',
   "shell: false",
@@ -102,7 +109,7 @@ export const CODEX_PROVIDER_CONTROLLED_COMMIT_RULE: AuditRule = (() => {
     severity: "error",
     title: "Codex provider and controlled commit remain bounded and explicit",
     description:
-      "The Codex pilot must consume one prebuilt execution plan directly, select only an explicit Codex CLI executable, start from a clean worktree, bound and redact provider execution, validate before commit, commit only exact safe files, never push, and keep candidate publication outside controlled commit.",
+      "The Codex provider must consume one prebuilt execution plan directly, select only an explicit Codex CLI executable, run under the qualified worktree-only permission profile, start from a clean worktree, bound and redact provider execution, validate before commit, commit only exact safe files, never push, and keep candidate publication outside controlled commit.",
     metadata: {
       introducedIn: "V14.6",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -130,7 +137,7 @@ export const CODEX_PROVIDER_CONTROLLED_COMMIT_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Keep the Codex provider bound to one prebuilt execution plan and one validation-gated exact-file Git commit; retain clean-worktree, shell-false, limits, redaction, no-push and separate-publication guarantees.",
+            "Keep the Codex provider bound to one prebuilt execution plan, the qualified worktree-only permission profile, and one validation-gated exact-file Git commit; retain clean-worktree, shell-false, limits, redaction, no-push and separate-publication guarantees.",
           )
         : pass(
             rule,

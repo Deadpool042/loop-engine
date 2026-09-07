@@ -1,22 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { createAgentRegistry } from "../../src/agents/registry.js";
 import { selectAgentProfile } from "../../src/agents/selector.js";
 import { buildAutoSubscriptionProviderConfigurations } from "../../src/composition/auto-subscription-execution.js";
 import { assembleLoopProviders, defaultLoopProviderRegistry } from "../../src/composition/provider-registry.js";
 
-test("AUTO subscription portfolio is Claude-only and subscription-funded", () => {
+test("AUTO subscription portfolio contains qualified Claude and Codex profiles only", () => {
   const configurations = buildAutoSubscriptionProviderConfigurations();
-  assert.equal(configurations.length, 1);
-  const [configuration] = configurations;
-  assert.ok(configuration);
-  assert.equal(configuration.id, "claude_code");
-  assert.equal(configuration.executable, "claude");
-  assert.equal(configuration.timeoutMs, 420_000);
-  assert.equal(configuration.maxTurns, 32);
-  assert.equal(configuration.profiles?.length, 3);
+  assert.equal(configurations.length, 2);
+  const [claude, codex] = configurations;
+  assert.ok(claude);
+  assert.ok(codex);
+
+  assert.equal(claude.id, "claude_code");
+  assert.equal(claude.executable, "claude");
+  assert.equal(claude.timeoutMs, 420_000);
+  assert.equal("maxTurns" in claude ? claude.maxTurns : null, 32);
   assert.deepEqual(
-    configuration.profiles?.map((profile) => ({
+    claude.profiles?.map((profile) => ({
       model: profile.model,
       tier: profile.economicTier,
       funding: profile.fundingMode,
@@ -43,6 +45,38 @@ test("AUTO subscription portfolio is Claude-only and subscription-funded", () =>
       },
     ],
   );
+
+  assert.equal(codex.id, "codex");
+  assert.equal(codex.executable, "codex");
+  assert.equal(codex.timeoutMs, 420_000);
+  assert.deepEqual(
+    codex.profiles?.map((profile) => ({
+      model: profile.model,
+      tier: profile.economicTier,
+      funding: profile.fundingMode,
+      quota: profile.quota,
+    })),
+    [
+      {
+        model: "gpt-5.6-luna",
+        tier: "economy",
+        funding: "included_subscription",
+        quota: { state: "unknown", source: "unavailable" },
+      },
+      {
+        model: "gpt-5.6-sol",
+        tier: "standard",
+        funding: "included_subscription",
+        quota: { state: "unknown", source: "unavailable" },
+      },
+      {
+        model: "gpt-5.6-terra",
+        tier: "advanced",
+        funding: "included_subscription",
+        quota: { state: "unknown", source: "unavailable" },
+      },
+    ],
+  );
 });
 
 test("AUTO selects the smallest capable subscription profile", () => {
@@ -50,7 +84,9 @@ test("AUTO selects the smallest capable subscription profile", () => {
     defaultLoopProviderRegistry,
     buildAutoSubscriptionProviderConfigurations(),
   );
-  const registry = assemblies[0]!.agentRegistry;
+  const registry = createAgentRegistry(
+    assemblies.flatMap((assembly) => [...assembly.agentRegistry.profiles]),
+  );
 
   const simple = selectAgentProfile(registry, {
     requiredCapabilities: ["code_edit", "shell_exec"],
@@ -59,6 +95,14 @@ test("AUTO selects the smallest capable subscription profile", () => {
   });
   assert.equal(simple.outcome, "selected");
   assert.equal(simple.outcome === "selected" ? simple.profile.model : null, "claude-haiku-4-5");
+  assert.equal(
+    simple.outcome === "selected"
+      ? simple.notSelected?.some(
+          (candidate) => candidate.profileId === "configured.codex.economy",
+        )
+      : false,
+    true,
+  );
 
   const architecture = selectAgentProfile(registry, {
     requiredCapabilities: ["code_edit", "long_context"],
@@ -67,6 +111,14 @@ test("AUTO selects the smallest capable subscription profile", () => {
   });
   assert.equal(architecture.outcome, "selected");
   assert.equal(architecture.outcome === "selected" ? architecture.profile.model : null, "claude-sonnet-5");
+  assert.equal(
+    architecture.outcome === "selected"
+      ? architecture.notSelected?.some(
+          (candidate) => candidate.profileId === "configured.codex.standard",
+        )
+      : false,
+    true,
+  );
 
   const refactor = selectAgentProfile(registry, {
     requiredCapabilities: ["code_edit", "long_context", "multi_file_refactor"],
@@ -75,4 +127,12 @@ test("AUTO selects the smallest capable subscription profile", () => {
   });
   assert.equal(refactor.outcome, "selected");
   assert.equal(refactor.outcome === "selected" ? refactor.profile.model : null, "claude-opus-5");
+  assert.equal(
+    refactor.outcome === "selected"
+      ? refactor.notSelected?.some(
+          (candidate) => candidate.profileId === "configured.codex.advanced",
+        )
+      : false,
+    true,
+  );
 });
