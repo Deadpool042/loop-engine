@@ -255,6 +255,10 @@ function buildDecisionContext(
       governedAllowedPaths: parsedScope.allowedPaths,
       noProviderChoice: true,
       noCommitPushMergeDeploy: true,
+      providerPhaseEndsBeforeValidation: true,
+      validationOwner: "loop_engine",
+      providerMustNotExecuteValidation: true,
+      planningSourceUpdateMustNotDependOnValidation: true,
     },
   };
   const contextJson = JSON.stringify(context);
@@ -315,6 +319,14 @@ const CODE_CHANGE_DENIAL_PATTERNS = Object.freeze([
   /\bpas d['’]impl[eé]mentation\b/i,
 ]);
 
+const PROVIDER_PHASE_VALIDATION_PATTERNS = Object.freeze([
+  /\b(?:pnpm|npm|yarn|bun)\s+(?:run\s+)?(?:ci|test|validate|lint|typecheck)\b/i,
+  /\b(?:run|execute|rerun|re-run)\b.{0,80}\b(?:tests?|validation|ci|lint|typecheck)\b/i,
+  /\b(?:ci|tests?|validation|lint|typecheck)\b.{0,80}\b(?:must|should|needs? to)\s+pass\b/i,
+  /\b(?:after|once|when)\b.{0,80}\b(?:ci|tests?|validation)\b.{0,40}\bpass(?:es|ed)?\b/i,
+  /\bwait(?:ing)? for\b.{0,80}\b(?:ci|validation|tests?)\b/i,
+]);
+
 function hasCodeWritablePath(paths: readonly string[]): boolean {
   return paths.some(
     (path) =>
@@ -327,15 +339,25 @@ function hasCodeWritablePath(paths: readonly string[]): boolean {
 function proposalContradictsConcreteCandidate(
   candidateText: string,
   governedAllowedPaths: readonly string[],
-  proposal: Readonly<{ outOfScope: unknown }>,
+  proposal: Readonly<{ outOfScope: unknown; deliverables: unknown }>,
 ): boolean {
   if (
     !Array.isArray(proposal.outOfScope) ||
-    !proposal.outOfScope.every((item) => typeof item === "string")
+    !proposal.outOfScope.every((item) => typeof item === "string") ||
+    !Array.isArray(proposal.deliverables) ||
+    !proposal.deliverables.every((item) => typeof item === "string")
   ) {
     return false;
   }
   const outOfScope = proposal.outOfScope.map((item) => item.trim());
+  const deliverables = proposal.deliverables.map((item) => item.trim());
+  if (
+    deliverables.some((item) =>
+      PROVIDER_PHASE_VALIDATION_PATTERNS.some((pattern) => pattern.test(item)),
+    )
+  ) {
+    return true;
+  }
   if (
     outOfScope.some((item) =>
       ABSOLUTE_NO_CHANGE_PATTERNS.some((pattern) => pattern.test(item)),
@@ -382,7 +404,7 @@ function buildClaudeArgs(
     profile.effort,
     "--system-prompt",
     profile.corrective
-      ? `${EXECUTION_DECISION_PROPOSAL_SYSTEM_PROMPT} A lower-tier proposal was rejected because it contradicted the canonical requested change. Preserve the concrete implementation outcome and never place required implementation, writing code, or modifying files in outOfScope.`
+      ? `${EXECUTION_DECISION_PROPOSAL_SYSTEM_PROMPT} A lower-tier proposal was rejected because it contradicted the canonical requested change or assigned post-provider validation work to the provider. Preserve the concrete implementation outcome; never place required implementation, writing code, or modifying files in outOfScope; and never require the provider to run validation, make CI pass, wait for validation, or condition the planning-source update on validation.`
       : EXECUTION_DECISION_PROPOSAL_SYSTEM_PROMPT,
     contextJson,
   ]);
