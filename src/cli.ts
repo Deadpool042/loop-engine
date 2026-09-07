@@ -201,7 +201,7 @@ else if (command === "status")
 else if (command === "summary")
   printWorkspaceSummary(application, application.loadConfig());
 else if (command === "completion-events" && process.argv.includes("--json"))
-  printCompletionEventsJson(application, application.loadConfig());
+  await printCompletionEventsJson(application, application.loadConfig());
 else if (command === "completion-events") {
   terminal.error("completion-events requires --json");
   process.exit(1);
