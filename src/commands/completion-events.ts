@@ -25,9 +25,82 @@ function failureEventId(project: string, idempotencyKey: string): string {
     .slice(0, 32);
 }
 
-function currentFailureEvent(
-  application: LoopApplicationAssembly,
+function gateFingerprint(gate: Readonly<{
+  phaseId: string;
+  state: "open" | "closed";
+  blockedBy?: string;
+}>): string {
+  return createHash("sha256")
+    .update("gate.blocked.fingerprint")
+    .update("\0")
+    .update(gate.phaseId)
+    .update("\0")
+    .update(gate.state)
+    .update("\0")
+    .update(gate.blockedBy ?? "")
+    .digest("hex")
+    .slice(0, 32);
+}
+
+function gateBlockedEventId(
+  project: string,
+  candidateId: string,
+  fingerprint: string,
+): string {
+  return createHash("sha256")
+    .update("gate.blocked")
+    .update("\0")
+    .update(project)
+    .update("\0")
+    .update(candidateId)
+    .update("\0")
+    .update(fingerprint)
+    .digest("hex")
+    .slice(0, 32);
+}
+
+function currentGateBlockedEvent(
   project: LoopApplicationConfig["projects"][number],
+  projectReport: ReturnType<LoopApplicationAssembly["generateProjectReport"]>,
+) {
+  if (
+    projectReport.planning.recommendation !== "gated_no_work" ||
+    projectReport.planning.voluntaryNoWork
+  ) {
+    return null;
+  }
+
+  const candidate = projectReport.roadmap.candidates.find(
+    (item) => item.status === "todo" || item.status === "in_progress",
+  );
+  if (
+    candidate?.id === undefined ||
+    candidate.phaseId === undefined ||
+    candidate.admissibility?.state !== "not_admissible" ||
+    candidate.admissibility.reason !== "phase_closed"
+  ) {
+    return null;
+  }
+
+  const gate = projectReport.roadmap.phaseGates.find(
+    (item) => item.phaseId === candidate.phaseId && item.state === "closed",
+  );
+  if (!gate) return null;
+
+  const fingerprint = gateFingerprint(gate);
+  return Object.freeze({
+    schemaVersion: 1 as const,
+    type: "gate.blocked" as const,
+    eventId: gateBlockedEventId(project.name, candidate.id, fingerprint),
+    project: Object.freeze({ name: project.name }),
+    candidate: Object.freeze({ id: candidate.id }),
+    gate: Object.freeze({ fingerprint }),
+  });
+}
+
+function currentFailureEvent(
+  project: LoopApplicationConfig["projects"][number],
+  projectReport: ReturnType<LoopApplicationAssembly["generateProjectReport"]>,
   overview: ReturnType<LoopApplicationAssembly["generateRoadmapOverviewReport"]>,
   executionStatus: Awaited<
     ReturnType<LoopApplicationAssembly["generateExecutionStatusReport"]>
@@ -44,8 +117,7 @@ function currentFailureEvent(
   }
 
   const currentCandidate = overview.roadmap.selectedCandidate;
-  const currentGitHead =
-    application.generateProjectReport(project).git.lastCommit?.hash ?? null;
+  const currentGitHead = projectReport.git.lastCommit?.hash ?? null;
   if (
     currentCandidate?.id !== execution.candidateId ||
     currentGitHead === null ||
@@ -100,16 +172,27 @@ export async function generateCompletionEventsReport(
     let overview: ReturnType<
       LoopApplicationAssembly["generateRoadmapOverviewReport"]
     >;
+    let projectReport: ReturnType<
+      LoopApplicationAssembly["generateProjectReport"]
+    > | null = null;
     try {
       overview = application.generateRoadmapOverviewReport(project);
+      projectReport = application.generateProjectReport(project);
       const completionEvent = overview.roadmap.completionEvent;
       if (completionEvent) events.push(completionEvent);
+      const gateBlockedEvent = currentGateBlockedEvent(project, projectReport);
+      if (gateBlockedEvent) events.push(gateBlockedEvent);
     } catch {
       errors.push({ project: project.name, code: "overview_failed" });
       continue;
     }
 
-    if (overview.roadmap.selectedCandidate?.id === undefined) continue;
+    if (
+      projectReport === null ||
+      overview.roadmap.selectedCandidate?.id === undefined
+    ) {
+      continue;
+    }
 
     try {
       const executionStatus =
@@ -117,8 +200,8 @@ export async function generateCompletionEventsReport(
           expectedDurationMs: null,
         });
       const failureEvent = currentFailureEvent(
-        application,
         project,
+        projectReport,
         overview,
         executionStatus,
       );
