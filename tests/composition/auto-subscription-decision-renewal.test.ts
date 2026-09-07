@@ -15,6 +15,7 @@ import test from "node:test";
 
 import type { ProjectConfig } from "../../src/core/config.js";
 import {
+  AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL,
   AUTO_SUBSCRIPTION_DECISION_MODEL,
   ensureAutoSubscriptionExecutionDecision,
 } from "../../src/composition/auto-subscription-decision-renewal.js";
@@ -223,6 +224,76 @@ test("renews a missing decision through read-only Claude subscription proposal",
       assert.ok(parsed.decision.decision.brief);
     }
     assert.equal(git(root, ["status", "--short"]), "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("rejects a no-change economy brief and retries once with Sonnet", async () => {
+  const { root, project, head } = fixture();
+  try {
+    const observedCalls: string[][] = [];
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      project,
+      head,
+      "H1-L1",
+      {
+        runClaude: async (args) => {
+          observedCalls.push([...args]);
+          if (observedCalls.length === 1) {
+            return claudeSuccess({
+              objective: "Explore the current implementation.",
+              deliverables: ["Understand the existing flow."],
+              outOfScope: [
+                "Implementation",
+                "Writing code",
+                "Modifying files",
+              ],
+              allowedPaths: ["docs/continuation-proof.md"],
+            });
+          }
+          return claudeSuccess();
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(result.ok ? result.status : null, "renewed");
+    assert.equal(
+      result.ok ? result.model : null,
+      AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL,
+    );
+    assert.equal(observedCalls.length, 2);
+
+    const firstModelIndex = observedCalls[0]?.indexOf("--model") ?? -1;
+    const secondModelIndex = observedCalls[1]?.indexOf("--model") ?? -1;
+    const secondEffortIndex = observedCalls[1]?.indexOf("--effort") ?? -1;
+    assert.ok(firstModelIndex >= 0);
+    assert.ok(secondModelIndex >= 0);
+    assert.ok(secondEffortIndex >= 0);
+    assert.equal(
+      observedCalls[0]?.[firstModelIndex + 1],
+      AUTO_SUBSCRIPTION_DECISION_MODEL,
+    );
+    assert.equal(
+      observedCalls[1]?.[secondModelIndex + 1],
+      AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL,
+    );
+    assert.equal(observedCalls[1]?.[secondEffortIndex + 1], "medium");
+
+    const parsed = parseExecutionDecisionFile(
+      readFileSync(
+        join(root, ".loop-engine", "execution-decision.yaml"),
+        "utf8",
+      ),
+    );
+    assert.equal(parsed.ok, true);
+    if (parsed.ok) {
+      assert.deepEqual(parsed.decision.decision.brief?.outOfScope, [
+        "No deployment.",
+        "No provider configuration.",
+      ]);
+    }
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
