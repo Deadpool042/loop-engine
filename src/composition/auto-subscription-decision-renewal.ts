@@ -36,8 +36,14 @@ import {
 } from "./auto-subscription-admission.js";
 import { buildSubscriptionCliEnvironment } from "../loop/subscription-cli-environment.js";
 import { isPathAllowed, parseAllowedPaths } from "../loop/file-scope.js";
+import {
+  ANTHROPIC_HAIKU_4_5_MODEL,
+  ANTHROPIC_SONNET_5_MODEL,
+} from "../text-only-provider/pricing.js";
 
-export const AUTO_SUBSCRIPTION_DECISION_MODEL = "claude-haiku-4-5";
+export const AUTO_SUBSCRIPTION_DECISION_MODEL = ANTHROPIC_HAIKU_4_5_MODEL;
+export const AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL =
+  ANTHROPIC_SONNET_5_MODEL;
 export const AUTO_SUBSCRIPTION_DECISION_TIMEOUT_MS = 60_000;
 const MAX_OUTPUT_BYTES = 512 * 1024;
 const MAX_CONTEXT_BYTES = 160 * 1024;
@@ -171,6 +177,7 @@ type AutoDecisionContext =
       ok: true;
       current: ProductionCurrent;
       contextJson: string;
+      candidateText: string;
       governedAllowedPaths: readonly string[];
     }>
   | Readonly<{
@@ -267,11 +274,90 @@ function buildDecisionContext(
       projectConfig: project,
     }),
     contextJson,
+    candidateText: candidate.text,
     governedAllowedPaths: parsedScope.allowedPaths,
   });
 }
 
-function buildClaudeArgs(contextJson: string): readonly string[] {
+type DecisionProposalProfile = Readonly<{
+  model: string;
+  effort: "low" | "medium";
+  corrective: boolean;
+}>;
+
+const DECISION_PROPOSAL_PROFILES: readonly DecisionProposalProfile[] =
+  Object.freeze([
+    Object.freeze({
+      model: AUTO_SUBSCRIPTION_DECISION_MODEL,
+      effort: "low" as const,
+      corrective: false,
+    }),
+    Object.freeze({
+      model: AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL,
+      effort: "medium" as const,
+      corrective: true,
+    }),
+  ]);
+
+const CONCRETE_CHANGE_PATTERN =
+  /\b(add|ajout(?:er)?|implement|impl[eé]ment(?:er)?|fix|corrig(?:er)?|create|cr[eé]er|modify|modifier|update|mettre [aà] jour|expose|exposer|support|supporter|deliver|livrer)\b/i;
+const ABSOLUTE_NO_CHANGE_PATTERNS = Object.freeze([
+  /^modifying files$/i,
+  /\bno (?:file modifications?|file changes?)\b/i,
+  /\bwithout (?:file modifications?|file changes?)\b/i,
+  /\baucune modification(?: de fichiers?)?\b/i,
+]);
+const CODE_CHANGE_DENIAL_PATTERNS = Object.freeze([
+  /^implementation$/i,
+  /^writing code$/i,
+  /\bno (?:implementation|code changes?)\b/i,
+  /\bwithout (?:implementation|code changes?)\b/i,
+  /\bpas d['’]impl[eé]mentation\b/i,
+]);
+
+function hasCodeWritablePath(paths: readonly string[]): boolean {
+  return paths.some(
+    (path) =>
+      path.startsWith("src/") ||
+      path.startsWith("tests/") ||
+      /\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|swift|rb|php|cs)$/i.test(path),
+  );
+}
+
+function proposalContradictsConcreteCandidate(
+  candidateText: string,
+  governedAllowedPaths: readonly string[],
+  proposal: Readonly<{ outOfScope: unknown }>,
+): boolean {
+  if (
+    !Array.isArray(proposal.outOfScope) ||
+    !proposal.outOfScope.every((item) => typeof item === "string")
+  ) {
+    return false;
+  }
+  const outOfScope = proposal.outOfScope.map((item) => item.trim());
+  if (
+    outOfScope.some((item) =>
+      ABSOLUTE_NO_CHANGE_PATTERNS.some((pattern) => pattern.test(item)),
+    )
+  ) {
+    return true;
+  }
+  if (
+    !CONCRETE_CHANGE_PATTERN.test(candidateText) ||
+    !hasCodeWritablePath(governedAllowedPaths)
+  ) {
+    return false;
+  }
+  return outOfScope.some((item) =>
+    CODE_CHANGE_DENIAL_PATTERNS.some((pattern) => pattern.test(item)),
+  );
+}
+
+function buildClaudeArgs(
+  contextJson: string,
+  profile: DecisionProposalProfile,
+): readonly string[] {
   return Object.freeze([
     "--restricted",
     "--print",
@@ -291,11 +377,13 @@ function buildClaudeArgs(contextJson: string): readonly string[] {
     "--max-turns",
     "3",
     "--model",
-    AUTO_SUBSCRIPTION_DECISION_MODEL,
+    profile.model,
     "--effort",
-    "low",
+    profile.effort,
     "--system-prompt",
-    EXECUTION_DECISION_PROPOSAL_SYSTEM_PROMPT,
+    profile.corrective
+      ? `${EXECUTION_DECISION_PROPOSAL_SYSTEM_PROMPT} A lower-tier proposal was rejected because it contradicted the canonical requested change. Preserve the concrete implementation outcome and never place required implementation, writing code, or modifying files in outOfScope.`
+      : EXECUTION_DECISION_PROPOSAL_SYSTEM_PROMPT,
     contextJson,
   ]);
 }
@@ -303,50 +391,98 @@ function buildClaudeArgs(contextJson: string): readonly string[] {
 async function prepareDecisionDraft(
   current: ProductionCurrent,
   contextJson: string,
+  candidateText: string,
   governedAllowedPaths: readonly string[],
   runClaude: NonNullable<AutoSubscriptionDecisionRenewalDependencies["runClaude"]>,
 ): Promise<
-  | Readonly<{ ok: true; draft: ExecutionDecisionDraft }>
+  | Readonly<{ ok: true; draft: ExecutionDecisionDraft; model: string }>
   | AutoSubscriptionDecisionFailure
 > {
-  const result = await runClaude(buildClaudeArgs(contextJson), current.projectPath);
-  if (result.timedOut) {
-    return failure("auto_subscription_decision_timeout", "Execution decision preparation timed out.");
-  }
-  if (result.outputLimited) {
-    return failure("auto_subscription_decision_output_limit", "Execution decision preparation exceeded its output limit.");
-  }
-  if (result.exitCode !== 0) {
-    return failure("auto_subscription_decision_provider_failed", "Claude Code could not prepare the execution decision.");
-  }
+  let lastFailure: AutoSubscriptionDecisionFailure | null = null;
 
-  const structured = parseClaudeStructuredOutput(result.stdout);
-  const proposal = parseExecutionDecisionProviderProposal(structured);
-  if (proposal === null) {
-    return failure("auto_subscription_decision_invalid_output", "Claude Code returned an invalid execution decision draft.");
-  }
-
-  const draft = createExecutionDecisionDraft(
-    {
-      project: current.project,
-      candidateId: current.candidateId,
-      sourceDocument: current.sourceDocument,
-      gitHead: current.gitHead,
-      executionDecisionPath: current.executionDecisionPath,
-    },
-    Object.freeze({
-      ...proposal,
-      allowedPaths: governedAllowedPaths,
-    }),
-  );
-  if (!draft.ok) {
-    return failure(
-      "auto_subscription_decision_invalid_scope",
-      `Execution decision draft rejected: ${draft.reason}`,
+  for (const profile of DECISION_PROPOSAL_PROFILES) {
+    const result = await runClaude(
+      buildClaudeArgs(contextJson, profile),
+      current.projectPath,
     );
+    if (result.timedOut) {
+      return failure(
+        "auto_subscription_decision_timeout",
+        "Execution decision preparation timed out.",
+      );
+    }
+    if (result.outputLimited) {
+      return failure(
+        "auto_subscription_decision_output_limit",
+        "Execution decision preparation exceeded its output limit.",
+      );
+    }
+    if (result.exitCode !== 0) {
+      return failure(
+        "auto_subscription_decision_provider_failed",
+        "Claude Code could not prepare the execution decision.",
+      );
+    }
+
+    const structured = parseClaudeStructuredOutput(result.stdout);
+    const proposal = parseExecutionDecisionProviderProposal(structured);
+    if (proposal === null) {
+      lastFailure = failure(
+        "auto_subscription_decision_invalid_output",
+        `Claude Code ${profile.model} returned an invalid execution decision draft.`,
+      );
+      continue;
+    }
+
+    if (
+      proposalContradictsConcreteCandidate(
+        candidateText,
+        governedAllowedPaths,
+        proposal,
+      )
+    ) {
+      lastFailure = failure(
+        "auto_subscription_decision_invalid_output",
+        `Claude Code ${profile.model} produced a brief that contradicts the canonical requested change.`,
+      );
+      continue;
+    }
+
+    const draft = createExecutionDecisionDraft(
+      {
+        project: current.project,
+        candidateId: current.candidateId,
+        sourceDocument: current.sourceDocument,
+        gitHead: current.gitHead,
+        executionDecisionPath: current.executionDecisionPath,
+      },
+      Object.freeze({
+        ...proposal,
+        allowedPaths: governedAllowedPaths,
+      }),
+    );
+    if (!draft.ok) {
+      lastFailure = failure(
+        "auto_subscription_decision_invalid_scope",
+        `Execution decision draft rejected: ${draft.reason}`,
+      );
+      continue;
+    }
+
+    return Object.freeze({
+      ok: true as const,
+      draft: draft.draft,
+      model: profile.model,
+    });
   }
 
-  return Object.freeze({ ok: true as const, draft: draft.draft });
+  return (
+    lastFailure ??
+    failure(
+      "auto_subscription_decision_invalid_output",
+      "Claude Code could not produce a coherent execution decision draft.",
+    )
+  );
 }
 
 function ensureLocalDecisionDirectory(
@@ -393,6 +529,7 @@ function ensureLocalDecisionDirectory(
 async function publishDecision(
   current: ProductionCurrent,
   draft: ExecutionDecisionDraft,
+  model: string,
 ): Promise<AutoSubscriptionDecisionRenewalResult> {
   const publish = createProductionTransactionPort();
   const publication = await publish(
@@ -434,7 +571,7 @@ async function publishDecision(
   return Object.freeze({
     ok: true as const,
     status: "renewed" as const,
-    model: AUTO_SUBSCRIPTION_DECISION_MODEL,
+    model,
   });
 }
 
@@ -469,9 +606,11 @@ function isRenewalAllowed(
  * the canonical candidate and exact Git SHA. BLOCKED/NO_ACTIONABLE_WORK and
  * malformed project identity remain fail-closed.
  *
- * The proposal call uses Claude Code subscription auth, Haiku, restricted
- * mode, no built-in tools, no MCP tools, a JSON schema, and no API key.
- * Claude only proposes a draft; Loop Engine validates and authorizes it.
+ * The proposal call uses Claude Code subscription auth, Haiku first,
+ * restricted mode, no built-in tools, no MCP tools, a JSON schema, and no API
+ * key. If the economy draft is malformed or contradicts a concrete canonical
+ * change, one bounded Sonnet 5 / medium retry is allowed. Claude only proposes
+ * a draft; Loop Engine validates and authorizes it.
  */
 export async function ensureAutoSubscriptionExecutionDecision(
   project: ProjectConfig,
@@ -518,12 +657,17 @@ export async function ensureAutoSubscriptionExecutionDecision(
   const prepared = await prepareDecisionDraft(
     context.current,
     context.contextJson,
+    context.candidateText,
     context.governedAllowedPaths,
     dependencies.runClaude ?? runClaudeProcess,
   );
   if (!prepared.ok) return prepared;
 
-  const published = await publishDecision(context.current, prepared.draft);
+  const published = await publishDecision(
+    context.current,
+    prepared.draft,
+    prepared.model,
+  );
   if (!published.ok) return published;
 
   const finalAdmission = evaluateAutoSubscriptionAdmission(
