@@ -12,6 +12,8 @@ test("AUTO subscription portfolio is Claude-only and subscription-funded", () =>
   assert.ok(configuration);
   assert.equal(configuration.id, "claude_code");
   assert.equal(configuration.executable, "claude");
+  assert.equal(configuration.timeoutMs, 420_000);
+  assert.equal(configuration.maxTurns, 32);
   assert.equal(configuration.profiles?.length, 3);
   assert.deepEqual(
     configuration.profiles?.map((profile) => ({

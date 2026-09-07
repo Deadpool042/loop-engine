@@ -299,6 +299,73 @@ test("rejects a no-change economy brief and retries once with Sonnet", async () 
   }
 });
 
+test("rejects provider-phase validation deliverables and retries once with Sonnet", async () => {
+  const { root, project, head } = fixture();
+  try {
+    const observedCalls: string[][] = [];
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      project,
+      head,
+      "H1-L1",
+      {
+        runClaude: async (args) => {
+          observedCalls.push([...args]);
+          if (observedCalls.length === 1) {
+            return claudeSuccess({
+              objective: "Implement the bounded continuation result.",
+              deliverables: [
+                "Add docs/continuation-proof.md.",
+                "Verification: pnpm run ci must pass.",
+                "Mark H1-L1 complete after CI passes.",
+              ],
+              outOfScope: ["No deployment."],
+              allowedPaths: [
+                "docs/continuation-proof.md",
+                "docs/roadmap/README.md",
+              ],
+            });
+          }
+          return claudeSuccess();
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(result.ok ? result.status : null, "renewed");
+    assert.equal(
+      result.ok ? result.model : null,
+      AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL,
+    );
+    assert.equal(observedCalls.length, 2);
+
+    const secondSystemPromptIndex =
+      observedCalls[1]?.indexOf("--system-prompt") ?? -1;
+    assert.ok(secondSystemPromptIndex >= 0);
+    assert.match(
+      observedCalls[1]?.[secondSystemPromptIndex + 1] ?? "",
+      /never require the provider to run validation, make CI pass, wait for validation/i,
+    );
+
+    const parsed = parseExecutionDecisionFile(
+      readFileSync(
+        join(root, ".loop-engine", "execution-decision.yaml"),
+        "utf8",
+      ),
+    );
+    assert.equal(parsed.ok, true);
+    if (parsed.ok) {
+      const deliverables =
+        parsed.decision.decision.brief?.deliverables ?? [];
+      assert.equal(
+        deliverables.some((item) => /pnpm run ci|after CI passes/i.test(item)),
+        false,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("renews a stale SHA-bound decision for the exact current candidate", async () => {
   const { root, project, head } = fixture();
   try {
