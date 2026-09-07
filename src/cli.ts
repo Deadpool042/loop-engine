@@ -95,6 +95,7 @@ import { buildAutoSubscriptionProviderConfigurations } from "./composition/auto-
 import { ensureAutoSubscriptionExecutionDecision } from "./composition/auto-subscription-decision-renewal.js";
 import { printJsonError } from "./commands/json-error.js";
 import { printCompletionEventsJson } from "./commands/completion-events.js";
+import { printExecutionStatusJson } from "./commands/execution-status.js";
 import { printExecutionDecisionProposalJson } from "./commands/execution-decision-propose.js";
 import { printExecutionDecisionCurrentJson } from "./commands/execution-decision-current.js";
 import {
@@ -203,6 +204,14 @@ else if (command === "completion-events" && process.argv.includes("--json"))
   printCompletionEventsJson(application, application.loadConfig());
 else if (command === "completion-events") {
   terminal.error("completion-events requires --json");
+  process.exit(1);
+}
+else if (command === "execution-status" && process.argv.includes("--json")) {
+  const project = resolveProjectOrExit("execution-status");
+  await printExecutionStatusJson(application, project.name);
+}
+else if (command === "execution-status") {
+  terminal.error("execution-status requires <project> --json");
   process.exit(1);
 }
 else if (command === "json-check") runJsonCheck();
@@ -1096,7 +1105,7 @@ else if (command === "review") {
   if (exitCode !== 0) process.exitCode = exitCode;
 } else {
   terminal.error(
-    "Usage: pnpm loop help|summary|status|doctor|roadmap status|overview|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|run <project>|runs <project> [--limit N | --run-id <runId>]|candidate review <project> --run-id <runId>",
+    "Usage: pnpm loop help|summary|status|doctor|roadmap status|overview|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|execution-status <project> --json|run <project>|runs <project> [--limit N | --run-id <runId>]|candidate review <project> --run-id <runId>",
   );
   process.exit(1);
 }

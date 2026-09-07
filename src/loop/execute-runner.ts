@@ -63,6 +63,19 @@ export type LoopRunExecuteOptions = LoopRunPlanOptions &
 
 export type LoopRunExecuteProgressEvent = Readonly<{
   status: LoopRunStatus;
+  at: string;
+  runId: string;
+  step: string;
+  executor: Readonly<{
+    profileId: string;
+    provider: string;
+    runtime: string;
+    model: string;
+    effort: string;
+    fundingMode: string | null;
+    attempt: number;
+    maxAttempts: number;
+  }> | null;
 }>;
 
 type ExecuteDependencies = Readonly<{
@@ -196,7 +209,31 @@ export async function runLoopExecute(
       }),
     );
     try {
-      options.onProgress?.(Object.freeze({ status: to }));
+      const selected =
+        agentPolicy?.selection?.outcome === "selected"
+          ? agentPolicy.selection.profile
+          : null;
+      options.onProgress?.(
+        Object.freeze({
+          status: to,
+          at: timestamp,
+          runId,
+          step: stepName,
+          executor:
+            selected === null
+              ? null
+              : Object.freeze({
+                  profileId: selected.id,
+                  provider: selected.provider,
+                  runtime: selected.runtime,
+                  model: selected.model,
+                  effort: selected.effort,
+                  fundingMode: selected.fundingMode ?? null,
+                  attempt: modelEscalationAttempts.length + 1,
+                  maxAttempts: modelAttemptBudget,
+                }),
+        }),
+      );
     } catch {
       // Observation is auxiliary and must never alter the governed run.
     }

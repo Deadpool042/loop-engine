@@ -5,6 +5,7 @@ const COMMANDS = [
   ["audit", "--manifest"],
   ["summary", "--json"],
   ["completion-events", "--json"],
+  ["execution-status", "loop-engine", "--json"],
   ["context", "loop-engine", "--json"],
   ["next", "loop-engine", "--json"],
   ["prompt", "loop-engine", "--json"],
@@ -463,6 +464,14 @@ function validatePayload(command: readonly string[], json: unknown): void {
     assertField(json, "errors");
     assertArray(json.events);
     assertArray(json.errors);
+  } else if (commandName === "execution-status") {
+    assertField(json, "project");
+    assertField(json, "execution");
+    assertField(json, "telemetry");
+    const telemetry = json.telemetry;
+    assertRecord(telemetry);
+    assertField(telemetry, "tokens");
+    assertField(telemetry, "costUsd");
   } else if (commandName === "context") {
     assertField(json, "project");
     assertField(json, "docs");

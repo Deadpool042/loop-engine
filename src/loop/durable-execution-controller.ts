@@ -3,6 +3,7 @@ import {
   DURABLE_EXECUTION_SCHEMA_VERSION,
   type DurableExecutionCancellationResult,
   type DurableExecutionEvent,
+  type DurableExecutionProgress,
   type DurableExecutionRecord,
   type DurableExecutionRequest,
   type DurableExecutionResult,
@@ -127,7 +128,9 @@ function finish(
 export async function runDurableLoopExecution(
   store: DurableExecutionStore,
   request: DurableExecutionRequest,
-  execute: () => Promise<LoopRunResult>,
+  execute: (
+    onProgress: (progress: DurableExecutionProgress) => void,
+  ) => Promise<LoopRunResult>,
   now: () => string = () => new Date().toISOString(),
 ): Promise<DurableExecutionResult> {
   if (!validRequest(request)) {
@@ -164,31 +167,97 @@ export async function runDurableLoopExecution(
     return Object.freeze({ status: "executed" as const, record: cancelled });
   }
 
+  const key = request.idempotencyKey.trim();
+  const owner = request.owner.trim();
+  let progressWrites: Promise<void> = Promise.resolve();
+
+  const observeProgress = (progress: DurableExecutionProgress): void => {
+    progressWrites = progressWrites
+      .then(async () => {
+        const current = await store.load(key);
+        if (
+          current === null ||
+          current.status !== "running" ||
+          current.leaseOwner !== owner
+        ) {
+          return;
+        }
+        const updated = Object.freeze({
+          ...current,
+          revision: current.revision + 1,
+          updatedAt: progress.at,
+          progress,
+        });
+        await store.save(updated, current.revision);
+      })
+      .catch(() => {
+        // Progress is auxiliary. A telemetry write must never fail the run.
+      });
+  };
+
   let result: LoopRunResult;
   try {
-    result = await execute();
+    result = await execute(observeProgress);
+    await progressWrites;
   } catch {
-    const failed = finish(leased, now(), "failed", null, internalFailure("durable_execution_failed", "The durable execution callback failed."));
-    if (!(await store.save(failed, leased.revision))) {
-      return reject("record_conflict", await store.load(request.idempotencyKey.trim()), "The durable execution record changed while persisting failure.");
+    await progressWrites;
+    const latest = await store.load(key);
+    const base =
+      latest !== null &&
+      latest.status === "running" &&
+      latest.leaseOwner === owner
+        ? latest
+        : leased;
+    const failed = finish(
+      base,
+      now(),
+      "failed",
+      null,
+      internalFailure(
+        "durable_execution_failed",
+        "The durable execution callback failed.",
+      ),
+    );
+    if (!(await store.save(failed, base.revision))) {
+      return reject(
+        "record_conflict",
+        await store.load(key),
+        "The durable execution record changed while persisting failure.",
+      );
     }
     return Object.freeze({ status: "executed" as const, record: failed });
   }
 
-  const latest = await store.load(request.idempotencyKey.trim());
-  const cancelledAfterRun = latest?.cancellationRequested === true;
+  const latest = await store.load(key);
+  const base =
+    latest !== null &&
+    latest.status === "running" &&
+    latest.leaseOwner === owner
+      ? latest
+      : leased;
+  const cancelledAfterRun = base.cancellationRequested === true;
   const completed = finish(
-    leased,
+    base,
     now(),
-    cancelledAfterRun ? "cancelled" : result.status === "completed" ? "completed" : "failed",
+    cancelledAfterRun
+      ? "cancelled"
+      : result.status === "completed"
+        ? "completed"
+        : "failed",
     cancelledAfterRun ? null : result,
     cancelledAfterRun
-      ? internalFailure("execution_cancelled", "Cancellation was observed before terminal persistence.")
+      ? internalFailure(
+          "execution_cancelled",
+          "Cancellation was observed before terminal persistence.",
+        )
       : result.failure,
   );
-  const expectedRevision = latest?.revision ?? leased.revision;
-  if (!(await store.save(completed, expectedRevision))) {
-    return reject("record_conflict", await store.load(request.idempotencyKey.trim()), "The durable execution record changed while persisting its terminal result.");
+  if (!(await store.save(completed, base.revision))) {
+    return reject(
+      "record_conflict",
+      await store.load(key),
+      "The durable execution record changed while persisting its terminal result.",
+    );
   }
   return Object.freeze({ status: "executed" as const, record: completed });
 }

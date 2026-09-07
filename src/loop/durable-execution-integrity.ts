@@ -23,6 +23,32 @@ export function canonicalizeDurableExecutionRecord(
     cancellationRequested: record.cancellationRequested,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+    ...(record.progress === undefined
+      ? {}
+      : {
+          progress:
+            record.progress === null
+              ? null
+              : {
+                  status: record.progress.status,
+                  at: record.progress.at,
+                  runId: record.progress.runId,
+                  step: record.progress.step,
+                  executor:
+                    record.progress.executor === null
+                      ? null
+                      : {
+                          profileId: record.progress.executor.profileId,
+                          provider: record.progress.executor.provider,
+                          runtime: record.progress.executor.runtime,
+                          model: record.progress.executor.model,
+                          effort: record.progress.executor.effort,
+                          fundingMode: record.progress.executor.fundingMode,
+                          attempt: record.progress.executor.attempt,
+                          maxAttempts: record.progress.executor.maxAttempts,
+                        },
+                },
+        }),
     result: record.result,
     failure: record.failure,
     events: record.events.map((item) => ({

@@ -24,6 +24,23 @@ export type DurableExecutionEvent = Readonly<{
   owner: string | null;
 }>;
 
+export type DurableExecutionProgress = Readonly<{
+  status: LoopRunResult["status"];
+  at: string;
+  runId: string;
+  step: string;
+  executor: Readonly<{
+    profileId: string;
+    provider: string;
+    runtime: string;
+    model: string;
+    effort: string;
+    fundingMode: string | null;
+    attempt: number;
+    maxAttempts: number;
+  }> | null;
+}>;
+
 export type DurableExecutionRecord = Readonly<{
   schemaVersion: typeof DURABLE_EXECUTION_SCHEMA_VERSION;
   revision: number;
@@ -36,6 +53,7 @@ export type DurableExecutionRecord = Readonly<{
   cancellationRequested: boolean;
   createdAt: string;
   updatedAt: string;
+  progress?: DurableExecutionProgress | null;
   result: LoopRunResult | null;
   failure: LoopRunFailure | null;
   events: readonly DurableExecutionEvent[];
