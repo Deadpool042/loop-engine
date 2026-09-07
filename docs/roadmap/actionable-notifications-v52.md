@@ -52,8 +52,9 @@ Règles :
 ## Périmètre d’écriture
 
 - `src/commands/completion-events.ts`
-- tests ciblés sous `tests/commands/completion-events.test.ts`
-- documentation de roadmap associée si nécessaire
+- `tests/commands/completion-events.test.ts`
+- `docs/roadmap/loop-engine.md`
+- `docs/roadmap/actionable-notifications-v52.md`
 
 ## Hors périmètre
 
