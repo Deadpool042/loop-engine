@@ -23,7 +23,8 @@ export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProv
     Object.freeze({
       id: "claude_code" as const,
       executable: "claude",
-      timeoutMs: 300_000,
+      timeoutMs: 420_000,
+      maxTurns: 32,
       profiles: Object.freeze([
         Object.freeze({
           id: "economy",
