@@ -62,6 +62,55 @@ test("falls back after a recoverable provider failure", async () => {
   );
 });
 
+test("falls back after a provider turn-budget exhaustion", async () => {
+  const outcome = await executeLoopProviderFailover({
+    maxAttempts: 2,
+    attempts: [
+      {
+        plan: plan("anthropic", "claude-sonnet"),
+        executor: failed("provider_max_turns"),
+      },
+      {
+        plan: plan("openai", "gpt-5.6-sol"),
+        executor: completed("src/fallback.ts"),
+      },
+    ],
+  });
+
+  assert.equal(outcome.result.status, "completed");
+  assert.equal(outcome.evidence.selectedProvider, "openai");
+  assert.deepEqual(
+    outcome.evidence.attempts.map((attempt) => [
+      attempt.provider,
+      attempt.status,
+      attempt.recoverable,
+    ]),
+    [
+      ["anthropic", "failed", true],
+      ["openai", "completed", false],
+    ],
+  );
+});
+
+test("falls back after a provider process limit", async () => {
+  const outcome = await executeLoopProviderFailover({
+    maxAttempts: 2,
+    attempts: [
+      {
+        plan: plan("anthropic", "claude-sonnet"),
+        executor: failed("provider_limit_exceeded"),
+      },
+      {
+        plan: plan("openai", "gpt-5.6-sol"),
+        executor: completed("src/fallback.ts"),
+      },
+    ],
+  });
+
+  assert.equal(outcome.result.status, "completed");
+  assert.equal(outcome.evidence.selectedProvider, "openai");
+});
+
 test("stops immediately on a terminal provider failure", async () => {
   let fallbackCalls = 0;
   const fallback: LoopExecutor = async () => {

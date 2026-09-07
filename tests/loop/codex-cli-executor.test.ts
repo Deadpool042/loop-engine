@@ -142,7 +142,7 @@ describe("createCodexCliLoopExecutor", () => {
     );
   });
 
-  it("uses the current non-interactive workspace-write Codex CLI arguments", async () => {
+  it("uses the qualified worktree-only Codex AUTO permission profile", async () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
     const captureArgs = join(cwd, "../codex-arguments.json");
     const captureCwd = join(cwd, "../codex-cwd.txt");
@@ -161,8 +161,13 @@ describe("createCodexCliLoopExecutor", () => {
       assert.deepEqual(args.slice(0, -1), [
         "exec",
         "--ignore-user-config",
-        "--sandbox",
-        "workspace-write",
+        "--ignore-rules",
+        "--ephemeral",
+        "--strict-config",
+        "-c",
+        'permissions.loop_engine_auto={description="Loop Engine AUTO worktree only",filesystem={":root"="deny",":minimal"="read",":tmpdir"="deny",":slash_tmp"="deny","~/.local/lib/node_modules/@openai/codex"="read",":workspace_roots"={"."="write"}},network={enabled=false}}',
+        "-c",
+        'default_permissions="loop_engine_auto"',
         "-c",
         'approval_policy="never"',
         "--model",
@@ -170,6 +175,7 @@ describe("createCodexCliLoopExecutor", () => {
         "--json",
       ]);
       assert.equal(args.includes("--full-auto"), false);
+      assert.equal(args.includes("--sandbox"), false);
       const prompt = args.at(-1) ?? "";
       assert.match(prompt, /Stay inside the current worktree\./);
       assert.match(prompt, /Prefer direct execution for this low-effort task\./);

@@ -15,6 +15,21 @@ export type CodexCliLoopExecutorOptions = Readonly<{
   maxOutputBytes?: number;
 }>;
 
+const CODEX_AUTO_PERMISSION_PROFILE_ID = "loop_engine_auto";
+const CODEX_INSTALL_READ_ROOT = "~/.local/lib/node_modules/@openai/codex";
+
+function buildCodexAutoPermissionProfileConfig(): string {
+  return [
+    `permissions.${CODEX_AUTO_PERMISSION_PROFILE_ID}={`,
+    'description="Loop Engine AUTO worktree only",',
+    'filesystem={":root"="deny",":minimal"="read",":tmpdir"="deny",',
+    '":slash_tmp"="deny",',
+    `"${CODEX_INSTALL_READ_ROOT}"="read",`,
+    '":workspace_roots"={"."="write"}},',
+    "network={enabled=false}}",
+  ].join("");
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -173,8 +188,13 @@ export function createCodexCliLoopExecutor(
     const args = [
       "exec",
       "--ignore-user-config",
-      "--sandbox",
-      "workspace-write",
+      "--ignore-rules",
+      "--ephemeral",
+      "--strict-config",
+      "-c",
+      buildCodexAutoPermissionProfileConfig(),
+      "-c",
+      `default_permissions="${CODEX_AUTO_PERMISSION_PROFILE_ID}"`,
       "-c",
       'approval_policy="never"',
       "--model",

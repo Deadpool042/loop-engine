@@ -145,6 +145,37 @@ test("executes the configured fallback through one application executor", async 
   assert.equal(dependency.agentRegistry.profiles.length, 2);
 });
 
+test("falls back from Claude to Codex without widening the admitted budget", async () => {
+  const primary = profile(
+    "configured.claude.standard",
+    "anthropic",
+    "claude_code",
+    2,
+  );
+  const fallback = profile("configured.codex.standard", "openai", "codex", 5);
+  let observedPlan: LoopExecutionPlan | null = null;
+  const fallbackExecutor: LoopExecutor = async (fallbackPlan) => {
+    observedPlan = fallbackPlan;
+    return completed("src/codex-fallback.ts")(fallbackPlan);
+  };
+
+  const dependency = createLoopProviderFailoverAssembly(
+    [
+      assembly("claude", primary, failed("provider_max_turns")),
+      assembly("codex", fallback, fallbackExecutor),
+    ],
+    2,
+  );
+
+  const result = await dependency.executor(plan(primary));
+  assert.equal(result.status, "completed");
+  assert.deepEqual(result.modifiedFiles, ["src/codex-fallback.ts"]);
+  assert.equal(observedPlan?.provider, "openai");
+  assert.equal(observedPlan?.runtime, "codex");
+  assert.equal(observedPlan?.profileId, "configured.codex.standard");
+  assert.equal(observedPlan?.budget.maxCalls, 2);
+});
+
 test("skips explicitly unavailable fallback profiles", async () => {
   const primary = profile("configured.codex", "openai", "codex", 2);
   const unavailable = Object.freeze({

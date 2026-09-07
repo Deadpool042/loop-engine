@@ -14,9 +14,10 @@ const INCLUDED_QUOTA_UNKNOWN = Object.freeze({
 /**
  * Fixed, subscription-only autonomous portfolio.
  *
- * Codex is intentionally excluded from AUTO until its read boundary is
- * qualified for autonomous use (V49). No API or additional-credit funding
- * mode is present here.
+ * Claude remains the deterministic primary at equal funding/tier/effort.
+ * Codex is a qualified secondary provider: its AUTO executor uses a strict
+ * worktree-only permission profile and subscription authentication only.
+ * No API or additional-credit funding mode is present here.
  */
 export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProviderConfiguration[] {
   return Object.freeze([
@@ -48,6 +49,44 @@ export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProv
         Object.freeze({
           id: "advanced",
           model: "claude-opus-5",
+          economicTier: "advanced" as const,
+          fundingMode: "included_subscription" as const,
+          quota: INCLUDED_QUOTA_UNKNOWN,
+          capabilities: Object.freeze([
+            ...BASE_CAPABILITIES,
+            "long_context" as const,
+            "multi_file_refactor" as const,
+          ]),
+        }),
+      ]),
+    }),
+    Object.freeze({
+      id: "codex" as const,
+      executable: "codex",
+      timeoutMs: 420_000,
+      profiles: Object.freeze([
+        Object.freeze({
+          id: "economy",
+          model: "gpt-5.6-luna",
+          economicTier: "economy" as const,
+          fundingMode: "included_subscription" as const,
+          quota: INCLUDED_QUOTA_UNKNOWN,
+          capabilities: BASE_CAPABILITIES,
+        }),
+        Object.freeze({
+          id: "standard",
+          model: "gpt-5.6-sol",
+          economicTier: "standard" as const,
+          fundingMode: "included_subscription" as const,
+          quota: INCLUDED_QUOTA_UNKNOWN,
+          capabilities: Object.freeze([
+            ...BASE_CAPABILITIES,
+            "long_context" as const,
+          ]),
+        }),
+        Object.freeze({
+          id: "advanced",
+          model: "gpt-5.6-terra",
           economicTier: "advanced" as const,
           fundingMode: "included_subscription" as const,
           quota: INCLUDED_QUOTA_UNKNOWN,
