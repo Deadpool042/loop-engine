@@ -1,24 +1,23 @@
 import assert from "node:assert/strict";
 import { appendFileSync, mkdirSync, rmSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { lookupRunHistoryEntry } from "../../src/core/run-history-lookup.js";
 import {
   generateRunHistoryReport,
   recordLoopRunHistory,
+  resolveRunHistoryFilePath,
+  RUN_HISTORY_DIRECTORY,
 } from "../../src/core/index.js";
 import type { LoopRunResult } from "../../src/loop/types.js";
-
-const RUN_HISTORY_DIRECTORY = ".loop-engine/runs";
 
 function fixtureProjectName(): string {
   return `run-history-lookup-${randomUUID()}`;
 }
 
 function journalPath(project: string): string {
-  return join(RUN_HISTORY_DIRECTORY, `${project}.jsonl`);
+  return resolveRunHistoryFilePath(project);
 }
 
 function fixtureResult(
