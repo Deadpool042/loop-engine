@@ -2,14 +2,15 @@
 
 ## Statut
 
-- Décision : planifiée.
+- Décision : implémentée et validée.
 - Priorité : P0.
 - Projet : Loop Engine.
 - Parent transversal : OpenClaw Control OC-10.
+- Preuve : PR #282, CI run `34150858465` verte.
 
 ## Objectif
 
-Implémenter directement l’événement déterministe `gate.blocked` dans la projection agrégée existante `completion-events --json`, à partir de l’état canonique existant.
+`gate.blocked` est désormais projeté dans la projection agrégée existante `completion-events --json` à partir du snapshot canonique complet. La réalisation finale évite de dépendre de la projection roadmap bornée afin qu’un long historique de lots terminés ne puisse pas masquer le premier candidat ouvert bloqué.
 
 Claude Code peut explorer le code en interne pour comprendre l’implémentation, mais l’exploration n’est pas un livrable : aucun fichier ou rapport d’exploration séparé ne doit être créé.
 
@@ -98,11 +99,20 @@ Après le retour du provider, Loop Engine :
 - aligne `tests/core/roadmap-proposal-report.test.ts:353` sur le profil `balanced` réellement attendu tant que V52 constitue du travail ouvert borné ; la CI actuelle échoue avec `actual: balanced` / `expected: economy` ;
 - exécute `pnpm run ci`.
 
+## Preuves de validation
+
+- `pnpm run typecheck` : vert ;
+- `pnpm run json-check` : vert ;
+- `pnpm run audit:strict` : vert, 560/560 ;
+- `pnpm run audit:profiles` : vert ;
+- PR #282, CI run `34150858465` : succès ;
+- suite standard nettoyée de 372 à 326 fichiers de test ; 4 burn-ins historiques restent disponibles via `pnpm run test:burnin`.
+
 ## Critères de clôture
 
-1. `completion-events --json` expose exactement un `gate.blocked` pour une gate canonique bloquante.
-2. Le même état produit le même `eventId`.
-3. Aucun événement n’est créé pour un état volontairement sans travail.
-4. Aucun secret ni log brut n’est exposé.
-5. Les événements existants ne régressent pas.
-6. CI verte.
+1. `completion-events --json` expose exactement un `gate.blocked` pour une gate canonique bloquante — **validé**.
+2. Le même état produit le même `eventId` — **validé**.
+3. Aucun événement n’est créé pour un état volontairement sans travail — **validé**.
+4. Aucun secret ni log brut n’est exposé — **validé**.
+5. Les événements existants ne régressent pas — **validé**.
+6. CI verte — **validé**.
