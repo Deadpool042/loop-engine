@@ -141,6 +141,36 @@ describe("runLoopExecute — policy repair budget parity", () => {
     );
   });
 
+  it("clamps the effective repair budget to zero when no repairer is configured", async () => {
+    const result = await runLoopExecute("repair-budget-fixture", {
+      ...deterministicOptions(),
+      maxRepairs: 1,
+      executor: async () => ({
+        status: "completed" as const,
+        modifiedFiles: [],
+        details: [],
+      }),
+      validator: async () => ({
+        status: "failed" as const,
+        failedCommand: "fixture-validation",
+        exitCode: 1,
+        details: ["fixture failure"],
+      }),
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "validation_failed");
+    assert.notEqual(result.failure?.code, "repairer_unavailable");
+    assert.equal(result.validation?.repairAttempts, 0);
+    assert.equal(
+      result.steps.some((step) =>
+        step.details.includes("Repair budget: requested=1, effective=0"),
+      ),
+      true,
+    );
+    assert.equal(result.steps.some((step) => step.name === "repairing"), false);
+  });
+
   it("preserves a stricter caller request of zero repairs", async () => {
     let repairCalls = 0;
 

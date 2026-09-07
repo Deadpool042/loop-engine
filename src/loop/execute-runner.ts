@@ -365,10 +365,12 @@ export async function runLoopExecute(
 
   const policyRepairCeiling =
     agentPolicy.selectionRequest.budgetCeiling?.maxRepairs;
-  const effectiveMaxRepairs =
+  const admittedMaxRepairs =
     typeof policyRepairCeiling === "number"
       ? Math.min(dependencies.maxRepairs, policyRepairCeiling)
       : dependencies.maxRepairs;
+  const effectiveMaxRepairs =
+    dependencies.repairer === null ? 0 : admittedMaxRepairs;
 
   brief =
     cycle.brief === undefined
