@@ -29,20 +29,28 @@ function git(root: string, args: readonly string[]): string {
   }).trim();
 }
 
-function fixture(options: { detail?: boolean; writeScope?: boolean } = {}): {
+function fixture(
+  options: {
+    detail?: boolean;
+    writeScope?: boolean;
+    candidateText?: string;
+    codeScope?: boolean;
+  } = {},
+): {
   root: string;
   project: ProjectConfig;
   head: string;
 } {
   const root = mkdtempSync(join(tmpdir(), "loop-auto-decision-"));
+  const candidateText = options.candidateText ?? "Finish bounded continuation.";
   mkdirSync(join(root, "docs", "roadmap"), { recursive: true });
   writeFileSync(join(root, ".gitignore"), ".loop-engine/\n", "utf8");
   writeFileSync(join(root, "OBJECTIVE.md"), "# Objective\n\nKeep the workflow governed.\n", "utf8");
   writeFileSync(
     join(root, "docs", "roadmap", "README.md"),
     options.detail === false
-      ? "# Roadmap\n\n- [ ] H1-L1 — Finish bounded continuation.\n"
-      : "# Roadmap\n\n- [ ] H1-L1 — Finish bounded continuation. [Détail](./h1-l1.md)\n",
+      ? `# Roadmap\n\n- [ ] H1-L1 — ${candidateText}\n`
+      : `# Roadmap\n\n- [ ] H1-L1 — ${candidateText} [Détail](./h1-l1.md)\n`,
     "utf8",
   );
   if (options.detail !== false) {
@@ -65,7 +73,7 @@ function fixture(options: { detail?: boolean; writeScope?: boolean } = {}): {
           : [
               "## Périmètre d’écriture",
               "",
-              "- `docs/continuation-proof.md`",
+              ...(options.codeScope ? ["- `src/example.ts`"] : ["- `docs/continuation-proof.md`"]),
               "- `docs/roadmap/README.md`",
               "",
             ]),
@@ -292,6 +300,82 @@ test("rejects a no-change economy brief and retries once with Sonnet", async () 
       assert.deepEqual(parsed.decision.decision.brief?.outOfScope, [
         "No deployment.",
         "No provider configuration.",
+      ]);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("rejects exploration-only code briefs and retries once with Sonnet", async () => {
+  const { root, project, head } = fixture({
+    candidateText: "Implement the bounded continuation.",
+    codeScope: true,
+  });
+  try {
+    const observedCalls: string[][] = [];
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      project,
+      head,
+      "H1-L1",
+      {
+        runClaude: async (args) => {
+          observedCalls.push([...args]);
+          if (observedCalls.length === 1) {
+            return claudeSuccess({
+              objective: "Explore the codebase.",
+              deliverables: [
+                "Exploration notes documenting the current implementation.",
+              ],
+              outOfScope: [
+                "Code modifications",
+                "File creation",
+                "Test execution",
+              ],
+              allowedPaths: [
+                "src/example.ts",
+                "docs/roadmap/README.md",
+              ],
+            });
+          }
+          return claudeSuccess({
+            objective: "Implement the bounded continuation.",
+            deliverables: [
+              "Implement the bounded continuation in src/example.ts.",
+              "Update docs/roadmap/README.md.",
+            ],
+            outOfScope: ["No deployment."],
+            allowedPaths: [
+              "src/example.ts",
+              "docs/roadmap/README.md",
+            ],
+          });
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(result.ok ? result.status : null, "renewed");
+    assert.equal(
+      result.ok ? result.model : null,
+      AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL,
+    );
+    assert.equal(observedCalls.length, 2);
+
+    const parsed = parseExecutionDecisionFile(
+      readFileSync(
+        join(root, ".loop-engine", "execution-decision.yaml"),
+        "utf8",
+      ),
+    );
+    assert.equal(parsed.ok, true);
+    if (parsed.ok) {
+      assert.deepEqual(parsed.decision.decision.brief?.deliverables, [
+        "Implement the bounded continuation in src/example.ts.",
+        "Update docs/roadmap/README.md.",
+      ]);
+      assert.deepEqual(parsed.decision.decision.brief?.outOfScope, [
+        "No deployment.",
       ]);
     }
   } finally {
