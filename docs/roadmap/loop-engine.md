@@ -258,6 +258,21 @@ Le durcissement #257 a confirmé qu'une exécution AUTO doit posséder un brief 
 - aucune modification de main, push, PR, merge ou déploiement n'est ajoutée ;
 - V51.1 est un burn-in documentaire et ne peut pas modifier `src/**` ou `projects.yaml`.
 
+## Cycle V52 — événement actionnable de gate bloquante
+
+Contexte vérifié le 2026-09-07 : `completion-events --json` couvre déjà `lot.completed` et `execution.failed`. Le burn-in OpenClaw a aussi qualifié la séparation provider/validation : Claude produit le delta borné, puis Loop Engine exécute la validation et la publication candidate. Le manque fonctionnel restant pour OC-10 est l’observabilité déterministe d’une gate canonique nécessitant une intervention utilisateur.
+
+- [ ] [P0] V52.0 — Ajouter `gate.blocked` à `completion-events --json` en le dérivant exclusivement de l’état canonique existant. L’événement doit être stable/idempotent pour un même projet + candidat + état de gate, ne rien émettre pour maintenance/roadmap épuisée/absence volontaire de travail, ne contenir aucun secret ou log brut et ne modifier ni la sélection roadmap ni les événements `lot.completed` / `execution.failed`. Détail : [Événement actionnable gate.blocked](actionable-notifications-v52.md).
+
+### Gates V52
+
+- aucune logique ntfy ou n8n dans Loop Engine ;
+- aucune nouvelle persistence ou scheduler ;
+- aucun changement des règles de sélection, admissibilité ou phase gates ;
+- aucune validation/CI exécutée par Claude : Loop Engine reste propriétaire de cette phase ;
+- aucun appel IA supplémentaire hors runtime sélectionné ;
+- `pnpm run ci` doit rester vert avant publication candidate.
+
 ## Gel architectural
 
 - Aucun nouveau lot V15+ n'est désormais bloqué par le decision gate précédent : `runLoopExecute`/`runLoopCommit` ont été intégrés et démontrés en conditions réelles sur un projet non-fixture, avec commit borné explicite (`docs/audits/real-controlled-commit-pilot.md`).
