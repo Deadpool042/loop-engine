@@ -314,8 +314,11 @@ const ABSOLUTE_NO_CHANGE_PATTERNS = Object.freeze([
 const CODE_CHANGE_DENIAL_PATTERNS = Object.freeze([
   /^implementation$/i,
   /^writing code$/i,
-  /\bno (?:implementation|code changes?)\b/i,
-  /\bwithout (?:implementation|code changes?)\b/i,
+  /^code (?:modifications?|changes?)$/i,
+  /^source (?:modifications?|changes?)$/i,
+  /^editing (?:code|source)$/i,
+  /\bno (?:implementation|code changes?|source changes?)\b/i,
+  /\bwithout (?:implementation|code changes?|source changes?)\b/i,
   /\bpas d['’]impl[eé]mentation\b/i,
 ]);
 
@@ -371,6 +374,11 @@ function proposalContradictsConcreteCandidate(
   ) {
     return false;
   }
+  if (
+    !deliverables.some((item) => CONCRETE_CHANGE_PATTERN.test(item))
+  ) {
+    return true;
+  }
   return outOfScope.some((item) =>
     CODE_CHANGE_DENIAL_PATTERNS.some((pattern) => pattern.test(item)),
   );
@@ -404,7 +412,7 @@ function buildClaudeArgs(
     profile.effort,
     "--system-prompt",
     profile.corrective
-      ? `${EXECUTION_DECISION_PROPOSAL_SYSTEM_PROMPT} A lower-tier proposal was rejected because it contradicted the canonical requested change or assigned post-provider validation work to the provider. Preserve the concrete implementation outcome; never place required implementation, writing code, or modifying files in outOfScope; and never require the provider to run validation, make CI pass, wait for validation, or condition the planning-source update on validation.`
+      ? `${EXECUTION_DECISION_PROPOSAL_SYSTEM_PROMPT} A lower-tier proposal was rejected because it contradicted the canonical requested change, assigned post-provider validation work to the provider, or reduced a concrete code lot to exploration only. Preserve the concrete implementation outcome; when code paths are writable, include at least one concrete change deliverable; never place required implementation, writing code, code modifications, or source changes in outOfScope; and never require the provider to run validation, make CI pass, wait for validation, or condition the planning-source update on validation.`
       : EXECUTION_DECISION_PROPOSAL_SYSTEM_PROMPT,
     contextJson,
   ]);
