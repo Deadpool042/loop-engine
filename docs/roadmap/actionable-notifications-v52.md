@@ -95,6 +95,7 @@ Après le retour du provider, Loop Engine :
 - vérifie l’idempotence du `eventId` ;
 - vérifie qu’une condition non bloquante n’émet rien ;
 - vérifie que `lot.completed` et `execution.failed` restent inchangés ;
+- aligne `tests/core/roadmap-proposal-report.test.ts:353` sur le profil `balanced` réellement attendu tant que V52 constitue du travail ouvert borné ; la CI actuelle échoue avec `actual: balanced` / `expected: economy` ;
 - exécute `pnpm run ci`.
 
 ## Critères de clôture
