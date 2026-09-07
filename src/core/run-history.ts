@@ -1,14 +1,20 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import type { LoopRunResult, LoopRunStatus } from "../loop/types.js";
+import {
+  resolveLegacyLoopEngineStatePath,
+  resolveLoopEngineStatePath,
+} from "./runtime-state.js";
 
 /**
  * Run History / Execution Evidence Store.
  *
  * Persists the TERMINAL result of an existing LoopRunner cycle (plan,
- * execute, commit) as an append-only, project-scoped JSONL journal under
- * `.loop-engine/runs/<project>.jsonl`. This is strictly an observability
+ * execute, commit) as an append-only, project-scoped JSONL journal under the
+ * user runtime state directory (`$XDG_STATE_HOME/loop-engine/runs` or
+ * `~/.local/state/loop-engine/runs`). Legacy repository-local journals remain
+ * readable during migration. This is strictly an observability
  * layer: it records facts the runner already computed (see
  * `src/loop/types.ts` for `LoopRunResult`) and never derives, infers, or
  * decides anything from them -- no stagnation detector, no circuit breaker,
@@ -27,7 +33,9 @@ import type { LoopRunResult, LoopRunStatus } from "../loop/types.js";
  * observed.
  */
 
-export const RUN_HISTORY_DIRECTORY = ".loop-engine/runs";
+export const RUN_HISTORY_DIRECTORY = resolveLoopEngineStatePath("runs");
+export const LEGACY_RUN_HISTORY_DIRECTORY =
+  resolveLegacyLoopEngineStatePath("runs");
 /** Smallest reasonable default page: fits one terminal screen without pagination. */
 export const DEFAULT_RUN_HISTORY_LIMIT = 20;
 /** Hard cap bounding the read-side buffer regardless of a caller-supplied limit. */
@@ -50,14 +58,31 @@ const PROJECT_IDENTITY_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
 export class InvalidRunHistoryProjectIdentityError extends Error {}
 
-/** Resolves the project-scoped journal path, rejecting any identity that could escape `.loop-engine/runs/`. */
-export function resolveRunHistoryFilePath(projectName: string): string {
+/** Resolves the project-scoped durable journal path, rejecting identities that could escape the state directory. */
+function assertRunHistoryProjectIdentity(projectName: string): void {
   if (!PROJECT_IDENTITY_PATTERN.test(projectName)) {
     throw new InvalidRunHistoryProjectIdentityError(
       `Invalid run history project identity: ${projectName}`,
     );
   }
+}
+
+export function resolveRunHistoryFilePath(projectName: string): string {
+  assertRunHistoryProjectIdentity(projectName);
   return join(RUN_HISTORY_DIRECTORY, `${projectName}.jsonl`);
+}
+
+export function resolveLegacyRunHistoryFilePath(projectName: string): string {
+  assertRunHistoryProjectIdentity(projectName);
+  return join(LEGACY_RUN_HISTORY_DIRECTORY, `${projectName}.jsonl`);
+}
+
+export function resolveReadableRunHistoryFilePath(
+  projectName: string,
+): string {
+  const current = resolveRunHistoryFilePath(projectName);
+  if (existsSync(current)) return current;
+  return resolveLegacyRunHistoryFilePath(projectName);
 }
 
 export function isTerminalLoopRunResult(result: LoopRunResult): boolean {
