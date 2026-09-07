@@ -1,13 +1,15 @@
 import { resolve } from "node:path";
 
 import type { AgentRegistry } from "../agents/registry.js";
+import { resolveLoopEngineStatePath } from "../core/runtime-state.js";
 import type { LoopRunHistoryWriteOutcome } from "../core/run-history.js";
 import { createFileDurableExecutionStore } from "../loop/file-durable-execution-store.js";
 import type { LoopExecutor } from "../loop/execution.js";
 import { createDurableExecutionControlPlane } from "./durable-execution-control-plane.js";
 import type { IsolatedProviderRunPublish } from "./isolated-provider-publication.js";
 
-const DURABLE_EXECUTION_DIRECTORY = ".loop-engine/durable-executions";
+const DURABLE_EXECUTION_DIRECTORY =
+  resolveLoopEngineStatePath("durable-executions");
 const DURABLE_LEASE_DURATION_MS = 30 * 60_000;
 
 export type DurablePublishApplication = Readonly<{

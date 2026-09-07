@@ -1,10 +1,17 @@
 import { resolve } from "node:path";
 
-import { generateRunHistoryReport } from "../core/index.js";
+import {
+  generateRunHistoryReport,
+  resolveLegacyLoopEngineStatePath,
+  resolveLoopEngineStatePath,
+} from "../core/index.js";
 import type { DurableExecutionRecord } from "../loop/durable-execution.js";
 import { readFileDurableExecutionRecords } from "../loop/file-durable-execution-store.js";
 
-const DURABLE_EXECUTION_DIRECTORY = ".loop-engine/durable-executions";
+const DURABLE_EXECUTION_DIRECTORY =
+  resolveLoopEngineStatePath("durable-executions");
+const LEGACY_DURABLE_EXECUTION_DIRECTORY =
+  resolveLegacyLoopEngineStatePath("durable-executions");
 const HISTORY_LIMIT = 10;
 
 type ParsedDurableIdentity = Readonly<{
@@ -185,6 +192,42 @@ function terminalSummary(record: DurableExecutionRecord) {
   });
 }
 
+async function readExecutionRecords(
+  project: string,
+  directory?: string,
+): Promise<readonly DurableExecutionRecord[]> {
+  if (directory !== undefined) {
+    return readFileDurableExecutionRecords(resolve(directory), project);
+  }
+
+  const [current, legacy] = await Promise.all([
+    readFileDurableExecutionRecords(DURABLE_EXECUTION_DIRECTORY, project),
+    readFileDurableExecutionRecords(
+      LEGACY_DURABLE_EXECUTION_DIRECTORY,
+      project,
+    ),
+  ]);
+  const byKey = new Map<string, DurableExecutionRecord>();
+  for (const record of [...legacy, ...current]) {
+    const existing = byKey.get(record.idempotencyKey);
+    if (
+      existing === undefined ||
+      record.updatedAt > existing.updatedAt ||
+      (record.updatedAt === existing.updatedAt &&
+        record.revision > existing.revision)
+    ) {
+      byKey.set(record.idempotencyKey, record);
+    }
+  }
+  return Object.freeze(
+    [...byKey.values()].sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        left.idempotencyKey.localeCompare(right.idempotencyKey),
+    ),
+  );
+}
+
 export async function buildExecutionStatusReport(
   project: string,
   options: Readonly<{
@@ -193,10 +236,7 @@ export async function buildExecutionStatusReport(
     expectedDurationMs?: number | null;
   }> = {},
 ) {
-  const records = await readFileDurableExecutionRecords(
-    resolve(options.directory ?? DURABLE_EXECUTION_DIRECTORY),
-    project,
-  );
+  const records = await readExecutionRecords(project, options.directory);
   const record = records[0] ?? null;
 
   if (record === null) {

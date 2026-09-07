@@ -22,7 +22,7 @@ import {
   DEFAULT_RUN_HISTORY_LIMIT,
   InvalidRunHistoryProjectIdentityError,
   MAX_RUN_HISTORY_LIMIT,
-  resolveRunHistoryFilePath,
+  resolveReadableRunHistoryFilePath,
 } from "./run-history.js";
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import {
@@ -1318,7 +1318,7 @@ export function generateRunHistoryReport(
   const limit = normalizeRunHistoryLimit(options.limit);
   let filePath: string;
   try {
-    filePath = resolveRunHistoryFilePath(projectName);
+    filePath = resolveReadableRunHistoryFilePath(projectName);
   } catch (error) {
     if (error instanceof InvalidRunHistoryProjectIdentityError) {
       return {

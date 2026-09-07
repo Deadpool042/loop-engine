@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { appendFileSync, existsSync, readFileSync, rmSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -7,11 +13,13 @@ import { describe, it } from "node:test";
 import {
   generateRunHistoryReport,
   recordLoopRunHistory,
+  resolveLegacyRunHistoryFilePath,
+  resolveRunHistoryFilePath,
+  LEGACY_RUN_HISTORY_DIRECTORY,
+  RUN_HISTORY_DIRECTORY,
   type LoopRunHistoryReport,
 } from "../../src/core/index.js";
 import type { LoopRunResult, LoopRunStatus } from "../../src/loop/types.js";
-
-const RUN_HISTORY_DIRECTORY = ".loop-engine/runs";
 
 function fixtureProjectName(): string {
   return `run-history-fixture-${randomUUID()}`;
@@ -44,7 +52,7 @@ function fixtureResult(
 }
 
 function journalPath(project: string): string {
-  return join(RUN_HISTORY_DIRECTORY, `${project}.jsonl`);
+  return resolveRunHistoryFilePath(project);
 }
 
 function withFixtureProject(run: (project: string) => void): void {
@@ -155,6 +163,29 @@ describe("run history evidence store", () => {
     assert.deepEqual(report.entries, []);
     assert.equal(report.corruptedLines, 0);
     assert.equal(report.error, undefined);
+  });
+
+  it("reads a legacy repository-local journal when no durable-state journal exists", () => {
+    const project = fixtureProjectName();
+    const currentPath = journalPath(project);
+    const legacyPath = resolveLegacyRunHistoryFilePath(project);
+    try {
+      rmSync(currentPath, { force: true });
+      rmSync(legacyPath, { force: true });
+      mkdirSync(LEGACY_RUN_HISTORY_DIRECTORY, { recursive: true });
+      const result = fixtureResult(project, {
+        status: "failed",
+        completedAt: "2026-01-06T00:00:00.000Z",
+      });
+      appendFileSync(legacyPath, `${JSON.stringify(result)}\n`, "utf8");
+
+      const report = generateRunHistoryReport(project);
+      assert.equal(report.entries.length, 1);
+      assert.equal(report.entries[0]?.runId, result.runId);
+    } finally {
+      rmSync(currentPath, { force: true });
+      rmSync(legacyPath, { force: true });
+    }
   });
 
   it("isolates journals per project", () => {

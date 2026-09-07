@@ -5,7 +5,7 @@ import { LOOP_RUN_STATUSES, type LoopRunResult } from "../loop/types.js";
 import {
   InvalidRunHistoryProjectIdentityError,
   isTerminalLoopRunResult,
-  resolveRunHistoryFilePath,
+  resolveReadableRunHistoryFilePath,
 } from "./run-history.js";
 
 const RUN_HISTORY_LOOKUP_CHUNK_BYTES = 64 * 1024;
@@ -59,7 +59,7 @@ export function lookupRunHistoryEntry(
 ): LoopRunHistoryLookupResult {
   let filePath: string;
   try {
-    filePath = resolveRunHistoryFilePath(projectName);
+    filePath = resolveReadableRunHistoryFilePath(projectName);
   } catch (error) {
     if (error instanceof InvalidRunHistoryProjectIdentityError) {
       return Object.freeze({
