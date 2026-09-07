@@ -75,6 +75,12 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
         funding: "included_subscription",
         quota: { state: "unknown", source: "unavailable" },
       },
+      {
+        model: "gpt-6-astra",
+        tier: "frontier",
+        funding: "included_subscription",
+        quota: { state: "unknown", source: "unavailable" },
+      },
     ],
   );
 });

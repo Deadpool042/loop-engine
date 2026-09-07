@@ -46,7 +46,10 @@ test("evidence-aware executor preserves bounded failover evidence", async () => 
       { plan: primary, executor: recoverableFailure },
       { plan: fallback, executor: completed },
     ],
-    { maxAttempts: 2 },
+    {
+      maxAttempts: 2,
+      createWorkspaceReset: async () => async (): Promise<void> => undefined,
+    },
   );
 
   const result = await executor(primary);

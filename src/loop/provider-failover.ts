@@ -38,11 +38,17 @@ export type LoopProviderFailureClassifier = (
   attempt: Readonly<{ plan: LoopExecutionPlan; attempt: number }>,
 ) => boolean;
 
+export type LoopProviderWorkspaceReset = () => Promise<void>;
+export type LoopProviderWorkspaceResetFactory = (
+  cwd: string,
+) => Promise<LoopProviderWorkspaceReset>;
+
 export type LoopProviderFailoverOptions = Readonly<{
   attempts: readonly LoopProviderFailoverAttempt[];
   maxAttempts: number;
   cwd: string;
   isRecoverableFailure?: LoopProviderFailureClassifier;
+  createWorkspaceReset?: LoopProviderWorkspaceResetFactory;
 }>;
 
 const DEFAULT_RECOVERABLE_FAILURE_CODES = new Set([
@@ -161,6 +167,19 @@ export async function executeLoopProviderFailover(
   const boundedAttempts = options.attempts.slice(0, options.maxAttempts);
   const evidence: LoopProviderFailoverAttemptEvidence[] = [];
   const modifiedFiles = new Set<string>();
+  let resetWorkspace: LoopProviderWorkspaceReset | null = null;
+  let resetPreparationFailed = false;
+
+  if (
+    boundedAttempts.length > 1 &&
+    options.createWorkspaceReset !== undefined
+  ) {
+    try {
+      resetWorkspace = await options.createWorkspaceReset(options.cwd);
+    } catch {
+      resetPreparationFailed = true;
+    }
+  }
 
   for (const [index, attempt] of boundedAttempts.entries()) {
     const attemptNumber = index + 1;
@@ -247,6 +266,41 @@ export async function executeLoopProviderFailover(
         evidence: freezeEvidence(options.maxAttempts, evidence, null),
       });
     }
+
+    if (resetPreparationFailed) {
+      return Object.freeze({
+        result: fail(
+          "provider_failover_workspace_reset_failed",
+          "Provider failover could not prepare a clean baseline for the next attempt.",
+          "Workspace reset preparation diagnostics were redacted.",
+        ),
+        evidence: freezeEvidence(options.maxAttempts, evidence, null),
+      });
+    }
+    if (resetWorkspace === null) {
+      return Object.freeze({
+        result: fail(
+          "provider_failover_workspace_reset_unavailable",
+          "Provider failover requires an explicit workspace reset before the next attempt.",
+          "No workspace reset callback was configured.",
+        ),
+        evidence: freezeEvidence(options.maxAttempts, evidence, null),
+      });
+    }
+
+    try {
+      await resetWorkspace();
+    } catch {
+      return Object.freeze({
+        result: fail(
+          "provider_failover_workspace_reset_failed",
+          "Provider failover could not restore the clean baseline before the next attempt.",
+          "Workspace reset diagnostics were redacted.",
+        ),
+        evidence: freezeEvidence(options.maxAttempts, evidence, null),
+      });
+    }
+    modifiedFiles.clear();
   }
 
   const exhausted = fail(
@@ -268,6 +322,7 @@ export function createProviderFailoverLoopExecutor(
   options: Readonly<{
     maxAttempts: number;
     isRecoverableFailure?: LoopProviderFailureClassifier;
+    createWorkspaceReset?: LoopProviderWorkspaceResetFactory;
   }>,
 ): LoopExecutor {
   return async (primaryPlan, cwd) => {
@@ -287,6 +342,9 @@ export function createProviderFailoverLoopExecutor(
       ...(options.isRecoverableFailure === undefined
         ? {}
         : { isRecoverableFailure: options.isRecoverableFailure }),
+      ...(options.createWorkspaceReset === undefined
+        ? {}
+        : { createWorkspaceReset: options.createWorkspaceReset }),
     });
     return outcome.result;
   };

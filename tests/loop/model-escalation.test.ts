@@ -165,6 +165,37 @@ describe("bounded intra-provider model escalation", () => {
     );
   });
 
+  it("escalates from Terra advanced to Astra frontier within Codex", () => {
+    const registry = createAgentRegistry([
+      profile("codex.advanced", "gpt-5.6-terra", "advanced"),
+      profile("codex.frontier", "gpt-6-astra", "frontier"),
+    ]);
+    const resolution = resolved(registry);
+    const currentPlan = planFromResolution(resolution);
+
+    assert.equal(currentPlan.model, "gpt-5.6-terra");
+
+    const decision = resolveIntraProviderModelEscalation({
+      registry,
+      resolution,
+      currentPlan,
+      allowEscalation: true,
+      completedAttempts: 1,
+      maxAttempts: 2,
+      failureCode: "validation_failed",
+    });
+
+    assert.equal(decision.outcome, "escalated");
+    assert.equal(
+      decision.outcome === "escalated" ? decision.profile.id : null,
+      "codex.frontier",
+    );
+    assert.equal(
+      decision.outcome === "escalated" ? decision.evidence.toModel : null,
+      "gpt-6-astra",
+    );
+  });
+
   it("never changes provider or runtime during a model escalation", () => {
     const registry = createAgentRegistry([
       profile("codex.economy", "luna", "economy"),

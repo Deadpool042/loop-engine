@@ -111,6 +111,8 @@ const failed =
       }),
     });
 
+const cleanResetFactory = async () => async (): Promise<void> => undefined;
+
 test("admits a provider-specific fallback plan without widening budget", () => {
   const primary = profile("configured.codex", "openai", "codex", 2);
   const fallback = profile("configured.claude", "anthropic", "claude_code", 5);
@@ -135,6 +137,7 @@ test("executes the configured fallback through one application executor", async 
       assembly("claude", fallback, completed("src/fallback.ts")),
     ],
     2,
+    { createWorkspaceReset: cleanResetFactory },
   );
 
   const result = await dependency.executor(plan(primary));
@@ -165,6 +168,7 @@ test("falls back from Claude to Codex without widening the admitted budget", asy
       assembly("codex", fallback, fallbackExecutor),
     ],
     2,
+    { createWorkspaceReset: cleanResetFactory },
   );
 
   const result = await dependency.executor(plan(primary));
@@ -211,6 +215,7 @@ test("skips explicitly unavailable fallback profiles", async () => {
       }),
     ],
     2,
+    { createWorkspaceReset: cleanResetFactory },
   );
 
   const result = await dependency.executor(plan(primary));
@@ -283,6 +288,7 @@ test("uses a paid fallback only when the admitted policy explicitly allows it", 
       assembly("claude", paidFallback, fallbackExecutor),
     ],
     2,
+    { createWorkspaceReset: cleanResetFactory },
   );
 
   const result = await dependency.executor(
