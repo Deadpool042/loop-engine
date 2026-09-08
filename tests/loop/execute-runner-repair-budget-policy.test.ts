@@ -141,34 +141,64 @@ describe("runLoopExecute — policy repair budget parity", () => {
     );
   });
 
-  it("clamps the effective repair budget to zero when no repairer is configured", async () => {
+  it("uses the admitted executor as a bounded fallback repairer", async () => {
+    let executorCalls = 0;
+    let validationCalls = 0;
+
     const result = await runLoopExecute("repair-budget-fixture", {
       ...deterministicOptions(),
       maxRepairs: 1,
-      executor: async () => ({
-        status: "completed" as const,
-        modifiedFiles: [],
-        details: [],
-      }),
-      validator: async () => ({
-        status: "failed" as const,
-        failedCommand: "fixture-validation",
-        exitCode: 1,
-        details: ["fixture failure"],
-      }),
+      executor: async (plan) => {
+        executorCalls += 1;
+        if (executorCalls === 2) {
+          assert.equal(
+            plan.policy.rationale.some((reason) =>
+              reason.includes("Validation repair attempt 1/1"),
+            ),
+            true,
+          );
+          assert.equal(
+            plan.policy.rationale.some((reason) =>
+              reason.includes("Failed command: fixture-validation"),
+            ),
+            true,
+          );
+        }
+        return {
+          status: "completed" as const,
+          modifiedFiles: [],
+          details: [],
+        };
+      },
+      validator: async () => {
+        validationCalls += 1;
+        return validationCalls === 1
+          ? {
+              status: "failed" as const,
+              failedCommand: "fixture-validation",
+              exitCode: 1,
+              details: ["fixture failure"],
+            }
+          : {
+              status: "passed" as const,
+              failedCommand: null,
+              exitCode: 0,
+              details: ["fixture passed"],
+            };
+      },
     });
 
-    assert.equal(result.status, "failed");
-    assert.equal(result.failure?.code, "validation_failed");
-    assert.notEqual(result.failure?.code, "repairer_unavailable");
-    assert.equal(result.validation?.repairAttempts, 0);
+    assert.equal(result.status, "completed");
+    assert.equal(executorCalls, 2);
+    assert.equal(validationCalls, 2);
+    assert.equal(result.validation?.repairAttempts, 1);
     assert.equal(
       result.steps.some((step) =>
-        step.details.includes("Repair budget: requested=1, effective=0"),
+        step.details.includes("Repair budget: requested=1, effective=1"),
       ),
       true,
     );
-    assert.equal(result.steps.some((step) => step.name === "repairing"), false);
+    assert.equal(result.steps.some((step) => step.name === "repairing"), true);
   });
 
   it("preserves a stricter caller request of zero repairs", async () => {

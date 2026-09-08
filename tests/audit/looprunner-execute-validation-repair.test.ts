@@ -40,8 +40,8 @@ describe("LoopRunner execute validation repair audit", () => {
       `${runner}\nawait dependencies.executor({});\nprocess.env.SECRET;`,
     );
 
-    assert.equal(baseline.executorCallSites, 3);
-    assert.equal(result.executorCallSites, 4);
+    assert.equal(baseline.executorCallSites, 4);
+    assert.equal(result.executorCallSites, 5);
     assert.deepEqual(result.forbidden, ["process.env"]);
   });
 

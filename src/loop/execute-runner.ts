@@ -369,8 +369,7 @@ export async function runLoopExecute(
     typeof policyRepairCeiling === "number"
       ? Math.min(dependencies.maxRepairs, policyRepairCeiling)
       : dependencies.maxRepairs;
-  const effectiveMaxRepairs =
-    dependencies.repairer === null ? 0 : admittedMaxRepairs;
+  const effectiveMaxRepairs = admittedMaxRepairs;
 
   brief =
     cycle.brief === undefined
@@ -803,20 +802,6 @@ export async function runLoopExecute(
       validationAttempt.details,
     );
 
-    if (!dependencies.repairer) {
-      transition("failed", "failed", "failed", [
-        "No LoopRepairer is configured.",
-      ]);
-      return finalize(
-        cycle.candidate,
-        internalFailure(
-          "repairer_unavailable",
-          "Validation failed but no LoopRepairer is configured.",
-          `Repair budget: ${effectiveMaxRepairs}`,
-        ),
-      );
-    }
-
     repairAttempts += 1;
     validation = createValidationResult(
       project,
@@ -827,29 +812,60 @@ export async function runLoopExecute(
 
     let repairResult;
     try {
-      repairResult = await dependencies.repairer(
-        Object.freeze({
-          runId,
-          project: executionProject,
-          candidate: cycle.candidate,
-          agentPolicy,
-          contextPackage,
-          modifiedFiles: Object.freeze([...modifiedFiles].sort()),
-          validation: validationAttempt,
-          attempt: repairAttempts,
-          maxRepairs: effectiveMaxRepairs,
-        }),
-      );
+      if (dependencies.repairer !== null) {
+        repairResult = await dependencies.repairer(
+          Object.freeze({
+            runId,
+            project: executionProject,
+            candidate: cycle.candidate,
+            agentPolicy,
+            contextPackage,
+            modifiedFiles: Object.freeze([...modifiedFiles].sort()),
+            validation: validationAttempt,
+            attempt: repairAttempts,
+            maxRepairs: effectiveMaxRepairs,
+          }),
+        );
+      } else {
+        const repairPlan = Object.freeze({
+          ...executionPlan,
+          policy: Object.freeze({
+            ...executionPlan.policy,
+            requiredCapabilities: Object.freeze([
+              ...executionPlan.policy.requiredCapabilities,
+            ]),
+            requiredPermissions: Object.freeze([
+              ...executionPlan.policy.requiredPermissions,
+            ]),
+            ...(executionPlan.policy.allowedFundingModes === undefined
+              ? {}
+              : {
+                  allowedFundingModes: Object.freeze([
+                    ...executionPlan.policy.allowedFundingModes,
+                  ]),
+                }),
+            rationale: Object.freeze([
+              ...executionPlan.policy.rationale,
+              `Validation repair attempt ${repairAttempts}/${effectiveMaxRepairs}.`,
+              `Failed command: ${validationAttempt.failedCommand ?? "unknown"}.`,
+            ]),
+          }),
+        });
+        repairResult = await dependencies.executor(
+          repairPlan,
+          executionProject.path,
+        );
+      }
     } catch {
       transition("failed", "failed", "failed", [
-        "The injected LoopRepairer threw an error.",
+        "The bounded repair execution threw an error.",
       ]);
       return finalize(
         cycle.candidate,
         internalFailure(
           "repair_failed",
-          "The injected LoopRepairer failed.",
-          "Repairer errors are redacted from the public result.",
+          "The bounded validation repair failed.",
+          "Repair diagnostics are redacted from the public result.",
         ),
       );
     }
