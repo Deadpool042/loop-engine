@@ -89,6 +89,8 @@ export async function runDurableAutoSubscriptionPublish(
   const executionOptions = {
     candidateId: input.candidateId,
     maxRepairs: input.maxRepairs,
+    maxModelAttempts: 1,
+    decomposeOversizedCandidate: true,
     ...(application.loopExecutor === undefined
       ? {}
       : { executor: application.loopExecutor }),

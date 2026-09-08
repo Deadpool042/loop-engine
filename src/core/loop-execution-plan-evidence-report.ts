@@ -15,6 +15,7 @@ export function generateExecutionReportWithEvidence(
   const executionPlanEvidence = projectLoopExecutionPlanEvidence(
     result.agentPolicy,
     result.writableFileScope,
+    result.modelAttemptBudget ?? 1,
   );
   const providerFailoverEvidence = result.providerFailoverEvidence ?? null;
 

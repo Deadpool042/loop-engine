@@ -14,6 +14,7 @@ import {
   type LoopRuntimeDelegationPolicy,
 } from "./runtime-delegation.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
+import type { AutoMicroLotDecomposition } from "./micro-lot-decomposition.js";
 import type {
   AgentPolicyMode,
   AgentPolicyResolution,
@@ -34,6 +35,7 @@ export type CreateLoopExecutionPlanInput = Readonly<{
   contextPackage: MinimalContextPackage;
   allowedPaths?: readonly string[];
   worktreeMode?: "clean" | "repair_existing";
+  microLot?: AutoMicroLotDecomposition;
   brief?: Readonly<{
     objective: string;
     deliverables: readonly string[];
@@ -50,6 +52,7 @@ export type LoopExecutionPlan = Readonly<{
   contextPackage: MinimalContextPackage;
   allowedPaths?: readonly string[];
   worktreeMode?: "clean" | "repair_existing";
+  microLot?: AutoMicroLotDecomposition;
   brief?: Readonly<{
     objective: string;
     deliverables: readonly string[];
@@ -120,6 +123,7 @@ export function createLoopExecutionPlan(
     ...(input.worktreeMode === undefined
       ? {}
       : { worktreeMode: input.worktreeMode }),
+    ...(input.microLot === undefined ? {} : { microLot: input.microLot }),
     ...(input.brief === undefined
       ? {}
       : {

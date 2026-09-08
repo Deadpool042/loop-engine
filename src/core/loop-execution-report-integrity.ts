@@ -92,6 +92,10 @@ function isExecutionPlanEvidence(
     isNonEmptyString(value.model) &&
     isMember(AGENT_EFFORTS, value.effort) &&
     isAgentBudget(value.budget) &&
+    (value.modelAttemptBudget === undefined ||
+      (typeof value.modelAttemptBudget === "number" &&
+        Number.isInteger(value.modelAttemptBudget) &&
+        value.modelAttemptBudget >= 1)) &&
     (value.allowedPaths === undefined || isStringArray(value.allowedPaths)) &&
     isNonEmptyString(value.policy.id) &&
     (value.policy.mode === "execute" || value.policy.mode === "commit") &&

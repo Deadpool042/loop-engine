@@ -6,6 +6,7 @@ import type { LoopExecutionPlanFingerprint } from "./execution-plan-evidence-fin
 import type { LoopModelEscalationEvidence } from "./model-escalation.js";
 import type { LoopProviderFailoverEvidence } from "./provider-failover.js";
 import type { LoopProviderFailoverEvidenceFingerprint } from "./provider-failover-evidence-integrity.js";
+import type { AutoMicroLotDecomposition } from "./micro-lot-decomposition.js";
 
 export const LOOP_RUN_MODES = ["plan", "execute", "commit", "publish"] as const;
 export type LoopRunMode = (typeof LOOP_RUN_MODES)[number];
@@ -77,6 +78,8 @@ export type LoopRunResult = Readonly<{
   agentPolicy: AgentPolicyResolution | null;
   contextPackage: MinimalContextPackage | null;
   writableFileScope?: readonly string[] | null;
+  modelAttemptBudget?: number;
+  decomposition?: AutoMicroLotDecomposition | null;
   brief?: Readonly<{
     objective: string;
     deliverables: readonly string[];

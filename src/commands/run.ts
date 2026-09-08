@@ -129,6 +129,7 @@ export type RunLoopRunCommandOptions = Readonly<{
   candidateId?: string;
   maxRepairs?: number;
   provider?: LoopProviderId;
+  autoSubscription?: boolean;
   commitMessage?: string;
   exportPatchPath?: string;
   onProgress?: (event: Readonly<{ status: string }>) => void;
@@ -223,6 +224,9 @@ export async function runLoopRunCommand(
           ? {}
           : { candidateId: options.candidateId }),
         maxRepairs: options.maxRepairs ?? 0,
+        ...(options.autoSubscription === true
+          ? { maxModelAttempts: 1, decomposeOversizedCandidate: true }
+          : {}),
         ...(options.exportPatchPath === undefined
           ? {}
           : { exportPatchPath: options.exportPatchPath }),
@@ -253,6 +257,9 @@ export async function runLoopRunCommand(
         ? {}
         : { candidateId: options.candidateId }),
       maxRepairs: options.maxRepairs ?? 0,
+      ...(options.autoSubscription === true
+        ? { maxModelAttempts: 1, decomposeOversizedCandidate: true }
+        : {}),
       ...(options.onProgress === undefined
         ? {}
         : { onProgress: options.onProgress }),

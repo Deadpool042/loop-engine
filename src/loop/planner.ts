@@ -3,6 +3,10 @@ import { resolveExecutionAuthorization } from "../governance/execution-authoriza
 import { buildProjectSnapshot } from "../intelligence/project-snapshot.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import type { ProjectSnapshot } from "../intelligence/snapshot.js";
+import {
+  decomposeOversizedAutoCandidate,
+  type AutoMicroLotDecomposition,
+} from "./micro-lot-decomposition.js";
 
 export type LoopPlan =
   | Readonly<{
@@ -18,6 +22,8 @@ export type LoopPlan =
       // (rather than by heuristic roadmap selection).
       authorizedBy?: "execution_decision";
       allowedPaths?: readonly string[];
+      sourceDocument?: string;
+      decomposition?: AutoMicroLotDecomposition;
       brief?: Readonly<{
         objective: string;
         deliverables: readonly string[];
@@ -54,6 +60,8 @@ export type LoopPlanOptions = Readonly<{
   candidateId?: string;
   /** Canonical project path used to resolve a project-scoped execution decision. */
   executionDecisionProjectPath?: string;
+  /** AUTO-only deterministic narrowing before provider execution. */
+  decomposeOversizedCandidate?: boolean;
 }>;
 
 const PLANNED_STEPS_AFTER_CANDIDATE = [
@@ -113,7 +121,8 @@ export function planLoopCycle(
         outcome: "blocked",
         candidate: null,
         code: "candidate_not_addressable",
-        reason: "This roadmap does not expose addressable candidate identifiers.",
+        reason:
+          "This roadmap does not expose addressable candidate identifiers.",
       };
     }
 
@@ -184,21 +193,53 @@ export function planLoopCycle(
       };
     }
 
+    const governedPlan = authorization.governed
+      ? {
+          authorizedBy: "execution_decision" as const,
+          allowedPaths: authorization.allowedPaths,
+          ...(authorization.sourceDocument === undefined
+            ? {}
+            : { sourceDocument: authorization.sourceDocument }),
+          ...(authorization.brief === undefined
+            ? {}
+            : { brief: authorization.brief }),
+        }
+      : {};
+    const microLot =
+      options.decomposeOversizedCandidate && authorization.governed
+        ? decomposeOversizedAutoCandidate({
+            candidate,
+            allowedPaths: authorization.allowedPaths,
+            ...(authorization.sourceDocument === undefined
+              ? {}
+              : { sourceDocument: authorization.sourceDocument }),
+            ...(authorization.brief === undefined
+              ? {}
+              : { brief: authorization.brief }),
+          })
+        : { candidate, ...governedPlan };
+
     return {
       outcome: "ready",
-      candidate,
+      candidate: microLot.candidate,
       plannedSteps: [
-        `Select roadmap candidate: ${candidate.text}`,
+        `Select roadmap candidate: ${microLot.candidate.text}`,
+        ...(microLot.decomposition === undefined
+          ? []
+          : [
+              `Decompose oversized parent ${candidate.id} into ${microLot.decomposition.children.length} traceable micro-lots`,
+            ]),
         ...PLANNED_STEPS_AFTER_CANDIDATE,
       ],
       snapshot,
-      ...(authorization.governed
-        ? {
-            authorizedBy: "execution_decision" as const,
-            allowedPaths: authorization.allowedPaths,
-            ...(authorization.brief === undefined ? {} : { brief: authorization.brief }),
-          }
-        : {}),
+      ...governedPlan,
+      ...(microLot.allowedPaths === undefined
+        ? {}
+        : { allowedPaths: microLot.allowedPaths }),
+      ...(microLot.brief === undefined ? {} : { brief: microLot.brief }),
+      ...(microLot.decomposition === undefined
+        ? {}
+        : { decomposition: microLot.decomposition }),
     };
   }
 

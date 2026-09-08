@@ -3,6 +3,7 @@ import { basename, resolve } from "node:path";
 
 import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
+import { buildAutoMicroLotPlanningInstructions } from "./micro-lot-decomposition.js";
 import { buildLoopRuntimeDelegationGuidance } from "./runtime-delegation.js";
 import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
 import { buildSubscriptionCliEnvironment } from "./subscription-cli-environment.js";
@@ -36,6 +37,9 @@ function buildPrompt(plan: LoopExecutionPlan): string {
           ...plan.allowedPaths.map((path) => `- ${path}`),
           "Do not modify files outside this scope.",
         ]),
+    ...(plan.microLot === undefined
+      ? []
+      : buildAutoMicroLotPlanningInstructions(plan.microLot)),
     ...(plan.brief === undefined
       ? ["Do not modify the roadmap or mark the selected candidate complete."]
       : [

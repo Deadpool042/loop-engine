@@ -22,6 +22,7 @@ export type ExecutionAuthorizationResult =
       authorized: true;
       candidateId: string;
       allowedPaths: readonly string[];
+      sourceDocument?: string;
       brief?: Readonly<{
         objective: string;
         deliverables: readonly string[];
@@ -133,6 +134,9 @@ export function resolveExecutionAuthorization(
         authorized: true,
         candidateId,
         allowedPaths: decision.decision.candidate!.allowedPaths!,
+        ...(decision.source.document === undefined
+          ? {}
+          : { sourceDocument: decision.source.document }),
         ...(decision.decision.brief === undefined
           ? {}
           : { brief: decision.decision.brief }),
