@@ -43,16 +43,16 @@ export function getAllowedPermissionsForMode(
 }
 
 // Budget defaults per mode. Only maxCalls/maxRepairs carry real meaning here.
-// Plan never calls an agent (maxCalls: 0). Execute/commit/publish default to
-// one top-level model attempt. A stronger model must be selected up front
-// instead of paying the latency cost of an automatic escalation.
+// Plan never calls an agent (maxCalls: 0). Execute/commit/publish allow at
+// most two top-level model attempts: one initial call plus one bounded
+// intra-provider escalation. Callers can only restrict these ceilings.
 export const DEFAULT_MODE_BUDGETS: Readonly<
   Record<AgentPolicyMode, AgentBudget>
 > = {
   plan: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 0, maxRepairs: 0 },
-  execute: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 1, maxRepairs: 1 },
-  commit: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 1, maxRepairs: 1 },
-  publish: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 1, maxRepairs: 1 },
+  execute: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 2, maxRepairs: 1 },
+  commit: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 2, maxRepairs: 1 },
+  publish: { ...UNBOUNDED_AGENT_BUDGET, maxCalls: 2, maxRepairs: 1 },
 };
 
 // NOT an executable budget — never authorizes a real agent call. It is only
@@ -196,9 +196,9 @@ const CONTEXT_BUDGET_BY_EFFORT: Readonly<Record<AgentEffort, ContextBudget>> = {
     includeFullFiles: false,
   },
   medium: {
-    maxFiles: 6,
-    maxCharacters: 40_000,
-    maxEstimatedTokens: 10_000,
+    maxFiles: 8,
+    maxCharacters: 60_000,
+    maxEstimatedTokens: 15_000,
     includeFullFiles: false,
   },
   high: {
