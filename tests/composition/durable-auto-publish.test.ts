@@ -43,6 +43,27 @@ function completedResult(runId = "run-1"): LoopRunResult {
   });
 }
 
+function failedResult(runId = "run-failed"): LoopRunResult {
+  return Object.freeze({
+    ...completedResult(runId),
+    status: "failed" as const,
+    validation: Object.freeze({
+      status: "failed" as const,
+      attempts: 1,
+      repairAttempts: 0,
+      commands: Object.freeze(["pnpm run typecheck"]),
+      failedCommand: "pnpm run typecheck",
+      exitCode: 2,
+    }),
+    publication: null,
+    failure: Object.freeze({
+      code: "validation_failed",
+      message: "Validation failed.",
+      details: Object.freeze(["Failed command: pnpm run typecheck"]),
+    }),
+  });
+}
+
 test("durable AUTO publish replays the same terminal result without a second execution", async () => {
   const root = mkdtempSync(join(tmpdir(), "loop-durable-auto-publish-"));
   try {
@@ -139,6 +160,56 @@ test("durable AUTO publish reports in_progress while another owner holds the lea
     release();
     const completed = await active;
     assert.equal(completed.report.status, "completed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+
+test("durable AUTO publish retries a failed terminal result only when explicitly requested", async () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-durable-auto-publish-"));
+  try {
+    let publishCalls = 0;
+    let historyCalls = 0;
+    const application = {
+      async runLoopPublish() {
+        publishCalls += 1;
+        return publishCalls === 1
+          ? failedResult("run-failed")
+          : completedResult("run-retry");
+      },
+      recordLoopRunHistory() {
+        historyCalls += 1;
+        return Object.freeze({ written: true, ok: true });
+      },
+    };
+
+    const input = {
+      project: "example",
+      candidateId: "H1-L1",
+      expectedGitHead: "a".repeat(40),
+      maxRepairs: 0,
+      storeDirectory: root,
+      owner: "worker:first",
+    } as const;
+
+    const first = await runDurableAutoSubscriptionPublish(application, input);
+    const replay = await runDurableAutoSubscriptionPublish(application, {
+      ...input,
+      owner: "worker:replay",
+    });
+    const retry = await runDurableAutoSubscriptionPublish(application, {
+      ...input,
+      owner: "worker:retry",
+      retryTerminal: true,
+    });
+
+    assert.equal(first.report.status, "failed");
+    assert.equal(replay.report.status, "failed");
+    assert.equal(retry.report.status, "completed");
+    assert.equal(retry.report.runId, "run-retry");
+    assert.equal(publishCalls, 2);
+    assert.equal(historyCalls, 2);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
