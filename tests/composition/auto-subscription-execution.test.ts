@@ -15,8 +15,8 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
 
   assert.equal(claude.id, "claude_code");
   assert.equal(claude.executable, "claude");
-  assert.equal(claude.timeoutMs, 240_000);
-  assert.equal("maxTurns" in claude ? claude.maxTurns : null, 16);
+  assert.equal(claude.timeoutMs, 360_000);
+  assert.equal("maxTurns" in claude ? claude.maxTurns : null, 24);
   assert.deepEqual(
     claude.profiles?.map((profile) => ({
       model: profile.model,
@@ -36,7 +36,7 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
 
   assert.equal(codex.id, "codex");
   assert.equal(codex.executable, "codex");
-  assert.equal(codex.timeoutMs, 240_000);
+  assert.equal(codex.timeoutMs, 360_000);
   assert.deepEqual(
     codex.profiles?.map((profile) => ({
       model: profile.model,
