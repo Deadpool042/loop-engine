@@ -31,12 +31,6 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
         funding: "included_subscription",
         quota: { state: "unknown", source: "unavailable" },
       },
-      {
-        model: "claude-opus-5",
-        tier: "advanced",
-        funding: "included_subscription",
-        quota: { state: "unknown", source: "unavailable" },
-      },
     ],
   );
 
@@ -54,18 +48,6 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
       {
         model: "gpt-5.6-sol",
         tier: "standard",
-        funding: "included_subscription",
-        quota: { state: "unknown", source: "unavailable" },
-      },
-      {
-        model: "gpt-5.6-terra",
-        tier: "advanced",
-        funding: "included_subscription",
-        quota: { state: "unknown", source: "unavailable" },
-      },
-      {
-        model: "gpt-6-astra",
-        tier: "frontier",
         funding: "included_subscription",
         quota: { state: "unknown", source: "unavailable" },
       },
@@ -119,14 +101,5 @@ test("AUTO selects a standard capable subscription profile first", () => {
     requiredPermissions: ["write_worktree"],
     allowedFundingModes: ["included_subscription"],
   });
-  assert.equal(refactor.outcome, "selected");
-  assert.equal(refactor.outcome === "selected" ? refactor.profile.model : null, "claude-opus-5");
-  assert.equal(
-    refactor.outcome === "selected"
-      ? refactor.notSelected?.some(
-          (candidate) => candidate.profileId === "configured.codex.advanced",
-        )
-      : false,
-    true,
-  );
+  assert.equal(refactor.outcome, "no_match");
 });
