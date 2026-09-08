@@ -25,8 +25,8 @@ export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProv
     Object.freeze({
       id: "claude_code" as const,
       executable: "claude",
-      timeoutMs: 240_000,
-      maxTurns: 16,
+      timeoutMs: 360_000,
+      maxTurns: 24,
       profiles: Object.freeze([
         Object.freeze({
           id: "standard",
@@ -44,7 +44,7 @@ export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProv
     Object.freeze({
       id: "codex" as const,
       executable: "codex",
-      timeoutMs: 240_000,
+      timeoutMs: 360_000,
       profiles: Object.freeze([
         Object.freeze({
           id: "standard",
