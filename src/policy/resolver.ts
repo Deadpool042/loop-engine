@@ -76,14 +76,10 @@ const ARCHITECTURE_KEYWORDS = [
 ];
 const REVIEW_KEYWORDS = ["revue", "review"];
 
-export function classifyLoopTaskCategory(
-  candidate: RoadmapCandidate | null,
+export function classifyLoopTaskTextCategory(
+  text: string,
 ): LoopTaskCategory {
-  if (!candidate) {
-    return "none";
-  }
-
-  const haystack = candidate.text.toLowerCase();
+  const haystack = text.toLowerCase();
 
   if (DOCUMENTATION_KEYWORDS.some((keyword) => haystack.includes(keyword))) {
     return "documentation";
@@ -106,6 +102,14 @@ export function classifyLoopTaskCategory(
   }
 
   return "code";
+}
+
+export function classifyLoopTaskCategory(
+  candidate: RoadmapCandidate | null,
+): LoopTaskCategory {
+  return candidate === null
+    ? "none"
+    : classifyLoopTaskTextCategory(candidate.text);
 }
 
 const CATEGORY_CAPABILITIES: Readonly<
