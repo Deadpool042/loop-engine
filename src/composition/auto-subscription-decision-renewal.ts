@@ -30,6 +30,7 @@ import {
   parseExecutionDecisionProviderProposal,
 } from "../governance/execution-decision-provider.js";
 import { resolveExecutionAuthorization } from "../governance/execution-authorization.js";
+import { classifyLoopTaskTextCategory } from "../policy/resolver.js";
 import {
   evaluateAutoSubscriptionAdmission,
   type AutoSubscriptionAdmission,
@@ -369,7 +370,7 @@ function proposalContradictsConcreteCandidate(
     return true;
   }
   if (
-    !CONCRETE_CHANGE_PATTERN.test(candidateText) ||
+    classifyLoopTaskTextCategory(candidateText) !== "code" ||
     !hasCodeWritablePath(governedAllowedPaths)
   ) {
     return false;

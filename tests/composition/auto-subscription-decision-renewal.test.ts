@@ -463,6 +463,84 @@ test("rejects exploration-only code briefs and retries once with Sonnet", async 
   }
 });
 
+test("rejects planning-only briefs for noun-phrased code candidates and retries with Sonnet", async () => {
+  const { root, project, head } = fixture({
+    candidateText:
+      "Wishlist V2 compte client : persistance serveur des favoris authentifiés et fusion idempotente des favoris visiteur.",
+    codeScope: true,
+  });
+  try {
+    const observedCalls: string[][] = [];
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      project,
+      head,
+      "H1-L1",
+      {
+        runClaude: async (args) => {
+          observedCalls.push([...args]);
+          if (observedCalls.length === 1) {
+            return claudeSuccess({
+              objective:
+                "Clarify the current Wishlist implementation before designing the change.",
+              deliverables: [
+                "User responses to clarifying questions about current implementation state.",
+              ],
+              outOfScope: [
+                "Code changes",
+                "Implementation",
+                "Running validation",
+              ],
+              allowedPaths: [
+                "src/example.ts",
+                "docs/roadmap/README.md",
+              ],
+            });
+          }
+          return claudeSuccess({
+            objective:
+              "Implement authenticated favorite persistence and idempotent guest merge.",
+            deliverables: [
+              "Implement server persistence and idempotent merge in src/example.ts.",
+              "Update docs/roadmap/README.md.",
+            ],
+            outOfScope: ["No deployment."],
+            allowedPaths: [
+              "src/example.ts",
+              "docs/roadmap/README.md",
+            ],
+          });
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(
+      result.ok ? result.model : null,
+      AUTO_SUBSCRIPTION_DECISION_ESCALATION_MODEL,
+    );
+    assert.equal(observedCalls.length, 2);
+
+    const parsed = parseExecutionDecisionFile(
+      readFileSync(
+        join(root, ".loop-engine", "execution-decision.yaml"),
+        "utf8",
+      ),
+    );
+    assert.equal(parsed.ok, true);
+    if (parsed.ok) {
+      assert.deepEqual(parsed.decision.decision.brief?.deliverables, [
+        "Implement server persistence and idempotent merge in src/example.ts.",
+        "Update docs/roadmap/README.md.",
+      ]);
+      assert.deepEqual(parsed.decision.decision.brief?.outOfScope, [
+        "No deployment.",
+      ]);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("rejects provider-phase validation deliverables and retries once with Sonnet", async () => {
   const { root, project, head } = fixture();
   try {
