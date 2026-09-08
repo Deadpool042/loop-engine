@@ -49,7 +49,10 @@ function isProgress(value: unknown): boolean {
     !isNonEmptyString(value.status) ||
     !isNonEmptyString(value.at) ||
     !isNonEmptyString(value.runId) ||
-    !isNonEmptyString(value.step)
+    !isNonEmptyString(value.step) ||
+    (value.details !== undefined &&
+      (!Array.isArray(value.details) ||
+        !value.details.every(isNonEmptyString)))
   ) {
     return false;
   }
@@ -117,6 +120,9 @@ function isDurableExecutionRecord(value: unknown): value is DurableExecutionReco
     !isNonEmptyString(value.createdAt) ||
     !isNonEmptyString(value.updatedAt) ||
     !isProgress(value.progress) ||
+    (value.progressEvents !== undefined &&
+      (!Array.isArray(value.progressEvents) ||
+        !value.progressEvents.every(isProgress))) ||
     !isFailure(value.failure) ||
     !Array.isArray(value.events) ||
     !value.events.every(isEvent)

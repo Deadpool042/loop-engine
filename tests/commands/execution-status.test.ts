@@ -28,6 +28,7 @@ function runningRecord(): DurableExecutionRecord {
       at: "2026-09-06T22:00:30.000Z",
       runId: "run-active",
       step: "executing",
+      details: Object.freeze(["Calling admitted executor."]),
       executor: Object.freeze({
         profileId: "configured.claude_code.economy",
         provider: "anthropic",
@@ -39,6 +40,44 @@ function runningRecord(): DurableExecutionRecord {
         maxAttempts: 2,
       }),
     }),
+    progressEvents: Object.freeze([
+      Object.freeze({
+        status: "ready" as const,
+        at: "2026-09-06T22:00:10.000Z",
+        runId: "run-active",
+        step: "ready",
+        details: Object.freeze([
+          "Selected executor profile: configured.claude_code.economy",
+        ]),
+        executor: Object.freeze({
+          profileId: "configured.claude_code.economy",
+          provider: "anthropic",
+          runtime: "claude_code",
+          model: "claude-haiku-4-5",
+          effort: "low",
+          fundingMode: "included_subscription",
+          attempt: 1,
+          maxAttempts: 2,
+        }),
+      }),
+      Object.freeze({
+        status: "executing" as const,
+        at: "2026-09-06T22:00:30.000Z",
+        runId: "run-active",
+        step: "executing",
+        details: Object.freeze(["Calling admitted executor."]),
+        executor: Object.freeze({
+          profileId: "configured.claude_code.economy",
+          provider: "anthropic",
+          runtime: "claude_code",
+          model: "claude-haiku-4-5",
+          effort: "low",
+          fundingMode: "included_subscription",
+          attempt: 1,
+          maxAttempts: 2,
+        }),
+      }),
+    ]),
     result: null,
     failure: null,
     events: Object.freeze([
@@ -204,6 +243,11 @@ test("execution status persists active progress and estimates ETA without invent
     assert.equal(report.execution?.progress.remainingMs, 90_000);
     assert.equal(report.execution?.executor?.runtime, "claude_code");
     assert.equal(report.execution?.executor?.model, "claude-haiku-4-5");
+    assert.equal(report.execution?.timeline.length, 2);
+    assert.equal(report.execution?.timeline[0]?.step, "ready");
+    assert.deepEqual(report.execution?.timeline[1]?.details, [
+      "Calling admitted executor.",
+    ]);
     assert.equal(report.telemetry.tokens.status, "unavailable");
     assert.equal(report.telemetry.costUsd.status, "unavailable");
   } finally {
@@ -234,6 +278,11 @@ test("execution status exposes a terminal failure instead of making the same can
     assert.equal(report.execution?.terminal?.validation?.failedCommand, "pnpm run typecheck");
     assert.deepEqual(report.execution?.terminal?.modifiedFiles, ["src/feature.ts"]);
     assert.equal(report.execution?.executor?.model, "claude-sonnet-5");
+    assert.equal(report.execution?.timeline.length, 1);
+    assert.equal(report.execution?.timeline[0]?.step, "failed");
+    assert.deepEqual(report.execution?.timeline[0]?.details, [
+      "Validation failed.",
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -29,6 +29,7 @@ export type DurableExecutionProgress = Readonly<{
   at: string;
   runId: string;
   step: string;
+  details?: readonly string[];
   executor: Readonly<{
     profileId: string;
     provider: string;
@@ -54,6 +55,7 @@ export type DurableExecutionRecord = Readonly<{
   createdAt: string;
   updatedAt: string;
   progress?: DurableExecutionProgress | null;
+  progressEvents?: readonly DurableExecutionProgress[];
   result: LoopRunResult | null;
   failure: LoopRunFailure | null;
   events: readonly DurableExecutionEvent[];

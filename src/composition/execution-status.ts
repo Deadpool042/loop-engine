@@ -13,6 +13,7 @@ const DURABLE_EXECUTION_DIRECTORY =
 const LEGACY_DURABLE_EXECUTION_DIRECTORY =
   resolveLegacyLoopEngineStatePath("durable-executions");
 const HISTORY_LIMIT = 10;
+const EXECUTION_TIMELINE_LIMIT = 32;
 
 type ParsedDurableIdentity = Readonly<{
   candidateId: string | null;
@@ -176,6 +177,43 @@ function estimatedProgress(
   });
 }
 
+function executionTimeline(record: DurableExecutionRecord) {
+  const observed = record.progressEvents ?? [];
+  if (observed.length > 0) {
+    return Object.freeze(
+      observed.slice(-EXECUTION_TIMELINE_LIMIT).map((progress) =>
+        Object.freeze({
+          status: progress.status,
+          at: progress.at,
+          runId: progress.runId,
+          step: progress.step,
+          details: Object.freeze([...(progress.details ?? [])]),
+          executor:
+            progress.executor === null
+              ? null
+              : Object.freeze({ ...progress.executor }),
+        }),
+      ),
+    );
+  }
+
+  const result = record.result;
+  if (!result) return Object.freeze([]);
+  const executor = terminalExecutor(record);
+  return Object.freeze(
+    result.steps.slice(-EXECUTION_TIMELINE_LIMIT).map((step) =>
+      Object.freeze({
+        status: step.status,
+        at: step.completedAt ?? step.startedAt,
+        runId: result.runId,
+        step: step.name,
+        details: Object.freeze([...step.details]),
+        executor,
+      }),
+    ),
+  );
+}
+
 function terminalSummary(record: DurableExecutionRecord) {
   if (record.status === "running") return null;
   const result = record.result;
@@ -281,6 +319,7 @@ export async function buildExecutionStatusReport(
       updatedAt: record.updatedAt,
       runId: record.progress?.runId ?? record.result?.runId ?? null,
       progress,
+      timeline: executionTimeline(record),
       executor: executorFor(record),
       terminal: terminalSummary(record),
     }),
