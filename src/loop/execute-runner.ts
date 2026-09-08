@@ -435,22 +435,23 @@ export async function runLoopExecute(
     );
   }
 
-  function failForScopeViolation(): LoopRunResult | null {
+  function detectScopeViolation(): LoopRunFailure | null {
     if (writableFileScope === null) return null;
     const rejected = findOutOfScopeFiles([...modifiedFiles], writableFileScope);
     if (rejected.length === 0) return null;
-    transition("failed", "failed", "failed", [
-      "Modified files fall outside the authorized writable file scope.",
-    ]);
-    return finalize(
-      cycle.candidate,
-      Object.freeze({
-        code: "scope_violation",
-        message:
-          "Modified files fall outside the authorized writable file scope.",
-        details: Object.freeze(rejected.map((path) => `Out of scope: ${path}`)),
-      }),
-    );
+    return Object.freeze({
+      code: "scope_violation",
+      message:
+        "Modified files fall outside the authorized writable file scope.",
+      details: Object.freeze(rejected.map((path) => `Out of scope: ${path}`)),
+    });
+  }
+
+  function failForScopeViolation(): LoopRunResult | null {
+    const failure = detectScopeViolation();
+    if (failure === null) return null;
+    transition("failed", "failed", "failed", [failure.message]);
+    return finalize(cycle.candidate, failure);
   }
 
   function failForMissingGovernedDelta(): LoopRunResult | null {
@@ -569,8 +570,20 @@ export async function runLoopExecute(
 
   const initialWorktreeFailure = await refreshModifiedFilesFromWorktree();
   if (initialWorktreeFailure !== null) return initialWorktreeFailure;
-  const initialScopeFailure = failForScopeViolation();
-  if (initialScopeFailure !== null) return initialScopeFailure;
+
+  const initialScopeViolation = detectScopeViolation();
+  if (initialScopeViolation !== null) {
+    if (dependencies.resetExecutionWorkspace === null) {
+      transition("failed", "failed", "failed", [initialScopeViolation.message]);
+      return finalize(cycle.candidate, initialScopeViolation);
+    }
+
+    executionResult = Object.freeze({
+      status: "failed" as const,
+      modifiedFiles: Object.freeze([...modifiedFiles].sort()),
+      failure: initialScopeViolation,
+    });
+  }
 
   if (executionResult.status === "failed") {
     const escalation = resolveIntraProviderModelEscalation({

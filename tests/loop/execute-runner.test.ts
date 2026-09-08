@@ -787,6 +787,195 @@ describe("runLoopExecute", () => {
     assert.deepEqual(result.modifiedFiles, []);
   });
 
+  it("automatically retries a first scope violation from a clean baseline with the next model", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+    ]);
+    const observedModels: string[] = [];
+    let executorCalls = 0;
+    let validatorCalls = 0;
+    let resetCalls = 0;
+    let modified: string[] = [];
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      planLoopCycle: () => ({
+        outcome: "ready" as const,
+        candidate: fixtureCandidate(),
+        plannedSteps: [],
+        snapshot: fixtureSnapshot(fixtureProject(), fixtureCandidate()),
+        authorizedBy: "execution_decision" as const,
+        allowedPaths: ["src/**"],
+      }),
+      readModifiedWorktreeFiles: async () => [...modified],
+      resetExecutionWorkspace: async () => {
+        resetCalls += 1;
+        modified = [];
+      },
+      executor: async (plan) => {
+        observedModels.push(plan.model);
+        executorCalls += 1;
+        assert.deepEqual(
+          modified,
+          [],
+          "each scope-retry attempt must start from a clean baseline",
+        );
+
+        modified =
+          executorCalls === 1 ? ["docs/outside.md"] : ["src/feature.ts"];
+
+        return {
+          status: "completed" as const,
+          modifiedFiles: [...modified],
+          details: [],
+        };
+      },
+      validator: async () => {
+        validatorCalls += 1;
+        return {
+          status: "passed" as const,
+          failedCommand: null,
+          exitCode: 0,
+          details: [],
+        };
+      },
+    });
+
+    assert.equal(result.status, "completed");
+    assert.equal(executorCalls, 2);
+    assert.equal(resetCalls, 1);
+    assert.equal(validatorCalls, 1);
+    assert.deepEqual(observedModels, ["luna", "terra"]);
+    assert.deepEqual(result.modifiedFiles, ["src/feature.ts"]);
+    assert.equal(
+      result.modelEscalationEvidence?.attempts[0]?.trigger,
+      "scope_violation",
+    );
+    assert.equal(
+      JSON.stringify(result).includes("docs/outside.md"),
+      false,
+      "the rejected first-attempt delta must not survive the reset",
+    );
+  });
+
+  it("stops after one clean scope retry when the escalated model still violates scope", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+    ]);
+    let executorCalls = 0;
+    let resetCalls = 0;
+    let modified: string[] = [];
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      planLoopCycle: () => ({
+        outcome: "ready" as const,
+        candidate: fixtureCandidate(),
+        plannedSteps: [],
+        snapshot: fixtureSnapshot(fixtureProject(), fixtureCandidate()),
+        authorizedBy: "execution_decision" as const,
+        allowedPaths: ["src/**"],
+      }),
+      readModifiedWorktreeFiles: async () => [...modified],
+      resetExecutionWorkspace: async () => {
+        resetCalls += 1;
+        modified = [];
+      },
+      executor: async () => {
+        executorCalls += 1;
+        modified = [
+          executorCalls === 1 ? "docs/first-outside.md" : "docs/second-outside.md",
+        ];
+        return {
+          status: "completed" as const,
+          modifiedFiles: [...modified],
+          details: [],
+        };
+      },
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "scope_violation");
+    assert.equal(executorCalls, 2);
+    assert.equal(resetCalls, 1);
+    assert.match(
+      result.failure?.details.join("\n") ?? "",
+      /docs\/second-outside\.md/,
+    );
+    assert.equal(
+      JSON.stringify(result).includes("docs/first-outside.md"),
+      false,
+    );
+  });
+
+  it("escalates after provider_limit_exceeded once lower-tier provider attempts are exhausted", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+    ]);
+    const observedModels: string[] = [];
+    let executorCalls = 0;
+    let resetCalls = 0;
+    let modified: string[] = [];
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      readModifiedWorktreeFiles: async () => [...modified],
+      resetExecutionWorkspace: async () => {
+        resetCalls += 1;
+        modified = [];
+      },
+      executor: async (plan) => {
+        observedModels.push(plan.model);
+        executorCalls += 1;
+        if (executorCalls === 1) {
+          modified = ["src/partial.ts"];
+          return {
+            status: "failed" as const,
+            modifiedFiles: [...modified],
+            failure: {
+              code: "provider_limit_exceeded",
+              message: "Configured execution limit was exceeded.",
+              details: [],
+            },
+          };
+        }
+
+        modified = ["src/feature.ts"];
+        return {
+          status: "completed" as const,
+          modifiedFiles: [...modified],
+          details: ["Escalated model completed."],
+        };
+      },
+      validator: async () => ({
+        status: "passed" as const,
+        failedCommand: null,
+        exitCode: 0,
+        details: [],
+      }),
+    });
+
+    assert.equal(result.status, "completed");
+    assert.equal(executorCalls, 2);
+    assert.equal(resetCalls, 1);
+    assert.deepEqual(observedModels, ["luna", "terra"]);
+    assert.deepEqual(result.modifiedFiles, ["src/feature.ts"]);
+    assert.equal(
+      result.modelEscalationEvidence?.attempts[0]?.trigger,
+      "provider_limit_exceeded",
+    );
+    assert.equal(JSON.stringify(result).includes("src/partial.ts"), false);
+  });
+
   it("escalates once to the next model after provider_max_turns", async () => {
     const registry = createAgentRegistry([
       routingProfile("codex.economy", "luna", "economy"),

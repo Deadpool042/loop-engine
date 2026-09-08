@@ -16,7 +16,9 @@ export const LOOP_MODEL_ESCALATION_MAX_ATTEMPTS = 2 as const;
 
 export const LOOP_MODEL_ESCALATION_TRIGGERS = [
   "provider_max_turns",
+  "provider_limit_exceeded",
   "validation_failed",
+  "scope_violation",
 ] as const;
 
 export type LoopModelEscalationTrigger =
