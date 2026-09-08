@@ -851,6 +851,9 @@ export async function runLoopExecute(
               ...executionPlan.policy.rationale,
               `Validation repair attempt ${repairAttempts}/${effectiveMaxRepairs}.`,
               `Failed command: ${validationAttempt.failedCommand ?? "unknown"}.`,
+              ...(validationAttempt.repairDiagnostics ?? []).map(
+                (line) => `Validation diagnostic: ${line}`,
+              ),
             ]),
           }),
         });
