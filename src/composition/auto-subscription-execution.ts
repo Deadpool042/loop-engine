@@ -14,9 +14,10 @@ const INCLUDED_QUOTA_UNKNOWN = Object.freeze({
 /**
  * Fixed, subscription-only autonomous portfolio.
  *
- * Claude remains the deterministic primary at equal funding/tier/effort.
- * Codex is a qualified secondary provider: its AUTO executor uses a strict
- * worktree-only permission profile and subscription authentication only.
+ * AUTO deliberately exposes only standard subscription profiles.
+ * Claude remains the deterministic primary at equal funding/tier/effort;
+ * Codex stays available as the qualified secondary provider, but the AUTO
+ * composition does not escalate to advanced/frontier profiles implicitly.
  * No API or additional-credit funding mode is present here.
  */
 export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProviderConfiguration[] {
@@ -38,18 +39,6 @@ export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProv
             "long_context" as const,
           ]),
         }),
-        Object.freeze({
-          id: "advanced",
-          model: "claude-opus-5",
-          economicTier: "advanced" as const,
-          fundingMode: "included_subscription" as const,
-          quota: INCLUDED_QUOTA_UNKNOWN,
-          capabilities: Object.freeze([
-            ...BASE_CAPABILITIES,
-            "long_context" as const,
-            "multi_file_refactor" as const,
-          ]),
-        }),
       ]),
     }),
     Object.freeze({
@@ -66,30 +55,6 @@ export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProv
           capabilities: Object.freeze([
             ...BASE_CAPABILITIES,
             "long_context" as const,
-          ]),
-        }),
-        Object.freeze({
-          id: "advanced",
-          model: "gpt-5.6-terra",
-          economicTier: "advanced" as const,
-          fundingMode: "included_subscription" as const,
-          quota: INCLUDED_QUOTA_UNKNOWN,
-          capabilities: Object.freeze([
-            ...BASE_CAPABILITIES,
-            "long_context" as const,
-            "multi_file_refactor" as const,
-          ]),
-        }),
-        Object.freeze({
-          id: "frontier",
-          model: "gpt-6-astra",
-          economicTier: "frontier" as const,
-          fundingMode: "included_subscription" as const,
-          quota: INCLUDED_QUOTA_UNKNOWN,
-          capabilities: Object.freeze([
-            ...BASE_CAPABILITIES,
-            "long_context" as const,
-            "multi_file_refactor" as const,
           ]),
         }),
       ]),
