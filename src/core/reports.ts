@@ -939,19 +939,37 @@ export function generateDoctorReport(config: Config) {
   };
 }
 
+export type ConfiguredValidationCommandResult = Readonly<{
+  exitCode: number;
+  diagnostics?: readonly string[];
+}>;
+
 /** Runs configured validation commands in declaration order without formatting output. */
 export async function runConfiguredValidations(
   project: ProjectConfig,
-  runCommand: (command: string, cwd: string) => Promise<number>,
-): Promise<{ failedCommand: string | null; exitCode: number }> {
+  runCommand: (
+    command: string,
+    cwd: string,
+  ) => Promise<number | ConfiguredValidationCommandResult>,
+): Promise<{
+  failedCommand: string | null;
+  exitCode: number;
+  diagnostics: readonly string[];
+}> {
   const projectPath = resolve(project.path);
   for (const command of project.validation) {
-    const exitCode = await runCommand(command, projectPath);
+    const observed = await runCommand(command, projectPath);
+    const exitCode =
+      typeof observed === "number" ? observed : observed.exitCode;
+    const diagnostics =
+      typeof observed === "number"
+        ? Object.freeze([])
+        : Object.freeze([...(observed.diagnostics ?? [])]);
     if (exitCode !== 0) {
-      return { failedCommand: command, exitCode };
+      return { failedCommand: command, exitCode, diagnostics };
     }
   }
-  return { failedCommand: null, exitCode: 0 };
+  return { failedCommand: null, exitCode: 0, diagnostics: Object.freeze([]) };
 }
 
 export function generateProjectValidationReport(project: ProjectConfig) {

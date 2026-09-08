@@ -34,6 +34,7 @@ projects:
       - docs/domains
       - docs/roadmap/README.md
     validation:
+      - DATABASE_URL=postgresql://loop_engine:loop_engine@127.0.0.1:5434/creatyss_generate pnpm run db:generate
       - pnpm run typecheck
       - pnpm run lint
     planning:

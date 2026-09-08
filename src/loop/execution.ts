@@ -48,6 +48,7 @@ export type LoopValidatorResult = Readonly<{
   failedCommand: string | null;
   exitCode: number;
   details: readonly string[];
+  repairDiagnostics?: readonly string[];
 }>;
 
 export type LoopValidator = (
@@ -82,21 +83,68 @@ export type LoopRepairer = (
   input: LoopRepairerInput,
 ) => Promise<LoopRepairerResult>;
 
-function runValidationCommand(command: string, cwd: string): Promise<number> {
-  return new Promise<number>((resolvePromise) => {
+const VALIDATION_DIAGNOSTIC_BUFFER_CHARS = 32_000;
+const VALIDATION_DIAGNOSTIC_MAX_LINES = 40;
+const VALIDATION_DIAGNOSTIC_MAX_LINE_CHARS = 500;
+
+function sanitizeValidationDiagnostics(
+  output: string,
+  cwd: string,
+): readonly string[] {
+  const normalized = output
+    .replace(/\u001b\[[0-9;]*m/g, "")
+    .replaceAll(cwd, ".")
+    .replace(
+      /([a-z][a-z0-9+.-]*:\/\/[^:\s/@]+:)[^@\s]+@/gi,
+      "$1[REDACTED]@",
+    )
+    .replace(
+      /\b([A-Z][A-Z0-9_]*(?:TOKEN|KEY|SECRET|PASSWORD|PASS|PWD))=([^\s]+)/g,
+      "$1=[REDACTED]",
+    );
+
+  const lines = normalized
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim().length > 0)
+    .slice(-VALIDATION_DIAGNOSTIC_MAX_LINES)
+    .map((line) => line.slice(0, VALIDATION_DIAGNOSTIC_MAX_LINE_CHARS));
+
+  return Object.freeze(lines);
+}
+
+function runValidationCommand(
+  command: string,
+  cwd: string,
+): Promise<Readonly<{ exitCode: number; diagnostics: readonly string[] }>> {
+  return new Promise((resolvePromise) => {
     const child = spawn(command, {
       cwd,
       shell: true,
-      stdio: ["ignore", "ignore", "ignore"],
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
+    let output = "";
     let settled = false;
+    const consume = (chunk: Buffer): void => {
+      output += chunk.toString("utf8");
+      if (output.length > VALIDATION_DIAGNOSTIC_BUFFER_CHARS) {
+        output = output.slice(-VALIDATION_DIAGNOSTIC_BUFFER_CHARS);
+      }
+    };
     const settle = (exitCode: number): void => {
       if (settled) return;
       settled = true;
-      resolvePromise(exitCode);
+      resolvePromise(
+        Object.freeze({
+          exitCode,
+          diagnostics: sanitizeValidationDiagnostics(output, cwd),
+        }),
+      );
     };
 
+    child.stdout.on("data", consume);
+    child.stderr.on("data", consume);
     child.once("error", () => settle(1));
     child.once("close", (code) => settle(code ?? 1));
   });
@@ -123,6 +171,9 @@ export async function validateLoopExecution(
             `Failed command: ${result.failedCommand}`,
           ],
     ),
+    ...(result.diagnostics.length === 0
+      ? {}
+      : { repairDiagnostics: Object.freeze([...result.diagnostics]) }),
   });
 }
 
