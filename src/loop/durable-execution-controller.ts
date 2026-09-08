@@ -151,6 +151,7 @@ export async function runDurableLoopExecution(
   }
   if (
     existing !== null &&
+    existing.status === "running" &&
     !leaseExpired(existing, observedAt) &&
     existing.leaseOwner !== request.owner.trim()
   ) {
