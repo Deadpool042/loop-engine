@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
-import { lstatSync, mkdirSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+
+import { resolveContextPath } from "../context/path.js";
 
 import type { ProjectConfig } from "../core/config.js";
 import {
@@ -18,6 +20,7 @@ import {
 import {
   serializeReadyExecutionDecision,
 } from "../governance/execution-decision-approval.js";
+import { parseExecutionDecisionFile } from "../governance/execution-decision.js";
 import {
   createProductionTransactionPort,
   validatePublishedExecutionDecision,
@@ -558,10 +561,75 @@ function ensureLocalDecisionDirectory(
   return null;
 }
 
+function prepareShaOnlyRebindDraft(
+  context: Extract<AutoDecisionContext, { ok: true }>,
+): ExecutionDecisionDraft | null {
+  const decisionPath = resolveContextPath(
+    context.current.projectPath,
+    context.current.executionDecisionPath,
+  );
+  if (!decisionPath.insideProject) return null;
+
+  let raw: string;
+  try {
+    raw = readFileSync(decisionPath.absolutePath, "utf8");
+  } catch {
+    return null;
+  }
+
+  const parsed = parseExecutionDecisionFile(raw);
+  if (!parsed.ok) return null;
+
+  const existing = parsed.decision;
+  const candidate = existing.decision.candidate;
+  const brief = existing.decision.brief;
+
+  if (
+    existing.project !== context.current.project ||
+    existing.decision.state !== "READY" ||
+    candidate?.id !== context.current.candidateId ||
+    existing.source.document !== context.current.sourceDocument ||
+    brief === undefined ||
+    JSON.stringify(candidate.allowedPaths) !==
+      JSON.stringify(context.governedAllowedPaths) ||
+    proposalContradictsConcreteCandidate(
+      context.candidateText,
+      context.governedAllowedPaths,
+      {
+        deliverables: brief.deliverables,
+        outOfScope: brief.outOfScope,
+      },
+    )
+  ) {
+    return null;
+  }
+
+  const rebound = createExecutionDecisionDraft(
+    {
+      project: context.current.project,
+      candidateId: context.current.candidateId,
+      sourceDocument: context.current.sourceDocument,
+      gitHead: context.current.gitHead,
+      executionDecisionPath: context.current.executionDecisionPath,
+    },
+    {
+      objective: brief.objective,
+      deliverables: brief.deliverables,
+      outOfScope: brief.outOfScope,
+      allowedPaths: context.governedAllowedPaths,
+      ...(brief.forbiddenContentTerms === undefined
+        ? {}
+        : { forbiddenContentTerms: brief.forbiddenContentTerms }),
+    },
+  );
+
+  return rebound.ok ? rebound.draft : null;
+}
+
 async function publishDecision(
   current: ProductionCurrent,
   draft: ExecutionDecisionDraft,
-  model: string,
+  model?: string,
 ): Promise<AutoSubscriptionDecisionRenewalResult> {
   const publish = createProductionTransactionPort();
   const publication = await publish(
@@ -603,7 +671,7 @@ async function publishDecision(
   return Object.freeze({
     ok: true as const,
     status: "renewed" as const,
-    model,
+    ...(model === undefined ? {} : { model }),
   });
 }
 
@@ -685,6 +753,19 @@ export async function ensureAutoSubscriptionExecutionDecision(
 
   const directoryFailure = ensureLocalDecisionDirectory(context.current);
   if (directoryFailure !== null) return directoryFailure;
+
+  const reboundDraft = prepareShaOnlyRebindDraft(context);
+  if (reboundDraft !== null) {
+    const rebound = await publishDecision(context.current, reboundDraft);
+    if (!rebound.ok) return rebound;
+
+    const reboundAdmission = evaluateAutoSubscriptionAdmission(
+      project,
+      currentGitHead,
+      candidateId,
+    );
+    return reboundAdmission.ok ? rebound : reboundAdmission;
+  }
 
   const prepared = await prepareDecisionDraft(
     context.current,

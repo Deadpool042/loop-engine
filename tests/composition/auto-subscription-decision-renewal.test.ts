@@ -608,7 +608,7 @@ test("rejects provider-phase validation deliverables and retries once with Sonne
   }
 });
 
-test("renews a stale SHA-bound decision for the exact current candidate", async () => {
+test("rebinds a stale SHA locally when the canonical contract is unchanged", async () => {
   const { root, project, head } = fixture();
   try {
     mkdirSync(join(root, ".loop-engine"), { recursive: true });
@@ -629,8 +629,9 @@ test("renews a stale SHA-bound decision for the exact current candidate", async 
         },
       },
     );
-    assert.equal(result.ok, true);
-    assert.equal(calls, 1);
+    assert.deepEqual(result, { ok: true, status: "renewed" });
+    assert.equal(calls, 0);
+
     const parsed = parseExecutionDecisionFile(
       readFileSync(
         join(root, ".loop-engine", "execution-decision.yaml"),
@@ -638,7 +639,70 @@ test("renews a stale SHA-bound decision for the exact current candidate", async 
       ),
     );
     assert.equal(parsed.ok, true);
-    if (parsed.ok) assert.equal(parsed.decision.source.gitHead, head);
+    if (parsed.ok) {
+      assert.equal(parsed.decision.source.gitHead, head);
+      assert.deepEqual(parsed.decision.decision.candidate?.allowedPaths, [
+        "docs/continuation-proof.md",
+        "docs/roadmap/README.md",
+      ]);
+      assert.deepEqual(parsed.decision.decision.brief?.deliverables, [
+        "Add docs/continuation-proof.md.",
+        "Mark H1-L1 complete.",
+      ]);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("falls back to provider renewal when a stale decision scope no longer matches the canonical scope", async () => {
+  const { root, project, head } = fixture();
+  try {
+    mkdirSync(join(root, ".loop-engine"), { recursive: true });
+    writeFileSync(
+      join(root, ".loop-engine", "execution-decision.yaml"),
+      [
+        "version: 1",
+        "project: example",
+        "decision:",
+        "  state: READY",
+        "  candidate:",
+        "    id: H1-L1",
+        "    allowedPaths:",
+        "      - docs/legacy-proof.md",
+        "  brief:",
+        "    objective: Document the bounded continuation result.",
+        "    deliverables:",
+        "      - Add docs/legacy-proof.md.",
+        "    outOfScope:",
+        "      - No deployment.",
+        "source:",
+        "  document: docs/roadmap/README.md",
+        `  gitHead: ${"b".repeat(40)}`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    let calls = 0;
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      project,
+      head,
+      "H1-L1",
+      {
+        runClaude: async () => {
+          calls += 1;
+          return claudeSuccess();
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(calls, 1);
+    assert.equal(
+      result.ok ? result.model : null,
+      AUTO_SUBSCRIPTION_DECISION_MODEL,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
