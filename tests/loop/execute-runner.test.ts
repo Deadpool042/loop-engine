@@ -914,6 +914,68 @@ describe("runLoopExecute", () => {
     );
   });
 
+  it("escalates after provider_limit_exceeded once lower-tier provider attempts are exhausted", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+    ]);
+    const observedModels: string[] = [];
+    let executorCalls = 0;
+    let resetCalls = 0;
+    let modified: string[] = [];
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      readModifiedWorktreeFiles: async () => [...modified],
+      resetExecutionWorkspace: async () => {
+        resetCalls += 1;
+        modified = [];
+      },
+      executor: async (plan) => {
+        observedModels.push(plan.model);
+        executorCalls += 1;
+        if (executorCalls === 1) {
+          modified = ["src/partial.ts"];
+          return {
+            status: "failed" as const,
+            modifiedFiles: [...modified],
+            failure: {
+              code: "provider_limit_exceeded",
+              message: "Configured execution limit was exceeded.",
+              details: [],
+            },
+          };
+        }
+
+        modified = ["src/feature.ts"];
+        return {
+          status: "completed" as const,
+          modifiedFiles: [...modified],
+          details: ["Escalated model completed."],
+        };
+      },
+      validator: async () => ({
+        status: "passed" as const,
+        failedCommand: null,
+        exitCode: 0,
+        details: [],
+      }),
+    });
+
+    assert.equal(result.status, "completed");
+    assert.equal(executorCalls, 2);
+    assert.equal(resetCalls, 1);
+    assert.deepEqual(observedModels, ["luna", "terra"]);
+    assert.deepEqual(result.modifiedFiles, ["src/feature.ts"]);
+    assert.equal(
+      result.modelEscalationEvidence?.attempts[0]?.trigger,
+      "provider_limit_exceeded",
+    );
+    assert.equal(JSON.stringify(result).includes("src/partial.ts"), false);
+  });
+
   it("escalates once to the next model after provider_max_turns", async () => {
     const registry = createAgentRegistry([
       routingProfile("codex.economy", "luna", "economy"),
