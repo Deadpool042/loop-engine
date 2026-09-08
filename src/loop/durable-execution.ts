@@ -72,6 +72,7 @@ export type DurableExecutionRequest = Readonly<{
   project: string;
   owner: string;
   leaseDurationMs: number;
+  retryTerminal?: boolean;
 }>;
 
 export type DurableExecutionResult =

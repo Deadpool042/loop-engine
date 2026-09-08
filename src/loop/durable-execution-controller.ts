@@ -142,11 +142,16 @@ export async function runDurableLoopExecution(
   if (existing !== null && existing.project !== request.project.trim()) {
     return reject("project_mismatch", existing, "The idempotency key is already bound to another project.");
   }
-  if (existing !== null && terminal(existing)) {
+  if (
+    existing !== null &&
+    terminal(existing) &&
+    (existing.status === "completed" || request.retryTerminal !== true)
+  ) {
     return Object.freeze({ status: "replayed" as const, record: existing });
   }
   if (
     existing !== null &&
+    existing.status === "running" &&
     !leaseExpired(existing, observedAt) &&
     existing.leaseOwner !== request.owner.trim()
   ) {

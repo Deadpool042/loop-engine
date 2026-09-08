@@ -62,6 +62,7 @@ export type DurableAutoPublishInput = Readonly<{
   candidateId: string;
   expectedGitHead: string;
   maxRepairs: number;
+  retryTerminal?: boolean;
   storeDirectory?: string;
   owner?: string;
 }>;
@@ -102,6 +103,7 @@ export async function runDurableAutoSubscriptionPublish(
       project: input.project,
       owner: input.owner ?? `loop-engine-cli:${process.pid}`,
       leaseDurationMs: DURABLE_LEASE_DURATION_MS,
+      ...(input.retryTerminal === true ? { retryTerminal: true } : {}),
     },
     executionOptions,
   );

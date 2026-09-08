@@ -733,6 +733,7 @@ else if (command === "review") {
   const candidateId = optionValue("--candidate");
   const autoSubscription = hasOption("--auto-subscription");
   const durable = hasOption("--durable");
+  const retryTerminal = hasOption("--retry-terminal");
   const expectedGitHead = optionValue("--expected-git-head");
   const commitMessage = optionValue("--commit-message");
   const exportPatchPath = optionValue("--export-patch");
@@ -841,6 +842,13 @@ else if (command === "review") {
       json,
       "durable_requires_auto_subscription_publish",
       "--durable requires publish mode with --auto-subscription.",
+    );
+  }
+  if (retryTerminal && !durable) {
+    failOption(
+      json,
+      "durable_requires_auto_subscription_publish",
+      "--retry-terminal requires durable publish mode with --auto-subscription.",
     );
   }
 
@@ -997,6 +1005,7 @@ else if (command === "review") {
         candidateId: candidateId!,
         expectedGitHead: expectedGitHead!,
         maxRepairs,
+        ...(retryTerminal ? { retryTerminal: true } : {}),
       });
     if (json) {
       console.log(JSON.stringify(durableResult.report));
