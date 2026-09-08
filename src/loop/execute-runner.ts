@@ -388,13 +388,16 @@ export async function runLoopExecute(
     );
   }
 
-  modelAttemptBudget = Math.min(
-    resolveModelAttemptBudget(
-      agentPolicy,
-      dependencies.agentPolicy.allowEscalation,
-    ),
-    options.maxModelAttempts ?? Number.POSITIVE_INFINITY,
+  modelAttemptBudget = resolveModelAttemptBudget(
+    agentPolicy,
+    dependencies.agentPolicy.allowEscalation,
   );
+  if (options.maxModelAttempts !== undefined) {
+    modelAttemptBudget = Math.min(
+      modelAttemptBudget,
+      options.maxModelAttempts,
+    );
+  }
 
   const policyRepairCeiling =
     agentPolicy.selectionRequest.budgetCeiling?.maxRepairs;
