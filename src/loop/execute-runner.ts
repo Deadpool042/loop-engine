@@ -66,6 +66,7 @@ export type LoopRunExecuteProgressEvent = Readonly<{
   at: string;
   runId: string;
   step: string;
+  details: readonly string[];
   executor: Readonly<{
     profileId: string;
     provider: string;
@@ -219,6 +220,7 @@ export async function runLoopExecute(
           at: timestamp,
           runId,
           step: stepName,
+          details: Object.freeze([...details]),
           executor:
             selected === null
               ? null

@@ -10,6 +10,8 @@ import {
   type DurableExecutionStore,
 } from "./durable-execution.js";
 
+const MAX_PROGRESS_EVENTS = 32;
+
 function nonEmpty(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -88,6 +90,8 @@ function leaseRecord(
     cancellationRequested: existing?.cancellationRequested ?? false,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
+    progress: null,
+    progressEvents: Object.freeze([]),
     result: null,
     failure: null,
     events: baseEvents,
@@ -187,11 +191,16 @@ export async function runDurableLoopExecution(
         ) {
           return;
         }
+        const progressEvents = Object.freeze([
+          ...(current.progressEvents ?? []),
+          progress,
+        ].slice(-MAX_PROGRESS_EVENTS));
         const updated = Object.freeze({
           ...current,
           revision: current.revision + 1,
           updatedAt: progress.at,
           progress,
+          progressEvents,
         });
         await store.save(updated, current.revision);
       })

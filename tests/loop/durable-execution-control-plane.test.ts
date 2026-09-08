@@ -77,6 +77,7 @@ test("active lease rejects concurrent owner without invoking provider", async ()
           at: "2026-07-31T00:00:00.500Z",
           runId: "run-durable-active",
           step: "executing",
+          details: Object.freeze(["Provider invocation started."]),
           executor: Object.freeze({
             profileId: "configured.claude_code.economy",
             provider: "anthropic",
@@ -106,6 +107,10 @@ test("active lease rejects concurrent owner without invoking provider", async ()
   assert.equal(activeRecord?.progress?.status, "executing");
   assert.equal(activeRecord?.progress?.executor?.runtime, "claude_code");
   assert.equal(activeRecord?.progress?.executor?.model, "claude-haiku-4-5");
+  assert.equal(activeRecord?.progressEvents?.length, 1);
+  assert.deepEqual(activeRecord?.progressEvents?.[0]?.details, [
+    "Provider invocation started.",
+  ]);
 
   const second = await control.execute({
     idempotencyKey: "cycle:concurrent",
