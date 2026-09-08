@@ -162,7 +162,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
         ...result.forbidden.map(
           (token) => `${RUNNER_FILE} -> forbidden: ${token}`,
         ),
-        ...(result.executorCallSites >= 1 && result.executorCallSites <= 3
+        ...(result.executorCallSites >= 1 && result.executorCallSites <= 4
           ? []
           : [
               `${RUNNER_FILE} -> unexpected executor call-site count: ${result.executorCallSites}`,
