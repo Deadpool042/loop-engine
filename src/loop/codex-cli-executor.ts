@@ -6,6 +6,7 @@ import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
 import { buildLoopRuntimeDelegationGuidance } from "./runtime-delegation.js";
 import { buildSubscriptionCliEnvironment } from "./subscription-cli-environment.js";
+import { admitProviderWorktree } from "./provider-worktree-admission.js";
 import { readModifiedWorktreeFiles } from "./worktree-status.js";
 
 export type CodexCliLoopExecutorOptions = Readonly<{
@@ -68,6 +69,12 @@ function buildPrompt(plan: LoopExecutionPlan): string {
           "Produce every required deliverable, but only within the writable file scope.",
         ]),
     ...buildLoopRuntimeDelegationGuidance(plan.delegation),
+    ...(plan.worktreeMode === "repair_existing"
+      ? [
+          "This is a bounded validation-repair pass over the existing admitted worktree delta.",
+          "Repair the current changes in place. Do not discard unrelated state or widen the writable scope.",
+        ]
+      : []),
     "Stay inside the current worktree. Do not commit, push, tag, publish, or expose secrets.",
     "Finish by leaving the intended source changes in the worktree.",
   ].join("\n");
@@ -179,11 +186,10 @@ export function createCodexCliLoopExecutor(
         "worktree_status_failed",
         "Unable to verify the provider worktree.",
       );
-    if (before.length > 0)
-      return failure(
-        "worktree_not_clean",
-        "Codex execution requires a clean worktree.",
-      );
+    const worktreeAdmission = admitProviderWorktree(plan, before);
+    if (!worktreeAdmission.ok) {
+      return failure(worktreeAdmission.code, worktreeAdmission.message, before);
+    }
 
     const args = [
       "exec",

@@ -6,6 +6,7 @@ import type { LoopExecutionPlan } from "./execution-plan.js";
 import { buildLoopRuntimeDelegationGuidance } from "./runtime-delegation.js";
 import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
 import { buildSubscriptionCliEnvironment } from "./subscription-cli-environment.js";
+import { admitProviderWorktree } from "./provider-worktree-admission.js";
 import { readModifiedWorktreeFiles } from "./worktree-status.js";
 
 export type ClaudeCodeCliLoopExecutorOptions = Readonly<{
@@ -54,6 +55,12 @@ function buildPrompt(plan: LoopExecutionPlan): string {
           "Produce every required deliverable, but only within the writable file scope.",
         ]),
     ...buildLoopRuntimeDelegationGuidance(plan.delegation),
+    ...(plan.worktreeMode === "repair_existing"
+      ? [
+          "This is a bounded validation-repair pass over the existing admitted worktree delta.",
+          "Repair the current changes in place. Do not discard unrelated state or widen the writable scope.",
+        ]
+      : []),
     "Stay inside the current worktree. Do not commit, push, tag, publish, alter credentials, or expose secrets.",
     "Implement only the target files explicitly named by the selected candidate.",
     "Finish by leaving only the intended source changes in the worktree.",
@@ -201,11 +208,9 @@ export function createClaudeCodeCliLoopExecutor(
         "Unable to verify the provider worktree.",
       );
     }
-    if (before.length > 0) {
-      return failure(
-        "worktree_not_clean",
-        "Claude Code execution requires a clean worktree.",
-      );
+    const worktreeAdmission = admitProviderWorktree(plan, before);
+    if (!worktreeAdmission.ok) {
+      return failure(worktreeAdmission.code, worktreeAdmission.message, before);
     }
 
     const args = [

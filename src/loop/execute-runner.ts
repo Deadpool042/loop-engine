@@ -831,6 +831,7 @@ export async function runLoopExecute(
       } else {
         const repairPlan = Object.freeze({
           ...executionPlan,
+          worktreeMode: "repair_existing" as const,
           policy: Object.freeze({
             ...executionPlan.policy,
             requiredCapabilities: Object.freeze([

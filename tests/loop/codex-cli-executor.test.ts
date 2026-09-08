@@ -198,6 +198,90 @@ describe("createCodexCliLoopExecutor", () => {
     }
   });
 
+  it("keeps initial execution strict when the worktree is already dirty", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    try {
+      writeFileSync(join(cwd, "feature.ts"), "export const value = 1;\n");
+      const result = await createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(
+        {
+          ...fakePlan(cwd),
+          allowedPaths: ["feature.ts"],
+        },
+        cwd,
+      );
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "worktree_not_clean",
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("repairs an existing dirty worktree only inside the admitted scope", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    const captureArgs = join(cwd, "../codex-repair-arguments.json");
+    try {
+      writeFileSync(join(cwd, "feature.ts"), "export const value = 1;\n");
+      process.env.FAKE_CODEX_CAPTURE_ARGS = captureArgs;
+
+      const result = await createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(
+        {
+          ...fakePlan(cwd),
+          allowedPaths: ["feature.ts"],
+          worktreeMode: "repair_existing",
+        },
+        cwd,
+      );
+
+      assert.equal(result.status, "completed");
+      assert.deepEqual(result.modifiedFiles, ["feature.ts"]);
+      const args = JSON.parse(readFileSync(captureArgs, "utf8")) as string[];
+      const prompt = args.at(-1) ?? "";
+      assert.match(prompt, /bounded validation-repair pass/);
+      assert.match(prompt, /Repair the current changes in place/);
+    } finally {
+      delete process.env.FAKE_CODEX_CAPTURE_ARGS;
+      cleanup();
+    }
+  });
+
+  it("refuses bounded repair when any existing change is outside scope", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    try {
+      writeFileSync(join(cwd, "outside.ts"), "export const value = 1;\n");
+
+      const result = await createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(
+        {
+          ...fakePlan(cwd),
+          allowedPaths: ["feature.ts"],
+          worktreeMode: "repair_existing",
+        },
+        cwd,
+      );
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "worktree_scope_violation",
+      );
+      assert.deepEqual(result.modifiedFiles, ["outside.ts"]);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("does not inherit API keys or unrelated credentials into Codex", async () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
     const captureEnv = join(cwd, "../codex-env.json");

@@ -151,6 +151,7 @@ describe("runLoopExecute — policy repair budget parity", () => {
       executor: async (plan) => {
         executorCalls += 1;
         if (executorCalls === 2) {
+          assert.equal(plan.worktreeMode, "repair_existing");
           assert.equal(
             plan.policy.rationale.some((reason) =>
               reason.includes("Validation repair attempt 1/1"),
