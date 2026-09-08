@@ -8,6 +8,7 @@ import { describe, it } from "node:test";
 import { createAgentRegistry } from "../../src/agents/registry.js";
 import type { AgentProfile } from "../../src/agents/types.js";
 import type { Config, ProjectConfig } from "../../src/core/config.js";
+import { generateExecutionReportWithEvidence } from "../../src/core/loop-execution-plan-evidence-report.js";
 import type { RoadmapCandidate } from "../../src/intelligence/roadmap.js";
 import type { ProjectSnapshot } from "../../src/intelligence/snapshot.js";
 import { DEFAULT_AGENT_POLICY } from "../../src/policy/defaults.js";
@@ -890,7 +891,9 @@ describe("runLoopExecute", () => {
       executor: async () => {
         executorCalls += 1;
         modified = [
-          executorCalls === 1 ? "docs/first-outside.md" : "docs/second-outside.md",
+          executorCalls === 1
+            ? "docs/first-outside.md"
+            : "docs/second-outside.md",
         ];
         return {
           status: "completed" as const,
@@ -1090,7 +1093,10 @@ describe("runLoopExecute", () => {
     assert.deepEqual(observedModels, ["luna", "terra"]);
     assert.equal(validatorCalls, 2);
     assert.equal(result.validation?.attempts, 2);
-    assert.equal(result.modelEscalationEvidence?.attempts[0]?.trigger, "validation_failed");
+    assert.equal(
+      result.modelEscalationEvidence?.attempts[0]?.trigger,
+      "validation_failed",
+    );
     assert.deepEqual(
       result.steps.map((step) => step.name),
       [
@@ -1120,8 +1126,7 @@ describe("runLoopExecute", () => {
       agentPolicy: DEFAULT_AGENT_POLICY,
       agentRegistry: registry,
       maxRepairs: 0,
-      readModifiedWorktreeFiles: async () =>
-        dirty ? ["src/feature.ts"] : [],
+      readModifiedWorktreeFiles: async () => (dirty ? ["src/feature.ts"] : []),
       resetExecutionWorkspace: async () => {
         resetCalls += 1;
         dirty = false;
@@ -1203,7 +1208,10 @@ describe("runLoopExecute", () => {
       result.failure?.code,
       "model_escalation_workspace_reset_failed",
     );
-    assert.equal(JSON.stringify(result).includes("private reset diagnostic"), false);
+    assert.equal(
+      JSON.stringify(result).includes("private reset diagnostic"),
+      false,
+    );
   });
 
   it("does not use model escalation for provider/runtime failures handled by failover", async () => {
@@ -1288,6 +1296,44 @@ describe("runLoopExecute", () => {
     assert.deepEqual(
       result.steps.map((step) => step.name),
       ["planning", "ready", "executing", "failed"],
+    );
+  });
+  it("caps the real AUTO model attempt budget at one and exposes it in run evidence", async () => {
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+      routingProfile("codex.standard", "terra", "standard"),
+    ]);
+    let executorCalls = 0;
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      maxModelAttempts: 1,
+      executor: async () => {
+        executorCalls += 1;
+        return {
+          status: "failed" as const,
+          modifiedFiles: [],
+          failure: {
+            code: "provider_max_turns",
+            message: "The model exhausted its bounded turn budget.",
+            details: [],
+          },
+        };
+      },
+    });
+    const report = generateExecutionReportWithEvidence(result);
+
+    assert.equal(result.status, "failed");
+    assert.equal(executorCalls, 1);
+    assert.equal(result.modelAttemptBudget, 1);
+    assert.equal(report.executionPlanEvidence?.modelAttemptBudget, 1);
+    assert.equal(result.modelEscalationEvidence, null);
+    assert.ok(
+      result.steps.some((step) =>
+        step.details.includes("Model attempt budget: 1"),
+      ),
     );
   });
 });

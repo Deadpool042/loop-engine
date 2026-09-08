@@ -1027,7 +1027,7 @@ else if (command === "review") {
         ...(candidateId !== undefined ? { candidateId } : {}),
         maxRepairs,
         ...(autoSubscription
-          ? { provider: "claude_code" as const }
+          ? { provider: "claude_code" as const, autoSubscription: true }
           : providerId !== undefined
             ? { provider: providerId }
             : {}),

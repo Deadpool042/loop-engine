@@ -172,7 +172,7 @@ function parsePhaseGate(line: string): ParsedPhaseGate | null {
 }
 
 function phaseIdFromCandidateId(id: string | undefined): string | undefined {
-  return id?.match(/^(H\d+)-L\d+[A-Za-z]?$/)?.[1];
+  return id?.match(/^(H\d+)-L\d+[A-Za-z]?(?:\.M\d+)?$/)?.[1];
 }
 
 function admissibilityForCandidate(options: {

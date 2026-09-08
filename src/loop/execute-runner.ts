@@ -30,6 +30,7 @@ import {
   type LoopValidatorResult,
 } from "./execution.js";
 import type { LoopRunPlanOptions } from "./runner.js";
+import type { AutoMicroLotDecomposition } from "./micro-lot-decomposition.js";
 import type {
   LoopRunFailure,
   LoopRunResult,
@@ -45,6 +46,10 @@ export type LoopRunExecuteOptions = LoopRunPlanOptions &
     validator?: LoopValidator;
     repairer?: LoopRepairer;
     maxRepairs?: number;
+    /** Composition-only ceiling; AUTO sets this to one without changing global policy. */
+    maxModelAttempts?: number;
+    /** AUTO-only deterministic narrowing of manifestly oversized governed candidates. */
+    decomposeOversizedCandidate?: boolean;
     /** Internal composition override for an already allocated isolated workspace. */
     executionProjectPath?: string;
     /** Explicit composition-only destination for a validated isolated patch. */
@@ -88,6 +93,7 @@ type ExecuteDependencies = Readonly<{
     options?: {
       candidateId?: string;
       executionDecisionProjectPath?: string;
+      decomposeOversizedCandidate?: boolean;
     },
   ) => LoopPlan;
   agentPolicy: AgentPolicy;
@@ -100,8 +106,7 @@ type ExecuteDependencies = Readonly<{
   maxRepairs: number;
   readModifiedWorktreeFiles: typeof readModifiedWorktreeFiles;
   resetExecutionWorkspace:
-    | ((executionProjectPath: string) => Promise<void>)
-    | null;
+    ((executionProjectPath: string) => Promise<void>) | null;
 }>;
 
 function resolveDependencies(
@@ -187,6 +192,7 @@ export async function runLoopExecute(
   let brief: NonNullable<LoopRunResult["brief"]> | null = null;
   const modelEscalationAttempts: LoopModelEscalationAttemptEvidence[] = [];
   let modelAttemptBudget = 1;
+  let decomposition: AutoMicroLotDecomposition | null = null;
 
   function transition(
     to: LoopRunStatus,
@@ -264,6 +270,8 @@ export async function runLoopExecute(
       contextPackage,
       writableFileScope,
       brief,
+      modelAttemptBudget,
+      decomposition,
       modelEscalationEvidence:
         modelEscalationAttempts.length === 0
           ? null
@@ -277,6 +285,22 @@ export async function runLoopExecute(
   transition("planning", "planning", "completed", [
     `Resolving project: ${projectName}`,
   ]);
+
+  if (
+    options.maxModelAttempts !== undefined &&
+    (!Number.isInteger(options.maxModelAttempts) ||
+      options.maxModelAttempts < 1)
+  ) {
+    transition("failed", "failed", "failed", ["Invalid model attempt budget."]);
+    return finalize(
+      null,
+      internalFailure(
+        "invalid_model_attempt_budget",
+        "maxModelAttempts must be a positive integer.",
+        String(options.maxModelAttempts),
+      ),
+    );
+  }
 
   if (!isValidRepairBudget(dependencies.maxRepairs)) {
     transition("failed", "failed", "failed", ["Invalid repair budget."]);
@@ -320,6 +344,9 @@ export async function runLoopExecute(
       ...(options.executionProjectPath === undefined
         ? {}
         : { executionDecisionProjectPath: project.path }),
+      ...(options.decomposeOversizedCandidate === true
+        ? { decomposeOversizedCandidate: true }
+        : {}),
     }),
   );
   if (cycle.outcome === "blocked") {
@@ -335,6 +362,7 @@ export async function runLoopExecute(
   }
 
   const governedExecution = cycle.authorizedBy === "execution_decision";
+  decomposition = cycle.decomposition ?? null;
 
   agentPolicy = dependencies.resolvePolicy({
     policy: dependencies.agentPolicy,
@@ -360,9 +388,12 @@ export async function runLoopExecute(
     );
   }
 
-  modelAttemptBudget = resolveModelAttemptBudget(
-    agentPolicy,
-    dependencies.agentPolicy.allowEscalation,
+  modelAttemptBudget = Math.min(
+    resolveModelAttemptBudget(
+      agentPolicy,
+      dependencies.agentPolicy.allowEscalation,
+    ),
+    options.maxModelAttempts ?? Number.POSITIVE_INFINITY,
   );
 
   const policyRepairCeiling =
@@ -385,9 +416,7 @@ export async function runLoopExecute(
     cycle.snapshot,
     agentPolicy.requirements.contextBudget,
   );
-  const buildExecutionPlan = (
-    resolution: AgentPolicyResolution,
-  ) =>
+  const buildExecutionPlan = (resolution: AgentPolicyResolution) =>
     createLoopExecutionPlan(
       Object.freeze({
         runId,
@@ -399,6 +428,9 @@ export async function runLoopExecute(
           ? {}
           : { allowedPaths: cycle.allowedPaths }),
         ...(cycle.brief === undefined ? {} : { brief: cycle.brief }),
+        ...(cycle.decomposition === undefined
+          ? {}
+          : { microLot: cycle.decomposition }),
       }),
     );
   let executionPlan = buildExecutionPlan(agentPolicy);
@@ -456,10 +488,7 @@ export async function runLoopExecute(
   }
 
   function failForMissingGovernedDelta(): LoopRunResult | null {
-    if (
-      !governedExecution ||
-      modifiedFiles.size > 0
-    ) {
+    if (!governedExecution || modifiedFiles.size > 0) {
       return null;
     }
 
@@ -470,8 +499,7 @@ export async function runLoopExecute(
       cycle.candidate,
       Object.freeze({
         code: "no_effective_change",
-        message:
-          "Governed execution produced no worktree change.",
+        message: "Governed execution produced no worktree change.",
         details: Object.freeze([
           "A READY execution decision requires a non-empty worktree delta before validation.",
         ]),
@@ -629,8 +657,7 @@ export async function runLoopExecute(
         );
       }
 
-      const escalatedWorktreeFailure =
-        await refreshModifiedFilesFromWorktree();
+      const escalatedWorktreeFailure = await refreshModifiedFilesFromWorktree();
       if (escalatedWorktreeFailure !== null) return escalatedWorktreeFailure;
       const escalatedScopeFailure = failForScopeViolation();
       if (escalatedScopeFailure !== null) return escalatedScopeFailure;
@@ -729,8 +756,7 @@ export async function runLoopExecute(
           `Attempt ${completedModelAttempts}/${modelAttemptBudget}`,
         ]);
 
-        const escalationResetFailure =
-          await resetWorkspaceForModelEscalation();
+        const escalationResetFailure = await resetWorkspaceForModelEscalation();
         if (escalationResetFailure !== null) return escalationResetFailure;
 
         try {

@@ -30,6 +30,9 @@ export function canonicalizeLoopExecutionPlanEvidence(
     effort: evidence.effort,
     delegation: evidence.delegation,
     budget: evidence.budget,
+    ...(evidence.modelAttemptBudget === undefined
+      ? {}
+      : { modelAttemptBudget: evidence.modelAttemptBudget }),
     ...(evidence.allowedPaths === undefined
       ? {}
       : { allowedPaths: canonicalStringArray(evidence.allowedPaths) }),

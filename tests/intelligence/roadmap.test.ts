@@ -188,6 +188,27 @@ describe("findRoadmapCandidates", () => {
     }
   });
 
+  it("keeps AUTO micro-lot children bound to their parent phase gate", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "<!-- loop-engine:phase-gate phase=H3 state=closed blockedBy=H2-RC -->",
+        "- [ ] H3-L3.M2 — Continue the bounded child",
+      ].join("\n"),
+    );
+
+    try {
+      const candidate = findRoadmapCandidates(project, projectPath)[0];
+      assert.equal(candidate?.phaseId, "H3");
+      assert.deepEqual(candidate?.admissibility, {
+        state: "not_admissible",
+        reason: "phase_closed",
+        blockedBy: "H2-RC",
+      });
+    } finally {
+      cleanup();
+    }
+  });
+
   it("accepts an explicitly open phase and leaves roadmaps without gates unchanged", () => {
     const { project, projectPath, cleanup } = setupRoadmap(
       [

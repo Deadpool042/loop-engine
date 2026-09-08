@@ -21,6 +21,7 @@ export type LoopExecutionPlanEvidence = Readonly<{
   effort: AgentEffort;
   delegation: LoopRuntimeDelegationPolicy;
   budget: AgentBudget;
+  modelAttemptBudget?: number;
   allowedPaths?: readonly string[];
   policy: Readonly<{
     id: string;
@@ -39,6 +40,7 @@ export type LoopExecutionPlanEvidence = Readonly<{
 export function projectLoopExecutionPlanEvidence(
   resolution: AgentPolicyResolution | null,
   allowedPaths?: readonly string[] | null,
+  modelAttemptBudget = 1,
 ): LoopExecutionPlanEvidence | null {
   if (
     resolution?.status !== "resolved" ||
@@ -61,6 +63,7 @@ export function projectLoopExecutionPlanEvidence(
     effort,
     delegation: resolveLoopRuntimeDelegationPolicy(effort),
     budget: Object.freeze({ ...profile.budget }),
+    modelAttemptBudget,
     ...(allowedPaths === undefined || allowedPaths === null
       ? {}
       : { allowedPaths: Object.freeze([...allowedPaths].sort()) }),

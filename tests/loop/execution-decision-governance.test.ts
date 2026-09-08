@@ -107,6 +107,38 @@ describe("project-owned execution decision governance", () => {
     }
   });
 
+  it("AUTO planning narrows a governed oversized parent before agent execution", () => {
+    const { project } = setupGovernedProject({
+      roadmap: "- [ ] H3-L3 — Deliver the complete G3 workflow\n",
+      decisionYaml: (sha) => [
+        "version: 1", "project: fixture", "decision:", "  state: READY",
+        "  candidate:", "    id: H3-L3", "    allowedPaths:",
+        "      - src/g3/a.ts", "      - src/g3/b.ts", "      - src/g3/c.ts",
+        "      - src/g3/d.ts", "      - roadmap.md", "  brief:",
+        "    objective: Deliver the complete G3 workflow.", "    deliverables:",
+        "      - Implement G3 state.", "      - Implement G3 continuation.",
+        "      - Add G3 integration.", "      - Update roadmap.md candidate state.",
+        "    outOfScope:", "      - Deployment", "source:",
+        "  document: roadmap.md", `  gitHead: ${sha}`,
+      ].join("\n"),
+    });
+
+    try {
+      const plan = planLoopCycle(project, { decomposeOversizedCandidate: true });
+      assert.equal(plan.outcome, "ready");
+      if (plan.outcome === "ready") {
+        assert.equal(plan.candidate.id, "H3-L3.M1");
+        assert.equal(plan.decomposition?.parentCandidate.id, "H3-L3");
+        assert.equal(plan.decomposition?.children.length, 3);
+        assert.deepEqual(plan.allowedPaths, [
+          "roadmap.md", "src/g3/a.ts", "src/g3/b.ts",
+        ]);
+      }
+    } finally {
+      rmSync(project.path, { recursive: true, force: true });
+    }
+  });
+
   it("blocks fail-closed when source.gitHead does not match the evaluated HEAD", () => {
     const { project } = setupGovernedProject({
       roadmap: "| H1-L4 | Confirmed candidate | ⬜ À faire |",

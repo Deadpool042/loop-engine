@@ -208,13 +208,13 @@ describe("run command — agent decision observability", () => {
     );
     assert.ok(
       log.lines.some((line) =>
-        line.includes(
-          "Fallback: preferred_capability_tier_unavailable",
-        ),
+        line.includes("Fallback: preferred_capability_tier_unavailable"),
       ),
     );
     assert.ok(
-      log.lines.some((line) => line.includes("Reason: fixture decision reason")),
+      log.lines.some((line) =>
+        line.includes("Reason: fixture decision reason"),
+      ),
     );
     assert.ok(
       log.lines.some((line) =>
@@ -342,7 +342,10 @@ describe("run command — publish mode", () => {
       loopAgentRegistry: {},
       runLoopPublish: (
         _projectName: string,
-        options?: { onProgress?: (event: { status: string }) => void; provider?: unknown },
+        options?: {
+          onProgress?: (event: { status: string }) => void;
+          provider?: unknown;
+        },
       ) => {
         receivedProvider = options;
         options?.onProgress?.({ status: "executing" });
@@ -379,6 +382,52 @@ describe("run command — publish mode", () => {
           "Publication: candidate_ref refs/loop-engine/candidates/run-history-write-failure-fixture/run-1",
         ),
       ),
+    );
+  });
+});
+
+describe("run command — AUTO fast path", () => {
+  it("forwards one real model attempt and deterministic oversized decomposition only for AUTO", async () => {
+    const observed: unknown[] = [];
+    const result: LoopRunResult = {
+      ...fixtureCompletedResult(),
+      mode: "execute",
+      modelAttemptBudget: 1,
+    };
+    const application = {
+      loopExecutor: () => Promise.resolve({ modifiedFiles: [] }),
+      loopAgentRegistry: {},
+      runLoopExecute: (_projectName: string, options?: unknown) => {
+        observed.push(options);
+        return Promise.resolve(result);
+      },
+      recordLoopRunHistory: () => ({ written: true, ok: true }),
+      generateExecutionReport: (runResult: LoopRunResult) => runResult,
+    } as unknown as LoopApplicationAssembly;
+
+    const log = captureConsoleLog();
+    try {
+      const exitCode = await runLoopRunCommand(
+        application,
+        FIXTURE_PROJECT,
+        "execute",
+        true,
+        { provider: "claude_code", autoSubscription: true },
+      );
+      assert.equal(exitCode, 0);
+    } finally {
+      log.restore();
+    }
+
+    assert.equal(observed.length, 1);
+    assert.equal(
+      (observed[0] as { maxModelAttempts?: number }).maxModelAttempts,
+      1,
+    );
+    assert.equal(
+      (observed[0] as { decomposeOversizedCandidate?: boolean })
+        .decomposeOversizedCandidate,
+      true,
     );
   });
 });

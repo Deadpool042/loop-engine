@@ -285,3 +285,28 @@ V14.4 does not add:
 9. `commit` and `publication` remain `null` for every result.
 10. Plan mode behavior and JSON schema version remain unchanged.
 11. CI, strict audit and all audit profiles pass.
+
+## AUTO oversized-candidate micro-lots
+
+The Cockpit/AUTO composition applies an additional deterministic planning step
+before provider execution. A governed candidate is considered manifestly
+oversized when its approved execution-decision brief contains more than two
+non-planning deliverables, more than three non-planning writable paths, or a
+recursive writable scope combined with multiple deliverables.
+
+The existing `LoopPlan` is narrowed rather than replaced by another
+orchestrator. The planner derives ordered child identifiers (`<parent>.M1`,
+`<parent>.M2`, ...), selects only the first child, limits it to one deliverable
+and at most two non-planning writable paths, and emits the full decomposition
+as machine-readable run state. The provider must materialize those ordered
+children and their bounded scope/brief details in the canonical planning source,
+marking only the selected child complete. Once the validated candidate ref is
+adopted, normal roadmap selection therefore continues with the next open child
+instead of re-running the monolithic parent.
+
+This behavior is AUTO-only. AUTO also caps the actual intra-provider model
+attempt budget at one, independently of the provider failover limit, and records
+that value in the run and execution-plan evidence. Explicit `execute`, `commit`
+and `publish` paths keep their existing global policy budgets. AUTO keeps its
+standard subscription profiles and existing timeout/turn limits; decomposition
+does not add a planning model call, model escalation, or provider cascade.
