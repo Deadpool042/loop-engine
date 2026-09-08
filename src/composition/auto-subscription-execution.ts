@@ -24,17 +24,9 @@ export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProv
     Object.freeze({
       id: "claude_code" as const,
       executable: "claude",
-      timeoutMs: 420_000,
-      maxTurns: 32,
+      timeoutMs: 240_000,
+      maxTurns: 16,
       profiles: Object.freeze([
-        Object.freeze({
-          id: "economy",
-          model: "claude-haiku-4-5",
-          economicTier: "economy" as const,
-          fundingMode: "included_subscription" as const,
-          quota: INCLUDED_QUOTA_UNKNOWN,
-          capabilities: BASE_CAPABILITIES,
-        }),
         Object.freeze({
           id: "standard",
           model: "claude-sonnet-5",
@@ -63,16 +55,8 @@ export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProv
     Object.freeze({
       id: "codex" as const,
       executable: "codex",
-      timeoutMs: 420_000,
+      timeoutMs: 240_000,
       profiles: Object.freeze([
-        Object.freeze({
-          id: "economy",
-          model: "gpt-5.6-luna",
-          economicTier: "economy" as const,
-          fundingMode: "included_subscription" as const,
-          quota: INCLUDED_QUOTA_UNKNOWN,
-          capabilities: BASE_CAPABILITIES,
-        }),
         Object.freeze({
           id: "standard",
           model: "gpt-5.6-sol",

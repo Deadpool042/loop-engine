@@ -948,7 +948,7 @@ else if (command === "review") {
       const providers = buildAutoSubscriptionProviderConfigurations();
       runApplication = createLoopApplicationAssembly({
         providers,
-        maxProviderAttempts: 2,
+        maxProviderAttempts: 1,
       });
     } catch {
       failOption(
