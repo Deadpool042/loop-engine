@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -33,8 +33,11 @@ describe("validateLoopExecution repair diagnostics", () => {
   it("captures bounded compiler diagnostics for repair without exposing them in public details", async () => {
     const root = mkdtempSync(join(tmpdir(), "loop-validation-diagnostics-"));
     try {
-      const command =
-        "node -e \"console.error('src/example.ts(4,2): error TS2322: Type string is not assignable to number'); process.exit(2)\"";
+      writeFileSync(
+        join(root, "validator-fail.mjs"),
+        "console.error('src/example.ts(4,2): error TS2322: Type string is not assignable to number'); process.exit(2);\n",
+      );
+      const command = "node validator-fail.mjs";
       const result = await validateLoopExecution({
         runId: "run-validation-diagnostics",
         project: project(root, command),
