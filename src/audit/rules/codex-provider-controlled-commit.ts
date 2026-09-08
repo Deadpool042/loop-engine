@@ -5,6 +5,7 @@ import { sourceIncludesToken } from "../source.js";
 import type { AuditRuleDefinition as AuditRule } from "../types.js";
 
 const PROVIDER_FILE = "src/loop/codex-cli-executor.ts";
+const WORKTREE_ADMISSION_FILE = "src/loop/provider-worktree-admission.ts";
 const COMMITTER_FILE = "src/loop/git-committer.ts";
 const COMMIT_RUNNER_FILE = "src/loop/commit-runner.ts";
 const COMMAND_FILE = "src/commands/run.ts";
@@ -27,8 +28,15 @@ const REQUIRED_PROVIDER_TOKENS = Object.freeze([
   'plan.provider !== "openai" || plan.runtime !== "codex"',
   "shell: false",
   "maxOutputBytes",
-  "worktree_not_clean",
+  "admitProviderWorktree",
   'child.kill("SIGTERM")',
+]);
+const REQUIRED_WORKTREE_ADMISSION_TOKENS = Object.freeze([
+  'plan.worktreeMode !== "repair_existing"',
+  "findOutOfScopeFiles",
+  '"worktree_not_clean"',
+  '"repair_scope_unavailable"',
+  '"worktree_scope_violation"',
 ]);
 const REQUIRED_COMMITTER_TOKENS = Object.freeze([
   '["add", "--", ...files]',
@@ -62,6 +70,7 @@ const FORBIDDEN_TOKENS = Object.freeze([
 
 export function inspectCodexProviderControlledCommitInvariant(
   providerSource: string,
+  worktreeAdmissionSource: string,
   committerSource: string,
   runnerSource: string,
   commandSource: string,
@@ -71,6 +80,9 @@ export function inspectCodexProviderControlledCommitInvariant(
     ...REQUIRED_PROVIDER_TOKENS.filter(
       (token) => !sourceIncludesToken(providerSource, token),
     ).map((token) => `${PROVIDER_FILE} -> missing: ${token}`),
+    ...REQUIRED_WORKTREE_ADMISSION_TOKENS.filter(
+      (token) => !sourceIncludesToken(worktreeAdmissionSource, token),
+    ).map((token) => `${WORKTREE_ADMISSION_FILE} -> missing: ${token}`),
     ...REQUIRED_COMMITTER_TOKENS.filter(
       (token) => !sourceIncludesToken(committerSource, token),
     ).map((token) => `${COMMITTER_FILE} -> missing: ${token}`),
@@ -89,6 +101,7 @@ export function inspectCodexProviderControlledCommitInvariant(
   ];
   const combined = [
     providerSource,
+    worktreeAdmissionSource,
     committerSource,
     runnerSource,
     commandSource,
@@ -109,7 +122,7 @@ export const CODEX_PROVIDER_CONTROLLED_COMMIT_RULE: AuditRule = (() => {
     severity: "error",
     title: "Codex provider and controlled commit remain bounded and explicit",
     description:
-      "The Codex provider must consume one prebuilt execution plan directly, select only an explicit Codex CLI executable, run under the qualified worktree-only permission profile, start from a clean worktree, bound and redact provider execution, validate before commit, commit only exact safe files, never push, and keep candidate publication outside controlled commit.",
+      "The Codex provider must consume one prebuilt execution plan directly, select only an explicit Codex CLI executable, run under the qualified worktree-only permission profile, require a clean worktree for initial execution and permit only explicit scope-bound dirty-worktree repair, bound and redact provider execution, validate before commit, commit only exact safe files, never push, and keep candidate publication outside controlled commit.",
     metadata: {
       introducedIn: "V14.6",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -121,6 +134,7 @@ export const CODEX_PROVIDER_CONTROLLED_COMMIT_RULE: AuditRule = (() => {
         existsSync(path) ? readFileSync(path, "utf8") : "";
       const result = inspectCodexProviderControlledCommitInvariant(
         read(PROVIDER_FILE),
+        read(WORKTREE_ADMISSION_FILE),
         read(COMMITTER_FILE),
         read(COMMIT_RUNNER_FILE),
         read(COMMAND_FILE),
@@ -137,13 +151,14 @@ export const CODEX_PROVIDER_CONTROLLED_COMMIT_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Keep the Codex provider bound to one prebuilt execution plan, the qualified worktree-only permission profile, and one validation-gated exact-file Git commit; retain clean-worktree, shell-false, limits, redaction, no-push and separate-publication guarantees.",
+            "Keep the Codex provider bound to one prebuilt execution plan, the qualified worktree-only permission profile, and one validation-gated exact-file Git commit; retain strict-clean initial execution, explicit scope-bound repair admission, shell-false, limits, redaction, no-push and separate-publication guarantees.",
           )
         : pass(
             rule,
             `${rule.title}.`,
             Object.freeze([
               PROVIDER_FILE,
+              WORKTREE_ADMISSION_FILE,
               COMMITTER_FILE,
               COMMIT_RUNNER_FILE,
               COMMAND_FILE,
