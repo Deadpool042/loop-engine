@@ -33,6 +33,7 @@ export type CreateLoopExecutionPlanInput = Readonly<{
   agentPolicy: AgentPolicyResolution;
   contextPackage: MinimalContextPackage;
   allowedPaths?: readonly string[];
+  worktreeMode?: "clean" | "repair_existing";
   brief?: Readonly<{
     objective: string;
     deliverables: readonly string[];
@@ -48,6 +49,7 @@ export type LoopExecutionPlan = Readonly<{
   candidate: RoadmapCandidate;
   contextPackage: MinimalContextPackage;
   allowedPaths?: readonly string[];
+  worktreeMode?: "clean" | "repair_existing";
   brief?: Readonly<{
     objective: string;
     deliverables: readonly string[];
@@ -115,6 +117,9 @@ export function createLoopExecutionPlan(
     ...(input.allowedPaths === undefined
       ? {}
       : { allowedPaths: Object.freeze([...input.allowedPaths]) }),
+    ...(input.worktreeMode === undefined
+      ? {}
+      : { worktreeMode: input.worktreeMode }),
     ...(input.brief === undefined
       ? {}
       : {

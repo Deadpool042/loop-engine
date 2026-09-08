@@ -26,8 +26,11 @@ configured executable with structured arguments, `shell: false`, the project pat
 as `cwd`, a finite timeout and a finite combined output budget.
 
 The prompt prohibits commit, push, tag, publication and work outside the current
-worktree. Provider stdout and stderr are not exposed in `LoopRunResult`; failures
-use stable redacted codes.
+worktree. Initial provider execution requires a clean worktree. A dirty worktree
+is accepted only for an explicit bounded validation-repair pass, and only when
+every pre-existing modified file remains inside the already admitted writable
+file scope. Provider stdout and stderr are not exposed in `LoopRunResult`;
+failures use stable redacted codes.
 
 The provider process inherits the operator's already configured Codex login. Loop
 Engine does not load API keys, inspect authentication files or discover a provider.
@@ -79,6 +82,7 @@ pnpm loop run <project> --mode commit \
 - no shell interpolation;
 - execution duration and output are bounded;
 - provider diagnostics and output are redacted;
+- initial execution starts clean; dirty-worktree reuse is limited to explicit scope-bound repair;
 - commit follows successful validation only;
 - only the exact validated file list is staged and committed;
 - the commit revision is verified before it is reported;

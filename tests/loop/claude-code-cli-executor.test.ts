@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -143,6 +144,91 @@ describe("createClaudeCodeCliLoopExecutor", () => {
       });
       const result = await executor(fakePlan(cwd), cwd);
       assert.equal(result.status, "completed");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("keeps initial execution strict when the worktree is already dirty", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    try {
+      writeFileSync(join(cwd, "feature.ts"), "export const value = 1;\n");
+      const result = await createClaudeCodeCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(
+        {
+          ...fakePlan(cwd),
+          allowedPaths: ["feature.ts"],
+        },
+        cwd,
+      );
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "worktree_not_clean",
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("repairs an existing dirty worktree only inside the admitted scope", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    const capturePath = join(cwd, "..", "claude-repair-arguments.json");
+    try {
+      writeFileSync(join(cwd, "feature.ts"), "export const value = 1;\n");
+      process.env.FAKE_CLAUDE_CAPTURE_ARGS = capturePath;
+
+      const result = await createClaudeCodeCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(
+        {
+          ...fakePlan(cwd),
+          allowedPaths: ["feature.ts"],
+          worktreeMode: "repair_existing",
+        },
+        cwd,
+      );
+
+      assert.equal(result.status, "completed");
+      assert.deepEqual(result.modifiedFiles, ["feature.ts"]);
+      const prompt =
+        (JSON.parse(readFileSync(capturePath, "utf8")) as string[]).at(-1) ??
+        "";
+      assert.match(prompt, /bounded validation-repair pass/);
+      assert.match(prompt, /Repair the current changes in place/);
+    } finally {
+      delete process.env.FAKE_CLAUDE_CAPTURE_ARGS;
+      cleanup();
+    }
+  });
+
+  it("refuses bounded repair when any existing change is outside scope", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    try {
+      writeFileSync(join(cwd, "outside.ts"), "export const value = 1;\n");
+
+      const result = await createClaudeCodeCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(
+        {
+          ...fakePlan(cwd),
+          allowedPaths: ["feature.ts"],
+          worktreeMode: "repair_existing",
+        },
+        cwd,
+      );
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "worktree_scope_violation",
+      );
+      assert.deepEqual(result.modifiedFiles, ["outside.ts"]);
     } finally {
       cleanup();
     }
