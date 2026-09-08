@@ -15,8 +15,8 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
 
   assert.equal(claude.id, "claude_code");
   assert.equal(claude.executable, "claude");
-  assert.equal(claude.timeoutMs, 420_000);
-  assert.equal("maxTurns" in claude ? claude.maxTurns : null, 32);
+  assert.equal(claude.timeoutMs, 240_000);
+  assert.equal("maxTurns" in claude ? claude.maxTurns : null, 16);
   assert.deepEqual(
     claude.profiles?.map((profile) => ({
       model: profile.model,
@@ -25,12 +25,6 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
       quota: profile.quota,
     })),
     [
-      {
-        model: "claude-haiku-4-5",
-        tier: "economy",
-        funding: "included_subscription",
-        quota: { state: "unknown", source: "unavailable" },
-      },
       {
         model: "claude-sonnet-5",
         tier: "standard",
@@ -48,7 +42,7 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
 
   assert.equal(codex.id, "codex");
   assert.equal(codex.executable, "codex");
-  assert.equal(codex.timeoutMs, 420_000);
+  assert.equal(codex.timeoutMs, 240_000);
   assert.deepEqual(
     codex.profiles?.map((profile) => ({
       model: profile.model,
@@ -57,12 +51,6 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
       quota: profile.quota,
     })),
     [
-      {
-        model: "gpt-5.6-luna",
-        tier: "economy",
-        funding: "included_subscription",
-        quota: { state: "unknown", source: "unavailable" },
-      },
       {
         model: "gpt-5.6-sol",
         tier: "standard",
@@ -85,7 +73,7 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
   );
 });
 
-test("AUTO selects the smallest capable subscription profile", () => {
+test("AUTO selects a standard capable subscription profile first", () => {
   const assemblies = assembleLoopProviders(
     defaultLoopProviderRegistry,
     buildAutoSubscriptionProviderConfigurations(),
@@ -100,11 +88,11 @@ test("AUTO selects the smallest capable subscription profile", () => {
     allowedFundingModes: ["included_subscription"],
   });
   assert.equal(simple.outcome, "selected");
-  assert.equal(simple.outcome === "selected" ? simple.profile.model : null, "claude-haiku-4-5");
+  assert.equal(simple.outcome === "selected" ? simple.profile.model : null, "claude-sonnet-5");
   assert.equal(
     simple.outcome === "selected"
       ? simple.notSelected?.some(
-          (candidate) => candidate.profileId === "configured.codex.economy",
+          (candidate) => candidate.profileId === "configured.codex.standard",
         )
       : false,
     true,
