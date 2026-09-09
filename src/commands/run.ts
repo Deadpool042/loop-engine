@@ -1,4 +1,3 @@
-import { createAgentRegistry } from "../agents/registry.js";
 import type {
   LoopApplicationAssembly,
   LoopApplicationProject,
@@ -195,12 +194,15 @@ export async function runLoopRunCommand(
   }
 
   const primaryAgentRegistry =
-    options.provider !== undefined && application.loopAgentRegistry
-      ? createAgentRegistry(
-          application.loopAgentRegistry.profiles.filter(
-            (profile) => profile.runtime === options.provider,
+    options.provider !== undefined &&
+    application.loopAgentRegistry?.profiles !== undefined
+      ? Object.freeze({
+          profiles: Object.freeze(
+            application.loopAgentRegistry.profiles.filter(
+              (profile) => profile.runtime === options.provider,
+            ),
           ),
-        )
+        })
       : application.loopAgentRegistry;
 
   const executionDependencies = {
