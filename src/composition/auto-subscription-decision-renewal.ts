@@ -566,6 +566,78 @@ function ensureLocalDecisionDirectory(
   return null;
 }
 
+function detailItems(content: string): readonly string[] {
+  const lines = content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const bullets = lines
+    .filter((line) => /^-\s+/.test(line))
+    .map((line) => line.replace(/^-\s+/, "").trim())
+    .filter(Boolean);
+  return Object.freeze(bullets.length > 0 ? bullets : lines);
+}
+
+function prepareCanonicalDetailDraft(
+  context: Extract<AutoDecisionContext, { ok: true }>,
+): ExecutionDecisionDraft | null {
+  const detail = resolveRoadmapCandidateDetail(context.current.projectPath, {
+    id: context.current.candidateId,
+    path: context.current.sourceDocument,
+    text: context.candidateText,
+  });
+  if (detail === null || detail.truncated) return null;
+
+  const objectiveSection = detail.sections.find(
+    (section) => section.kind === "objective" && !section.truncated,
+  );
+  const deliverablesSection = detail.sections.find(
+    (section) =>
+      !section.truncated &&
+      /^(?:livrables?|deliverables?)$/i.test(section.title.trim()),
+  );
+  const outOfScopeSection = detail.sections.find(
+    (section) => section.kind === "out_of_scope" && !section.truncated,
+  );
+
+  if (
+    objectiveSection === undefined ||
+    deliverablesSection === undefined ||
+    outOfScopeSection === undefined
+  ) {
+    return null;
+  }
+
+  const objective = objectiveSection.content.trim();
+  const deliverables = detailItems(deliverablesSection.content);
+  const outOfScope = detailItems(outOfScopeSection.content);
+  if (
+    objective.length === 0 ||
+    deliverables.length === 0 ||
+    outOfScope.length === 0
+  ) {
+    return null;
+  }
+
+  const draft = createExecutionDecisionDraft(
+    {
+      project: context.current.project,
+      candidateId: context.current.candidateId,
+      sourceDocument: context.current.sourceDocument,
+      gitHead: context.current.gitHead,
+      executionDecisionPath: context.current.executionDecisionPath,
+    },
+    {
+      objective,
+      deliverables,
+      outOfScope,
+      allowedPaths: context.governedAllowedPaths,
+    },
+  );
+
+  return draft.ok ? draft.draft : null;
+}
+
 function prepareDeterministicRebindDraft(
   context: Extract<AutoDecisionContext, { ok: true }>,
 ): ExecutionDecisionDraft | null {
@@ -761,6 +833,19 @@ export async function ensureAutoSubscriptionExecutionDecision(
 
   const directoryFailure = ensureLocalDecisionDirectory(context.current);
   if (directoryFailure !== null) return directoryFailure;
+
+  const canonicalDraft = prepareCanonicalDetailDraft(context);
+  if (canonicalDraft !== null) {
+    const canonical = await publishDecision(context.current, canonicalDraft);
+    if (!canonical.ok) return canonical;
+
+    const canonicalAdmission = evaluateAutoSubscriptionAdmission(
+      project,
+      currentGitHead,
+      candidateId,
+    );
+    return canonicalAdmission.ok ? canonical : canonicalAdmission;
+  }
 
   const reboundDraft = prepareDeterministicRebindDraft(context);
   if (reboundDraft !== null) {

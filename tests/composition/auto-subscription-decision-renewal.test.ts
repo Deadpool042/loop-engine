@@ -36,6 +36,7 @@ function fixture(
     candidateText?: string;
     codeScope?: boolean;
     codeScopePath?: string;
+    canonicalDeliverables?: boolean;
   } = {},
 ): {
   root: string;
@@ -69,6 +70,17 @@ function fixture(
         "- Add docs/continuation-proof.md.",
         "- Mark H1-L1 complete in docs/roadmap/README.md.",
         "",
+        ...(options.canonicalDeliverables
+          ? [
+              "## Livrables",
+              "",
+              options.codeScope
+                ? `- Implement the bounded continuation in ${options.codeScopePath ?? "src/example.ts"}.`
+                : "- Add docs/continuation-proof.md.",
+              "- Update docs/roadmap/README.md.",
+              "",
+            ]
+          : []),
         ...(options.writeScope === false
           ? []
           : [
@@ -725,6 +737,84 @@ test("rebinds a stale decision locally when the canonical scope only expands", a
       assert.deepEqual(parsed.decision.decision.brief?.deliverables, [
         "Add docs/continuation-proof.md.",
         "Mark H1-L1 complete.",
+      ]);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("rebuilds a stale divergent decision from canonical detail without a provider", async () => {
+  const { root, project, head } = fixture({
+    candidateText: "Implement checkout UI changes.",
+    codeScope: true,
+    codeScopePath: "app/(public)/checkout/**",
+    canonicalDeliverables: true,
+  });
+  try {
+    mkdirSync(join(root, ".loop-engine"), { recursive: true });
+    writeFileSync(
+      join(root, ".loop-engine", "execution-decision.yaml"),
+      [
+        "version: 1",
+        "project: example",
+        "decision:",
+        "  state: READY",
+        "  candidate:",
+        "    id: H1-L1",
+        "    allowedPaths:",
+        "      - entities/checkout/**",
+        "      - docs/roadmap/README.md",
+        "  brief:",
+        "    objective: Explore the current checkout.",
+        "    deliverables:",
+        "      - Exploration notes only.",
+        "    outOfScope:",
+        "      - Implementation",
+        "source:",
+        "  document: docs/roadmap/README.md",
+        `  gitHead: ${"b".repeat(40)}`,
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    let calls = 0;
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      project,
+      head,
+      "H1-L1",
+      {
+        runClaude: async () => {
+          calls += 1;
+          throw new Error("provider must not be called");
+        },
+      },
+    );
+
+    assert.deepEqual(result, { ok: true, status: "renewed" });
+    assert.equal(calls, 0);
+
+    const parsed = parseExecutionDecisionFile(
+      readFileSync(
+        join(root, ".loop-engine", "execution-decision.yaml"),
+        "utf8",
+      ),
+    );
+    assert.equal(parsed.ok, true);
+    if (parsed.ok) {
+      assert.equal(parsed.decision.source.gitHead, head);
+      assert.deepEqual(parsed.decision.decision.candidate?.allowedPaths, [
+        "app/(public)/checkout/**",
+        "docs/roadmap/README.md",
+      ]);
+      assert.deepEqual(parsed.decision.decision.brief?.deliverables, [
+        "Implement the bounded continuation in app/(public)/checkout/**.",
+        "Update docs/roadmap/README.md.",
+      ]);
+      assert.deepEqual(parsed.decision.decision.brief?.outOfScope, [
+        "No deployment.",
+        "No provider configuration.",
       ]);
     }
   } finally {
