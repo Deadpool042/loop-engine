@@ -561,7 +561,7 @@ function ensureLocalDecisionDirectory(
   return null;
 }
 
-function prepareShaOnlyRebindDraft(
+function prepareDeterministicRebindDraft(
   context: Extract<AutoDecisionContext, { ok: true }>,
 ): ExecutionDecisionDraft | null {
   const decisionPath = resolveContextPath(
@@ -582,6 +582,7 @@ function prepareShaOnlyRebindDraft(
 
   const existing = parsed.decision;
   const candidate = existing.decision.candidate;
+  const existingAllowedPaths = candidate?.allowedPaths;
   const brief = existing.decision.brief;
 
   if (
@@ -590,8 +591,10 @@ function prepareShaOnlyRebindDraft(
     candidate?.id !== context.current.candidateId ||
     existing.source.document !== context.current.sourceDocument ||
     brief === undefined ||
-    JSON.stringify(candidate.allowedPaths) !==
-      JSON.stringify(context.governedAllowedPaths) ||
+    existingAllowedPaths === undefined ||
+    !existingAllowedPaths.every((path) =>
+      context.governedAllowedPaths.includes(path),
+    ) ||
     proposalContradictsConcreteCandidate(
       context.candidateText,
       context.governedAllowedPaths,
@@ -754,7 +757,7 @@ export async function ensureAutoSubscriptionExecutionDecision(
   const directoryFailure = ensureLocalDecisionDirectory(context.current);
   if (directoryFailure !== null) return directoryFailure;
 
-  const reboundDraft = prepareShaOnlyRebindDraft(context);
+  const reboundDraft = prepareDeterministicRebindDraft(context);
   if (reboundDraft !== null) {
     const rebound = await publishDecision(context.current, reboundDraft);
     if (!rebound.ok) return rebound;
