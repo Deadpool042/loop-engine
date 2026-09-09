@@ -93,6 +93,14 @@ export function decomposeOversizedAutoCandidate(
   const sourceDocument = input.sourceDocument;
   const allowedPaths = input.allowedPaths;
   const brief = input.brief;
+
+  // AUTO micro-lots are already bounded resumable units. Recursively splitting
+  // them creates synthetic IDs such as M2.M1 that are not present in the
+  // canonical roadmap yet and makes completion ownership ambiguous.
+  if (typeof parentId === "string" && /\.M\d+$/i.test(parentId)) {
+    return input;
+  }
+
   if (
     parentId === undefined ||
     sourceDocument === undefined ||
