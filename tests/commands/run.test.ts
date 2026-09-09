@@ -386,6 +386,44 @@ describe("run command — publish mode", () => {
   });
 });
 
+describe("run command — explicit provider registry narrowing", () => {
+  it("keeps partial test assemblies compatible when registry profiles are absent", async () => {
+    const publishResult: LoopRunResult = {
+      ...fixtureCompletedResult(),
+      mode: "publish",
+      publication: {
+        kind: "candidate_ref",
+        ref: "refs/loop-engine/candidates/run-history-write-failure-fixture/run-partial-registry",
+        commitSha: "c".repeat(40),
+        baseSha: "b".repeat(40),
+      },
+    };
+    const application = {
+      loopExecutor: () => Promise.resolve({ modifiedFiles: [] }),
+      loopAgentRegistry: {},
+      runLoopPublish: () => Promise.resolve(publishResult),
+      recordLoopRunHistory: () => ({ written: true, ok: true }),
+      generateExecutionReport: (runResult: LoopRunResult) => runResult,
+    } as unknown as LoopApplicationAssembly;
+
+    const log = captureConsoleLog();
+    try {
+      const exitCode = await runLoopRunCommand(
+        application,
+        FIXTURE_PROJECT,
+        "publish",
+        true,
+        { provider: "claude_code" },
+      );
+      assert.equal(exitCode, 0);
+    } finally {
+      log.restore();
+    }
+  });
+});
+
+
+
 describe("run command — AUTO fast path", () => {
   it("forwards one real model attempt and deterministic oversized decomposition only for AUTO", async () => {
     const observed: unknown[] = [];
