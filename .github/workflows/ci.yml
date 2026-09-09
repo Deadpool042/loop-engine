@@ -64,13 +64,19 @@ jobs:
       - name: Run reference validation
         run: |
           mkdir -p artifacts
-          set -o pipefail
+          set +e
           pnpm run ci 2>&1 | tee artifacts/ci.log
+          status=${PIPESTATUS[0]}
+          echo "${status}" > artifacts/ci.exit
+          exit 0
       - name: Show validation failure tail
-        if: failure()
         run: |
+          status="$(cat artifacts/ci.exit)"
+          if [[ "${status}" == "0" ]]; then
+            exit 0
+          fi
           tail -n 200 artifacts/ci.log
-          exit 1
+          exit "${status}"
 
       - name: Upload diagnostics
         if: failure()
