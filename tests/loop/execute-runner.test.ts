@@ -1298,6 +1298,106 @@ describe("runLoopExecute", () => {
       ["planning", "ready", "executing", "failed"],
     );
   });
+  it("fails AUTO when technical validation passes but the selected candidate stays todo", async () => {
+    const cwd = await createGitWorktree();
+    const project = { ...fixtureProject(), path: cwd };
+    const candidate = { ...fixtureCandidate(), id: "VNEXT3-G3.M2" };
+    let planCalls = 0;
+
+    try {
+      const result = await runLoopExecute(project.name, {
+        ...deterministicOptions(),
+        loadConfig: () => fixtureConfig(project),
+        decomposeOversizedCandidate: true,
+        planLoopCycle: () => {
+          planCalls += 1;
+          return {
+            outcome: "ready" as const,
+            candidate,
+            plannedSteps: [],
+            snapshot: fixtureSnapshot(project, candidate),
+            authorizedBy: "execution_decision" as const,
+          };
+        },
+        readModifiedWorktreeFiles: async () => ["roadmap.md"],
+        executor: async () => {
+          await writeFile(join(cwd, "roadmap.md"), "- [ ] VNEXT3-G3.M2 — still open\n");
+          return {
+            status: "completed" as const,
+            modifiedFiles: ["roadmap.md"],
+            details: ["Implementation returned successfully."],
+          };
+        },
+        validator: async () => ({
+          status: "passed" as const,
+          failedCommand: null,
+          exitCode: 0,
+          details: ["Technical validation passed."],
+        }),
+      });
+
+      assert.equal(planCalls, 2);
+      assert.equal(result.status, "failed");
+      assert.equal(result.failure?.code, "candidate_not_completed");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("completes AUTO only when post-validation planning sees candidate_done", async () => {
+    const cwd = await createGitWorktree();
+    const project = { ...fixtureProject(), path: cwd };
+    const candidate = { ...fixtureCandidate(), id: "VNEXT3-G3.M2" };
+    let planCalls = 0;
+
+    try {
+      const result = await runLoopExecute(project.name, {
+        ...deterministicOptions(),
+        loadConfig: () => fixtureConfig(project),
+        decomposeOversizedCandidate: true,
+        planLoopCycle: () => {
+          planCalls += 1;
+          if (planCalls === 1) {
+            return {
+              outcome: "ready" as const,
+              candidate,
+              plannedSteps: [],
+              snapshot: fixtureSnapshot(project, candidate),
+              authorizedBy: "execution_decision" as const,
+            };
+          }
+          return {
+            outcome: "blocked" as const,
+            candidate: { ...candidate, status: "done" as const },
+            code: "candidate_done" as const,
+            reason: "Roadmap candidate is already done: VNEXT3-G3.M2",
+          };
+        },
+        readModifiedWorktreeFiles: async () => ["roadmap.md"],
+        executor: async () => {
+          await writeFile(join(cwd, "roadmap.md"), "- [x] VNEXT3-G3.M2 — done\n");
+          return {
+            status: "completed" as const,
+            modifiedFiles: ["roadmap.md"],
+            details: ["Implementation returned successfully."],
+          };
+        },
+        validator: async () => ({
+          status: "passed" as const,
+          failedCommand: null,
+          exitCode: 0,
+          details: ["Technical validation passed."],
+        }),
+      });
+
+      assert.equal(planCalls, 2);
+      assert.equal(result.status, "completed");
+      assert.equal(result.failure, null);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("caps the real AUTO model attempt budget at one and exposes it in run evidence", async () => {
     const registry = createAgentRegistry([
       routingProfile("codex.economy", "luna", "economy"),

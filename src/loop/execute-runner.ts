@@ -729,6 +729,39 @@ export async function runLoopExecute(
     );
 
     if (validationAttempt.status === "passed") {
+      if (
+        governedExecution &&
+        options.decomposeOversizedCandidate === true &&
+        typeof cycle.candidate.id === "string"
+      ) {
+        const completion = dependencies.planLoopCycle(
+          executionProject,
+          Object.freeze({
+            candidateId: cycle.candidate.id,
+            executionDecisionProjectPath: project.path,
+          }),
+        );
+        if (
+          completion.outcome !== "blocked" ||
+          completion.code !== "candidate_done"
+        ) {
+          transition("failed", "failed", "failed", [
+            "Validated AUTO execution did not close its selected roadmap candidate.",
+          ]);
+          return finalize(
+            cycle.candidate,
+            Object.freeze({
+              code: "candidate_not_completed",
+              message:
+                "Validated AUTO execution did not mark its selected roadmap candidate as done.",
+              details: Object.freeze([
+                `Candidate remains actionable after validation: ${cycle.candidate.id}`,
+              ]),
+            }),
+          );
+        }
+      }
+
       transition(
         "completed",
         "completed",
