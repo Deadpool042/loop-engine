@@ -60,6 +60,16 @@ function isPlanningStateDeliverable(
   );
 }
 
+function referencedPaths(
+  deliverables: readonly string[],
+  workPaths: readonly string[],
+): string[] {
+  const haystack = deliverables.join("\n").toLowerCase();
+  return workPaths.filter((path) =>
+    haystack.includes(path.toLowerCase()),
+  );
+}
+
 function chunk<T>(
   values: readonly T[],
   size: number,
@@ -120,11 +130,41 @@ export function decomposeOversizedAutoCandidate(
   const pathChunks = chunk(workPaths, AUTO_MICRO_LOT_MAX_PATHS);
   const childCount = Math.max(deliverableChunks.length, pathChunks.length);
   const children: AutoMicroLotChild[] = [];
+  const referencedByPlanning = referencedPaths(
+    planningDeliverables,
+    workPaths,
+  );
+  const claimedPaths = new Set<string>();
+
   for (let index = 0; index < childCount; index += 1) {
-    const childPaths = pathChunks[index] ?? pathChunks[pathChunks.length - 1]!;
-    const childDeliverables = deliverableChunks[index] ?? [
-      `Complete the bounded parent objective within ${childPaths.join(", ")}.`,
-    ];
+    const childDeliverables = deliverableChunks[index] ?? [];
+    const affinityPaths = referencedPaths(childDeliverables, workPaths);
+    if (index === 0) {
+      for (const path of referencedByPlanning) affinityPaths.push(path);
+    }
+
+    const childPaths = [...new Set(affinityPaths)];
+    for (const path of childPaths) claimedPaths.add(path);
+
+    const fallbackChunk =
+      pathChunks[index] ?? pathChunks[pathChunks.length - 1] ?? [];
+    for (const path of fallbackChunk) {
+      if (childPaths.length >= AUTO_MICRO_LOT_MAX_PATHS) break;
+      if (claimedPaths.has(path)) continue;
+      childPaths.push(path);
+      claimedPaths.add(path);
+    }
+
+    if (childPaths.length === 0 && fallbackChunk.length > 0) {
+      childPaths.push(fallbackChunk[fallbackChunk.length - 1]!);
+    }
+
+    const effectiveDeliverables =
+      childDeliverables.length > 0
+        ? childDeliverables
+        : [
+            `Complete the bounded parent objective within ${childPaths.join(", ")}.`,
+          ];
     const id = `${parentId}.M${index + 1}`;
     children.push(
       Object.freeze({
@@ -132,7 +172,7 @@ export function decomposeOversizedAutoCandidate(
         index: index + 1,
         status: index === 0 ? ("selected" as const) : ("pending" as const),
         objective: `${brief.objective} (${index + 1}/${childCount})`,
-        deliverables: Object.freeze([...childDeliverables]),
+        deliverables: Object.freeze([...effectiveDeliverables]),
         outOfScope: Object.freeze([...brief.outOfScope]),
         allowedPaths: Object.freeze(
           [...new Set([...childPaths, sourceDocument])].sort(),

@@ -96,6 +96,63 @@ test("AUTO deterministically splits a G3-like oversized candidate into traceable
   assert.ok(instructions.includes("- `src/g3/c.ts`"));
 });
 
+test("AUTO keeps explicitly referenced writable paths with their deliverable", () => {
+  const result = decomposeOversizedAutoCandidate({
+    candidate: {
+      ...candidate,
+      id: "VNEXT3-G3.M2",
+      path: "docs/roadmap/README.md",
+      line: 67,
+      text: "- [ ] VNEXT3-G3.M2 — Checkout entities updated to include gift context",
+    },
+    sourceDocument: "docs/roadmap/README.md",
+    allowedPaths: [
+      "docs/roadmap/README.md",
+      "docs/roadmap/cycle-continuite-client-vnext3.md",
+      "docs/testing/2026-09-08-vnext3-g3-gifting-staging-recipe.md",
+      "entities/checkout/**",
+    ],
+    brief: {
+      objective: "Implement Gifting V1 checkout entity change.",
+      deliverables: [
+        "Update entities/checkout/** to introduce a GiftRequest aggregate.",
+        "Update docs/roadmap/README.md to record progress.",
+        "Update docs/roadmap/cycle-continuite-client-vnext3.md with progress notes.",
+        "Update docs/testing/2026-09-08-vnext3-g3-gifting-staging-recipe.md with the staging recipe.",
+      ],
+      outOfScope: ["No deployment."],
+    },
+  });
+
+  const children = result.decomposition?.children ?? [];
+  assert.equal(children[0]?.id, "VNEXT3-G3.M2.M1");
+  assert.deepEqual(children[0]?.deliverables, [
+    "Update entities/checkout/** to introduce a GiftRequest aggregate.",
+  ]);
+  assert.ok(children[0]?.allowedPaths.includes("entities/checkout/**"));
+  assert.ok(
+    children[0]?.allowedPaths.includes(
+      "docs/roadmap/cycle-continuite-client-vnext3.md",
+    ),
+  );
+  assert.equal(
+    children[0]?.allowedPaths.includes(
+      "docs/testing/2026-09-08-vnext3-g3-gifting-staging-recipe.md",
+    ),
+    false,
+  );
+
+  assert.equal(children[1]?.id, "VNEXT3-G3.M2.M2");
+  assert.deepEqual(children[1]?.deliverables, [
+    "Update docs/testing/2026-09-08-vnext3-g3-gifting-staging-recipe.md with the staging recipe.",
+  ]);
+  assert.ok(
+    children[1]?.allowedPaths.includes(
+      "docs/testing/2026-09-08-vnext3-g3-gifting-staging-recipe.md",
+    ),
+  );
+});
+
 test("AUTO leaves an already bounded candidate unchanged", () => {
   const result = decomposeOversizedAutoCandidate({
     candidate,
