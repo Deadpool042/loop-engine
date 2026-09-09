@@ -38,6 +38,10 @@ if (captureCwd) writeFileSync(captureCwd, process.cwd());
 if (captureEnv) writeFileSync(captureEnv, JSON.stringify(process.env));
 const mode = process.env.FAKE_CODEX_MODE ?? "success";
 if (mode === "hang") setInterval(() => {}, 1000);
+if (mode === "quota_exhausted") {
+  process.stderr.write("Usage limit reached for this subscription window.\n");
+  process.exit(9);
+}
 if (mode === "nonzero") process.exit(9);
 if (mode === "nonzero_after_write") {
   writeFileSync("outside.md", "partial provider change\\n");
@@ -365,6 +369,29 @@ describe("createCodexCliLoopExecutor", () => {
       );
     } finally {
       delete process.env.FAKE_CODEX_CAPTURE_ARGS;
+      cleanup();
+    }
+  });
+
+  it("classifies subscription quota exhaustion as a recoverable provider limit", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    try {
+      process.env.FAKE_CODEX_MODE = "quota_exhausted";
+      const result = await createCodexCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      })(fakePlan(cwd), cwd);
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "provider_limit_exceeded",
+      );
+      assert.equal(
+        JSON.stringify(result).includes("Usage limit reached"),
+        false,
+      );
+    } finally {
+      delete process.env.FAKE_CODEX_MODE;
       cleanup();
     }
   });

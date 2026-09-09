@@ -92,6 +92,7 @@ function failure(
 type RunProcessOutcome = Readonly<{
   exitCode: number;
   stdout: string;
+  stderr: string;
   killedReason: "timeout" | "output_limit" | null;
 }>;
 
@@ -112,6 +113,7 @@ function runProcess(
       }),
     });
     let stdout = "";
+    let stderr = "";
     let observedBytes = 0;
     let settled = false;
     let timer: NodeJS.Timeout | null = null;
@@ -122,19 +124,22 @@ function runProcess(
       if (settled) return;
       settled = true;
       if (timer !== null) clearTimeout(timer);
-      resolvePromise(Object.freeze({ exitCode, stdout, killedReason }));
+      resolvePromise(
+        Object.freeze({ exitCode, stdout, stderr, killedReason }),
+      );
     };
-    const consume = (chunk: Buffer, capture: boolean): void => {
+    const consume = (chunk: Buffer, channel: "stdout" | "stderr"): void => {
       observedBytes += chunk.byteLength;
       if (observedBytes > maxOutputBytes) {
         child.kill("SIGTERM");
         settle(124, "output_limit");
         return;
       }
-      if (capture) stdout += chunk.toString("utf8");
+      if (channel === "stdout") stdout += chunk.toString("utf8");
+      else stderr += chunk.toString("utf8");
     };
-    child.stdout.on("data", (chunk: Buffer) => consume(chunk, true));
-    child.stderr.on("data", (chunk: Buffer) => consume(chunk, false));
+    child.stdout.on("data", (chunk: Buffer) => consume(chunk, "stdout"));
+    child.stderr.on("data", (chunk: Buffer) => consume(chunk, "stderr"));
     child.once("error", () => settle(127));
     child.once("close", (code) => settle(code ?? 1));
     timer = setTimeout(() => {
@@ -148,6 +153,12 @@ type ClaudeCodeCliJsonOutput = Readonly<{
   is_error?: boolean;
   subtype?: string;
 }>;
+
+function isQuotaOrRateLimitFailure(output: string): boolean {
+  return /(?:hit\s+your\s+limit|usage\s+limit|rate\s+limit|quota\s+(?:exhausted|exceeded)|(?:limit|quota).{0,40}(?:reached|exceeded|exhausted)|5\s*(?:h|hour)\b)/i.test(
+    output,
+  );
+}
 
 function parseClaudeCodeJsonOutput(
   stdout: string,
@@ -279,6 +290,16 @@ export function createClaudeCodeCliLoopExecutor(
       return failure(
         "provider_max_turns",
         "Claude Code exhausted the configured turn limit.",
+        modifiedFiles,
+      );
+    }
+    if (
+      result.exitCode !== 0 &&
+      isQuotaOrRateLimitFailure(`${result.stdout}\n${result.stderr}`)
+    ) {
+      return failure(
+        "provider_limit_exceeded",
+        "Claude Code subscription quota or rate limit was reached.",
         modifiedFiles,
       );
     }

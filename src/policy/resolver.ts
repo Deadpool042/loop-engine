@@ -14,6 +14,7 @@ import {
   type AgentCapability,
   type AgentPermission,
   type AgentProfileTier,
+  type AgentProvider,
 } from "../agents/types.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
 import {
@@ -164,6 +165,17 @@ const CATEGORY_PREFERRED_CAPABILITY_TIER: Readonly<
   Partial<Record<LoopTaskCategory, AgentProfileTier>>
 > = {
   architecture: "high_reasoning",
+};
+
+const CATEGORY_PREFERRED_PROVIDERS: Readonly<
+  Partial<Record<LoopTaskCategory, readonly AgentProvider[]>>
+> = {
+  code: Object.freeze(["openai", "anthropic"]),
+  tests: Object.freeze(["openai", "anthropic"]),
+  validation: Object.freeze(["openai", "anthropic"]),
+  documentation: Object.freeze(["anthropic", "openai"]),
+  architecture: Object.freeze(["anthropic", "openai"]),
+  review: Object.freeze(["anthropic", "openai"]),
 };
 
 export function deriveRequiredPermissions(
@@ -381,11 +393,16 @@ export function resolvePolicy(
     ]);
   }
 
+  const preferredProviders =
+    CATEGORY_PREFERRED_PROVIDERS[requirements.category];
   const selectionRequest = {
     requiredCapabilities: sortedUnique(requirements.requiredCapabilities),
     requiredPermissions: sortedUnique(requirements.requiredPermissions),
     minEffort: requirements.minimumEffort,
     maxEffort: maximumEffort,
+    ...(preferredProviders === undefined
+      ? {}
+      : { preferredProviders: Object.freeze([...preferredProviders]) }),
     ...(allowedProviders === undefined
       ? {}
       : { allowedProviders: sortedUnique(allowedProviders) }),

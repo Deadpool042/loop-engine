@@ -36,6 +36,12 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function isQuotaOrRateLimitFailure(output: string): boolean {
+  return /(?:hit\s+your\s+limit|usage\s+limit|rate\s+limit|quota\s+(?:exhausted|exceeded)|(?:limit|quota).{0,40}(?:reached|exceeded|exhausted)|5\s*(?:h|hour)\b)/i.test(
+    output,
+  );
+}
+
 function buildPrompt(plan: LoopExecutionPlan): string {
   const files = plan.contextPackage.files.map((file) => file.path).join(", ");
   return [
@@ -108,7 +114,7 @@ function runProcess(
   cwd: string,
   timeoutMs: number,
   maxOutputBytes: number,
-): Promise<Readonly<{ exitCode: number; stdout: string }>> {
+): Promise<Readonly<{ exitCode: number; stdout: string; stderr: string }>> {
   return new Promise((resolvePromise) => {
     const child = spawn(executable, [...args], {
       cwd,
@@ -117,6 +123,7 @@ function runProcess(
       env: buildSubscriptionCliEnvironment(),
     });
     let stdout = "";
+    let stderr = "";
     let observedBytes = 0;
     let settled = false;
     let timer: NodeJS.Timeout | null = null;
@@ -124,19 +131,20 @@ function runProcess(
       if (settled) return;
       settled = true;
       if (timer !== null) clearTimeout(timer);
-      resolvePromise(Object.freeze({ exitCode, stdout }));
+      resolvePromise(Object.freeze({ exitCode, stdout, stderr }));
     };
-    const consume = (chunk: Buffer, capture: boolean): void => {
+    const consume = (chunk: Buffer, channel: "stdout" | "stderr"): void => {
       observedBytes += chunk.byteLength;
       if (observedBytes > maxOutputBytes) {
         child.kill("SIGTERM");
         settle(124);
         return;
       }
-      if (capture) stdout += chunk.toString("utf8");
+      if (channel === "stdout") stdout += chunk.toString("utf8");
+      else stderr += chunk.toString("utf8");
     };
-    child.stdout.on("data", (chunk: Buffer) => consume(chunk, true));
-    child.stderr.on("data", (chunk: Buffer) => consume(chunk, false));
+    child.stdout.on("data", (chunk: Buffer) => consume(chunk, "stdout"));
+    child.stderr.on("data", (chunk: Buffer) => consume(chunk, "stderr"));
     child.once("error", () => settle(127));
     child.once("close", (code) => settle(code ?? 1));
     timer = setTimeout(() => {
@@ -229,6 +237,15 @@ export function createCodexCliLoopExecutor(
       return failure(
         "provider_limit_exceeded",
         "Codex execution exceeded a configured limit.",
+        modifiedFiles,
+      );
+    if (
+      result.exitCode !== 0 &&
+      isQuotaOrRateLimitFailure(`${result.stdout}\n${result.stderr}`)
+    )
+      return failure(
+        "provider_limit_exceeded",
+        "Codex subscription quota or rate limit was reached.",
         modifiedFiles,
       );
     if (result.exitCode !== 0)

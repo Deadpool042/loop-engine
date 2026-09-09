@@ -55,7 +55,7 @@ test("AUTO subscription portfolio contains qualified Claude and Codex profiles o
   );
 });
 
-test("AUTO selects a standard capable subscription profile first", () => {
+test("AUTO honors explicit task provider preference among equal subscription profiles", () => {
   const assemblies = assembleLoopProviders(
     defaultLoopProviderRegistry,
     buildAutoSubscriptionProviderConfigurations(),
@@ -68,13 +68,18 @@ test("AUTO selects a standard capable subscription profile first", () => {
     requiredCapabilities: ["code_edit", "shell_exec"],
     requiredPermissions: ["write_worktree"],
     allowedFundingModes: ["included_subscription"],
+    preferredProviders: ["openai", "anthropic"],
   });
   assert.equal(simple.outcome, "selected");
-  assert.equal(simple.outcome === "selected" ? simple.profile.model : null, "claude-sonnet-5");
+  assert.equal(
+    simple.outcome === "selected" ? simple.profile.model : null,
+    "gpt-5.6-sol",
+  );
   assert.equal(
     simple.outcome === "selected"
       ? simple.notSelected?.some(
-          (candidate) => candidate.profileId === "configured.codex.standard",
+          (candidate) =>
+            candidate.profileId === "configured.claude_code.standard",
         )
       : false,
     true,
@@ -84,6 +89,7 @@ test("AUTO selects a standard capable subscription profile first", () => {
     requiredCapabilities: ["code_edit", "long_context"],
     requiredPermissions: ["write_worktree"],
     allowedFundingModes: ["included_subscription"],
+    preferredProviders: ["anthropic", "openai"],
   });
   assert.equal(architecture.outcome, "selected");
   assert.equal(architecture.outcome === "selected" ? architecture.profile.model : null, "claude-sonnet-5");

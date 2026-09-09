@@ -86,7 +86,9 @@ export function createFallbackExecutionPlan(
     runtime: profile.runtime,
     profileId: profile.id,
     model: profile.model,
-    effort: profile.effort,
+    // Effort is an invocation-level policy decision. A provider fallback must
+    // preserve it instead of inheriting the fallback profile's ranking hint.
+    effort: primaryPlan.effort,
     budget: intersectBudget(primaryPlan.budget, profile.budget),
     policy: Object.freeze({
       ...primaryPlan.policy,

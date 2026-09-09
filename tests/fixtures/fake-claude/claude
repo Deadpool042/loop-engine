@@ -92,6 +92,12 @@ switch (mode) {
     process.exit(0);
     break;
   }
+  case "quota_exhausted": {
+    process.stderr.write("You've hit your 5h usage limit. Resets later.\n");
+    write({ subtype: "error", is_error: true });
+    process.exit(1);
+    break;
+  }
   case "nonzero_exit": {
     write({ subtype: "error", is_error: true });
     process.exit(1);
