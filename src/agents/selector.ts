@@ -218,9 +218,9 @@ function compareEligibleProfiles(
   return (
     fundingModeRank(a) - fundingModeRank(b) ||
     economicTierRank(a) - economicTierRank(b) ||
+    compareAgentEffort(a.effort, b.effort) ||
     providerPreferenceRank(a, preferredProviders) -
       providerPreferenceRank(b, preferredProviders) ||
-    compareAgentEffort(a.effort, b.effort) ||
     a.id.localeCompare(b.id)
   );
 }
@@ -303,12 +303,12 @@ export function selectAgentProfile(
         reason = "economic_tier_unranked";
       } else if (profileEconomicTierRank > selectedEconomicTierRank) {
         reason = "higher_economic_tier_than_selected";
+      } else if (compareAgentEffort(profile.effort, selected.effort) > 0) {
+        reason = "higher_effort_than_selected";
       } else if (
         profileProviderPreferenceRank > selectedProviderPreferenceRank
       ) {
         reason = "less_preferred_provider_than_selected";
-      } else if (compareAgentEffort(profile.effort, selected.effort) > 0) {
-        reason = "higher_effort_than_selected";
       } else {
         reason = "deterministic_tiebreak";
       }
