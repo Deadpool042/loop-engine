@@ -39,7 +39,7 @@ if (captureEnv) writeFileSync(captureEnv, JSON.stringify(process.env));
 const mode = process.env.FAKE_CODEX_MODE ?? "success";
 if (mode === "hang") setInterval(() => {}, 1000);
 if (mode === "quota_exhausted") {
-  process.stderr.write("Usage limit reached for this subscription window.\n");
+  process.stderr.write("Usage limit reached for this subscription window.\\n");
   process.exit(9);
 }
 if (mode === "nonzero") process.exit(9);
