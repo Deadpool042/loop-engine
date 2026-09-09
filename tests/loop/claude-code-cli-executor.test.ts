@@ -298,6 +298,31 @@ describe("createClaudeCodeCliLoopExecutor", () => {
     }
   });
 
+  it("classifies subscription quota exhaustion as a recoverable provider limit", async () => {
+    const { cwd, executable, cleanup } = setupCleanWorktree();
+    try {
+      const executor = createClaudeCodeCliLoopExecutor({
+        executable,
+        timeoutMs: 5_000,
+      });
+      process.env.FAKE_CLAUDE_MODE = "quota_exhausted";
+      const result = await executor(fakePlan(cwd), cwd);
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "provider_limit_exceeded",
+      );
+      assert.equal(
+        result.status === "failed" ? result.failure.message : null,
+        "Claude Code subscription quota or rate limit was reached.",
+      );
+      assert.equal(JSON.stringify(result).includes("5h usage limit"), false);
+    } finally {
+      delete process.env.FAKE_CLAUDE_MODE;
+      cleanup();
+    }
+  });
+
   it("fails with provider_failed on a non-zero exit code", async () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
     try {

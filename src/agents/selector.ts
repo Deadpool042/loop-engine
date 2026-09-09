@@ -28,6 +28,7 @@ export type AgentSelectionRequest = Readonly<{
   maxEffort?: AgentEffort;
   budgetCeiling?: AgentBudgetCeiling;
   allowedProviders?: readonly AgentProvider[];
+  preferredProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
   allowedFundingModes?: readonly AgentFundingMode[];
 }>;
@@ -45,6 +46,7 @@ export type AgentNonSelection = Readonly<{
     | "less_preferred_funding_than_selected"
     | "higher_economic_tier_than_selected"
     | "economic_tier_unranked"
+    | "less_preferred_provider_than_selected"
     | "higher_effort_than_selected"
     | "deterministic_tiebreak";
 }>;
@@ -199,24 +201,39 @@ function economicTierRank(profile: AgentProfile): number {
     : agentEconomicTierRank(profile.economicTier);
 }
 
+function providerPreferenceRank(
+  profile: AgentProfile,
+  preferredProviders: readonly AgentProvider[] | undefined,
+): number {
+  if (preferredProviders === undefined) return 0;
+  const index = preferredProviders.indexOf(profile.provider);
+  return index < 0 ? preferredProviders.length : index;
+}
+
 function compareEligibleProfiles(
   a: AgentProfile,
   b: AgentProfile,
+  preferredProviders?: readonly AgentProvider[],
 ): number {
   return (
     fundingModeRank(a) - fundingModeRank(b) ||
     economicTierRank(a) - economicTierRank(b) ||
     compareAgentEffort(a.effort, b.effort) ||
+    providerPreferenceRank(a, preferredProviders) -
+      providerPreferenceRank(b, preferredProviders) ||
     a.id.localeCompare(b.id)
   );
 }
 
 export function pickSmallestCapable(
   profiles: readonly AgentProfile[],
+  preferredProviders?: readonly AgentProvider[],
 ): AgentProfile | null {
   if (profiles.length === 0) return null;
 
-  return [...profiles].sort(compareEligibleProfiles)[0] ?? null;
+  return [...profiles].sort((a, b) =>
+    compareEligibleProfiles(a, b, preferredProviders),
+  )[0] ?? null;
 }
 
 function canonicalizeSelectedProfile(profile: AgentProfile): AgentProfile {
@@ -253,17 +270,28 @@ export function selectAgentProfile(
     else rejected.push({ profileId: profile.id, reason: evaluation.reason });
   }
 
-  const selected = pickSmallestCapable(eligible);
+  const selected = pickSmallestCapable(
+    eligible,
+    request.preferredProviders,
+  );
   if (!selected) return { outcome: "no_match", rejected };
 
   const selectedFundingModeRank = fundingModeRank(selected);
   const selectedEconomicTierRank = economicTierRank(selected);
+  const selectedProviderPreferenceRank = providerPreferenceRank(
+    selected,
+    request.preferredProviders,
+  );
   const notSelected: AgentNonSelection[] = eligible
     .filter((profile) => profile.id !== selected.id)
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((profile) => {
       const profileFundingModeRank = fundingModeRank(profile);
       const profileEconomicTierRank = economicTierRank(profile);
+      const profileProviderPreferenceRank = providerPreferenceRank(
+        profile,
+        request.preferredProviders,
+      );
       let reason: AgentNonSelection["reason"];
 
       if (profileFundingModeRank > selectedFundingModeRank) {
@@ -277,6 +305,10 @@ export function selectAgentProfile(
         reason = "higher_economic_tier_than_selected";
       } else if (compareAgentEffort(profile.effort, selected.effort) > 0) {
         reason = "higher_effort_than_selected";
+      } else if (
+        profileProviderPreferenceRank > selectedProviderPreferenceRank
+      ) {
+        reason = "less_preferred_provider_than_selected";
       } else {
         reason = "deterministic_tiebreak";
       }

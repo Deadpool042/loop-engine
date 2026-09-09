@@ -47,6 +47,47 @@ describe("selectAgentProfile", () => {
     );
   });
 
+  it("uses explicit provider preference before deterministic id tie-break", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "claude",
+        provider: "anthropic",
+        runtime: "claude_code",
+        fundingMode: "included_subscription",
+        economicTier: "standard",
+        capabilities: ["code_edit"],
+      }),
+      profile({
+        id: "codex",
+        provider: "openai",
+        runtime: "codex",
+        fundingMode: "included_subscription",
+        economicTier: "standard",
+        capabilities: ["code_edit"],
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit"],
+      requiredPermissions: [],
+      preferredProviders: ["openai", "anthropic"],
+    });
+
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "codex",
+    );
+    assert.deepEqual(
+      result.outcome === "selected" ? result.notSelected : null,
+      [
+        {
+          profileId: "claude",
+          reason: "less_preferred_provider_than_selected",
+        },
+      ],
+    );
+  });
+
   it("breaks ties deterministically by id", () => {
     const registry = createAgentRegistry([
       profile({ id: "zeta", capabilities: ["code_edit"] }),

@@ -155,7 +155,10 @@ test("falls back from Claude to Codex without widening the admitted budget", asy
     "claude_code",
     2,
   );
-  const fallback = profile("configured.codex.standard", "openai", "codex", 5);
+  const fallback = Object.freeze({
+    ...profile("configured.codex.standard", "openai", "codex", 5),
+    effort: "low" as const,
+  });
   let observedPlan: LoopExecutionPlan | null = null;
   const fallbackExecutor: LoopExecutor = async (fallbackPlan) => {
     observedPlan = fallbackPlan;
@@ -177,6 +180,7 @@ test("falls back from Claude to Codex without widening the admitted budget", asy
   assert.equal(observedPlan?.provider, "openai");
   assert.equal(observedPlan?.runtime, "codex");
   assert.equal(observedPlan?.profileId, "configured.codex.standard");
+  assert.equal(observedPlan?.effort, "medium");
   assert.equal(observedPlan?.budget.maxCalls, 2);
 });
 

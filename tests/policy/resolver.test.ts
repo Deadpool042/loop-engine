@@ -339,6 +339,59 @@ describe("resolvePolicy — gates, in order", () => {
     );
   });
 
+  it("prefers Codex for code and Claude for architecture when both subscription profiles are otherwise equal", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "claude",
+        provider: "anthropic",
+        runtime: "claude_code",
+        fundingMode: "included_subscription",
+        economicTier: "standard",
+        capabilities: ["code_edit", "shell_exec", "test_execution", "long_context"],
+      }),
+      profile({
+        id: "codex",
+        provider: "openai",
+        runtime: "codex",
+        fundingMode: "included_subscription",
+        economicTier: "standard",
+        capabilities: ["code_edit", "shell_exec", "test_execution", "long_context"],
+      }),
+    ]);
+
+    const code = resolvePolicy({
+      policy: policy(),
+      registry,
+      candidate: candidate({ text: "- [ ] Implement checkout behavior" }),
+      mode: "execute",
+    });
+    assert.equal(
+      code.selection?.outcome === "selected" ? code.selection.profile.id : null,
+      "codex",
+    );
+    assert.deepEqual(code.selectionRequest.preferredProviders, [
+      "openai",
+      "anthropic",
+    ]);
+
+    const architecture = resolvePolicy({
+      policy: policy(),
+      registry,
+      candidate: candidate({ text: "- [ ] Revoir architecture checkout" }),
+      mode: "execute",
+    });
+    assert.equal(
+      architecture.selection?.outcome === "selected"
+        ? architecture.selection.profile.id
+        : null,
+      "claude",
+    );
+    assert.deepEqual(architecture.selectionRequest.preferredProviders, [
+      "anthropic",
+      "openai",
+    ]);
+  });
+
   it("keeps observable policy resolution stable across equivalent registry ordering", () => {
     const profiles = [
       profile({ id: "zeta", effort: "medium" }),

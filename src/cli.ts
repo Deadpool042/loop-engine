@@ -948,7 +948,7 @@ else if (command === "review") {
       const providers = buildAutoSubscriptionProviderConfigurations();
       runApplication = createLoopApplicationAssembly({
         providers,
-        maxProviderAttempts: 1,
+        maxProviderAttempts: providers.length,
       });
     } catch {
       failOption(
@@ -1027,7 +1027,7 @@ else if (command === "review") {
         ...(candidateId !== undefined ? { candidateId } : {}),
         maxRepairs,
         ...(autoSubscription
-          ? { provider: "claude_code" as const, autoSubscription: true }
+          ? { autoSubscription: true }
           : providerId !== undefined
             ? { provider: providerId }
             : {}),

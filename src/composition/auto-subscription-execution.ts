@@ -14,11 +14,11 @@ const INCLUDED_QUOTA_UNKNOWN = Object.freeze({
 /**
  * Fixed, subscription-only autonomous portfolio.
  *
- * AUTO deliberately exposes only standard subscription profiles.
- * Claude remains the deterministic primary at equal funding/tier/effort;
- * Codex stays available as the qualified secondary provider, but the AUTO
- * composition does not escalate to advanced/frontier profiles implicitly.
- * No API or additional-credit funding mode is present here.
+ * AUTO exposes only qualified subscription profiles. Primary selection is
+ * resolved by policy/task preference, capability, funding, quota and effort;
+ * declaration order is not an execution preference. The other compatible
+ * provider remains available for bounded failover. No API or
+ * additional-credit funding mode is present here.
  */
 export function buildAutoSubscriptionProviderConfigurations(): readonly LoopProviderConfiguration[] {
   return Object.freeze([
