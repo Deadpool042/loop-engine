@@ -66,6 +66,10 @@ jobs:
           mkdir -p artifacts
           set -o pipefail
           pnpm run ci 2>&1 | tee artifacts/ci.log
+      - name: Show validation failure tail
+        if: failure()
+        run: tail -n 200 artifacts/ci.log || true
+
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
