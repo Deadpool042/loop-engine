@@ -582,6 +582,7 @@ function prepareDeterministicRebindDraft(
 
   const existing = parsed.decision;
   const candidate = existing.decision.candidate;
+  const existingAllowedPaths = candidate?.allowedPaths;
   const brief = existing.decision.brief;
 
   if (
@@ -590,7 +591,8 @@ function prepareDeterministicRebindDraft(
     candidate?.id !== context.current.candidateId ||
     existing.source.document !== context.current.sourceDocument ||
     brief === undefined ||
-    !candidate.allowedPaths.every((path) =>
+    existingAllowedPaths === undefined ||
+    !existingAllowedPaths.every((path) =>
       context.governedAllowedPaths.includes(path),
     ) ||
     proposalContradictsConcreteCandidate(
