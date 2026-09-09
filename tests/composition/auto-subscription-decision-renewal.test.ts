@@ -35,6 +35,7 @@ function fixture(
     writeScope?: boolean;
     candidateText?: string;
     codeScope?: boolean;
+    codeScopePath?: string;
   } = {},
 ): {
   root: string;
@@ -73,7 +74,9 @@ function fixture(
           : [
               "## Périmètre d’écriture",
               "",
-              ...(options.codeScope ? ["- `src/example.ts`"] : ["- `docs/continuation-proof.md`"]),
+              ...(options.codeScope
+                ? [`- \`${options.codeScopePath ?? "src/example.ts"}\``]
+                : ["- `docs/continuation-proof.md`"]),
               "- `docs/roadmap/README.md`",
               "",
             ]),
@@ -387,10 +390,11 @@ test("rejects a no-change economy brief and retries once with Sonnet", async () 
   }
 });
 
-test("rejects exploration-only code briefs and retries once with Sonnet", async () => {
+test("rejects exploration-only code briefs for code-directory globs and retries once with Sonnet", async () => {
   const { root, project, head } = fixture({
     candidateText: "Implement the bounded continuation.",
     codeScope: true,
+    codeScopePath: "app/(public)/checkout/**",
   });
   try {
     const observedCalls: string[][] = [];
@@ -413,7 +417,7 @@ test("rejects exploration-only code briefs and retries once with Sonnet", async 
                 "Test execution",
               ],
               allowedPaths: [
-                "src/example.ts",
+                "app/(public)/checkout/**",
                 "docs/roadmap/README.md",
               ],
             });
@@ -421,12 +425,12 @@ test("rejects exploration-only code briefs and retries once with Sonnet", async 
           return claudeSuccess({
             objective: "Implement the bounded continuation.",
             deliverables: [
-              "Implement the bounded continuation in src/example.ts.",
+              "Implement the bounded continuation in app/(public)/checkout/**.",
               "Update docs/roadmap/README.md.",
             ],
             outOfScope: ["No deployment."],
             allowedPaths: [
-              "src/example.ts",
+              "app/(public)/checkout/**",
               "docs/roadmap/README.md",
             ],
           });
@@ -451,11 +455,15 @@ test("rejects exploration-only code briefs and retries once with Sonnet", async 
     assert.equal(parsed.ok, true);
     if (parsed.ok) {
       assert.deepEqual(parsed.decision.decision.brief?.deliverables, [
-        "Implement the bounded continuation in src/example.ts.",
+        "Implement the bounded continuation in app/(public)/checkout/**.",
         "Update docs/roadmap/README.md.",
       ]);
       assert.deepEqual(parsed.decision.decision.brief?.outOfScope, [
         "No deployment.",
+      ]);
+      assert.deepEqual(parsed.decision.decision.candidate?.allowedPaths, [
+        "app/(public)/checkout/**",
+        "docs/roadmap/README.md",
       ]);
     }
   } finally {

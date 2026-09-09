@@ -335,12 +335,17 @@ const PROVIDER_PHASE_VALIDATION_PATTERNS = Object.freeze([
 ]);
 
 function hasCodeWritablePath(paths: readonly string[]): boolean {
-  return paths.some(
-    (path) =>
-      path.startsWith("src/") ||
-      path.startsWith("tests/") ||
-      /\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|swift|rb|php|cs)$/i.test(path),
-  );
+  return paths.some((path) => {
+    const normalized = path.replaceAll("\\", "/");
+    return (
+      /^(?:app|src|packages|features|entities|prisma|scripts|tests|components|lib|server|client)\//i.test(
+        normalized,
+      ) ||
+      /\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|swift|rb|php|cs)$/i.test(
+        normalized,
+      )
+    );
+  });
 }
 
 function proposalContradictsConcreteCandidate(
