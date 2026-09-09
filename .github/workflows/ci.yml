@@ -68,7 +68,9 @@ jobs:
           pnpm run ci 2>&1 | tee artifacts/ci.log
       - name: Show validation failure tail
         if: failure()
-        run: tail -n 200 artifacts/ci.log || true
+        run: |
+          tail -n 200 artifacts/ci.log
+          exit 1
 
       - name: Upload diagnostics
         if: failure()
