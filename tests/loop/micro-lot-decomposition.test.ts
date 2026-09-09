@@ -100,10 +100,10 @@ test("AUTO keeps explicitly referenced writable paths with their deliverable", (
   const result = decomposeOversizedAutoCandidate({
     candidate: {
       ...candidate,
-      id: "VNEXT3-G3.M2",
+      id: "VNEXT3-G3",
       path: "docs/roadmap/README.md",
       line: 67,
-      text: "- [ ] VNEXT3-G3.M2 — Checkout entities updated to include gift context",
+      text: "- [ ] VNEXT3-G3 — Gifting checkout workflow",
     },
     sourceDocument: "docs/roadmap/README.md",
     allowedPaths: [
@@ -125,7 +125,7 @@ test("AUTO keeps explicitly referenced writable paths with their deliverable", (
   });
 
   const children = result.decomposition?.children ?? [];
-  assert.equal(children[0]?.id, "VNEXT3-G3.M2.M1");
+  assert.equal(children[0]?.id, "VNEXT3-G3.M1");
   assert.deepEqual(children[0]?.deliverables, [
     "Update entities/checkout/** to introduce a GiftRequest aggregate.",
   ]);
@@ -142,7 +142,7 @@ test("AUTO keeps explicitly referenced writable paths with their deliverable", (
     false,
   );
 
-  assert.equal(children[1]?.id, "VNEXT3-G3.M2.M2");
+  assert.equal(children[1]?.id, "VNEXT3-G3.M2");
   assert.deepEqual(children[1]?.deliverables, [
     "Update docs/testing/2026-09-08-vnext3-g3-gifting-staging-recipe.md with the staging recipe.",
   ]);
