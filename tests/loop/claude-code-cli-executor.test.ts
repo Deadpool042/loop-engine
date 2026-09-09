@@ -312,6 +312,10 @@ describe("createClaudeCodeCliLoopExecutor", () => {
         result.status === "failed" ? result.failure.code : null,
         "provider_limit_exceeded",
       );
+      assert.equal(
+        result.status === "failed" ? result.failure.message : null,
+        "Claude Code subscription quota or rate limit was reached.",
+      );
       assert.equal(JSON.stringify(result).includes("5h usage limit"), false);
     } finally {
       delete process.env.FAKE_CLAUDE_MODE;

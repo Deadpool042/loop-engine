@@ -387,6 +387,10 @@ describe("createCodexCliLoopExecutor", () => {
         "provider_limit_exceeded",
       );
       assert.equal(
+        result.status === "failed" ? result.failure.message : null,
+        "Codex subscription quota or rate limit was reached.",
+      );
+      assert.equal(
         JSON.stringify(result).includes("Usage limit reached"),
         false,
       );
