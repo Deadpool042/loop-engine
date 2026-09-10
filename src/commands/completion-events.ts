@@ -230,14 +230,14 @@ export async function generateCompletionEventsReport(
   }[] = [];
 
   for (const project of config.projects) {
-    try {
-      const ciEvent = currentCiTerminalEvent(
-        project.name,
-        options.readCiEvent ?? application.readCiTerminalEvent,
-      );
-      if (ciEvent) events.push(ciEvent);
-    } catch {
-      errors.push({ project: project.name, code: "ci_event_failed" });
+    const ciReader = options.readCiEvent ?? application.readCiTerminalEvent;
+    if (typeof ciReader === "function") {
+      try {
+        const ciEvent = currentCiTerminalEvent(project.name, ciReader);
+        if (ciEvent) events.push(ciEvent);
+      } catch {
+        errors.push({ project: project.name, code: "ci_event_failed" });
+      }
     }
 
     let overview: ReturnType<
