@@ -28,6 +28,8 @@ import {
   generateRunModelEfficiencyReport,
   lookupRunHistoryEntry,
   recordLoopRunHistory,
+  readCiTerminalEvent,
+  recordCiTerminalEvent,
   generateWorkspaceReports,
   generateWorkspaceSummaryReport,
   getRequiredProjectName,
@@ -175,6 +177,8 @@ export type LoopApplicationAssembly = Readonly<{
   lookupRunHistoryEntry: typeof lookupRunHistoryEntry;
   reviewCandidatePublication: CandidatePublicationReview;
   recordLoopRunHistory: typeof recordLoopRunHistory;
+  readCiTerminalEvent: typeof readCiTerminalEvent;
+  recordCiTerminalEvent: typeof recordCiTerminalEvent;
   generateWorkspaceReports: typeof generateWorkspaceReports;
   generateWorkspaceSummaryReport: typeof generateWorkspaceSummaryReport;
   getRequiredProjectName: typeof getRequiredProjectName;
@@ -350,6 +354,8 @@ export function createLoopApplicationAssembly(
     lookupRunHistoryEntry,
     reviewCandidatePublication: createCandidatePublicationReview(),
     recordLoopRunHistory,
+    readCiTerminalEvent,
+    recordCiTerminalEvent,
     generateWorkspaceReports,
     generateWorkspaceSummaryReport,
     getRequiredProjectName,

@@ -7,7 +7,10 @@ export function printHelp(): void {
   terminal.info("pnpm loop summary         — vue compacte du workspace");
   terminal.info("pnpm loop summary --json  — vue workspace en JSON");
   terminal.info(
-    "pnpm loop completion-events --json — projection agrégée read-only des lot.completed",
+    "pnpm loop completion-events --json — projection agrégée read-only des événements actionnables",
+  );
+  terminal.info(
+    "pnpm loop ci-event record <project> --conclusion <success|failure|cancelled> --sha <sha> --workflow <name> --run-id <id> --run-attempt <n> [--pr-number <n>] [--branch <ref>] --json — enregistre un résultat CI terminal borné",
   );
   terminal.info("pnpm loop serve-summary   — bridge HTTP read-only de summary");
   terminal.info("pnpm loop status          — état détaillé des projets");

@@ -105,6 +105,7 @@ import {
   printWorkspaceProjectStatusJson,
 } from "./commands/workspace.js";
 import { registerProjectEnvelopeCommand } from "./commands/project-register.js";
+import { recordCiTerminalEventCommand } from "./commands/ci-event.js";
 
 const application = createLoopApplicationAssembly();
 
@@ -205,6 +206,65 @@ else if (command === "completion-events" && process.argv.includes("--json"))
 else if (command === "completion-events") {
   terminal.error("completion-events requires --json");
   process.exit(1);
+}
+else if (command === "ci-event" && process.argv[3] === "record") {
+  const json = process.argv.includes("--json");
+  const project = resolveProjectOrExit("ci-event record", 4);
+  const conclusion = optionValue("--conclusion");
+  const sha = optionValue("--sha");
+  const workflow = optionValue("--workflow");
+  const runId = optionValue("--run-id");
+  const runAttemptValue = optionValue("--run-attempt");
+  const prNumberValue = optionValue("--pr-number");
+  const branch = optionValue("--branch");
+
+  if (!conclusion || !sha || !workflow || !runId || !runAttemptValue) {
+    failOption(
+      json,
+      "missing_ci_event_value",
+      "--conclusion, --sha, --workflow, --run-id and --run-attempt are required.",
+    );
+  }
+  if (!["success", "failure", "cancelled"].includes(conclusion)) {
+    failOption(json, "invalid_ci_event_value", "Invalid --conclusion value.");
+  }
+  if (!/^[a-f0-9]{40}$/i.test(sha)) {
+    failOption(json, "invalid_ci_event_value", "Invalid --sha value.");
+  }
+  if (!/^[0-9]{1,30}$/.test(runId)) {
+    failOption(json, "invalid_ci_event_value", "Invalid --run-id value.");
+  }
+  const runAttempt = Number(runAttemptValue);
+  if (!Number.isInteger(runAttempt) || runAttempt < 1 || runAttempt > 9999) {
+    failOption(json, "invalid_ci_event_value", "Invalid --run-attempt value.");
+  }
+  const prNumber = prNumberValue === undefined ? null : Number(prNumberValue);
+  if (
+    prNumber !== null &&
+    (!Number.isInteger(prNumber) || prNumber < 1 || prNumber > 999999999)
+  ) {
+    failOption(json, "invalid_ci_event_value", "Invalid --pr-number value.");
+  }
+
+  try {
+    const report = recordCiTerminalEventCommand(application, project, {
+      conclusion: conclusion as "success" | "failure" | "cancelled",
+      sha,
+      workflow,
+      runId,
+      runAttempt,
+      prNumber,
+      branch: branch ?? null,
+    });
+    if (json) console.log(JSON.stringify(report));
+    else terminal.info(`CI event recorded for ${project.name}: ${report.conclusion}`);
+  } catch (error) {
+    failOption(
+      json,
+      "ci_event_record_failed",
+      error instanceof Error ? error.message : "Unable to record CI event.",
+    );
+  }
 }
 else if (command === "execution-status" && process.argv.includes("--json")) {
   const project = resolveProjectOrExit("execution-status");
@@ -1114,7 +1174,7 @@ else if (command === "review") {
   if (exitCode !== 0) process.exitCode = exitCode;
 } else {
   terminal.error(
-    "Usage: pnpm loop help|summary|status|doctor|roadmap status|overview|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|execution-status <project> --json|run <project>|runs <project> [--limit N | --run-id <runId>]|candidate review <project> --run-id <runId>",
+    "Usage: pnpm loop help|summary|status|doctor|completion-events --json|ci-event record <project> ...|roadmap status|overview|objective|proposal-context <project>|context <project>|validate <project>|review <project>|next <project>|prompt <project>|execution-status <project> --json|run <project>|runs <project> [--limit N | --run-id <runId>]|candidate review <project> --run-id <runId>",
   );
   process.exit(1);
 }

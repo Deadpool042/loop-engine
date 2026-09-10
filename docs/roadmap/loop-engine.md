@@ -304,3 +304,16 @@ Voir `docs/architecture/job-package-portable-contract.md` pour l'audit complet.
 - [x] [P0] V53.0 — Qualifier le runtime Codex actuel et intégrer GPT-6 Astra au portefeuille AUTO abonnement. Preuve VPS : `codex-cli 0.153.4` et invocation `gpt-6-astra` réussie avec l’authentification ChatGPT existante, sans API key. Conserver `gpt-5.6-terra` en profil Codex `advanced` et ajouter `gpt-6-astra` en profil `frontier`; conserver Luna en economy et Sol en standard. Aucun fallback API payant. [Détail](./codex-astra-auto-v53.md)
 - [x] [P0] V53.1 — Garantir qu’un fallback provider démarre depuis le même baseline Git propre que la tentative primaire. Toute transition provider doit reset/clean le worktree isolé avant l’appel suivant ; si le reset est indisponible ou échoue, fail closed. Conserver le garde `worktree_not_clean` côté Codex et ne jamais agréger les fichiers modifiés d’une tentative rejetée dans le résultat final. [Détail](./codex-astra-auto-v53.md)
 - [x] [P1] V53.2 — Supprimer l’état incohérent `repairer_unavailable` du chemin AUTO : tant qu’aucun repairer concret n’est configuré, le budget effectif de réparation doit être ramené à 0 et la stratégie existante d’escalade de modèle/échec borné doit rester explicite. Aucun repairer fictif, aucun second moteur de correction et aucune permission supplémentaire. [Détail](./codex-astra-auto-v53.md)
+
+## V54 — événements CI terminaux actionnables
+
+- [x] [P0] V54.0 — Ajouter un snapshot CI terminal canonique par projet hors Git et la commande bornée `ci-event record <project>` : le repository est dérivé de `projects.yaml`, le caller fournit uniquement conclusion GitHub (`success|failure|cancelled`), SHA, workflow, run id/attempt, PR et branche optionnels. `completion-events --json` projette ensuite un `ci.green` ou `ci.failed` à `eventId` déterministe, sans credential, log brut, appel GitHub, scheduler, merge ou mutation du projet observé. La notification et l’émission depuis les workflows restent des responsabilités n8n/GitHub séparées.
+
+### Gates V54
+
+- un événement CI n’autorise jamais un merge : il sert de déclencheur observable et doit être reverifié par la frontière GitHub/DW avant toute intégration ;
+- aucune URL arbitraire n’est acceptée : l’URL de run est dérivée du repository canonique et du `runId` ;
+- l’état runtime est atomique, project-scoped et hors Git ;
+- `success` produit `ci.green`, `failure` et `cancelled` produisent `ci.failed` ;
+- aucun secret, token, contenu de log ou payload GitHub brut n’est persisté ;
+- les événements `lot.completed`, `execution.failed` et `gate.blocked` restent inchangés.
