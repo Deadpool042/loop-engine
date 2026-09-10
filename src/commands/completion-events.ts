@@ -4,13 +4,17 @@ import type {
   LoopApplicationAssembly,
   LoopApplicationConfig,
 } from "../composition/index.js";
+import {
+  ciTerminalEventType,
+  readCiTerminalEvent,
+} from "../core/ci-terminal-events.js";
 
 export type CompletionEventsReport = Readonly<{
   schemaVersion: 1;
   events: readonly unknown[];
   errors: readonly Readonly<{
     project: string;
-    code: "overview_failed" | "execution_status_failed";
+    code: "overview_failed" | "execution_status_failed" | "ci_event_failed";
   }>[];
 }>;
 
@@ -57,6 +61,56 @@ function gateBlockedEventId(
     .update(fingerprint)
     .digest("hex")
     .slice(0, 32);
+}
+
+function ciTerminalEventId(input: Readonly<{
+  project: string;
+  sha: string;
+  runId: string;
+  runAttempt: number;
+  conclusion: string;
+}>): string {
+  return createHash("sha256")
+    .update("ci.terminal")
+    .update("\0")
+    .update(input.project)
+    .update("\0")
+    .update(input.sha.toLowerCase())
+    .update("\0")
+    .update(input.runId)
+    .update("\0")
+    .update(String(input.runAttempt))
+    .update("\0")
+    .update(input.conclusion)
+    .digest("hex")
+    .slice(0, 32);
+}
+
+function currentCiTerminalEvent(
+  projectName: string,
+  reader: typeof readCiTerminalEvent = readCiTerminalEvent,
+) {
+  const event = reader(projectName);
+  if (event === null) return null;
+
+  return Object.freeze({
+    schemaVersion: 1 as const,
+    type: ciTerminalEventType(event.conclusion),
+    eventId: ciTerminalEventId(event),
+    project: Object.freeze({ name: event.project }),
+    repository: event.repository,
+    sha: event.sha.toLowerCase(),
+    conclusion: event.conclusion,
+    workflow: event.workflow,
+    run: Object.freeze({
+      id: event.runId,
+      attempt: event.runAttempt,
+      url: event.runUrl,
+    }),
+    pr: event.prNumber === null ? null : Object.freeze({ number: event.prNumber }),
+    branch: event.branch,
+    occurredAt: event.occurredAt,
+  });
 }
 
 function currentGateBlockedEvent(
@@ -161,14 +215,27 @@ function currentFailureEvent(
 export async function generateCompletionEventsReport(
   application: LoopApplicationAssembly,
   config: LoopApplicationConfig,
+  options: Readonly<{
+    readCiEvent?: typeof readCiTerminalEvent;
+  }> = {},
 ): Promise<CompletionEventsReport> {
   const events: unknown[] = [];
   const errors: {
     project: string;
-    code: "overview_failed" | "execution_status_failed";
+    code: "overview_failed" | "execution_status_failed" | "ci_event_failed";
   }[] = [];
 
   for (const project of config.projects) {
+    try {
+      const ciEvent = currentCiTerminalEvent(
+        project.name,
+        options.readCiEvent ?? readCiTerminalEvent,
+      );
+      if (ciEvent) events.push(ciEvent);
+    } catch {
+      errors.push({ project: project.name, code: "ci_event_failed" });
+    }
+
     let overview: ReturnType<
       LoopApplicationAssembly["generateRoadmapOverviewReport"]
     >;

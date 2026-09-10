@@ -53,7 +53,10 @@ export type JsonErrorCode =
   | "missing_candidate_run_id"
   | "missing_project_type"
   | "brief_approval_required"
-  | "project_registration_failed";
+  | "project_registration_failed"
+  | "missing_ci_event_value"
+  | "invalid_ci_event_value"
+  | "ci_event_record_failed";
 
 export function printJsonError(code: JsonErrorCode, message: string): void {
   console.log(
