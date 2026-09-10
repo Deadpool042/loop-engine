@@ -247,7 +247,7 @@ else if (command === "ci-event" && process.argv[3] === "record") {
   }
 
   try {
-    const report = recordCiTerminalEventCommand(project, {
+    const report = recordCiTerminalEventCommand(application, project, {
       conclusion: conclusion as "success" | "failure" | "cancelled",
       sha,
       workflow,

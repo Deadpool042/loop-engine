@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { recordCiTerminalEventCommand } from "../../src/commands/ci-event.js";
-import type { ProjectConfig } from "../../src/core/config.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationProject,
+} from "../../src/composition/index.js";
 import type { CiTerminalEventRecord } from "../../src/core/ci-terminal-events.js";
 
 const PROJECT = {
@@ -12,11 +15,27 @@ const PROJECT = {
   required_docs: [],
   validation: [],
   repository: "Deadpool042/CREATYSS",
-} satisfies ProjectConfig;
+} as LoopApplicationProject;
+
+function recordingApplication(
+  write: (record: CiTerminalEventRecord) => void,
+): LoopApplicationAssembly {
+  return {
+    recordCiTerminalEvent(record: CiTerminalEventRecord) {
+      write(record);
+      return { ok: true, path: "/tmp/ignored" };
+    },
+  } as unknown as LoopApplicationAssembly;
+}
 
 test("derives repository/run URL from canonical project configuration", () => {
   let written: CiTerminalEventRecord | null = null;
+  const application = recordingApplication((record) => {
+    written = record;
+  });
+
   const report = recordCiTerminalEventCommand(
+    application,
     PROJECT,
     {
       conclusion: "success",
@@ -28,10 +47,6 @@ test("derives repository/run URL from canonical project configuration", () => {
       branch: "test/m13",
     },
     () => new Date("2026-09-10T12:30:00.000Z"),
-    (record) => {
-      written = record;
-      return { ok: true, path: "/tmp/ignored" };
-    },
   );
 
   assert.equal(report.status, "recorded");
@@ -52,9 +67,14 @@ test("derives repository/run URL from canonical project configuration", () => {
 });
 
 test("refuses projects without a canonical GitHub repository", () => {
+  const application = recordingApplication(() => {
+    throw new Error("must not write");
+  });
+
   assert.throws(
     () =>
       recordCiTerminalEventCommand(
+        application,
         { ...PROJECT, repository: undefined },
         {
           conclusion: "failure",

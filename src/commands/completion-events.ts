@@ -4,10 +4,6 @@ import type {
   LoopApplicationAssembly,
   LoopApplicationConfig,
 } from "../composition/index.js";
-import {
-  ciTerminalEventType,
-  readCiTerminalEvent,
-} from "../core/ci-terminal-events.js";
 
 export type CompletionEventsReport = Readonly<{
   schemaVersion: 1;
@@ -86,9 +82,17 @@ function ciTerminalEventId(input: Readonly<{
     .slice(0, 32);
 }
 
+type CiTerminalReader = LoopApplicationAssembly["readCiTerminalEvent"];
+
+function ciTerminalEventType(
+  conclusion: "success" | "failure" | "cancelled",
+): "ci.green" | "ci.failed" {
+  return conclusion === "success" ? "ci.green" : "ci.failed";
+}
+
 function currentCiTerminalEvent(
   projectName: string,
-  reader: typeof readCiTerminalEvent = readCiTerminalEvent,
+  reader: CiTerminalReader,
 ) {
   const event = reader(projectName);
   if (event === null) return null;
@@ -216,7 +220,7 @@ export async function generateCompletionEventsReport(
   application: LoopApplicationAssembly,
   config: LoopApplicationConfig,
   options: Readonly<{
-    readCiEvent?: typeof readCiTerminalEvent;
+    readCiEvent?: CiTerminalReader;
   }> = {},
 ): Promise<CompletionEventsReport> {
   const events: unknown[] = [];
@@ -229,7 +233,7 @@ export async function generateCompletionEventsReport(
     try {
       const ciEvent = currentCiTerminalEvent(
         project.name,
-        options.readCiEvent ?? readCiTerminalEvent,
+        options.readCiEvent ?? application.readCiTerminalEvent,
       );
       if (ciEvent) events.push(ciEvent);
     } catch {

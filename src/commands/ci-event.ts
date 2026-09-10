@@ -1,11 +1,10 @@
-import type { ProjectConfig } from "../core/config.js";
-import {
-  recordCiTerminalEvent,
-  type CiTerminalConclusion,
-} from "../core/ci-terminal-events.js";
+import type {
+  LoopApplicationAssembly,
+  LoopApplicationProject,
+} from "../composition/index.js";
 
 export type RecordCiTerminalEventInput = Readonly<{
-  conclusion: CiTerminalConclusion;
+  conclusion: "success" | "failure" | "cancelled";
   sha: string;
   workflow: string;
   runId: string;
@@ -19,7 +18,7 @@ export type RecordCiTerminalEventReport = Readonly<{
   status: "recorded";
   project: string;
   repository: string;
-  conclusion: CiTerminalConclusion;
+  conclusion: "success" | "failure" | "cancelled";
   sha: string;
   workflow: string;
   runId: string;
@@ -29,10 +28,10 @@ export type RecordCiTerminalEventReport = Readonly<{
 }>;
 
 export function recordCiTerminalEventCommand(
-  project: ProjectConfig,
+  application: LoopApplicationAssembly,
+  project: LoopApplicationProject,
   input: RecordCiTerminalEventInput,
   now: () => Date = () => new Date(),
-  writer: typeof recordCiTerminalEvent = recordCiTerminalEvent,
 ): RecordCiTerminalEventReport {
   const repository = project.repository?.trim();
   if (!repository) {
@@ -43,7 +42,7 @@ export function recordCiTerminalEventCommand(
   const branch = input.branch?.trim() || null;
   const runUrl = `https://github.com/${repository}/actions/runs/${input.runId}`;
 
-  writer({
+  application.recordCiTerminalEvent({
     schemaVersion: 1,
     project: project.name,
     repository,
