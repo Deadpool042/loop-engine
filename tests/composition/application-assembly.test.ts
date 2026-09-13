@@ -5,6 +5,7 @@ import {
   createLoopApplicationAssembly,
   type LoopApplicationAssembly,
 } from "../../src/composition/application-assembly.js";
+import { generateProjectHandoffReportWithAutoRoute } from "../../src/composition/auto-route-handoff.js";
 
 describe("LoopApplicationAssembly", () => {
   it("returns the complete immutable application contract deterministically", () => {
@@ -18,6 +19,7 @@ describe("LoopApplicationAssembly", () => {
     assert.equal(second.loopExecutor, undefined);
     assert.equal(first.loadConfig, second.loadConfig);
     assert.equal(first.runLoopPlan, second.runLoopPlan);
+    assert.equal(first.generateProjectHandoffReport, generateProjectHandoffReportWithAutoRoute);
     assert.equal(first.runLoopExecute, second.runLoopExecute);
     assert.equal(first.runLoopCommit, second.runLoopCommit);
     assert.deepEqual(first.loopRunModes, second.loopRunModes);
@@ -58,7 +60,7 @@ describe("LoopApplicationAssembly", () => {
     assert.throws(
       () =>
         createLoopApplicationAssembly({
-          codexProvider: { executable: "/usr/local/bin/not-codex" },
+          codexProvider: { executable: "/usr/local/bin/not-codex", model: "test-model" },
         }),
       /codex/i,
     );

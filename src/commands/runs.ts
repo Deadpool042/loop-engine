@@ -42,7 +42,9 @@ export function printRunHistory(
       );
     }
     terminal.info(
-      "Tokens/cost/quota: unavailable — no reliable provider usage or quota source is recorded.",
+      report.telemetry.quota === "observed_delta_samples"
+        ? "Quota: observed OpenClaw delta samples available in Run History; tokens/cost remain unavailable."
+        : "Tokens/cost/quota: unavailable — no reliable provider usage or quota source is recorded.",
     );
 
     if (report.models.length === 0) {

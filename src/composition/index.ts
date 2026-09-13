@@ -56,6 +56,19 @@ export {
 } from "./provider-registry.js";
 
 export {
+  AUTO_SUBSCRIPTION_PORTFOLIO_ENV,
+  buildAutoSubscriptionExecutionCandidates,
+  buildAutoSubscriptionProviderConfigurations,
+  decideAutoSubscriptionRoute,
+  loadAutoSubscriptionModelPortfolioFromEnvironment,
+  parseAutoSubscriptionModelPortfolio,
+  type AutoSubscriptionExecutionCandidate,
+  type AutoSubscriptionModelPortfolio,
+  type AutoSubscriptionModelProfile,
+  type AutoSubscriptionNativeOpenClawProfile,
+} from "./auto-subscription-execution.js";
+
+export {
   createIsolatedProviderRunExecute,
   type IsolatedProviderExecutionOptions,
 } from "./isolated-provider-execution.js";

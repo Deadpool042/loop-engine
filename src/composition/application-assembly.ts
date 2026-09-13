@@ -7,7 +7,6 @@ import {
   generateExecutionReportWithEvidence,
   generateNextProjectActionReport,
   generateProjectContextReport,
-  generateProjectHandoffReport,
   generateProjectObjectiveReport,
   generateProjectPromptReport,
   generateProjectReport,
@@ -53,6 +52,7 @@ import {
   unconfiguredTextOnlyProvider,
 } from "../text-only-provider/index.js";
 import { createLoopProviderFailoverAssembly } from "./provider-failover-assembly.js";
+import { generateProjectHandoffReportWithAutoRoute } from "./auto-route-handoff.js";
 import {
   createIsolatedProviderRunExecute,
   createIsolatedProviderWorkspaceReset,
@@ -132,7 +132,7 @@ export type LoopApplicationAssembly = Readonly<{
   generateExecutionStatusReport: typeof buildExecutionStatusReport;
   generateNextProjectActionReport: typeof generateNextProjectActionReport;
   generateProjectContextReport: typeof generateProjectContextReport;
-  generateProjectHandoffReport: typeof generateProjectHandoffReport;
+  generateProjectHandoffReport: typeof generateProjectHandoffReportWithAutoRoute;
   generateProjectObjectiveReport: typeof generateProjectObjectiveReport;
   generateProjectPromptReport: typeof generateProjectPromptReport;
   generateProjectReport: typeof generateProjectReport;
@@ -311,7 +311,7 @@ export function createLoopApplicationAssembly(
     generateExecutionStatusReport: buildExecutionStatusReport,
     generateNextProjectActionReport,
     generateProjectContextReport,
-    generateProjectHandoffReport,
+    generateProjectHandoffReport: generateProjectHandoffReportWithAutoRoute,
     generateProjectObjectiveReport,
     generateProjectPromptReport,
     generateProjectReport,

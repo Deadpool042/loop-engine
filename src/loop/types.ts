@@ -1,5 +1,6 @@
 import type { MinimalContextPackage } from "../context/types.js";
 import type { RoadmapCandidate } from "../intelligence/roadmap.js";
+import type { LoopQuotaConsumptionEvidence } from "../policy/quota.js";
 import type { AgentPolicyResolution } from "../policy/types.js";
 import type { LoopExecutionPlanEvidence } from "./execution-plan-evidence.js";
 import type { LoopExecutionPlanFingerprint } from "./execution-plan-evidence-fingerprint.js";
@@ -90,4 +91,5 @@ export type LoopRunResult = Readonly<{
   modelEscalationEvidence?: LoopModelEscalationEvidence | null;
   providerFailoverEvidence?: LoopProviderFailoverEvidence | null;
   providerFailoverFingerprint?: LoopProviderFailoverEvidenceFingerprint | null;
+  quotaConsumptionEvidence?: LoopQuotaConsumptionEvidence | null;
 }>;

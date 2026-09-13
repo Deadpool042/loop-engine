@@ -302,6 +302,89 @@ test("uses a paid fallback only when the admitted policy explicitly allows it", 
   assert.equal(observedProfileId, "configured.claude.api");
 });
 
+test("quota/rate-limit fallback performs at most one attempt per provider without model cascade", async () => {
+  const primary = profile("configured.codex.standard", "openai", "codex", 2);
+  const alternateSameProvider = Object.freeze({
+    ...profile("configured.codex.frontier", "openai", "codex", 2),
+    economicTier: "frontier" as const,
+  });
+  const fallbackStandard = Object.freeze({
+    ...profile(
+      "configured.claude.standard",
+      "anthropic",
+      "claude_code",
+      2,
+    ),
+    economicTier: "standard" as const,
+  });
+  const fallbackFrontier = Object.freeze({
+    ...profile(
+      "configured.claude.frontier",
+      "anthropic",
+      "claude_code",
+      2,
+    ),
+    economicTier: "frontier" as const,
+  });
+  let primaryCalls = 0;
+  let fallbackCalls = 0;
+  let fallbackProfileId: string | null = null;
+  const primaryExecutor: LoopExecutor = async () => {
+    primaryCalls += 1;
+    return failed("provider_limit_exceeded")(plan(primary), "/tmp");
+  };
+  const fallbackExecutor: LoopExecutor = async (fallbackPlan) => {
+    fallbackCalls += 1;
+    fallbackProfileId = fallbackPlan.profileId;
+    return failed("provider_rate_limited")(fallbackPlan, "/tmp");
+  };
+
+  const dependency = createLoopProviderFailoverAssembly(
+    [
+      Object.freeze({
+        id: "codex",
+        agentRegistry: createAgentRegistry([primary, alternateSameProvider]),
+        executor: primaryExecutor,
+      }),
+      Object.freeze({
+        id: "claude_code",
+        agentRegistry: createAgentRegistry([fallbackFrontier, fallbackStandard]),
+        executor: fallbackExecutor,
+      }),
+    ],
+    2,
+    { createWorkspaceReset: cleanResetFactory },
+  );
+
+  const result = await dependency.executor(plan(primary), "/tmp");
+  assert.equal(result.status, "failed");
+  assert.equal(primaryCalls, 1);
+  assert.equal(fallbackCalls, 1);
+  assert.equal(fallbackProfileId, "configured.claude.standard");
+  assert.deepEqual(
+    result.providerFailoverEvidence?.attempts.map((attempt) => ({
+      attempt: attempt.attempt,
+      provider: attempt.provider,
+      profileId: attempt.profileId,
+      failureCode: attempt.failureCode,
+    })),
+    [
+      {
+        attempt: 1,
+        provider: "openai",
+        profileId: "configured.codex.standard",
+        failureCode: "provider_limit_exceeded",
+      },
+      {
+        attempt: 2,
+        provider: "anthropic",
+        profileId: "configured.claude.standard",
+        failureCode: "provider_rate_limited",
+      },
+    ],
+  );
+});
+
 test("rejects duplicate provider assembly ids before execution", () => {
   const primary = profile("configured.codex", "openai", "codex", 2);
   assert.throws(
