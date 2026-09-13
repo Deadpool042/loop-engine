@@ -296,6 +296,8 @@ describe("json errors", () => {
       "codex",
       "--provider-executable",
       "/usr/local/bin/not-codex",
+      "--provider-model",
+      "gpt-test",
       "--json",
     ]);
     const json = JSON.parse(output) as { error?: { code?: unknown } };
@@ -466,6 +468,8 @@ describe("json errors", () => {
       "claude_code",
       "--provider-executable",
       "/usr/local/bin/not-claude",
+      "--provider-model",
+      "claude-test",
       "--json",
     ]);
     const json = JSON.parse(output) as {
@@ -491,6 +495,8 @@ describe("json errors", () => {
           "claude_code",
           "--provider-executable",
           "/definitely-missing/claude",
+          "--provider-model",
+          "claude-test",
           "--json",
         ],
         fixture.cwd,

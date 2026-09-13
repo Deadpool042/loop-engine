@@ -1008,10 +1008,12 @@ describe("Core public API", () => {
       runJson("pnpm exec tsx src/cli.ts context loop-engine --json"),
       generateProjectContextReport(project),
     );
-    assert.deepEqual(
-      runJson("pnpm exec tsx src/cli.ts handoff loop-engine --json"),
-      generateProjectHandoffReport(project),
-    );
+    const cliHandoff = runJson(
+      "pnpm exec tsx src/cli.ts handoff loop-engine --json",
+    ) as Record<string, unknown>;
+    const { autoRoute, ...stableCliHandoff } = cliHandoff;
+    assert.deepEqual(stableCliHandoff, generateProjectHandoffReport(project));
+    assert.ok(autoRoute && typeof autoRoute === "object");
     assert.deepEqual(
       runJson("pnpm exec tsx src/cli.ts next loop-engine --json"),
       generateNextProjectActionReport(project),

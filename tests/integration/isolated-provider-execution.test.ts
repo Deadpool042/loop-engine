@@ -138,7 +138,12 @@ function application(
   chmodSync(executable, 0o755);
 
   return createLoopApplicationAssembly({
-    provider: { id: "claude_code", executable, timeoutMs: 5_000 },
+    provider: {
+      id: "claude_code",
+      executable,
+      model: "claude-test",
+      timeoutMs: 5_000,
+    },
     isolatedProviderExecution: {
       lockRoot: join(root, "locks"),
       workspaceRoot: join(root, "workspaces"),
