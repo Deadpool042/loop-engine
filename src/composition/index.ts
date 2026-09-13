@@ -72,3 +72,8 @@ export {
   createIsolatedProviderRunExecute,
   type IsolatedProviderExecutionOptions,
 } from "./isolated-provider-execution.js";
+
+export {
+  createOpenClawNativeLoopExecutor,
+  type OpenClawNativeLoopExecutorOptions,
+} from "../loop/openclaw-native-executor.js";

@@ -42,7 +42,7 @@ function isQuotaOrRateLimitFailure(output: string): boolean {
   );
 }
 
-function buildPrompt(plan: LoopExecutionPlan): string {
+export function buildLoopExecutionPrompt(plan: LoopExecutionPlan): string {
   const files = plan.contextPackage.files.map((file) => file.path).join(", ");
   return [
     "Implement exactly one reviewed Loop Engine roadmap candidate in the current repository.",
@@ -219,7 +219,7 @@ export function createCodexCliLoopExecutor(
       plan.model,
       "--json",
     ];
-    args.push(buildPrompt(plan));
+    args.push(buildLoopExecutionPrompt(plan));
     const result = await runProcess(
       options.executable.trim(),
       args,
