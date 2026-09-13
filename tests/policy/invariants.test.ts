@@ -10,6 +10,7 @@ import { resolvePolicy } from "../../src/policy/resolver.js";
 const POLICY_FILES = [
   "src/policy/types.ts",
   "src/policy/defaults.ts",
+  "src/policy/quota.ts",
   "src/policy/resolver.ts",
 ];
 

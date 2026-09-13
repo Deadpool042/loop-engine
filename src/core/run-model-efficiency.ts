@@ -25,6 +25,18 @@ const EXECUTION_MODES: ReadonlySet<LoopRunMode> = new Set([
 
 type TerminalRunStatus = "completed" | "failed" | "blocked" | "cancelled";
 
+export const LOOP_RUN_SCOPE_SIZES = ["none", "small", "medium", "large"] as const;
+export type LoopRunScopeSize = (typeof LOOP_RUN_SCOPE_SIZES)[number];
+
+export type LoopRunQuotaConsumptionObservation = Readonly<{
+  provider: string;
+  windows: readonly Readonly<{
+    label: string;
+    consumedPercent: number;
+    resetAt: number;
+  }>[];
+}>;
+
 export type LoopRunModelObservation = Readonly<{
   runId: string;
   completedAt: string | null;
@@ -36,6 +48,8 @@ export type LoopRunModelObservation = Readonly<{
   model: string;
   effort: AgentEffort | null;
   taskCategory: LoopTaskCategory | null;
+  scopeSize: LoopRunScopeSize | null;
+  quotaConsumption: LoopRunQuotaConsumptionObservation | null;
   selectedAfterFailover: boolean;
   providerAttempt: Readonly<{
     attempt: number;
@@ -111,11 +125,83 @@ export type LoopRunModelEfficiencyReport = Readonly<{
   telemetry: Readonly<{
     tokens: "unavailable";
     costUsd: "unavailable";
-    quota: "unavailable";
-    reason: "no_reliable_provider_usage_or_quota_source";
+    quota: "unavailable" | "observed_delta_samples";
+    reason:
+      | "no_reliable_provider_usage_or_quota_source"
+      | "run_history_contains_observed_quota_deltas";
   }>;
   error?: "invalid_project_identity";
 }>;
+
+export const MIN_QUOTA_CONSUMPTION_SAMPLE_SIZE = 5;
+export const MIN_EXPECTED_VALUE_SAMPLE_SIZE = MIN_QUOTA_CONSUMPTION_SAMPLE_SIZE;
+
+export type ExpectedQuotaConsumptionQuery = Readonly<{
+  provider: string;
+  model: string;
+  effort: AgentEffort;
+  taskCategory: LoopTaskCategory;
+  scopeSize: LoopRunScopeSize;
+}>;
+
+export type ExpectedQuotaConsumptionEstimate =
+  | Readonly<{
+      status: "unknown";
+      reason: "insufficient_samples" | "no_comparable_windows";
+      minimumSampleSize: number;
+      matchingRuns: number;
+    }>
+  | Readonly<{
+      status: "available";
+      method: "median_exact_match";
+      minimumSampleSize: number;
+      matchingRuns: number;
+      windows: readonly Readonly<{
+        label: string;
+        expectedConsumedPercent: number;
+        sampleSize: number;
+      }>[];
+    }>;
+
+export type ExpectedRunValueEstimate =
+  | Readonly<{
+      status: "unknown";
+      reason: "insufficient_samples";
+      minimumSampleSize: number;
+      matchingRuns: number;
+    }>
+  | Readonly<{
+      status: "available";
+      method: "governed_success_rate_exact_match";
+      minimumSampleSize: number;
+      matchingRuns: number;
+      successfulRuns: number;
+      expectedValuePercent: number;
+    }>;
+
+export type ExpectedRunEfficiencyQuery = ExpectedQuotaConsumptionQuery &
+  Readonly<{ quotaWindowLabel: string }>;
+
+export type ExpectedRunEfficiencyEstimate =
+  | Readonly<{
+      status: "unknown";
+      reason:
+        | "value_unknown"
+        | "quota_unknown"
+        | "quota_window_unknown"
+        | "quota_resolution_zero";
+      value: ExpectedRunValueEstimate;
+      quota: ExpectedQuotaConsumptionEstimate;
+    }>
+  | Readonly<{
+      status: "available";
+      method: "expected_value_per_quota";
+      quotaWindowLabel: string;
+      expectedValuePercent: number;
+      expectedQuotaConsumedPercent: number;
+      score: number;
+      sampleSize: number;
+    }>;
 
 function isTerminalRunStatus(status: LoopRunStatus): status is TerminalRunStatus {
   return (
@@ -322,6 +408,74 @@ function taskCategory(result: LoopRunResult): LoopTaskCategory | null {
     : null;
 }
 
+export function classifyRunScopeSize(pathCount: number): LoopRunScopeSize {
+  if (!Number.isInteger(pathCount) || pathCount < 0) {
+    throw new Error("Invalid run scope path count.");
+  }
+  if (pathCount === 0) return "none";
+  if (pathCount <= 3) return "small";
+  if (pathCount <= 10) return "medium";
+  return "large";
+}
+
+function runScopeSize(result: LoopRunResult): LoopRunScopeSize | null {
+  const plan = result.executionPlanEvidence as unknown;
+  if (isRecord(plan) && Array.isArray(plan.allowedPaths)) {
+    const paths = plan.allowedPaths.filter(nonEmptyString);
+    if (paths.length === plan.allowedPaths.length) {
+      return classifyRunScopeSize(paths.length);
+    }
+  }
+
+  const writableScope = result.writableFileScope as unknown;
+  if (Array.isArray(writableScope) && writableScope.every(nonEmptyString)) {
+    return classifyRunScopeSize(writableScope.length);
+  }
+  return null;
+}
+
+function quotaConsumptionObservation(
+  result: LoopRunResult,
+): LoopRunQuotaConsumptionObservation | null {
+  const evidence = result.quotaConsumptionEvidence as unknown;
+  if (
+    !isRecord(evidence) ||
+    evidence.schemaVersion !== 1 ||
+    evidence.source !== "openclaw_usage_status_delta" ||
+    !nonEmptyString(evidence.provider) ||
+    !Array.isArray(evidence.windows)
+  ) {
+    return null;
+  }
+
+  const windows = evidence.windows.flatMap((value) => {
+    if (!isRecord(value) || !nonEmptyString(value.label)) return [];
+    if (
+      typeof value.consumedPercent !== "number" ||
+      !Number.isFinite(value.consumedPercent) ||
+      value.consumedPercent < 0 ||
+      value.consumedPercent > 100 ||
+      typeof value.resetAt !== "number" ||
+      !Number.isFinite(value.resetAt)
+    ) {
+      return [];
+    }
+    return [
+      Object.freeze({
+        label: value.label,
+        consumedPercent: value.consumedPercent,
+        resetAt: value.resetAt,
+      }),
+    ];
+  });
+  if (windows.length === 0) return null;
+
+  return Object.freeze({
+    provider: evidence.provider,
+    windows: Object.freeze(windows),
+  });
+}
+
 export function projectRunModelObservation(
   result: LoopRunResult,
 ): LoopRunModelObservation | null {
@@ -343,6 +497,8 @@ export function projectRunModelObservation(
     model: identity.model,
     effort: identity.effort,
     taskCategory: taskCategory(result),
+    scopeSize: runScopeSize(result),
+    quotaConsumption: quotaConsumptionObservation(result),
     selectedAfterFailover: (identity.attempt?.attempt ?? 1) > 1,
     providerAttempt:
       identity.attempt === null
@@ -593,6 +749,167 @@ function aggregateProviderAttempts(
   );
 }
 
+function median(values: readonly number[]): number {
+  const ordered = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(ordered.length / 2);
+  if (ordered.length % 2 === 1) return ordered[middle]!;
+  return (ordered[middle - 1]! + ordered[middle]!) / 2;
+}
+
+function matchesExpectedConsumptionQuery(
+  observation: LoopRunModelObservation,
+  query: ExpectedQuotaConsumptionQuery,
+): boolean {
+  return (
+    observation.provider === query.provider &&
+    observation.model === query.model &&
+    observation.effort === query.effort &&
+    observation.taskCategory === query.taskCategory &&
+    observation.scopeSize === query.scopeSize &&
+    observation.selectedAfterFailover === false
+  );
+}
+
+export function estimateExpectedQuotaConsumption(
+  observations: readonly LoopRunModelObservation[],
+  query: ExpectedQuotaConsumptionQuery,
+): ExpectedQuotaConsumptionEstimate {
+  const matching = observations.filter(
+    (observation) =>
+      matchesExpectedConsumptionQuery(observation, query) &&
+      observation.quotaConsumption?.provider === query.provider,
+  );
+
+  if (matching.length < MIN_QUOTA_CONSUMPTION_SAMPLE_SIZE) {
+    return Object.freeze({
+      status: "unknown",
+      reason: "insufficient_samples",
+      minimumSampleSize: MIN_QUOTA_CONSUMPTION_SAMPLE_SIZE,
+      matchingRuns: matching.length,
+    });
+  }
+
+  const samplesByWindow = new Map<string, number[]>();
+  for (const observation of matching) {
+    for (const window of observation.quotaConsumption?.windows ?? []) {
+      const samples = samplesByWindow.get(window.label) ?? [];
+      samples.push(window.consumedPercent);
+      samplesByWindow.set(window.label, samples);
+    }
+  }
+
+  const windows = [...samplesByWindow.entries()]
+    .filter(([, samples]) => samples.length >= MIN_QUOTA_CONSUMPTION_SAMPLE_SIZE)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([label, samples]) =>
+      Object.freeze({
+        label,
+        expectedConsumedPercent: median(samples),
+        sampleSize: samples.length,
+      }),
+    );
+
+  if (windows.length === 0) {
+    return Object.freeze({
+      status: "unknown",
+      reason: "no_comparable_windows",
+      minimumSampleSize: MIN_QUOTA_CONSUMPTION_SAMPLE_SIZE,
+      matchingRuns: matching.length,
+    });
+  }
+
+  return Object.freeze({
+    status: "available",
+    method: "median_exact_match",
+    minimumSampleSize: MIN_QUOTA_CONSUMPTION_SAMPLE_SIZE,
+    matchingRuns: matching.length,
+    windows: Object.freeze(windows),
+  });
+}
+
+function isGovernedSuccessfulObservation(
+  observation: LoopRunModelObservation,
+): boolean {
+  return (
+    observation.runStatus === "completed" &&
+    observation.validation?.status !== "failed" &&
+    (observation.outOfScopeFileCount ?? 0) === 0
+  );
+}
+
+export function estimateExpectedRunValue(
+  observations: readonly LoopRunModelObservation[],
+  query: ExpectedQuotaConsumptionQuery,
+): ExpectedRunValueEstimate {
+  const matching = observations.filter((observation) =>
+    matchesExpectedConsumptionQuery(observation, query),
+  );
+
+  if (matching.length < MIN_EXPECTED_VALUE_SAMPLE_SIZE) {
+    return Object.freeze({
+      status: "unknown",
+      reason: "insufficient_samples",
+      minimumSampleSize: MIN_EXPECTED_VALUE_SAMPLE_SIZE,
+      matchingRuns: matching.length,
+    });
+  }
+
+  const successfulRuns = matching.filter(isGovernedSuccessfulObservation).length;
+  return Object.freeze({
+    status: "available",
+    method: "governed_success_rate_exact_match",
+    minimumSampleSize: MIN_EXPECTED_VALUE_SAMPLE_SIZE,
+    matchingRuns: matching.length,
+    successfulRuns,
+    expectedValuePercent: (successfulRuns / matching.length) * 100,
+  });
+}
+
+export function estimateExpectedRunEfficiency(
+  observations: readonly LoopRunModelObservation[],
+  query: ExpectedRunEfficiencyQuery,
+): ExpectedRunEfficiencyEstimate {
+  const value = estimateExpectedRunValue(observations, query);
+  const quota = estimateExpectedQuotaConsumption(observations, query);
+
+  if (value.status !== "available") {
+    return Object.freeze({ status: "unknown", reason: "value_unknown", value, quota });
+  }
+  if (quota.status !== "available") {
+    return Object.freeze({ status: "unknown", reason: "quota_unknown", value, quota });
+  }
+
+  const quotaWindow = quota.windows.find(
+    (window) => window.label === query.quotaWindowLabel,
+  );
+  if (!quotaWindow) {
+    return Object.freeze({
+      status: "unknown",
+      reason: "quota_window_unknown",
+      value,
+      quota,
+    });
+  }
+  if (quotaWindow.expectedConsumedPercent <= 0) {
+    return Object.freeze({
+      status: "unknown",
+      reason: "quota_resolution_zero",
+      value,
+      quota,
+    });
+  }
+
+  return Object.freeze({
+    status: "available",
+    method: "expected_value_per_quota",
+    quotaWindowLabel: query.quotaWindowLabel,
+    expectedValuePercent: value.expectedValuePercent,
+    expectedQuotaConsumedPercent: quotaWindow.expectedConsumedPercent,
+    score: value.expectedValuePercent / quotaWindow.expectedConsumedPercent,
+    sampleSize: Math.min(value.matchingRuns, quotaWindow.sampleSize),
+  });
+}
+
 export function buildRunModelEfficiencyReport(
   history: LoopRunHistoryReport,
 ): LoopRunModelEfficiencyReport {
@@ -606,6 +923,10 @@ export function buildRunModelEfficiencyReport(
         (observation): observation is LoopRunModelObservation =>
           observation !== null,
       ),
+  );
+
+  const hasQuotaEvidence = observations.some(
+    (observation) => observation.quotaConsumption !== null,
   );
 
   return Object.freeze({
@@ -623,8 +944,12 @@ export function buildRunModelEfficiencyReport(
     telemetry: Object.freeze({
       tokens: "unavailable" as const,
       costUsd: "unavailable" as const,
-      quota: "unavailable" as const,
-      reason: "no_reliable_provider_usage_or_quota_source" as const,
+      quota: hasQuotaEvidence
+        ? ("observed_delta_samples" as const)
+        : ("unavailable" as const),
+      reason: hasQuotaEvidence
+        ? ("run_history_contains_observed_quota_deltas" as const)
+        : ("no_reliable_provider_usage_or_quota_source" as const),
     }),
     ...(history.error === undefined ? {} : { error: history.error }),
   });

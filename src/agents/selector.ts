@@ -31,6 +31,15 @@ export type AgentSelectionRequest = Readonly<{
   preferredProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
   allowedFundingModes?: readonly AgentFundingMode[];
+  /** Require explicit usable quota evidence before a profile can compete. */
+  requireKnownQuota?: boolean;
+  /**
+   * Explicit opt-in for letting a frontier-tier profile compete when a known
+   * lower economic tier already satisfies every hard requirement. Omitted
+   * means frontier is used only when no known lower-tier capable alternative
+   * exists.
+   */
+  allowFrontier?: boolean;
 }>;
 
 export type AgentRejection = Readonly<{
@@ -48,6 +57,7 @@ export type AgentNonSelection = Readonly<{
     | "economic_tier_unranked"
     | "less_preferred_provider_than_selected"
     | "higher_effort_than_selected"
+    | "frontier_not_required"
     | "deterministic_tiebreak";
 }>;
 
@@ -60,6 +70,40 @@ export type AgentSelectionResult =
       notSelected?: readonly AgentNonSelection[];
     }>
   | Readonly<{ outcome: "no_match"; rejected: readonly AgentRejection[] }>;
+
+export type AgentEfficiencySignal =
+  | Readonly<{
+      profileId: string;
+      status: "available";
+      quotaWindowLabel: string;
+      expectedValuePercent: number;
+      expectedQuotaConsumedPercent: number;
+      sampleSize: number;
+    }>
+  | Readonly<{
+      profileId: string;
+      status: "unknown";
+      reason: string;
+    }>;
+
+export type AgentEfficiencyRankingResult = Readonly<{
+  rejected: readonly AgentRejection[];
+  ranked: readonly Readonly<{
+    profileId: string;
+    quotaWindowLabel: string;
+    expectedValuePercent: number;
+    expectedQuotaConsumedPercent: number;
+    score: number;
+    sampleSize: number;
+  }>[];
+  unranked: readonly Readonly<{
+    profileId: string;
+    reason:
+      | "efficiency_unknown"
+      | "invalid_efficiency_signal"
+      | "frontier_not_required";
+  }>[];
+}>;
 
 const BUDGET_DIMENSIONS = [
   "maxTokens",
@@ -102,6 +146,15 @@ export function evaluateAgentProfile(
     return {
       ok: false,
       reason: `profile quota is exhausted (source: ${profile.quota.source})`,
+    };
+  }
+  if (
+    request.requireKnownQuota === true &&
+    profile.quota?.state !== "available"
+  ) {
+    return {
+      ok: false,
+      reason: `profile quota is not proven available (source: ${profile.quota?.source ?? "unavailable"})`,
     };
   }
 
@@ -225,6 +278,41 @@ function compareEligibleProfiles(
   );
 }
 
+function applyFrontierGate(
+  eligible: readonly AgentProfile[],
+  request: AgentSelectionRequest,
+): Readonly<{
+  competitive: readonly AgentProfile[];
+  heldBack: readonly AgentProfile[];
+}> {
+  if (request.allowFrontier === true) {
+    return Object.freeze({
+      competitive: Object.freeze([...eligible]),
+      heldBack: Object.freeze([]),
+    });
+  }
+
+  const knownLowerTierExists = eligible.some(
+    (profile) =>
+      profile.economicTier !== undefined && profile.economicTier !== "frontier",
+  );
+  if (!knownLowerTierExists) {
+    return Object.freeze({
+      competitive: Object.freeze([...eligible]),
+      heldBack: Object.freeze([]),
+    });
+  }
+
+  return Object.freeze({
+    competitive: Object.freeze(
+      eligible.filter((profile) => profile.economicTier !== "frontier"),
+    ),
+    heldBack: Object.freeze(
+      eligible.filter((profile) => profile.economicTier === "frontier"),
+    ),
+  });
+}
+
 export function pickSmallestCapable(
   profiles: readonly AgentProfile[],
   preferredProviders?: readonly AgentProvider[],
@@ -251,6 +339,116 @@ function canonicalizeSelectedProfile(profile: AgentProfile): AgentProfile {
   });
 }
 
+function isUsableEfficiencySignal(
+  signal: Extract<AgentEfficiencySignal, { status: "available" }>,
+): boolean {
+  return (
+    signal.quotaWindowLabel.trim().length > 0 &&
+    Number.isFinite(signal.expectedValuePercent) &&
+    signal.expectedValuePercent >= 0 &&
+    signal.expectedValuePercent <= 100 &&
+    Number.isFinite(signal.expectedQuotaConsumedPercent) &&
+    signal.expectedQuotaConsumedPercent > 0 &&
+    signal.expectedQuotaConsumedPercent <= 100 &&
+    Number.isInteger(signal.sampleSize) &&
+    signal.sampleSize > 0
+  );
+}
+
+export function rankAgentProfilesByEfficiency(
+  registry: AgentRegistry,
+  request: AgentSelectionRequest,
+  signals: readonly AgentEfficiencySignal[],
+): AgentEfficiencyRankingResult {
+  const rejected: AgentRejection[] = [];
+  const eligible: AgentProfile[] = [];
+
+  for (const profile of [...registry.profiles].sort((a, b) =>
+    a.id.localeCompare(b.id),
+  )) {
+    const evaluation = evaluateAgentProfile(profile, request);
+    if (evaluation.ok) eligible.push(profile);
+    else rejected.push({ profileId: profile.id, reason: evaluation.reason });
+  }
+
+  const signalBuckets = new Map<string, AgentEfficiencySignal[]>();
+  for (const signal of signals) {
+    const bucket = signalBuckets.get(signal.profileId) ?? [];
+    bucket.push(signal);
+    signalBuckets.set(signal.profileId, bucket);
+  }
+
+  const frontierGate = applyFrontierGate(eligible, request);
+  const ranked = frontierGate.competitive.flatMap((profile) => {
+    const bucket = signalBuckets.get(profile.id) ?? [];
+    if (bucket.length !== 1) return [];
+    const signal = bucket[0]!;
+    if (signal.status !== "available" || !isUsableEfficiencySignal(signal)) {
+      return [];
+    }
+    return [
+      Object.freeze({
+        profileId: profile.id,
+        quotaWindowLabel: signal.quotaWindowLabel,
+        expectedValuePercent: signal.expectedValuePercent,
+        expectedQuotaConsumedPercent: signal.expectedQuotaConsumedPercent,
+        score:
+          signal.expectedValuePercent / signal.expectedQuotaConsumedPercent,
+        sampleSize: signal.sampleSize,
+      }),
+    ];
+  });
+
+  const profileById = new Map(eligible.map((profile) => [profile.id, profile]));
+  ranked.sort((left, right) => {
+    if (left.score !== right.score) return right.score - left.score;
+    const leftProfile = profileById.get(left.profileId)!;
+    const rightProfile = profileById.get(right.profileId)!;
+    return compareEligibleProfiles(
+      leftProfile,
+      rightProfile,
+      request.preferredProviders,
+    );
+  });
+
+  const rankedIds = new Set(ranked.map((entry) => entry.profileId));
+  const unrankedCompetitive = frontierGate.competitive
+    .filter((profile) => !rankedIds.has(profile.id))
+    .sort((left, right) =>
+      compareEligibleProfiles(left, right, request.preferredProviders),
+    )
+    .map((profile) => {
+      const bucket = signalBuckets.get(profile.id) ?? [];
+      const invalid =
+        bucket.length > 1 ||
+        (bucket.length === 1 &&
+          bucket[0]!.status === "available" &&
+          !isUsableEfficiencySignal(bucket[0]!));
+      return Object.freeze({
+        profileId: profile.id,
+        reason: invalid
+          ? ("invalid_efficiency_signal" as const)
+          : ("efficiency_unknown" as const),
+      });
+    });
+  const heldBackFrontier = frontierGate.heldBack
+    .slice()
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((profile) =>
+      Object.freeze({
+        profileId: profile.id,
+        reason: "frontier_not_required" as const,
+      }),
+    );
+  const unranked = [...unrankedCompetitive, ...heldBackFrontier];
+
+  return Object.freeze({
+    rejected: Object.freeze(rejected),
+    ranked: Object.freeze(ranked),
+    unranked: Object.freeze(unranked),
+  });
+}
+
 export function selectAgentProfile(
   registry: AgentRegistry,
   request: AgentSelectionRequest,
@@ -270,11 +468,15 @@ export function selectAgentProfile(
     else rejected.push({ profileId: profile.id, reason: evaluation.reason });
   }
 
+  const frontierGate = applyFrontierGate(eligible, request);
   const selected = pickSmallestCapable(
-    eligible,
+    frontierGate.competitive,
     request.preferredProviders,
   );
   if (!selected) return { outcome: "no_match", rejected };
+  const heldBackFrontierIds = new Set(
+    frontierGate.heldBack.map((profile) => profile.id),
+  );
 
   const selectedFundingModeRank = fundingModeRank(selected);
   const selectedEconomicTierRank = economicTierRank(selected);
@@ -294,7 +496,9 @@ export function selectAgentProfile(
       );
       let reason: AgentNonSelection["reason"];
 
-      if (profileFundingModeRank > selectedFundingModeRank) {
+      if (heldBackFrontierIds.has(profile.id)) {
+        reason = "frontier_not_required";
+      } else if (profileFundingModeRank > selectedFundingModeRank) {
         reason = "less_preferred_funding_than_selected";
       } else if (
         selected.economicTier !== undefined &&

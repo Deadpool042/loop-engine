@@ -10,7 +10,7 @@ Transformer un micro-lot planifié (le candidat de roadmap sélectionné par [`n
 
 ```text
 micro-lot
-  -> requirements   (LoopTaskRequirements — capacités, permissions, effort, budget, contexte)
+  -> requirements   (LoopTaskRequirements — catégorie, capacités, outils, scope, complexité, permissions, effort, budget, contexte)
   -> policy         (AgentPolicy — plafonds globaux, fournisseurs/runtimes autorisés)
   -> selection request (AgentSelectionRequest — voir agent-orchestration.md)
   -> selector        (selectAgentProfile — lookup pur dans l'AgentRegistry)
@@ -59,6 +59,9 @@ interface LoopTaskRequirements {
   category: LoopTaskCategory;
   mode: AgentPolicyMode;
   requiredCapabilities: readonly AgentCapability[];
+  requiredTools: readonly LoopTaskTool[];
+  scope: LoopTaskScope;
+  complexity: LoopTaskComplexity;
   requiredPermissions: readonly AgentPermission[];
   minimumEffort: AgentEffort;
   maximumEffort: AgentEffort;
@@ -72,7 +75,9 @@ interface LoopTaskRequirements {
 }
 ```
 
-`requiredCapabilities` dépend uniquement de la catégorie. `requiredPermissions` dépend du **plafond du mode** (`getAllowedPermissionsForMode`) filtré par les besoins de la catégorie — jamais l'inverse : c'est ce qui garantit qu'aucune capacité d'écriture n'est jamais requise en mode `plan`, quelle que soit la catégorie du lot.
+`requiredCapabilities`, `requiredTools`, `scope` et `complexity` dépendent uniquement de la catégorie déterministe du lot. `requiredTools` décrit les surfaces techniques nécessaires (`filesystem_read`, `filesystem_write`, `shell_exec`, `test_runner`) ; `scope` vaut `none`, `read_only` ou `bounded_write` ; `complexity` vaut `low`, `medium` ou `high`. Ces trois champs sont **descriptifs et non autorisants** : ils servent au futur routage AUTO, mais ne peuvent jamais élargir une permission.
+
+`requiredPermissions` dépend du **plafond du mode** (`getAllowedPermissionsForMode`) filtré par les besoins de la catégorie — jamais l'inverse : c'est ce qui garantit qu'un lot décrit comme `bounded_write` reste strictement `read_only` en mode `plan`. La complexité est également distincte de l'effort d'invocation : une architecture peut être `high` en complexité tout en gardant `minimumEffort=medium`, l'effort `high` restant réservé à une escalade réellement justifiée.
 
 `preferredCapabilityTier` (`CATEGORY_PREFERRED_CAPABILITY_TIER` dans `src/policy/resolver.ts`) exprime une préférence doctrinale abstraite et indépendante du fournisseur. Elle ne contraint jamais la sélection : `selectAgentProfile` reste un lookup pur sur les exigences hard `requiredCapabilities`/`requiredPermissions`/provider/runtime/effort/budget (voir "Cible de politique vs profil résolu" ci-dessous).
 
@@ -86,6 +91,7 @@ interface AgentPolicy {
   maximumEffort: AgentEffort;
   defaultBudget: AgentBudget;
   contextBudget: ContextBudget;
+  quotaReserve?: QuotaReservePolicy;
   allowedProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
   allowedFundingModes?: readonly AgentFundingMode[];
@@ -270,6 +276,68 @@ n8n            -> demande et limite
 Loop Engine    -> réduit, valide et sélectionne (ce lot : jusqu'à la sélection prévisionnelle)
 Agent          -> exécutera dans un futur lot (LoopExecutor, non implémenté ici)
 ```
+
+## Snapshot quota OpenClaw pour le routage AUTO
+
+`src/policy/quota.ts` normalise uniquement un snapshot externe marqué `source="openclaw_usage_status"` et `freshness="fresh"`. Le module ne lit aucun fichier, ne lance aucun CLI, ne persiste rien et ne maintient aucun compteur parallèle : OpenClaw reste la source provider.
+
+Chaque fenêtre conserve son `label`, `usedPercent`, `remainingPercent` calculé directement comme `100 - usedPercent` et son `resetAt`. La fenêtre gouvernante d'un provider est celle qui possède le plus faible `remainingPercent`; à égalité, le reset le plus tardif est retenu comme contrainte la plus durable. Un snapshot stale, non supporté ou sans horodatage valide reste `unknown`. Une fenêtre absente n'est jamais inventée.
+
+La réserve quota est une politique séparée et configurable (`QuotaReservePolicy`) : réparation, CI et urgence sont exprimées en pourcentages explicites. Le défaut courant réserve `10% + 5% + 5% = 20%`. `applyQuotaReserve()` calcule uniquement le quota utilisable (`max(0, remaining - reserve)`) sans modifier le snapshot OpenClaw. Chaque composante doit être comprise entre 0 et 100 et la somme ne peut pas dépasser 100 ; une configuration invalide échoue fermement au lieu d'être corrigée implicitement.
+
+### Estimation depuis Run History
+
+Le Run History peut porter une evidence additive `quotaConsumptionEvidence`, dérivée uniquement de deux snapshots OpenClaw frais capturés avant/après une exécution. Une fenêtre n'est comparable que si son `resetAt` est identique dans les deux snapshots et si `usedPercent` reste monotone. Un reset ou une baisse d'usage invalide cette mesure au lieu de produire un delta artificiel.
+
+`estimateExpectedQuotaConsumption()` applique un exact-match sur `provider + model + effort + taskCategory + scopeSize`. Les runs dont le modèle terminal résulte d'un failover sont exclus de cette attribution. `scopeSize` est déterministe depuis le nombre de chemins autorisés : `none=0`, `small=1..3`, `medium=4..10`, `large>=11`.
+
+Le seuil minimal est **5 exécutions comparables**. En dessous, le résultat reste `unknown/insufficient_samples`. À partir de cinq observations, l'estimation est la **médiane** des pourcentages réellement consommés, calculée séparément pour chaque fenêtre disposant elle-même d'au moins cinq mesures. Ce choix limite l'influence d'un run exceptionnel sans introduire de ML ni d'extrapolation. Une fenêtre insuffisamment observée reste inconnue.
+
+Lors de la qualification OC-14.7, les 20 dernières entrées réelles de `loop-engine` étaient des runs `plan`, avec **0 run d'exécution** et aucune evidence quota. La commande `runs --models` retourne donc correctement `quota=unavailable` : aucune estimation de secours n'est inventée.
+
+### Classement capacité puis rendement
+
+Le classement AUTO reste strictement en deux étages. `evaluateAgentProfile()` applique d'abord les hard gates : disponibilité, quota explicitement épuisé, financement, provider/runtime, capacités, permissions, effort maximum et budget. Un profil rejeté à cette étape ne peut jamais revenir grâce à un bon rendement historique.
+
+Parmi les profils admissibles, la valeur attendue utilise le même exact-match et le même seuil minimal de 5 runs. Elle correspond au taux de résultats gouvernés réussis : run `completed`, validation non échouée et aucune violation de scope observée. Le rendement n'est calculé que si la valeur attendue et le quota attendu de la **fenêtre quota actuellement gouvernante** sont tous deux disponibles. La formule est `expectedValuePercent / expectedQuotaConsumedPercent`.
+
+Un quota attendu à `0%` n'est pas interprété comme une consommation gratuite : avec la granularité des snapshots provider, cela reste une résolution insuffisante et donc `unknown`. `rankAgentProfilesByEfficiency()` produit seulement trois projections : `rejected` pour les hard gates, `ranked` pour les profils dont le rendement est défendable, et `unranked` pour les profils admissibles sans mesure fiable. Aucun score fictif n'est attribué à `unknown` et ce classement ne choisit pas encore l'exécuteur final.
+
+### Portfolio de modèles réellement disponible
+
+Le routage AUTO ne consomme plus de catalogue commercial codé en dur. `buildAutoSubscriptionProviderConfigurations()` reçoit un `AutoSubscriptionModelPortfolio` explicite ; chaque profil fournit son `model`, son `availability`, son evidence `quota` et ses `capabilities`. La couche AUTO ne fixe que le financement `included_subscription` et les contraintes d'exécution du CLI : elle ne déduit jamais un modèle, un tier économique, une capacité ou une disponibilité depuis un nom commercial.
+
+Le CLI charge cette projection éphémère depuis `LOOP_AUTO_SUBSCRIPTION_PORTFOLIO_JSON`. Sans cette preuve, AUTO retourne `auto_subscription_portfolio_unavailable`. Une exécution provider explicite exige également `--provider-model`, et `provider-registry.ts` refuse une configuration sans `model` ni `profiles`. Des identifiants de modèle inconnus du code restent admissibles lorsqu'ils sont explicitement fournis : le modèle est une donnée de runtime/configuration, pas une union statique.
+
+Qualification live du 2026-09-13 sur OpenClaw `2026.9.4` : `openai/gpt-5.6-sol` est le modèle par défaut résolu avec OAuth OpenAI sain ; `gpt-5.6-terra` et `gpt-6-astra` ne sont pas présents. `gpt-5.6-luna` apparaît uniquement comme `utilityModel` provider-default et n'est donc pas promu automatiquement comme candidat AUTO. Côté Claude, la source native ne fournit actuellement ni provider ni fenêtres et le bridge est `unavailable` car son cache est stale ; aucun profil Claude n'est inventé tant qu'une source fraîche runtime/déploiement ne le déclare pas explicitement disponible.
+
+Les `DEFAULT_AGENT_PROFILES` historiques restent des fixtures illustratives du forecast Policy Engine. Ils ne constituent jamais le portfolio AUTO et ne sont pas une preuve de disponibilité runtime.
+
+### Candidats runtime AUTO et binding d'exécution
+
+Le portfolio AUTO distingue désormais le **candidat de routage** du **binding actuellement exécutable**. `buildAutoSubscriptionExecutionCandidates()` conserve l'identité réelle de chaque chemin : `runtime=codex` / `runtime=claude_code` pour les bindings CLI directs existants, et `runtime=openclaw` pour un profil natif OpenClaw explicitement observé.
+
+Un profil OpenClaw natif doit fournir explicitement provider, modèle, availability, quota, capacités, permissions et budget ; aucune de ces valeurs n'est déduite du nom commercial du modèle ni de la présence du Gateway. Le candidat est exposé avec `executionPath=openclaw_native`.
+
+Conformément au gate OC-14.5, l'adapter `src/runtime/openclaw.ts` reste un stub déterministe non exécutant tant que la parité de binding native n'est pas promue. Le candidat OpenClaw porte donc actuellement `executableNow=false` / `openclaw_native_binding_not_yet_promoted`. Il peut être comparé par le futur routeur sans être transformé en faux transport CLI ni déclencher une exécution implicite. Les executors Codex/Claude existants restent inchangés.
+
+### Garde frontier
+
+Un profil `economicTier=frontier` ne gagne jamais simplement parce qu'il représente le tier le plus puissant. Après les hard gates, `selectAgentProfile()` et `rankAgentProfilesByEfficiency()` retiennent par défaut les tiers économiques connus inférieurs lorsqu'au moins l'un d'eux satisfait déjà le lot. Le frontier reste alors hors compétition avec la raison explicite `frontier_not_required`.
+
+Deux exceptions seulement : aucun tier inférieur connu ne satisfait les capacités/permissions du lot, ou l'appelant gouverné fournit `allowFrontier=true`. Cette autorisation ne sélectionne pas automatiquement le frontier : elle lui permet seulement de concourir aux mêmes règles de rendement et de préférence que les autres profils. Ainsi un modèle frontier peut être nécessaire ou justifié, mais jamais choisi sur son seul prestige/capacité maximale supposée.
+
+### Décision AUTO complète
+
+`decideAgentRoute()` est la décision déterministe finale sur un ensemble de candidats déjà observés. L'ordre reste unique : binding exécutable -> hard gates -> rendement mesuré lorsqu'il existe -> sinon `smallest_capable`. `decideAutoSubscriptionRoute()` raccorde ce moteur au portfolio AUTO et à l'`AgentPolicyResolution` déjà calculée ; l'effort d'invocation est donc `requirements.minimumEffort`, jamais une valeur réinventée dans le routeur.
+
+La décision `selected` expose explicitement `profileId`, `runtime`, `provider`, `model`, `effort`, `executionPath`, la base de sélection (`measured_efficiency` ou `smallest_capable`) et, si disponible, le score/fenêtre quota. Chaque autre candidat est conservé dans `notSelected` avec une raison structurée (`binding_unavailable`, hard gate, `frontier_not_required`, efficiency inconnue/invalide, rendement inférieur ou préférence inférieure). Un candidat OpenClaw non promu reste donc visible et explicable sans pouvoir être exécuté.
+
+### Fallback quota/rate-limit borné
+
+Le fallback d'exécution reste distinct du routage initial. Une erreur récupérable de type quota/rate-limit (`provider_limit_exceeded` / `provider_rate_limited`) peut ouvrir **au plus une tentative par provider** dans le budget `maxAttempts`. `createLoopProviderFailoverAssembly()` ne parcourt jamais les modèles d'un même provider : il conserve le plan primaire puis choisit au plus un profil compatible dans chaque autre assembly provider. En mode AUTO, l'escalade intra-provider reste bornée séparément à `maxModelAttempts=1`.
+
+Avant toute tentative suivante, un reset worktree explicite est obligatoire ; son absence ou son échec ferme le fallback. Les profils indisponibles, incompatibles ou en funding payant non autorisé sont filtrés avant l'appel. Cette structure empêche une cascade exhaustive de modèles/providers tout en conservant un recovery utile sur quota/rate-limit.
 
 ## Position d'OpenClaw, Codex, Claude Code et autres
 

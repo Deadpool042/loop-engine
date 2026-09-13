@@ -36,7 +36,10 @@ import type {
   AgentPolicyRequest,
   AgentPolicyResolution,
   LoopTaskCategory,
+  LoopTaskComplexity,
   LoopTaskRequirements,
+  LoopTaskScope,
+  LoopTaskTool,
 } from "./types.js";
 
 const NO_FALLBACK: AgentPolicyFallback = Object.freeze({
@@ -123,6 +126,40 @@ const CATEGORY_CAPABILITIES: Readonly<
   architecture: ["code_edit", "long_context"],
   review: [],
   none: [],
+};
+
+const CATEGORY_TOOLS: Readonly<
+  Record<LoopTaskCategory, readonly LoopTaskTool[]>
+> = {
+  documentation: ["filesystem_read", "filesystem_write"],
+  code: ["filesystem_read", "filesystem_write", "shell_exec", "test_runner"],
+  tests: ["filesystem_read", "filesystem_write", "test_runner"],
+  validation: ["filesystem_read", "shell_exec", "test_runner"],
+  architecture: ["filesystem_read", "filesystem_write"],
+  review: ["filesystem_read"],
+  none: [],
+};
+
+const CATEGORY_SCOPE: Readonly<Record<LoopTaskCategory, LoopTaskScope>> = {
+  documentation: "bounded_write",
+  code: "bounded_write",
+  tests: "bounded_write",
+  validation: "read_only",
+  architecture: "bounded_write",
+  review: "read_only",
+  none: "none",
+};
+
+const CATEGORY_COMPLEXITY: Readonly<
+  Record<LoopTaskCategory, LoopTaskComplexity>
+> = {
+  documentation: "low",
+  code: "medium",
+  tests: "medium",
+  validation: "low",
+  architecture: "high",
+  review: "low",
+  none: "low",
 };
 
 // Whether this category's work, if actually executed, would need to write
@@ -219,6 +256,9 @@ export function deriveTaskRequirements(
     category,
     mode,
     requiredCapabilities: CATEGORY_CAPABILITIES[category],
+    requiredTools: CATEGORY_TOOLS[category],
+    scope: CATEGORY_SCOPE[category],
+    complexity: CATEGORY_COMPLEXITY[category],
     requiredPermissions: deriveRequiredPermissions(category, mode),
     minimumEffort,
     maximumEffort: policy.maximumEffort,

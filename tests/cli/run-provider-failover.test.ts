@@ -204,3 +204,38 @@ test("loop run rejects fallback provider options without an explicit fallback pr
     fixture.cleanup();
   }
 });
+
+test("loop run never infers a provider model when --provider-model is omitted", () => {
+  const fixture = setupFixture();
+  try {
+    const result = spawnSync(
+      tsxPath,
+      [
+        cliPath,
+        "run",
+        "example",
+        "--mode",
+        "execute",
+        "--provider",
+        "codex",
+        "--provider-executable",
+        fixture.missingCodex,
+        "--json",
+      ],
+      {
+        cwd: fixture.root,
+        encoding: "utf8",
+        timeout: 10_000,
+      },
+    );
+
+    assert.equal(result.status, 1);
+    const error = JSON.parse(result.stdout) as {
+      error?: { code?: string; message?: string };
+    };
+    assert.equal(error.error?.code, "missing_provider_model");
+    assert.match(error.error?.message ?? "", /no model catalog is inferred/);
+  } finally {
+    fixture.cleanup();
+  }
+});

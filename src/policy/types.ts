@@ -65,6 +65,23 @@ export const LOOP_TASK_CATEGORIES = [
 
 export type LoopTaskCategory = (typeof LOOP_TASK_CATEGORIES)[number];
 
+export const LOOP_TASK_TOOLS = [
+  "filesystem_read",
+  "filesystem_write",
+  "shell_exec",
+  "test_runner",
+] as const;
+
+export type LoopTaskTool = (typeof LOOP_TASK_TOOLS)[number];
+
+export const LOOP_TASK_SCOPES = ["none", "read_only", "bounded_write"] as const;
+
+export type LoopTaskScope = (typeof LOOP_TASK_SCOPES)[number];
+
+export const LOOP_TASK_COMPLEXITIES = ["low", "medium", "high"] as const;
+
+export type LoopTaskComplexity = (typeof LOOP_TASK_COMPLEXITIES)[number];
+
 export type ContextBudget = Readonly<{
   maxFiles: number;
   maxCharacters: number;
@@ -72,10 +89,19 @@ export type ContextBudget = Readonly<{
   includeFullFiles: boolean;
 }>;
 
+export type QuotaReservePolicy = Readonly<{
+  repairPercent: number;
+  ciPercent: number;
+  emergencyPercent: number;
+}>;
+
 export type LoopTaskRequirements = Readonly<{
   category: LoopTaskCategory;
   mode: AgentPolicyMode;
   requiredCapabilities: readonly AgentCapability[];
+  requiredTools: readonly LoopTaskTool[];
+  scope: LoopTaskScope;
+  complexity: LoopTaskComplexity;
   requiredPermissions: readonly AgentPermission[];
   minimumEffort: AgentEffort;
   maximumEffort: AgentEffort;
@@ -98,6 +124,7 @@ export type AgentPolicy = Readonly<{
   maximumEffort: AgentEffort;
   defaultBudget: AgentBudget;
   contextBudget: ContextBudget;
+  quotaReserve?: QuotaReservePolicy;
   allowedProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
   // Paid funding modes are never implicitly authorized. When omitted, the

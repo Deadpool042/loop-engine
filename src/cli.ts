@@ -91,7 +91,10 @@ import {
   type LoopProviderId,
 } from "./composition/index.js";
 import { terminal } from "./ui/terminal.js";
-import { buildAutoSubscriptionProviderConfigurations } from "./composition/auto-subscription-execution.js";
+import {
+  buildAutoSubscriptionProviderConfigurations,
+  loadAutoSubscriptionModelPortfolioFromEnvironment,
+} from "./composition/auto-subscription-execution.js";
 import { ensureAutoSubscriptionExecutionDecision } from "./composition/auto-subscription-decision-renewal.js";
 import { printJsonError } from "./commands/json-error.js";
 import { printCompletionEventsJson } from "./commands/completion-events.js";
@@ -951,7 +954,6 @@ else if (command === "review") {
       `${providerLabel(providerId)} provider requires --provider-executable.`,
     );
   }
-
   const hasFallbackSpecificOption =
     hasOption("--fallback-provider-executable") ||
     hasOption("--fallback-provider-model") ||
@@ -1001,20 +1003,41 @@ else if (command === "review") {
       "--fallback-provider is only supported in execute or publish mode.",
     );
   }
+  if (providerId !== undefined && providerModel === undefined) {
+    failOption(
+      json,
+      "missing_provider_model",
+      `${providerLabel(providerId)} provider requires an explicit --provider-model; no model catalog is inferred.`,
+    );
+  }
+  if (
+    fallbackProviderId !== undefined &&
+    fallbackProviderModel === undefined
+  ) {
+    failOption(
+      json,
+      "missing_provider_model",
+      `${providerLabel(fallbackProviderId)} fallback provider requires an explicit --fallback-provider-model; no model catalog is inferred.`,
+    );
+  }
 
   let runApplication: LoopApplicationAssembly = application;
   if (autoSubscription) {
     try {
-      const providers = buildAutoSubscriptionProviderConfigurations();
+      const providers = buildAutoSubscriptionProviderConfigurations(
+        loadAutoSubscriptionModelPortfolioFromEnvironment(),
+      );
       runApplication = createLoopApplicationAssembly({
         providers,
         maxProviderAttempts: providers.length,
       });
-    } catch {
+    } catch (error) {
       failOption(
         json,
-        "invalid_provider_executable",
-        "Autonomous subscription provider configuration is unavailable.",
+        "auto_subscription_portfolio_unavailable",
+        error instanceof Error
+          ? error.message
+          : "Autonomous subscription provider portfolio is unavailable.",
       );
     }
   } else if (providerId !== undefined && providerExecutable !== undefined) {

@@ -3,6 +3,10 @@ import { describe, it } from "node:test";
 
 import {
   buildRunModelEfficiencyReport,
+  estimateExpectedQuotaConsumption,
+  estimateExpectedRunEfficiency,
+  estimateExpectedRunValue,
+  MIN_QUOTA_CONSUMPTION_SAMPLE_SIZE,
   projectRunModelObservation,
   type LoopRunHistoryReport,
 } from "../../src/core/index.js";
@@ -98,6 +102,45 @@ function policyCategory(
   return {
     requirements: { category },
   } as unknown as LoopRunResult["agentPolicy"];
+}
+
+function meteredRun(
+  runId: string,
+  fiveHourConsumedPercent: number,
+  weeklyConsumedPercent: number,
+): LoopRunResult {
+  return run({
+    runId,
+    agentPolicy: policyCategory("code"),
+    executionPlanEvidence: {
+      ...planEvidence(
+        "openai",
+        "codex",
+        "configured.codex.economy",
+        "gpt-5.6-luna",
+      ),
+      allowedPaths: ["src/**"],
+    },
+    quotaConsumptionEvidence: {
+      schemaVersion: 1,
+      source: "openclaw_usage_status_delta",
+      provider: "openai",
+      beforeUpdatedAt: 1_000,
+      afterUpdatedAt: 2_000,
+      windows: [
+        {
+          label: "5h",
+          consumedPercent: fiveHourConsumedPercent,
+          resetAt: 10_000,
+        },
+        {
+          label: "Week",
+          consumedPercent: weeklyConsumedPercent,
+          resetAt: 20_000,
+        },
+      ],
+    },
+  });
 }
 
 describe("run model efficiency evidence", () => {
@@ -439,5 +482,141 @@ describe("run model efficiency evidence", () => {
     );
 
     assert.equal(observation?.durationMs, null);
+  });
+
+  it("keeps expected quota consumption unknown below five exact comparable runs", () => {
+    const observations = [
+      meteredRun("sample-1", 1, 0.5),
+      meteredRun("sample-2", 2, 1),
+      meteredRun("sample-3", 2, 1),
+      meteredRun("sample-4", 3, 2),
+    ]
+      .map(projectRunModelObservation)
+      .filter((value): value is NonNullable<typeof value> => value !== null);
+
+    assert.equal(MIN_QUOTA_CONSUMPTION_SAMPLE_SIZE, 5);
+    assert.equal(observations[0]?.scopeSize, "small");
+    assert.deepEqual(
+      estimateExpectedQuotaConsumption(observations, {
+        provider: "openai",
+        model: "gpt-5.6-luna",
+        effort: "low",
+        taskCategory: "code",
+        scopeSize: "small",
+      }),
+      {
+        status: "unknown",
+        reason: "insufficient_samples",
+        minimumSampleSize: 5,
+        matchingRuns: 4,
+      },
+    );
+  });
+
+  it("uses the median after five exact comparable runs and ignores outlier magnitude", () => {
+    const observations = [
+      meteredRun("sample-1", 1, 0.5),
+      meteredRun("sample-2", 2, 1),
+      meteredRun("sample-3", 2, 1),
+      meteredRun("sample-4", 3, 2),
+      meteredRun("sample-5", 20, 10),
+    ]
+      .map(projectRunModelObservation)
+      .filter((value): value is NonNullable<typeof value> => value !== null);
+
+    assert.deepEqual(
+      estimateExpectedQuotaConsumption(observations, {
+        provider: "openai",
+        model: "gpt-5.6-luna",
+        effort: "low",
+        taskCategory: "code",
+        scopeSize: "small",
+      }),
+      {
+        status: "available",
+        method: "median_exact_match",
+        minimumSampleSize: 5,
+        matchingRuns: 5,
+        windows: [
+          { label: "5h", expectedConsumedPercent: 2, sampleSize: 5 },
+          { label: "Week", expectedConsumedPercent: 1, sampleSize: 5 },
+        ],
+      },
+    );
+
+    assert.deepEqual(buildRunModelEfficiencyReport(history([meteredRun("metered", 2, 1)])).telemetry, {
+      tokens: "unavailable",
+      costUsd: "unavailable",
+      quota: "observed_delta_samples",
+      reason: "run_history_contains_observed_quota_deltas",
+    });
+  });
+
+  it("estimates expected governed value from the same five-run exact-match cohort", () => {
+    const runs = [
+      meteredRun("success-1", 2, 1),
+      meteredRun("success-2", 2, 1),
+      meteredRun("success-3", 2, 1),
+      meteredRun("success-4", 2, 1),
+      run({
+        ...meteredRun("failed-5", 2, 1),
+        runId: "failed-5",
+        status: "failed",
+        failure: { code: "validation_failed", message: "fixture", details: [] },
+      }),
+    ];
+    const observations = runs
+      .map(projectRunModelObservation)
+      .filter((value): value is NonNullable<typeof value> => value !== null);
+
+    assert.deepEqual(
+      estimateExpectedRunValue(observations, {
+        provider: "openai",
+        model: "gpt-5.6-luna",
+        effort: "low",
+        taskCategory: "code",
+        scopeSize: "small",
+      }),
+      {
+        status: "available",
+        method: "governed_success_rate_exact_match",
+        minimumSampleSize: 5,
+        matchingRuns: 5,
+        successfulRuns: 4,
+        expectedValuePercent: 80,
+      },
+    );
+  });
+
+  it("computes value/quota efficiency only for the explicitly governing quota window", () => {
+    const observations = [
+      meteredRun("sample-1", 2, 1),
+      meteredRun("sample-2", 2, 1),
+      meteredRun("sample-3", 2, 1),
+      meteredRun("sample-4", 2, 1),
+      meteredRun("sample-5", 2, 1),
+    ]
+      .map(projectRunModelObservation)
+      .filter((value): value is NonNullable<typeof value> => value !== null);
+
+    assert.deepEqual(
+      estimateExpectedRunEfficiency(observations, {
+        provider: "openai",
+        model: "gpt-5.6-luna",
+        effort: "low",
+        taskCategory: "code",
+        scopeSize: "small",
+        quotaWindowLabel: "Week",
+      }),
+      {
+        status: "available",
+        method: "expected_value_per_quota",
+        quotaWindowLabel: "Week",
+        expectedValuePercent: 100,
+        expectedQuotaConsumedPercent: 1,
+        score: 100,
+        sampleSize: 5,
+      },
+    );
   });
 });

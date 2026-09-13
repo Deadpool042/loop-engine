@@ -28,6 +28,7 @@ export type JsonErrorCode =
   | "auto_subscription_requires_candidate"
   | "auto_subscription_requires_git_head"
   | "auto_subscription_conflict"
+  | "auto_subscription_portfolio_unavailable"
   | "candidate_not_canonical"
   | "git_head_changed"
   | "auto_subscription_requires_execution_decision"

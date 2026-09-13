@@ -107,10 +107,14 @@ describe("universal multi-agent runtime", () => {
 
   it("preserves both historical single-provider compatibility paths", () => {
     const codex = createLoopApplicationAssembly({
-      codexProvider: { executable: "codex" },
+      codexProvider: { executable: "codex", model: "gpt-test" },
     });
     const claude = createLoopApplicationAssembly({
-      claudeCodeProvider: { executable: "claude", maxTurns: 3 },
+      claudeCodeProvider: {
+        executable: "claude",
+        model: "claude-test",
+        maxTurns: 3,
+      },
     });
 
     assert.deepEqual(codex.loopProviderIds, ["codex"]);
