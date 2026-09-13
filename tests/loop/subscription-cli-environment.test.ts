@@ -66,12 +66,14 @@ describe("buildSubscriptionCliEnvironment", () => {
     const env = buildSubscriptionCliEnvironment({
       FAKE_CODEX_MODE: "success",
       FAKE_CLAUDE_CAPTURE_ARGS: "/tmp/capture.json",
+      FAKE_OPENCLAW_CAPTURE_ARGS: "/tmp/openclaw-capture.json",
       UNRELATED_TEST_SECRET: "nope",
     });
 
     assert.deepEqual(env, {
       FAKE_CODEX_MODE: "success",
       FAKE_CLAUDE_CAPTURE_ARGS: "/tmp/capture.json",
+      FAKE_OPENCLAW_CAPTURE_ARGS: "/tmp/openclaw-capture.json",
     });
   });
 });

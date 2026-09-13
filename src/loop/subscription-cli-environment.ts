@@ -23,7 +23,7 @@ const SUBSCRIPTION_CLI_ENV_KEYS = [
   "SSL_CERT_DIR",
 ] as const;
 
-const TEST_ONLY_PREFIXES = ["FAKE_CODEX_", "FAKE_CLAUDE_"] as const;
+const TEST_ONLY_PREFIXES = ["FAKE_CODEX_", "FAKE_CLAUDE_", "FAKE_OPENCLAW_"] as const;
 
 export function buildSubscriptionCliEnvironment(
   parent: NodeJS.ProcessEnv = process.env,
