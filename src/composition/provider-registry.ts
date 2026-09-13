@@ -15,12 +15,8 @@ import type {
 import type { LoopExecutor } from "../core/index.js";
 import { createClaudeCodeCliLoopExecutor } from "../loop/claude-code-cli-executor.js";
 import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";
-import { ANTHROPIC_HAIKU_4_5_MODEL } from "../text-only-provider/pricing.js";
-
 export const LOOP_PROVIDER_IDS = ["codex", "claude_code"] as const;
 export type LoopProviderId = (typeof LOOP_PROVIDER_IDS)[number];
-
-const DEFAULT_CODEX_MODEL = "gpt-5.6-luna";
 
 // This is the conservative capability envelope of the concrete Loop Engine
 // CLI integrations, not a model/provider capability catalog. It deliberately
@@ -37,7 +33,7 @@ const EXECUTABLE_PROVIDER_PERMISSIONS: readonly AgentPermission[] =
 export type LoopProviderModelProfileConfiguration = Readonly<{
   id: string;
   model: string;
-  economicTier: AgentEconomicTier;
+  economicTier?: AgentEconomicTier;
   availability?: AgentAvailabilityState;
   fundingMode?: AgentFundingMode;
   quota?: AgentQuotaSnapshot;
@@ -88,13 +84,6 @@ export type LoopProviderRegistry = Readonly<{
   registrations: readonly LoopProviderRegistration[];
 }>;
 
-function configuredModel(configuration: LoopProviderConfiguration): string {
-  if (configuration.model) return configuration.model;
-  return configuration.id === "codex"
-    ? DEFAULT_CODEX_MODEL
-    : ANTHROPIC_HAIKU_4_5_MODEL;
-}
-
 function configuredBudget(
   configuration: LoopProviderConfiguration,
 ): AgentProfile["budget"] {
@@ -121,7 +110,17 @@ function validateConfiguredProfiles(
       "Provider configuration must use either model or profiles, not both.",
     );
   }
-  if (configuration.profiles === undefined) return null;
+  if (configuration.model !== undefined && configuration.model.trim().length === 0) {
+    throw new TypeError("Configured provider model must not be empty.");
+  }
+  if (configuration.profiles === undefined) {
+    if (configuration.model === undefined) {
+      throw new TypeError(
+        "Provider configuration requires an explicit model or profiles; no model catalog is inferred.",
+      );
+    }
+    return null;
+  }
   if (configuration.profiles.length === 0) {
     throw new TypeError("Configured provider profiles must not be empty.");
   }
@@ -170,7 +169,9 @@ function configuredProfiles(
           provider,
           model: profile.model.trim(),
           effort: profile.effort ?? "low",
-          economicTier: profile.economicTier,
+          ...(profile.economicTier === undefined
+            ? {}
+            : { economicTier: profile.economicTier }),
           availability: profile.availability ?? "available",
           ...(profile.fundingMode === undefined
             ? {}
@@ -195,7 +196,7 @@ function configuredProfiles(
       id: `configured.${configuration.id}`,
       runtime,
       provider,
-      model: configuredModel(configuration),
+      model: configuration.model!.trim(),
       effort: "low",
       availability: "available",
       ...(configuration.fundingMode === undefined

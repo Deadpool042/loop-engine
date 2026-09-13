@@ -13,7 +13,12 @@ import {
   type AgentRuntime,
   UNBOUNDED_AGENT_BUDGET,
 } from "../agents/types.js";
-import type { AgentPolicy, AgentPolicyMode, ContextBudget } from "./types.js";
+import type {
+  AgentPolicy,
+  AgentPolicyMode,
+  ContextBudget,
+  QuotaReservePolicy,
+} from "./types.js";
 
 // Permission ceiling per mode. Each mode includes every permission of the
 // mode before it, plus only the additional permissions required by that mode.
@@ -76,6 +81,12 @@ export function getForecastSelectionBudgetForMode(
     ? DEFAULT_MODE_BUDGETS.execute
     : DEFAULT_MODE_BUDGETS[mode];
 }
+
+export const DEFAULT_QUOTA_RESERVE: QuotaReservePolicy = Object.freeze({
+  repairPercent: 10,
+  ciPercent: 5,
+  emergencyPercent: 5,
+});
 
 const BUDGET_DIMENSIONS = [
   "maxTokens",
@@ -253,5 +264,6 @@ export const DEFAULT_AGENT_POLICY: AgentPolicy = {
   maximumEffort: "high",
   defaultBudget: UNBOUNDED_AGENT_BUDGET,
   contextBudget: CONTEXT_BUDGET_BY_EFFORT.medium,
+  quotaReserve: DEFAULT_QUOTA_RESERVE,
   allowEscalation: true,
 };

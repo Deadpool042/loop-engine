@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import { createAgentRegistry } from "../../src/agents/registry.js";
 import {
   evaluateAgentProfile,
+  rankAgentProfilesByEfficiency,
   selectAgentProfile,
 } from "../../src/agents/selector.js";
 import type { AgentProfile } from "../../src/agents/types.js";
@@ -714,6 +715,248 @@ describe("selectAgentProfile", () => {
         reason: "profile quota is exhausted (source: runtime_report)",
       },
     ]);
+  });
+});
+
+describe("rankAgentProfilesByEfficiency", () => {
+  const request = {
+    requiredCapabilities: ["code_edit"] as const,
+    requiredPermissions: [] as const,
+  };
+
+  it("applies capability gates before considering any efficiency score", () => {
+    const registry = createAgentRegistry([
+      profile({ id: "incapable", capabilities: [] }),
+      profile({ id: "capable", capabilities: ["code_edit"] }),
+    ]);
+
+    const result = rankAgentProfilesByEfficiency(registry, request, [
+      {
+        profileId: "incapable",
+        status: "available",
+        quotaWindowLabel: "Week",
+        expectedValuePercent: 100,
+        expectedQuotaConsumedPercent: 1,
+        sampleSize: 5,
+      },
+      {
+        profileId: "capable",
+        status: "available",
+        quotaWindowLabel: "Week",
+        expectedValuePercent: 80,
+        expectedQuotaConsumedPercent: 4,
+        sampleSize: 5,
+      },
+    ]);
+
+    assert.deepEqual(result.rejected, [
+      { profileId: "incapable", reason: "missing capabilities: code_edit" },
+    ]);
+    assert.deepEqual(result.ranked.map((entry) => entry.profileId), ["capable"]);
+  });
+
+  it("orders eligible measured candidates by expected value per quota", () => {
+    const registry = createAgentRegistry([
+      profile({ id: "efficient", capabilities: ["code_edit"] }),
+      profile({ id: "expensive", capabilities: ["code_edit"] }),
+    ]);
+
+    const result = rankAgentProfilesByEfficiency(registry, request, [
+      {
+        profileId: "expensive",
+        status: "available",
+        quotaWindowLabel: "Week",
+        expectedValuePercent: 90,
+        expectedQuotaConsumedPercent: 9,
+        sampleSize: 8,
+      },
+      {
+        profileId: "efficient",
+        status: "available",
+        quotaWindowLabel: "Week",
+        expectedValuePercent: 80,
+        expectedQuotaConsumedPercent: 4,
+        sampleSize: 6,
+      },
+    ]);
+
+    assert.deepEqual(
+      result.ranked.map((entry) => ({ id: entry.profileId, score: entry.score })),
+      [
+        { id: "efficient", score: 20 },
+        { id: "expensive", score: 10 },
+      ],
+    );
+  });
+
+  it("keeps unknown efficiency unranked instead of assigning a fake zero score", () => {
+    const registry = createAgentRegistry([
+      profile({ id: "zeta", capabilities: ["code_edit"] }),
+      profile({ id: "alpha", capabilities: ["code_edit"] }),
+    ]);
+
+    const result = rankAgentProfilesByEfficiency(registry, request, [
+      { profileId: "alpha", status: "unknown", reason: "insufficient_samples" },
+    ]);
+
+    assert.deepEqual(result.ranked, []);
+    assert.deepEqual(result.unranked, [
+      { profileId: "alpha", reason: "efficiency_unknown" },
+      { profileId: "zeta", reason: "efficiency_unknown" },
+    ]);
+  });
+
+  it("fails an unusable zero-consumption signal into the unranked bucket", () => {
+    const registry = createAgentRegistry([
+      profile({ id: "zero-resolution", capabilities: ["code_edit"] }),
+    ]);
+
+    const result = rankAgentProfilesByEfficiency(registry, request, [
+      {
+        profileId: "zero-resolution",
+        status: "available",
+        quotaWindowLabel: "5h",
+        expectedValuePercent: 100,
+        expectedQuotaConsumedPercent: 0,
+        sampleSize: 5,
+      },
+    ]);
+
+    assert.deepEqual(result.ranked, []);
+    assert.deepEqual(result.unranked, [
+      { profileId: "zero-resolution", reason: "invalid_efficiency_signal" },
+    ]);
+  });
+});
+
+describe("frontier routing guard", () => {
+  it("does not select frontier when a known lower tier satisfies the same hard requirements", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "standard",
+        economicTier: "standard",
+        fundingMode: "included_subscription",
+        capabilities: ["code_edit", "shell_exec"],
+      }),
+      profile({
+        id: "frontier",
+        economicTier: "frontier",
+        fundingMode: "included_subscription",
+        capabilities: ["code_edit", "shell_exec", "long_context"],
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit", "shell_exec"],
+      requiredPermissions: [],
+      allowedFundingModes: ["included_subscription"],
+    });
+
+    assert.equal(result.outcome, "selected");
+    assert.equal(result.outcome === "selected" ? result.profile.id : null, "standard");
+    assert.deepEqual(
+      result.outcome === "selected" ? result.notSelected : null,
+      [{ profileId: "frontier", reason: "frontier_not_required" }],
+    );
+  });
+
+  it("allows frontier when no known lower tier satisfies the required capabilities", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "standard",
+        economicTier: "standard",
+        fundingMode: "included_subscription",
+        capabilities: ["code_edit", "shell_exec"],
+      }),
+      profile({
+        id: "frontier",
+        economicTier: "frontier",
+        fundingMode: "included_subscription",
+        capabilities: ["code_edit", "shell_exec", "long_context"],
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit", "long_context"],
+      requiredPermissions: [],
+      allowedFundingModes: ["included_subscription"],
+    });
+
+    assert.equal(result.outcome, "selected");
+    assert.equal(result.outcome === "selected" ? result.profile.id : null, "frontier");
+    assert.deepEqual(result.rejected, [
+      {
+        profileId: "standard",
+        reason: "missing capabilities: long_context",
+      },
+    ]);
+  });
+
+  it("holds frontier out of efficiency ranking unless explicitly allowed when a lower tier is capable", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "standard",
+        economicTier: "standard",
+        fundingMode: "included_subscription",
+        capabilities: ["code_edit"],
+      }),
+      profile({
+        id: "frontier",
+        economicTier: "frontier",
+        fundingMode: "included_subscription",
+        capabilities: ["code_edit", "long_context"],
+      }),
+    ]);
+    const signals = [
+      {
+        profileId: "standard",
+        status: "available" as const,
+        quotaWindowLabel: "Week",
+        expectedValuePercent: 80,
+        expectedQuotaConsumedPercent: 10,
+        sampleSize: 5,
+      },
+      {
+        profileId: "frontier",
+        status: "available" as const,
+        quotaWindowLabel: "Week",
+        expectedValuePercent: 100,
+        expectedQuotaConsumedPercent: 1,
+        sampleSize: 5,
+      },
+    ];
+
+    const guarded = rankAgentProfilesByEfficiency(
+      registry,
+      {
+        requiredCapabilities: ["code_edit"],
+        requiredPermissions: [],
+        allowedFundingModes: ["included_subscription"],
+      },
+      signals,
+    );
+    assert.deepEqual(
+      guarded.ranked.map((entry) => entry.profileId),
+      ["standard"],
+    );
+    assert.deepEqual(guarded.unranked, [
+      { profileId: "frontier", reason: "frontier_not_required" },
+    ]);
+
+    const explicitlyAllowed = rankAgentProfilesByEfficiency(
+      registry,
+      {
+        requiredCapabilities: ["code_edit"],
+        requiredPermissions: [],
+        allowedFundingModes: ["included_subscription"],
+        allowFrontier: true,
+      },
+      signals,
+    );
+    assert.deepEqual(
+      explicitlyAllowed.ranked.map((entry) => entry.profileId),
+      ["frontier", "standard"],
+    );
   });
 });
 

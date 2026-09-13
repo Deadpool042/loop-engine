@@ -11,6 +11,7 @@ import { DEFAULT_AGENT_POLICY } from "../../src/policy/defaults.js";
 import {
   classifyLoopTaskCategory,
   deriveRequiredPermissions,
+  deriveTaskRequirements,
   resolvePolicy,
 } from "../../src/policy/resolver.js";
 import type { AgentPolicy } from "../../src/policy/types.js";
@@ -154,6 +155,64 @@ describe("classifyLoopTaskCategory — deterministic keyword deduction", () => {
       ),
       "documentation",
     );
+  });
+});
+
+describe("deriveTaskRequirements — deterministic lot classification", () => {
+  it("classifies code work with explicit tools, bounded scope and medium complexity", () => {
+    const requirements = deriveTaskRequirements(
+      candidate({ text: "- [ ] Implement checkout behavior" }),
+      "execute",
+      policy(),
+    );
+
+    assert.equal(requirements.category, "code");
+    assert.deepEqual(requirements.requiredTools, [
+      "filesystem_read",
+      "filesystem_write",
+      "shell_exec",
+      "test_runner",
+    ]);
+    assert.equal(requirements.scope, "bounded_write");
+    assert.equal(requirements.complexity, "medium");
+  });
+
+  it("classifies review work as read-only with only filesystem inspection", () => {
+    const requirements = deriveTaskRequirements(
+      candidate({ text: "- [ ] Review the last release" }),
+      "execute",
+      policy(),
+    );
+
+    assert.equal(requirements.category, "review");
+    assert.deepEqual(requirements.requiredTools, ["filesystem_read"]);
+    assert.equal(requirements.scope, "read_only");
+    assert.equal(requirements.complexity, "low");
+    assert.deepEqual(requirements.requiredPermissions, ["read_only"]);
+  });
+
+  it("classifies architecture as high complexity without turning complexity into high effort", () => {
+    const requirements = deriveTaskRequirements(
+      candidate({ text: "- [ ] Revoir l'architecture du runner" }),
+      "execute",
+      policy(),
+    );
+
+    assert.equal(requirements.scope, "bounded_write");
+    assert.equal(requirements.complexity, "high");
+    assert.equal(requirements.minimumEffort, "medium");
+  });
+
+  it("keeps descriptive write scope from granting write permission in plan mode", () => {
+    const requirements = deriveTaskRequirements(
+      candidate({ text: "- [ ] Implement checkout behavior" }),
+      "plan",
+      policy(),
+    );
+
+    assert.equal(requirements.scope, "bounded_write");
+    assert.ok(requirements.requiredTools.includes("filesystem_write"));
+    assert.deepEqual(requirements.requiredPermissions, ["read_only"]);
   });
 });
 

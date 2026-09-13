@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/**/*.test.ts src/execution/*.test.ts src/execution/**/*.test.ts",
     "test:file": "tsx --test",
+    "oc14:openclaw-governance-probe": "tsx scripts/oc14-openclaw-governance-probe.ts",
     "test:burnin": "tsx --test tests/integration/*.burnin.ts",
     "generate:report-fixtures": "tsx scripts/generate-report-fixtures.ts",
     "reports:fixtures": "pnpm run generate:report-fixtures",

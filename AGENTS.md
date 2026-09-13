@@ -22,11 +22,11 @@ Loop Engine is a local, deterministic governance and orchestration engine over p
 
 Loop Engine supports governed orchestration by small lots — see `docs/architecture/looprunner-execute-validation-repair.md` for the current execution contract and `docs/architecture/autonomous-loop-runner.md` for the historical LoopRunner architecture. `plan` remains the default and never calls an agent. An explicitly configured Codex or Claude Code provider can run `execute` in a temporary isolated Git worktree; explicit `commit` remains bounded and `publish` can create only a validated internal candidate ref, never a push/merge or user-branch mutation.
 
-## Runtime IA principal
+## Routage IA cible
 
-Dans le workflow interactif normal, **ChatGPT + Development Workspace** est le runtime IA principal. Loop Engine fournit la gouvernance, les contrats déterministes et les validations ; il ne déclenche pas un second modèle simplement parce qu'un raisonnement est nécessaire.
+Aucun runtime IA n'est primaire par statut. Loop Engine fournit la gouvernance, les contrats déterministes, l'admission et les validations ; lorsqu'une exécution IA est admise, runtime/provider/modèle/effort sont des dimensions de sélection gouvernées plutôt qu'un choix ChatGPT/Claude/Codex codé en dur.
 
-Claude Code, Codex et les autres runtimes sont des spécialistes **opt-in**. Leur indisponibilité ne doit pas bloquer le fonctionnement normal, et aucune API IA payante n'est un fallback implicite.
+**ChatGPT + Development Workspace** reste une surface d'orchestration interactive possible, au même titre que les runtimes explicitement qualifiés. Claude Code, Codex, OpenClaw natif et les autres candidats doivent respecter les mêmes contraintes de capacités, permissions, budget, disponibilité et evidence. Aucun fallback silencieux ni aucune API IA payante implicite n'est autorisé.
 
 **Core philosophy (non-negotiable, enforced throughout the codebase):**
 

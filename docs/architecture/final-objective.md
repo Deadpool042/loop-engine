@@ -22,13 +22,13 @@ L'impact documentaire d'un changement est qualifié localement avant tout appel 
 
 Le comportement par défaut reste non destructif : pas d'appel IA automatique, pas de commit automatique, pas de push automatique et aucune modification arbitraire des projets observés. Une exception de gouvernance est autorisée uniquement lorsqu'un projet déclare explicitement `execution_decision` : après approbation humaine, Loop Engine peut publier ce seul artefact de décision dans le chemin configuré, avec confinement au projet, écriture transactionnelle, validation post-publication et récupération en cas d'échec de validation. Cette exception n'autorise aucune logique métier ni aucune écriture générale dans le projet observé. Un `execute` explicitement configuré s'effectue dans un Git worktree isolé et temporaire, jamais dans le dépôt source. Ces garanties ne s'effacent jamais devant un mode explicitement sélectionné : pas de commit automatique et pas de push automatique restent la règle tant qu'un mode `commit` ou `publish` n'a pas été explicitement demandé par l'humain.
 
-## Runtime IA principal et spécialistes
+## Routage IA cible
 
-Dans le mode interactif normal, **ChatGPT + Development Workspace** constitue le runtime IA principal. Loop Engine fournit la gouvernance, le contexte, les décisions déterministes et les validations ; il ne doit pas déclencher un second modèle simplement parce qu'un raisonnement est nécessaire alors que ChatGPT pilote déjà la mission.
+Dans la cible d'architecture, **aucun runtime IA n'est primaire par statut**. Loop Engine reste l'autorité de gouvernance : il sélectionne le travail admissible, impose les gates, construit le contexte borné, valide le résultat et produit l'evidence. Lorsqu'un lot requiert une exécution IA, le runtime/provider/modèle/effort doit être choisi par la politique à partir des capacités, permissions, disponibilité, budget et signaux de quota réellement connus — jamais parce que ChatGPT, Claude ou Codex serait codé en dur comme chemin principal.
+
+**ChatGPT + Development Workspace** reste une surface d'orchestration interactive possible et utile, mais n'est plus une cible d'architecture privilégiée. Claude Code, Codex, OpenClaw natif et tout autre runtime explicitement qualifié sont des candidats soumis aux mêmes contrats d'admission et de validation. L'indisponibilité d'un runtime particulier ne doit pas bloquer l'écosystème si un autre candidat compatible et gouverné existe ; aucune bascule silencieuse n'est autorisée.
 
 Les opérations qui ne nécessitent aucun raisonnement génératif restent entièrement déterministes : lecture des roadmaps, sélection des candidats, gates, état Git, historique des runs, diagnostics, validations et projections de cockpit.
-
-Claude Code, Codex et les autres runtimes restent des spécialistes secondaires **opt-in**. Ils ne font pas partie du chemin critique et ne sont appelés que lorsqu'un avantage concret est démontré pour un lot donné (par exemple exécution spécialisée, seconde lecture indépendante, tâche mécanique volumineuse ou expérimentation). Leur indisponibilité ne doit pas empêcher le fonctionnement normal de l'écosystème.
 
 Aucune API IA payante ne constitue un fallback implicite. Une API externe payante reste une exception explicitement autorisée pour une action précise. L'objectif est de maximiser le travail réalisé via les abonnements interactifs et les outils déterministes, sans transformer les quotas/crédits API en dépendance d'infrastructure.
 

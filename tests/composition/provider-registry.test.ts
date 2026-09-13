@@ -35,19 +35,14 @@ describe("LoopProviderRegistry", () => {
     assert.equal(Object.isFrozen(profile), true);
   });
 
-  it("uses the configured Codex default model and a neutral ranking effort when no override is supplied", () => {
-    const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
-      id: "codex",
-      executable: "/usr/local/bin/codex",
-    });
-
-    assert.deepEqual(
-      assembly.agentRegistry.profiles.map((profile) => ({
-        id: profile.id,
-        model: profile.model,
-        effort: profile.effort,
-      })),
-      [{ id: "configured.codex", model: "gpt-5.6-luna", effort: "low" }],
+  it("rejects a provider without an explicit model or observed profile portfolio", () => {
+    assert.throws(
+      () =>
+        assembleLoopProvider(defaultLoopProviderRegistry, {
+          id: "codex",
+          executable: "/usr/local/bin/codex",
+        }),
+      /requires an explicit model or profiles; no model catalog is inferred/,
     );
   });
 
