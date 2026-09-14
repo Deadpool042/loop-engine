@@ -322,7 +322,7 @@ Voir `docs/architecture/job-package-portable-contract.md` pour l'audit complet.
 
 Audit initial : [`../audits/2026-09-14-auto-routing-chatgpt-codex-claude-audit.md`](../audits/2026-09-14-auto-routing-chatgpt-codex-claude-audit.md). Roadmap/checklist : [`auto-routing-v55.md`](./auto-routing-v55.md).
 
-- [ ] [P0] V55.0 — Restaurer et fiabiliser le pipeline de preuve AUTO multi-provider : corriger le drift Development Workspace → `auto-route:evidence`, publier Codex + Claude depuis des preuves runtime fraîches et fail-closed, puis démontrer qu’un handoff canonique ne tombe plus sur `auto_portfolio_unavailable` lorsque les sources sont disponibles.
+- [x] [P0] V55.0 — Restaurer et fiabiliser le pipeline de preuve AUTO multi-provider : corriger le drift Development Workspace → `auto-route:evidence`, publier Codex + Claude depuis des preuves runtime fraîches et fail-closed, puis démontrer qu’un handoff canonique ne tombe plus sur `auto_portfolio_unavailable` lorsque les sources sont disponibles.
 - [ ] [P0] V55.1 — Ajouter ChatGPT comme route interactive gouvernée distincte des executors autonomes, réutiliser le selector/policy existant et exposer explicitement `chatgpt_handoff` ou `direct_cli` sans faux provider ni second routeur.
 - [ ] [P0] V55.2 — Raccorder `Continuer` de bout en bout et qualifier les chemins ChatGPT/Codex/Claude par burn-in réel, avec quotas/evidence/Run History et affichage Cockpit cohérent ; clôturer sans promouvoir les runtimes natifs OpenClaw non qualifiés.
 

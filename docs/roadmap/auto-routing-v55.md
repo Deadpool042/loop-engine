@@ -22,16 +22,24 @@ Restaurer le raccord réel Development Workspace → OpenClaw Control → Loop E
 
 ### Checklist
 
-- [ ] Corriger le drift `oc14:auto-route:evidence` → `auto-route:evidence` dans Development Workspace.
-- [ ] Ajouter une couverture qui échoue si le script de preuve réellement exposé par `openclaw-control/package.json` diverge du nom attendu par DW.
-- [ ] Étendre la preuve runtime OpenClaw Control pour exposer Codex **et** Claude uniquement depuis des sources observées/configurées.
-- [ ] Injecter les fenêtres Claude issues du bridge existant dans le snapshot quota AUTO lorsqu’elles sont fraîches ; sinon Claude reste `unknown/unavailable`.
-- [ ] Ne jamais inventer de pourcentage, modèle, disponibilité ou coût.
-- [ ] Conserver les executors directs Codex/Claude et les garde-fous abonnement existants.
-- [ ] Vérifier qu’un `project_handoff` réel ne retourne plus `auto_portfolio_unavailable` lorsque les preuves sont disponibles.
-- [ ] Supprimer les tests de suite standard qui dépendent de l’état courant du dépôt au lieu d’un invariant stable ; conserver les comportements via fixtures déterministes.
-- [ ] Pendant l’implémentation, exécuter seulement les tests ciblés du contrat modifié ; réserver `pnpm run ci` complet à la gate PR/fin de lot.
-- [ ] Tests/validations DW + OpenClaw Control + Loop Engine verts.
+- [x] Corriger le drift `oc14:auto-route:evidence` → `auto-route:evidence` dans Development Workspace.
+- [x] Ajouter une couverture qui échoue si le script de preuve réellement exposé par `openclaw-control/package.json` diverge du nom attendu par DW.
+- [x] Étendre la preuve runtime OpenClaw Control pour exposer Codex **et** Claude uniquement depuis des sources observées/configurées.
+- [x] Injecter les fenêtres Claude issues du bridge existant dans le snapshot quota AUTO lorsqu’elles sont fraîches ; sinon Claude reste `unknown/unavailable`.
+- [x] Ne jamais inventer de pourcentage, modèle, disponibilité ou coût.
+- [x] Conserver les executors directs Codex/Claude et les garde-fous abonnement existants.
+- [x] Vérifier qu’un `project_handoff` réel ne retourne plus `auto_portfolio_unavailable` lorsque les preuves sont disponibles.
+- [x] Supprimer les tests de suite standard qui dépendent de l’état courant du dépôt au lieu d’un invariant stable ; conserver les comportements via fixtures déterministes. Aucun test V55.0 dépendant de l’état courant n’a été conservé : les contrats concernés reposent sur fixtures/invariants déterministes.
+- [x] Pendant l’implémentation, exécuter seulement les tests ciblés du contrat modifié ; réserver `pnpm run ci` complet à la gate PR/fin de lot.
+- [x] Tests/validations DW + OpenClaw Control + Loop Engine verts.
+
+### Validation V55.0
+
+- cause racine corrigée : `dw-mcp` chargeait une copie `file:` périmée de `dw-shell` ; `worker_activate` rafraîchit désormais les dépendances locales de `dw-mcp` avant son build/restart ;
+- le handoff canonique observe désormais le profil Codex `gpt-5.6-sol` depuis la preuve runtime OpenClaw ; une preuve quota périmée produit explicitement `no_executable_route` / `quota_stale_snapshot`, jamais `auto_portfolio_unavailable` ni une disponibilité inventée ;
+- Claude reste absent/indisponible tant qu’aucun modèle et aucune fenêtre de quota fraîche ne sont prouvés par le bridge ;
+- `project_handoff` et `project_publish_canonical` consomment le même `buildAutoRouteEnvironmentDelta` ;
+- validations : `dw-shell` qualification 226/226, OpenClaw Control 46/46 + syntaxe, Loop Engine AUTO ciblé 12/12, suite complète 2486/2486 puis `json-check` vert séparément.
 
 ### Critère de fin
 
