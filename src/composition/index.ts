@@ -85,3 +85,11 @@ export {
   type OpenClawAcpClaudeLoopExecutorOptions,
   type OpenClawAcpClaudeSession,
 } from "../loop/openclaw-acp-claude-executor.js";
+
+export {
+  buildOpenClawAcpClaudeControlPlan,
+  buildOpenClawAcpClaudeTurnCall,
+  type OpenClawAcpClaudeControlPlan,
+  type OpenClawAcpClaudeControlPlanInput,
+  type OpenClawAcpGatewayCall,
+} from "../loop/openclaw-acp-claude-control-contract.js";
