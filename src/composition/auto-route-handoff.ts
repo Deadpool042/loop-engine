@@ -1,4 +1,5 @@
 import { createAgentRegistry } from "../agents/registry.js";
+import type { AgentRouteDecision } from "../agents/router.js";
 import type { AgentEfficiencySignal } from "../agents/selector.js";
 import {
   classifyRunScopeSize,
@@ -16,6 +17,7 @@ import {
   type OpenClawQuotaSnapshotResult,
 } from "../policy/quota.js";
 import { resolvePolicy } from "../policy/resolver.js";
+import type { AgentPolicyResolution } from "../policy/types.js";
 import {
   buildAutoSubscriptionExecutionCandidates,
   decideAutoSubscriptionRoute,
@@ -25,10 +27,27 @@ import {
 
 export const AUTO_QUOTA_SNAPSHOT_ENV = "LOOP_AUTO_QUOTA_SNAPSHOT_JSON";
 
+export type ChatGptHandoffDecision = Readonly<{
+  profileId: "interactive.chatgpt";
+  runtime: "chatgpt";
+  provider: "openai";
+  model: null;
+  effort: "low" | "medium" | "high" | "xhigh" | "max";
+  executionPath: "chatgpt_handoff";
+  basis: "governed_interactive_category" | "no_safe_autonomous_route";
+  efficiencyScore: null;
+  quotaWindowLabel: null;
+  expectedValuePercent: null;
+  expectedQuotaConsumedPercent: null;
+  sampleSize: null;
+}>;
+
 export type AutoRouteHandoffProjection = Readonly<{
   status: "selected" | "unavailable";
   reason: string | null;
-  decision: ReturnType<typeof decideAutoSubscriptionRoute>["selected"];
+  decision:
+    | ReturnType<typeof decideAutoSubscriptionRoute>["selected"]
+    | ChatGptHandoffDecision;
   notSelected: ReturnType<typeof decideAutoSubscriptionRoute>["notSelected"];
   quotaBefore:
     | Readonly<{
@@ -59,6 +78,55 @@ export type AutoRouteHandoffProjection = Readonly<{
       }>
     | Readonly<{ status: "unknown"; reason: string }>;
 }>;
+
+function chatGptHandoffDecision(
+  effort: ChatGptHandoffDecision["effort"],
+  basis: ChatGptHandoffDecision["basis"],
+): ChatGptHandoffDecision {
+  return Object.freeze({
+    profileId: "interactive.chatgpt" as const,
+    runtime: "chatgpt" as const,
+    provider: "openai" as const,
+    model: null,
+    effort,
+    executionPath: "chatgpt_handoff" as const,
+    basis,
+    efficiencyScore: null,
+    quotaWindowLabel: null,
+    expectedValuePercent: null,
+    expectedQuotaConsumedPercent: null,
+    sampleSize: null,
+  });
+}
+
+export function decideAutoContinuationRoute(
+  policy: AgentPolicyResolution,
+  autonomousRoute: AgentRouteDecision,
+): AgentRouteDecision["selected"] | ChatGptHandoffDecision | null {
+  if (policy.status !== "resolved") return null;
+
+  if (
+    policy.requirements.category === "review" ||
+    policy.requirements.category === "architecture"
+  ) {
+    return chatGptHandoffDecision(
+      policy.requirements.minimumEffort,
+      "governed_interactive_category",
+    );
+  }
+
+  if (
+    autonomousRoute.outcome === "selected" &&
+    autonomousRoute.selected !== null
+  ) {
+    return autonomousRoute.selected;
+  }
+
+  return chatGptHandoffDecision(
+    policy.requirements.minimumEffort,
+    "no_safe_autonomous_route",
+  );
+}
 
 function unknownProjection(reason: string): AutoRouteHandoffProjection {
   return Object.freeze({
@@ -181,6 +249,31 @@ export function generateAutoRouteHandoffProjection(
     return unknownProjection(`policy_${policy.status}`);
   }
 
+  const interactiveDecision = decideAutoContinuationRoute(
+    policy,
+    Object.freeze({
+      outcome: "no_match" as const,
+      selected: null,
+      notSelected: Object.freeze([]),
+    }),
+  );
+  if (interactiveDecision?.executionPath === "chatgpt_handoff") {
+    return Object.freeze({
+      status: "selected" as const,
+      reason: null,
+      decision: interactiveDecision,
+      notSelected: Object.freeze([]),
+      quotaBefore: Object.freeze({
+        status: "unknown" as const,
+        reason: "chatgpt_interactive_quota_not_modeled",
+      }),
+      estimatedImpact: Object.freeze({
+        status: "unknown" as const,
+        reason: "chatgpt_interactive_quota_not_modeled",
+      }),
+    });
+  }
+
   const selectedLotDetail = generateProjectHandoffReport(project).roadmap.selectedLotDetail;
   const writablePaths =
     selectedLotDetail === null
@@ -243,21 +336,25 @@ export function generateAutoRouteHandoffProjection(
   });
 
   const route = decideAutoSubscriptionRoute(portfolio, policy, signals);
-  if (route.outcome !== "selected" || route.selected === null) {
+  const continuationDecision = decideAutoContinuationRoute(policy, route);
+  if (continuationDecision?.executionPath === "chatgpt_handoff") {
     return Object.freeze({
-      status: "unavailable" as const,
-      reason: "no_executable_route",
-      decision: null,
+      status: "selected" as const,
+      reason: null,
+      decision: continuationDecision,
       notSelected: route.notSelected,
       quotaBefore: Object.freeze({
         status: "unknown" as const,
-        reason: quota.status === "available" ? "no_selected_route" : `quota_${quota.reason}`,
+        reason: "chatgpt_interactive_quota_not_modeled",
       }),
       estimatedImpact: Object.freeze({
         status: "unknown" as const,
-        reason: "no_selected_route",
+        reason: "chatgpt_interactive_quota_not_modeled",
       }),
     });
+  }
+  if (route.outcome !== "selected" || route.selected === null) {
+    return unknownProjection("no_safe_continuation_route");
   }
 
   let quotaBefore: AutoRouteHandoffProjection["quotaBefore"] = Object.freeze({

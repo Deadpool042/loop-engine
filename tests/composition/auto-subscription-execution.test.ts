@@ -5,6 +5,9 @@ import test from "node:test";
 import { createAgentRegistry } from "../../src/agents/registry.js";
 import { selectAgentProfile } from "../../src/agents/selector.js";
 import {
+  decideAutoContinuationRoute,
+} from "../../src/composition/auto-route-handoff.js";
+import {
   AUTO_SUBSCRIPTION_PORTFOLIO_ENV,
   buildAutoSubscriptionExecutionCandidates,
   buildAutoSubscriptionProviderConfigurations,
@@ -27,13 +30,14 @@ const BASE_CAPABILITIES = [
 
 function resolvedPolicy(
   effort: "low" | "medium" = "medium",
+  category: "code" | "review" | "architecture" = "code",
 ): AgentPolicyResolution {
   return {
     policyId: "auto-test-policy",
     mode: "execute",
     status: "resolved",
     requirements: {
-      category: "code",
+      category,
       mode: "execute",
       requiredCapabilities: ["code_edit", "shell_exec"],
       requiredTools: ["filesystem_read", "filesystem_write", "shell_exec"],
@@ -396,6 +400,130 @@ test("AUTO production builder contains no hardcoded commercial model catalog", (
     "utf8",
   );
   assert.doesNotMatch(source, /gpt-|claude-(?:haiku|sonnet|opus|fable)/i);
+});
+
+test("AUTO continuation selects ChatGPT handoff for governed review work without inventing a model or quota", () => {
+  const route = decideAutoContinuationRoute(
+    resolvedPolicy("medium", "review"),
+    {
+      outcome: "selected",
+      selected: {
+        profileId: "configured.codex.observed-codex",
+        runtime: "codex",
+        provider: "openai",
+        model: "runtime-observed-openai-model",
+        effort: "medium",
+        executionPath: "direct_cli",
+        basis: "smallest_capable",
+        efficiencyScore: null,
+        quotaWindowLabel: null,
+        expectedValuePercent: null,
+        expectedQuotaConsumedPercent: null,
+        sampleSize: null,
+      },
+      notSelected: [],
+    },
+  );
+
+  assert.deepEqual(route, {
+    profileId: "interactive.chatgpt",
+    runtime: "chatgpt",
+    provider: "openai",
+    model: null,
+    effort: "medium",
+    executionPath: "chatgpt_handoff",
+    basis: "governed_interactive_category",
+    efficiencyScore: null,
+    quotaWindowLabel: null,
+    expectedValuePercent: null,
+    expectedQuotaConsumedPercent: null,
+    sampleSize: null,
+  });
+});
+
+test("AUTO can select Claude direct CLI when Claude is the safe observed subscription route", () => {
+  const portfolio: AutoSubscriptionModelPortfolio = {
+    claude_code: [
+      {
+        id: "claude-safe",
+        model: "runtime-observed-claude",
+        economicTier: "standard",
+        availability: "available",
+        quota: { state: "available", source: "runtime_report" },
+        capabilities: [...BASE_CAPABILITIES, "long_context"],
+      },
+    ],
+    codex: [
+      {
+        id: "codex-unavailable",
+        model: "runtime-observed-openai",
+        economicTier: "standard",
+        availability: "unavailable",
+        quota: { state: "unknown", source: "unavailable" },
+        capabilities: [...BASE_CAPABILITIES, "long_context"],
+      },
+    ],
+  };
+  const decision = decideAutoSubscriptionRoute(portfolio, resolvedPolicy(), []);
+  assert.equal(decision.outcome, "selected");
+  assert.equal(decision.selected?.runtime, "claude_code");
+  assert.equal(decision.selected?.executionPath, "direct_cli");
+});
+
+test("AUTO continuation keeps a safe direct CLI route for bounded code work", () => {
+  const selected = {
+    profileId: "configured.codex.observed-codex",
+    runtime: "codex" as const,
+    provider: "openai" as const,
+    model: "runtime-observed-openai-model",
+    effort: "medium" as const,
+    executionPath: "direct_cli",
+    basis: "smallest_capable" as const,
+    efficiencyScore: null,
+    quotaWindowLabel: null,
+    expectedValuePercent: null,
+    expectedQuotaConsumedPercent: null,
+    sampleSize: null,
+  };
+  const route = decideAutoContinuationRoute(resolvedPolicy(), {
+    outcome: "selected",
+    selected,
+    notSelected: [],
+  });
+  assert.deepEqual(route, selected);
+});
+
+test("AUTO continuation falls back to ChatGPT when no autonomous route survives hard gates", () => {
+  const route = decideAutoContinuationRoute(resolvedPolicy("medium", "code"), {
+    outcome: "no_match",
+    selected: null,
+    notSelected: [
+      {
+        profileId: "configured.codex.observed-codex",
+        runtime: "codex",
+        provider: "openai",
+        model: "runtime-observed-openai-model",
+        executionPath: "direct_cli",
+        reason: "hard_gate",
+        detail: "profile quota is not proven available (source: unavailable)",
+      },
+    ],
+  });
+  assert.equal(route?.executionPath, "chatgpt_handoff");
+  assert.equal(route?.basis, "no_safe_autonomous_route");
+});
+
+test("AUTO continuation invents no route when policy resolution is not resolved", () => {
+  const unresolved: AgentPolicyResolution = {
+    ...resolvedPolicy(),
+    status: "no_compatible_agent",
+  };
+  const route = decideAutoContinuationRoute(unresolved, {
+    outcome: "no_match",
+    selected: null,
+    notSelected: [],
+  });
+  assert.equal(route, null);
 });
 
 test("AUTO policy selects only admissible observed profiles and keeps provider preference secondary to hard gates", () => {
