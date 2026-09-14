@@ -22,7 +22,7 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function buildPrompt(plan: LoopExecutionPlan): string {
+export function buildClaudeCodeExecutionPrompt(plan: LoopExecutionPlan): string {
   const files = plan.contextPackage.files.map((file) => file.path).join(", ");
   return [
     "Implement exactly one reviewed Loop Engine roadmap candidate in the current repository.",
@@ -244,7 +244,7 @@ export function createClaudeCodeCliLoopExecutor(
       String(maxTurns),
       "--model",
       plan.model,
-      buildPrompt(plan),
+      buildClaudeCodeExecutionPrompt(plan),
     ];
     const result = await runProcess(
       options.executable.trim(),
