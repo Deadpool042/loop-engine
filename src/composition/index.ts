@@ -77,3 +77,11 @@ export {
   createOpenClawNativeLoopExecutor,
   type OpenClawNativeLoopExecutorOptions,
 } from "../loop/openclaw-native-executor.js";
+
+export {
+  createOpenClawAcpClaudeLoopExecutor,
+  type OpenClawAcpClaudeControl,
+  type OpenClawAcpClaudeFailureKind,
+  type OpenClawAcpClaudeLoopExecutorOptions,
+  type OpenClawAcpClaudeSession,
+} from "../loop/openclaw-acp-claude-executor.js";
