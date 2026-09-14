@@ -53,14 +53,23 @@ Faire de ChatGPT une option réelle du choix AUTO sans le transformer en executo
 
 ### Checklist
 
-- [ ] Ajouter un candidat de continuation `chatgpt`/`chatgpt_handoff` distinct des executors autonomes.
-- [ ] Réutiliser le selector/policy existant ; aucun LLM ne choisit le LLM.
-- [ ] Définir mécaniquement les catégories/situations où l’orchestration interactive est admissible (audit, review, gouvernance/coordination, ou absence de route autonome sûre).
-- [ ] Conserver Codex/Claude pour les modifications autonomes bornées quand une route directe admissible existe.
-- [ ] Exposer `runtime/provider/model/effort/executionPath` et les raisons `notSelected` sans inventer de quota ChatGPT séparé.
-- [ ] Interdire à la route ChatGPT de déclencher `runDurableAutoSubscriptionPublish` comme si elle était un provider.
-- [ ] Conserver les routes natives OpenClaw Codex/Claude non exécutables tant que la parité reste négative.
-- [ ] Tests adversariaux : ChatGPT sélectionné, Codex sélectionné, Claude sélectionné, quota inconnu, aucun candidat sûr.
+- [x] Ajouter un candidat de continuation `chatgpt`/`chatgpt_handoff` distinct des executors autonomes.
+- [x] Réutiliser le selector/policy existant ; aucun LLM ne choisit le LLM.
+- [x] Définir mécaniquement les catégories/situations où l’orchestration interactive est admissible : `review`/`architecture` sont interactifs par préférence gouvernée ; les autres catégories basculent sur ChatGPT uniquement lorsqu’aucune route autonome sûre ne survit aux hard gates.
+- [x] Conserver Codex/Claude pour les modifications autonomes bornées quand une route directe admissible existe.
+- [x] Exposer `runtime/provider/model/effort/executionPath` et les raisons `notSelected` sans inventer de quota ChatGPT séparé ; le modèle ChatGPT reste explicitement `null` faute de preuve runtime canonique.
+- [x] Interdire à la route ChatGPT de déclencher `runDurableAutoSubscriptionPublish` comme si elle était un provider : `chatgpt_handoff` reste hors du portfolio provider/executor et ne possède aucun binding durable.
+- [x] Conserver les routes natives OpenClaw Codex/Claude non exécutables tant que la parité reste négative.
+- [x] Tests adversariaux : ChatGPT sélectionné, Codex sélectionné, Claude sélectionné, quota inconnu, aucun candidat sûr.
+
+### Validation V55.1
+
+- `chatgpt_handoff` est une route de continuation distincte, hors portfolio provider/executor ;
+- `review` et `architecture` privilégient mécaniquement l’orchestration interactive ; les autres catégories conservent `direct_cli` lorsqu’une route Codex/Claude sûre existe et basculent sur ChatGPT uniquement si aucune route autonome sûre ne survit aux hard gates ;
+- ChatGPT expose `runtime=chatgpt`, `provider=openai`, `model=null`, l’effort issu de la policy et `executionPath=chatgpt_handoff` sans quota inventé ;
+- les bindings OpenClaw natifs restent non promus/non exécutables ;
+- tests AUTO ciblés 14/14, `typecheck` vert, `json-check` vert ;
+- burn-in réel `project_handoff(loop-engine)` : décision `interactive.chatgpt` / `chatgpt_handoff`, quota et impact explicitement `chatgpt_interactive_quota_not_modeled`.
 
 ### Critère de fin
 
