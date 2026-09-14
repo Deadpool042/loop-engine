@@ -330,39 +330,6 @@ test("genuine active-candidate overflow remains deep and fail-closed before prov
   }
 });
 
-test("30. the real loop-engine repository uses completed-roadmap routing with a fully accounted estimate", () => {
-  // Mirrors the `loop-engine` entry in projects.yaml (path: .) and validates
-  // invariants of the current repository state. V52 is complete, so the
-  // completed-roadmap route uses the economy profile.
-  const loopEngineProject: ProjectConfig = {
-    name: "loop-engine",
-    path: process.cwd(),
-    type: "node-cli",
-    required_docs: ["README.md", "docs/architecture/project-intelligence.md"],
-    validation: ["pnpm run validate"],
-    requires_git: false,
-    planning: {
-      mode: "roadmap",
-      objective_source: "docs/architecture/final-objective.md",
-    },
-    roadmap: ["docs/roadmap/loop-engine.md"],
-  };
-  const estimate = generateRoadmapProposalEstimateReport(loopEngineProject);
-  assert.equal(estimate.estimate.status, "available");
-  if (estimate.estimate.status !== "available") return;
-  assert.equal(estimate.estimate.profile, "economy");
-  assert.equal(estimate.estimate.model, "claude-haiku-4-5");
-
-  const schemaJson = JSON.stringify(
-    toAnthropicOutputSchema(ROADMAP_PROPOSAL_OUTPUT_SCHEMA),
-  );
-  const promptPlusSchema =
-    estimateTokenCount(ROADMAP_PROPOSAL_SYSTEM_PROMPT) +
-    estimateTokenCount(schemaJson);
-  assert.ok(estimate.estimate.estimatedInputTokens >= promptPlusSchema);
-  assert.ok(estimate.estimate.estimatedOutputTokens > 0);
-});
-
 test("31. estimatedCostUsd uses the corrected estimatedInputTokens, not the old under-count", () => {
   const fixture = setupProject({
     "objective.md": "Objective.",

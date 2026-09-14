@@ -29,6 +29,8 @@ Restaurer le raccord réel Development Workspace → OpenClaw Control → Loop E
 - [ ] Ne jamais inventer de pourcentage, modèle, disponibilité ou coût.
 - [ ] Conserver les executors directs Codex/Claude et les garde-fous abonnement existants.
 - [ ] Vérifier qu’un `project_handoff` réel ne retourne plus `auto_portfolio_unavailable` lorsque les preuves sont disponibles.
+- [ ] Supprimer les tests de suite standard qui dépendent de l’état courant du dépôt au lieu d’un invariant stable ; conserver les comportements via fixtures déterministes.
+- [ ] Pendant l’implémentation, exécuter seulement les tests ciblés du contrat modifié ; réserver `pnpm run ci` complet à la gate PR/fin de lot.
 - [ ] Tests/validations DW + OpenClaw Control + Loop Engine verts.
 
 ### Critère de fin
