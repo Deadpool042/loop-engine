@@ -324,7 +324,7 @@ Audit initial : [`../audits/2026-09-14-auto-routing-chatgpt-codex-claude-audit.m
 
 - [x] [P0] V55.0 — Restaurer et fiabiliser le pipeline de preuve AUTO multi-provider : corriger le drift Development Workspace → `auto-route:evidence`, publier Codex + Claude depuis des preuves runtime fraîches et fail-closed, puis démontrer qu’un handoff canonique ne tombe plus sur `auto_portfolio_unavailable` lorsque les sources sont disponibles.
 - [x] [P0] V55.1 — Ajouter ChatGPT comme route interactive gouvernée distincte des executors autonomes, réutiliser le selector/policy existant et exposer explicitement `chatgpt_handoff` ou `direct_cli` sans faux provider ni second routeur.
-- [ ] [P0] V55.2 — Raccorder `Continuer` de bout en bout et qualifier les chemins ChatGPT/Codex/Claude par burn-in réel, avec quotas/evidence/Run History et affichage Cockpit cohérent ; clôturer sans promouvoir les runtimes natifs OpenClaw non qualifiés. [Détail](auto-routing-v55.md)
+- [x] [P0] V55.2 / OC-25.2 — Raccorder `Continuer` de bout en bout avec `chatgpt_handoff`, `direct_cli` et le binding `openclaw_native` positivement qualifié ; conserver Loop Engine comme autorité de sélection, qualifier le runtime OpenClaw/Luna par burn-in et benchmark comparatif, garder Codex/Claude directs en fallback, puis intégrer le correctif d’affinité micro-lot de #319 via la reprise propre #321 sur le `main` post-OC-25.2. Gates finales vertes : OpenClaw Control 56/56 + syntaxe, Loop Engine audit strict 560/560 et CI #321 verte. [Détail](auto-routing-v55.md)
 
 ### Gates V55
 
