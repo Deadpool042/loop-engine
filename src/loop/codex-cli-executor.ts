@@ -215,6 +215,8 @@ export function createCodexCliLoopExecutor(
       `default_permissions="${CODEX_AUTO_PERMISSION_PROFILE_ID}"`,
       "-c",
       'approval_policy="never"',
+      "-c",
+      `model_reasoning_effort="${plan.effort}"`,
       "--model",
       plan.model,
       "--json",
