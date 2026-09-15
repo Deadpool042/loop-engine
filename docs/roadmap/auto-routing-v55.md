@@ -1,16 +1,16 @@
-# V55 — Routage AUTO ChatGPT / Codex / Claude
+# V55 — Routage AUTO ChatGPT / runtimes abonnement
 
-Date : 2026-09-14
+Date : 2026-09-14 — révisé le 2026-09-15 après qualification OC-25.2
 
 ## Objectif
 
-Rendre le choix `Continuer` réellement automatique entre :
+Rendre le choix `Continuer` réellement automatique entre les routes gouvernées qui sont **effectivement qualifiées au moment de la décision** :
 
-- ChatGPT comme orchestrateur interactif principal ;
-- Codex CLI comme executor autonome abonnement ;
-- Claude Code CLI comme executor autonome abonnement ;
+- ChatGPT comme orchestrateur interactif ;
+- OpenClaw natif comme runtime abonnement lorsqu’un binding précis a atteint la parité ;
+- Codex CLI direct et Claude Code CLI comme executors abonnement conservés tant que leur retrait n’est pas justifié par une preuve de parité supérieure.
 
-sans API payante implicite, sans second routeur et sans promouvoir les runtimes natifs OpenClaw Codex/Claude qui n’ont pas atteint la parité.
+Aucune API payante implicite, aucun second routeur, aucun catalogue de modèles réinventé dans Loop Engine. Une qualification négative reste fail-closed ; une qualification positive doit être bornée au runtime/modèle réellement éprouvé.
 
 Audit de départ : [`../audits/2026-09-14-auto-routing-chatgpt-codex-claude-audit.md`](../audits/2026-09-14-auto-routing-chatgpt-codex-claude-audit.md).
 
@@ -75,54 +75,62 @@ Faire de ChatGPT une option réelle du choix AUTO sans le transformer en executo
 
 Le handoff AUTO peut retourner soit `chatgpt_handoff`, soit un `direct_cli` Codex/Claude, avec décision déterministe et explicable.
 
-## V55.2 — Continuer de bout en bout + burn-in
+## V55.2 / OC-25.2 — Continuer + runtime OpenClaw natif qualifié
 
 ### Objectif
 
-Raccorder le choix au CTA `Continuer` et démontrer en conditions réelles que l’orchestrateur utilise la route sélectionnée sans bypass de gouvernance.
+Raccorder `Continuer` au runtime réellement sélectionné tout en réduisant le custom : Loop Engine conserve l’admission, le scope, la policy, la validation et le Run History ; OpenClaw fournit le runtime/model catalog/OAuth lorsqu’un binding natif est positivement qualifié. Codex CLI direct et Claude Code direct restent disponibles tant que leur suppression n’est pas justifiée.
 
-### Livrables
+### Faits de qualification au 15/09/2026
 
-1. Ajouter une couverture ciblée prouvant qu’un lot non `review/architecture` atteint bien la route autonome `smallest_capable` lorsque le quota est frais, sans fallback ChatGPT prématuré.
-2. Vérifier dans cette couverture que le modèle/effort décidés restent ceux du handoff et qu’aucun caller ne peut les substituer.
-3. Mettre à jour la checklist V55.2 et la roadmap principale avec les preuves du burn-in réel.
+- `openclaw` est désormais un troisième binding distinct de `codex` et `claude_code` dans Loop Engine.
+- Tests ciblés de promotion/config native : 38/38 verts ; typecheck vert.
+- Config éphémère couverte : `memory.search.provider=none` et `agentRuntime.id=openclaw` sur le modèle exécuté.
+- Burn-in réel Loop Engine → OpenClaw → Luna : succès dans un dépôt temporaire, un seul fichier autorisé modifié, ~40,4 s sur la première mesure.
+- OpenClaw Control publie un profil `openclaw` natif depuis les surfaces réelles `models status/list`, avec version qualifiée et quota fail-closed ; aucun changement Development Workspace n’est requis pour transporter ce portfolio.
+- OpenClaw 2026.9.4 observe Luna/Terra/Sol/Astra disponibles côté OpenAI ; seul le binding Luna utility est promu dans le portfolio natif à ce stade.
+- `agent exec --fallback` a été qualifié avec primaire inexistant → Terra, puis primaire inexistant → Claude Sonnet 5 CLI. Cela prouve le failover, pas l’escalade de capacité d’une tâche saine.
+- Claude ACPX code reste non qualifié sur 2026.9.4 ; `claude_code` direct reste le fallback code sûr.
+- Les `agent exec` de qualification ne créent pas automatiquement de Task OpenClaw. Aucun TaskFlow miroir n’est ajouté : `project_publish_canonical` + durable execution/Run History Loop Engine restent le ledger canonique.
+- Le CTA OpenClaw Control accepte `openclaw_native` et transporte uniquement projet + candidateId + SHA ; provider/modèle/effort restent décidés dans Loop Engine.
+- Le Cockpit sait afficher explicitement `OpenClaw`.
 
-### Périmètre d’écriture
+### Mesures réelles et décision de préférence
 
-- `src/loop/codex-cli-executor.ts`
-- `src/loop/execute-runner.ts`
-- `tests/loop/codex-cli-executor.test.ts`
-- `tests/loop/execute-runner.test.ts`
-- `tests/composition/auto-subscription-execution.test.ts`
-- `docs/roadmap/auto-routing-v55.md`
-- `docs/roadmap/loop-engine.md`
+Les runs V55.2 Codex/Luna historiques montrent que le dispatch Loop Engine atteint l’étape `executing` environ 0,11–0,14 s après le début du run, tandis que certains providers ont pris environ 203 s et 266 s et que d’autres runs ont atteint 360 s. Ces anciens runs prouvent que l’ack/dispatch n’est pas la source principale de latence, mais ils ne sont pas utilisés comme benchmark comparatif car les tâches différaient.
 
-### Hors périmètre
+Un benchmark temporaire hors CI a ensuite exécuté exactement la même mission mono-fichier, avec Luna et les mêmes garde-fous, cinq fois par runtime :
 
-- tout autre `src/**`
-- nouveau selector, routeur, scheduler, ledger ou stockage de progression ;
-- API payante implicite ;
-- modification des profils/runtime qualifiés hors preuve du burn-in ;
-- modification de production, push, merge ou déploiement par le provider.
+- OpenClaw natif : 15 541 / 15 363 / 35 735 / 16 569 / 17 085 ms ; médiane 16 569 ms ; moyenne 20 059 ms ;
+- Codex CLI direct : 16 486 / 14 930 / 13 528 / 35 132 / 10 082 ms ; médiane 14 930 ms ; moyenne 18 032 ms.
+
+OpenClaw natif n’est donc pas plus rapide sur ce micro-benchmark : il est environ 10 % plus lent, avec une dispersion comparable. La promotion est néanmoins retenue **uniquement comme préférence de runtime sur un tie strict après les hard gates** parce qu’elle réduit la duplication runtime/catalogue/OAuth et prépare la suppression du chemin CLI custom. Funding, tier économique, effort, préférence provider et efficacité mesurée conservent la priorité. Codex/Claude directs restent des fallbacks.
+
+Un `project_handoff(creatyss)` réel après promotion sélectionne `configured.openclaw.openclaw-native-utility` / Luna ; Codex/Luna est conservé comme alternative avec `less_preferred_runtime_than_selected`.
 
 ### Checklist
 
-- [ ] Adapter `roadmap.continue` pour transporter la nouvelle route sans choisir localement le provider.
-- [ ] Pour `chatgpt_handoff`, retourner un handoff canonique consommable par la session ChatGPT, sans exécution provider implicite.
-- [ ] Pour `direct_cli`, conserver projet + candidat + SHA + route exacte et utiliser l’exécution durable Loop Engine existante.
-- [ ] Vérifier que le caller ne peut pas substituer provider/modèle/effort après la décision.
-- [ ] Burn-in réel ChatGPT : lot d’audit/revue traité via DW/Loop Engine avec route interactive.
-- [ ] Burn-in réel Codex : sélection + exécution abonnement bornée + validation/evidence.
-- [ ] Burn-in réel Claude : sélection + exécution abonnement bornée + validation/evidence, seulement si quota frais ; sinon preuve fail-closed explicite.
-- [ ] Vérifier les quotas avant/après lorsqu’ils sont réellement disponibles ; aucune estimation fictive.
-- [ ] Vérifier notification/Run History/candidate ref sans nouveau stockage de progression.
-- [ ] Mettre à jour Cockpit pour afficher clairement `ChatGPT`, `Codex` ou `Claude` sélectionné et pourquoi.
-- [ ] Audit final : aucune API payante implicite, aucun second router, aucun shell libre, aucun runtime natif non qualifié promu.
-- [ ] Validation/CI vertes dans chaque dépôt touché et worktrees `main` propres.
+- [x] Promouvoir le binding `openclaw` séparément de `codex`/`claude_code` sans toucher à #319.
+- [x] Corriger les assertions historiques et couvrir la config éphémère native.
+- [x] Raccorder l’evidence native OpenClaw au portfolio AUTO, version/modèle/quota fail-closed.
+- [x] Vérifier que Development Workspace transporte le nouveau binding sans logique de sélection supplémentaire.
+- [x] Qualifier un burn-in réel OpenClaw/Luna sous les garde-fous Loop Engine.
+- [x] Qualifier le mécanisme de fallback natif vers Terra et le fallback texte vers Claude CLI.
+- [x] Maintenir distincts failover provider/modèle et `model-escalation` de capacité.
+- [x] Raccorder `roadmap.continue` à `openclaw_native` sans laisser l’UI substituer provider/modèle/effort.
+- [x] Afficher `OpenClaw` explicitement dans le Cockpit.
+- [x] Évaluer Tasks/TaskFlow et refuser un ledger miroir qui ne lance pas l’exécution.
+- [x] Conserver Claude Code direct tant qu’ACPX ne respecte pas les mêmes bornes de sécurité.
+- [x] Obtenir au moins cinq mesures comparables du runtime natif avant de modifier le tie-break `codex` vs `openclaw`.
+- [x] Comparer ces mesures à cinq runs Codex sur la même mission sans confondre temps de dispatch, temps provider et temps de validation.
+- [x] Décider le tie-break AUTO sur preuves : préférence OpenClaw uniquement à égalité après hard gates, avec Codex/Claude directs conservés en fallback.
+- [x] Nettoyer toutes les probes temporaires et conserver uniquement tests/evidence/docs durables.
+- [ ] Rejouer les validations finales Loop Engine + OpenClaw Control.
+- [ ] Décider le sort de V55.2 / #319 seulement après ces gates.
 
 ### Critère de fin
 
-Un clic/une action `Continuer` obtient une décision AUTO fiable entre ChatGPT, Codex et Claude, puis emprunte le chemin correspondant sans que l’utilisateur choisisse manuellement le provider. Les limites de la route ChatGPT interactive sont affichées honnêtement.
+`Continuer` peut emprunter `chatgpt_handoff`, `direct_cli` ou `openclaw_native` selon la décision AUTO, sans bypass de gouvernance et sans second ledger. Le runtime OpenClaw n’est préféré à Codex sur un tie que si la qualification réelle le justifie ; les chemins directs restent disponibles tant que la parité/sécurité native n’est pas suffisante.
 
 ## Gates V55
 

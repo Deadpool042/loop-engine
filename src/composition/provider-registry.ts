@@ -4,18 +4,21 @@ import {
 } from "../agents/registry.js";
 import type {
   AgentAvailabilityState,
+  AgentBudget,
   AgentCapability,
   AgentEconomicTier,
   AgentEffort,
   AgentFundingMode,
   AgentPermission,
   AgentProfile,
+  AgentProvider,
   AgentQuotaSnapshot,
 } from "../agents/types.js";
 import type { LoopExecutor } from "../core/index.js";
 import { createClaudeCodeCliLoopExecutor } from "../loop/claude-code-cli-executor.js";
 import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";
-export const LOOP_PROVIDER_IDS = ["codex", "claude_code"] as const;
+import { createOpenClawNativeLoopExecutor } from "../loop/openclaw-native-executor.js";
+export const LOOP_PROVIDER_IDS = ["codex", "claude_code", "openclaw"] as const;
 export type LoopProviderId = (typeof LOOP_PROVIDER_IDS)[number];
 
 // This is the conservative capability envelope of the concrete Loop Engine
@@ -33,10 +36,13 @@ const EXECUTABLE_PROVIDER_PERMISSIONS: readonly AgentPermission[] =
 export type LoopProviderModelProfileConfiguration = Readonly<{
   id: string;
   model: string;
+  provider?: AgentProvider;
   economicTier?: AgentEconomicTier;
   availability?: AgentAvailabilityState;
   fundingMode?: AgentFundingMode;
   quota?: AgentQuotaSnapshot;
+  permissions?: readonly AgentPermission[];
+  budget?: AgentBudget;
   // Ranking baseline only. Invocation effort is still resolved by policy.
   effort?: AgentEffort;
   // Capabilities are explicit configuration evidence, not inferred from the
@@ -65,9 +71,20 @@ export type ClaudeCodeProviderConfiguration = Readonly<{
   maxTurns?: number;
 }>;
 
+export type OpenClawProviderConfiguration = Readonly<{
+  id: "openclaw";
+  executable: string;
+  model?: string;
+  profiles?: readonly LoopProviderModelProfileConfiguration[];
+  fundingMode?: AgentFundingMode;
+  quota?: AgentQuotaSnapshot;
+  timeoutMs?: number;
+}>;
+
 export type LoopProviderConfiguration =
   | CodexProviderConfiguration
-  | ClaudeCodeProviderConfiguration;
+  | ClaudeCodeProviderConfiguration
+  | OpenClawProviderConfiguration;
 
 export type LoopProviderAssembly = Readonly<{
   id: LoopProviderId;
@@ -138,6 +155,15 @@ function validateConfiguredProfiles(
       throw new TypeError(`Duplicate configured provider profile id: ${id}`);
     }
     ids.add(id);
+    if (
+      configuration.id === "openclaw" &&
+      profile.provider !== undefined &&
+      profile.provider !== "openai"
+    ) {
+      throw new TypeError(
+        `Configured OpenClaw profile ${id} must use provider openai.`,
+      );
+    }
 
     const missingBaseCapabilities = EXECUTABLE_PROVIDER_CAPABILITIES.filter(
       (capability) => !profile.capabilities.includes(capability),
@@ -155,9 +181,8 @@ function validateConfiguredProfiles(
 function configuredProfiles(
   configuration: LoopProviderConfiguration,
 ): readonly AgentProfile[] {
-  const isCodex = configuration.id === "codex";
-  const runtime = isCodex ? "codex" : "claude_code";
-  const provider = isCodex ? "openai" : "anthropic";
+  const runtime = configuration.id;
+  const provider = configuration.id === "claude_code" ? "anthropic" : "openai";
   const configured = validateConfiguredProfiles(configuration);
 
   if (configured !== null) {
@@ -166,7 +191,7 @@ function configuredProfiles(
         Object.freeze({
           id: `configured.${configuration.id}.${profile.id.trim()}`,
           runtime,
-          provider,
+          provider: profile.provider ?? provider,
           model: profile.model.trim(),
           effort: profile.effort ?? "low",
           ...(profile.economicTier === undefined
@@ -182,8 +207,14 @@ function configuredProfiles(
           capabilities: Object.freeze([
             ...new Set(profile.capabilities),
           ]),
-          permissions: EXECUTABLE_PROVIDER_PERMISSIONS,
-          budget: configuredBudget(configuration),
+          permissions:
+            profile.permissions === undefined
+              ? EXECUTABLE_PROVIDER_PERMISSIONS
+              : Object.freeze([...new Set(profile.permissions)]),
+          budget:
+            profile.budget === undefined
+              ? configuredBudget(configuration)
+              : Object.freeze({ ...profile.budget }),
         }),
       ),
     );
@@ -262,6 +293,28 @@ export const claudeCodeProviderRegistration: LoopProviderRegistration =
     },
   });
 
+export const openClawProviderRegistration: LoopProviderRegistration =
+  Object.freeze({
+    id: "openclaw",
+    assemble(configuration): LoopProviderAssembly {
+      if (configuration.id !== "openclaw") {
+        throw new TypeError(
+          "OpenClaw registration received another provider configuration.",
+        );
+      }
+      const profiles = configuredProfiles(configuration);
+      const executor = createOpenClawNativeLoopExecutor({
+        executable: configuration.executable,
+        ...(configuration.timeoutMs ? { timeoutMs: configuration.timeoutMs } : {}),
+      });
+      return Object.freeze({
+        id: "openclaw",
+        executor,
+        agentRegistry: createAgentRegistry(profiles),
+      });
+    },
+  });
+
 export function createLoopProviderRegistry(
   registrations: readonly LoopProviderRegistration[],
 ): LoopProviderRegistry {
@@ -278,6 +331,7 @@ export function createLoopProviderRegistry(
 export const defaultLoopProviderRegistry = createLoopProviderRegistry([
   codexProviderRegistration,
   claudeCodeProviderRegistration,
+  openClawProviderRegistration,
 ]);
 
 export function assembleLoopProvider(

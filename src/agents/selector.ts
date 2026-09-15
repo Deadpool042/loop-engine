@@ -29,6 +29,7 @@ export type AgentSelectionRequest = Readonly<{
   budgetCeiling?: AgentBudgetCeiling;
   allowedProviders?: readonly AgentProvider[];
   preferredProviders?: readonly AgentProvider[];
+  preferredRuntimes?: readonly AgentRuntime[];
   allowedRuntimes?: readonly AgentRuntime[];
   allowedFundingModes?: readonly AgentFundingMode[];
   /** Require explicit usable quota evidence before a profile can compete. */
@@ -56,6 +57,7 @@ export type AgentNonSelection = Readonly<{
     | "higher_economic_tier_than_selected"
     | "economic_tier_unranked"
     | "less_preferred_provider_than_selected"
+    | "less_preferred_runtime_than_selected"
     | "higher_effort_than_selected"
     | "frontier_not_required"
     | "deterministic_tiebreak";
@@ -263,10 +265,20 @@ function providerPreferenceRank(
   return index < 0 ? preferredProviders.length : index;
 }
 
+function runtimePreferenceRank(
+  profile: AgentProfile,
+  preferredRuntimes: readonly AgentRuntime[] | undefined,
+): number {
+  if (preferredRuntimes === undefined) return 0;
+  const index = preferredRuntimes.indexOf(profile.runtime);
+  return index < 0 ? preferredRuntimes.length : index;
+}
+
 function compareEligibleProfiles(
   a: AgentProfile,
   b: AgentProfile,
   preferredProviders?: readonly AgentProvider[],
+  preferredRuntimes?: readonly AgentRuntime[],
 ): number {
   return (
     fundingModeRank(a) - fundingModeRank(b) ||
@@ -274,6 +286,8 @@ function compareEligibleProfiles(
     compareAgentEffort(a.effort, b.effort) ||
     providerPreferenceRank(a, preferredProviders) -
       providerPreferenceRank(b, preferredProviders) ||
+    runtimePreferenceRank(a, preferredRuntimes) -
+      runtimePreferenceRank(b, preferredRuntimes) ||
     a.id.localeCompare(b.id)
   );
 }
@@ -316,11 +330,12 @@ function applyFrontierGate(
 export function pickSmallestCapable(
   profiles: readonly AgentProfile[],
   preferredProviders?: readonly AgentProvider[],
+  preferredRuntimes?: readonly AgentRuntime[],
 ): AgentProfile | null {
   if (profiles.length === 0) return null;
 
   return [...profiles].sort((a, b) =>
-    compareEligibleProfiles(a, b, preferredProviders),
+    compareEligibleProfiles(a, b, preferredProviders, preferredRuntimes),
   )[0] ?? null;
 }
 
@@ -408,6 +423,7 @@ export function rankAgentProfilesByEfficiency(
       leftProfile,
       rightProfile,
       request.preferredProviders,
+      request.preferredRuntimes,
     );
   });
 
@@ -415,7 +431,12 @@ export function rankAgentProfilesByEfficiency(
   const unrankedCompetitive = frontierGate.competitive
     .filter((profile) => !rankedIds.has(profile.id))
     .sort((left, right) =>
-      compareEligibleProfiles(left, right, request.preferredProviders),
+      compareEligibleProfiles(
+        left,
+        right,
+        request.preferredProviders,
+        request.preferredRuntimes,
+      ),
     )
     .map((profile) => {
       const bucket = signalBuckets.get(profile.id) ?? [];
@@ -472,6 +493,7 @@ export function selectAgentProfile(
   const selected = pickSmallestCapable(
     frontierGate.competitive,
     request.preferredProviders,
+    request.preferredRuntimes,
   );
   if (!selected) return { outcome: "no_match", rejected };
   const heldBackFrontierIds = new Set(
@@ -484,6 +506,10 @@ export function selectAgentProfile(
     selected,
     request.preferredProviders,
   );
+  const selectedRuntimePreferenceRank = runtimePreferenceRank(
+    selected,
+    request.preferredRuntimes,
+  );
   const notSelected: AgentNonSelection[] = eligible
     .filter((profile) => profile.id !== selected.id)
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -493,6 +519,10 @@ export function selectAgentProfile(
       const profileProviderPreferenceRank = providerPreferenceRank(
         profile,
         request.preferredProviders,
+      );
+      const profileRuntimePreferenceRank = runtimePreferenceRank(
+        profile,
+        request.preferredRuntimes,
       );
       let reason: AgentNonSelection["reason"];
 
@@ -513,6 +543,10 @@ export function selectAgentProfile(
         profileProviderPreferenceRank > selectedProviderPreferenceRank
       ) {
         reason = "less_preferred_provider_than_selected";
+      } else if (
+        profileRuntimePreferenceRank > selectedRuntimePreferenceRank
+      ) {
+        reason = "less_preferred_runtime_than_selected";
       } else {
         reason = "deterministic_tiebreak";
       }

@@ -58,7 +58,7 @@ export type AutoSubscriptionExecutionCandidate = Readonly<{
   profile: AgentProfile;
   executionPath: "direct_cli" | "openclaw_native";
   executableNow: boolean;
-  reason: "direct_cli_binding_configured" | "openclaw_native_binding_not_yet_promoted";
+  reason: "direct_cli_binding_configured" | "openclaw_native_binding_configured";
 }>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -316,73 +316,57 @@ function asConfiguredProfiles(
   );
 }
 
-function asOpenClawAgentProfile(
-  profile: AutoSubscriptionNativeOpenClawProfile,
-): AgentProfile {
-  return Object.freeze({
-    id: `configured.openclaw.${profile.id}`,
-    runtime: "openclaw" as const,
-    provider: profile.provider,
-    model: profile.model,
-    effort: profile.effort ?? "low",
-    ...(profile.economicTier === undefined
-      ? {}
-      : { economicTier: profile.economicTier }),
-    availability: profile.availability,
-    fundingMode: "included_subscription" as const,
-    quota: Object.freeze({ ...profile.quota }),
-    capabilities: Object.freeze([...profile.capabilities]),
-    permissions: Object.freeze([...profile.permissions]),
-    budget: Object.freeze({ ...profile.budget }),
-  });
+function asOpenClawConfiguredProfiles(
+  profiles: readonly AutoSubscriptionNativeOpenClawProfile[],
+): readonly LoopProviderModelProfileConfiguration[] {
+  return Object.freeze(
+    profiles.map((profile) =>
+      Object.freeze({
+        id: profile.id,
+        model: profile.model,
+        provider: profile.provider,
+        ...(profile.economicTier === undefined
+          ? {}
+          : { economicTier: profile.economicTier }),
+        availability: profile.availability,
+        fundingMode: "included_subscription" as const,
+        quota: Object.freeze({ ...profile.quota }),
+        ...(profile.effort === undefined ? {} : { effort: profile.effort }),
+        capabilities: Object.freeze([...profile.capabilities]),
+        permissions: Object.freeze([...profile.permissions]),
+        budget: Object.freeze({ ...profile.budget }),
+      }),
+    ),
+  );
 }
 
 /**
- * AUTO routing candidates are broader than the currently executable bindings.
- * Direct CLI candidates are executable through the existing provider assembly.
- * OpenClaw-native candidates are represented explicitly by runtime identity but
- * remain non-executable until a separately qualified native binding replaces
- * the deterministic OpenClaw runtime stub.
+ * Builds the executable subscription runtime set from externally observed
+ * evidence. OpenClaw-native remains a distinct runtime identity; it is not
+ * collapsed into Codex merely because both use OpenAI subscription auth.
  */
 export function buildAutoSubscriptionExecutionCandidates(
   portfolio: AutoSubscriptionModelPortfolio,
 ): readonly AutoSubscriptionExecutionCandidate[] {
-  const candidates: AutoSubscriptionExecutionCandidate[] = [];
-  if (portfolio.codex !== undefined || portfolio.claude_code !== undefined) {
-    const directConfigurations = buildAutoSubscriptionProviderConfigurations({
-      ...(portfolio.codex === undefined ? {} : { codex: portfolio.codex }),
-      ...(portfolio.claude_code === undefined
-        ? {}
-        : { claude_code: portfolio.claude_code }),
-    });
-    const assemblies = assembleLoopProviders(
-      defaultLoopProviderRegistry,
-      directConfigurations,
-    );
-    for (const profile of assemblies.flatMap((assembly) => [
-      ...assembly.agentRegistry.profiles,
-    ])) {
-      candidates.push(
-        Object.freeze({
-          profile,
-          executionPath: "direct_cli" as const,
-          executableNow: true,
-          reason: "direct_cli_binding_configured" as const,
-        }),
-      );
-    }
-  }
-
-  for (const profile of portfolio.openclaw ?? []) {
-    candidates.push(
-      Object.freeze({
-        profile: asOpenClawAgentProfile(profile),
-        executionPath: "openclaw_native" as const,
-        executableNow: false,
-        reason: "openclaw_native_binding_not_yet_promoted" as const,
-      }),
-    );
-  }
+  const assemblies = assembleLoopProviders(
+    defaultLoopProviderRegistry,
+    buildAutoSubscriptionProviderConfigurations(portfolio),
+  );
+  const candidates = assemblies.flatMap((assembly) =>
+    assembly.agentRegistry.profiles.map((profile) => {
+      const openClawNative = profile.runtime === "openclaw";
+      return Object.freeze({
+        profile,
+        executionPath: openClawNative
+          ? ("openclaw_native" as const)
+          : ("direct_cli" as const),
+        executableNow: true,
+        reason: openClawNative
+          ? ("openclaw_native_binding_configured" as const)
+          : ("direct_cli_binding_configured" as const),
+      });
+    }),
+  );
 
   return Object.freeze(
     candidates.sort((left, right) =>
@@ -413,6 +397,9 @@ export function decideAutoSubscriptionRoute(
     ),
     request: Object.freeze({
       ...policy.selectionRequest,
+      preferredRuntimes:
+        policy.selectionRequest.preferredRuntimes ??
+        Object.freeze(["openclaw", "codex", "claude_code"] as const),
       requireKnownQuota: true,
     }),
     effort: policy.requirements.minimumEffort,
@@ -449,6 +436,16 @@ export function buildAutoSubscriptionProviderConfigurations(
         executable: "codex",
         timeoutMs: 360_000,
         profiles: asConfiguredProfiles(portfolio.codex),
+      }),
+    );
+  }
+  if (portfolio.openclaw !== undefined) {
+    configurations.push(
+      Object.freeze({
+        id: "openclaw" as const,
+        executable: "openclaw",
+        timeoutMs: 360_000,
+        profiles: asOpenClawConfiguredProfiles(portfolio.openclaw),
       }),
     );
   }

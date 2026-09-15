@@ -235,15 +235,14 @@ test("AUTO represents OpenClaw native as a distinct non-CLI execution candidate"
         provider: "openai",
         model: "runtime-observed-openclaw-model",
         executionPath: "openclaw_native",
-        executableNow: false,
-        reason: "openclaw_native_binding_not_yet_promoted",
+        executableNow: true,
+        reason: "openclaw_native_binding_configured",
       },
     ],
   );
-  assert.throws(
-    () => buildAutoSubscriptionProviderConfigurations(portfolio),
-    /produced no provider configuration/,
-  );
+  const [configuration] = buildAutoSubscriptionProviderConfigurations(portfolio);
+  assert.equal(configuration?.id, "openclaw");
+  assert.equal(configuration?.executable, "openclaw");
 });
 
 test("AUTO candidate portfolio can compare direct CLI and OpenClaw runtimes without collapsing their identities", () => {
@@ -286,7 +285,65 @@ test("AUTO candidate portfolio can compare direct CLI and OpenClaw runtimes with
     })),
     [
       { runtime: "codex", path: "direct_cli", executableNow: true },
-      { runtime: "openclaw", path: "openclaw_native", executableNow: false },
+      { runtime: "openclaw", path: "openclaw_native", executableNow: true },
+    ],
+  );
+});
+
+test("AUTO prefers qualified OpenClaw native over Codex only on an otherwise equal smallest-capable tie", () => {
+  const portfolio = parseAutoSubscriptionModelPortfolio({
+    codex: [
+      {
+        id: "same-capability-codex",
+        model: "same-luna-model",
+        economicTier: "economy",
+        availability: "available",
+        quota: { state: "available", source: "runtime_report" },
+        capabilities: BASE_CAPABILITIES,
+      },
+    ],
+    openclaw: [
+      {
+        id: "same-capability-openclaw",
+        provider: "openai",
+        model: "same-luna-model",
+        economicTier: "economy",
+        availability: "available",
+        quota: { state: "available", source: "runtime_report" },
+        capabilities: BASE_CAPABILITIES,
+        permissions: ["read_only", "write_worktree", "shell_exec"],
+        budget: {
+          maxTokens: null,
+          maxCostUsd: null,
+          maxDurationMs: 360_000,
+          maxCalls: 1,
+          maxRepairs: 1,
+        },
+      },
+    ],
+  });
+
+  const decision = decideAutoSubscriptionRoute(
+    portfolio,
+    resolvedPolicy("low"),
+    [],
+  );
+
+  assert.equal(decision.outcome, "selected");
+  assert.equal(decision.selected?.runtime, "openclaw");
+  assert.equal(decision.selected?.executionPath, "openclaw_native");
+  assert.deepEqual(
+    decision.notSelected.map((candidate) => ({
+      runtime: candidate.runtime,
+      reason: candidate.reason,
+      detail: candidate.detail,
+    })),
+    [
+      {
+        runtime: "codex",
+        reason: "lower_preference",
+        detail: "less_preferred_runtime_than_selected",
+      },
     ],
   );
 });

@@ -11,7 +11,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
 
-import { createOpenClawNativeLoopExecutor } from "../../src/loop/openclaw-native-executor.js";
+import {
+  buildOpenClawNativeExecConfig,
+  createOpenClawNativeLoopExecutor,
+} from "../../src/loop/openclaw-native-executor.js";
 import type { LoopExecutionPlan } from "../../src/loop/execution-plan.js";
 
 function setupCleanWorktree(): {
@@ -144,6 +147,25 @@ function clearFakeEnv(): void {
 }
 
 describe("createOpenClawNativeLoopExecutor", () => {
+  it("builds the bounded ephemeral config with memory search disabled and agentRuntime=openclaw", () => {
+    const config = JSON.parse(
+      buildOpenClawNativeExecConfig("openai/gpt-5.6-sol"),
+    ) as {
+      memory: { search: { provider: string } };
+      agents: {
+        defaults: {
+          models: Record<string, { agentRuntime: { id: string } }>;
+        };
+      };
+    };
+
+    assert.deepEqual(config.memory, { search: { provider: "none" } });
+    assert.deepEqual(
+      config.agents.defaults.models["openai/gpt-5.6-sol"]?.agentRuntime,
+      { id: "openclaw" },
+    );
+  });
+
   it("requires an openclaw executable, absolute config path and valid limits", () => {
     assert.throws(
       () => createOpenClawNativeLoopExecutor({ executable: "/usr/bin/node", configPath: "/tmp/x.json" }),
@@ -151,7 +173,7 @@ describe("createOpenClawNativeLoopExecutor", () => {
     );
     assert.throws(
       () => createOpenClawNativeLoopExecutor({ executable: "openclaw", configPath: "relative.json" }),
-      /absolute config path/,
+      /config path must be absolute/,
     );
     assert.throws(
       () => createOpenClawNativeLoopExecutor({ executable: "openclaw", configPath: "/tmp/x.json", timeoutMs: 0 }),
