@@ -174,6 +174,8 @@ describe("createCodexCliLoopExecutor", () => {
         'default_permissions="loop_engine_auto"',
         "-c",
         'approval_policy="never"',
+        "-c",
+        'model_reasoning_effort="low"',
         "--model",
         "gpt-5.6-terra",
         "--json",
@@ -352,6 +354,7 @@ describe("createCodexCliLoopExecutor", () => {
 
       assert.equal(result.status, "completed");
       const args = JSON.parse(readFileSync(captureArgs, "utf8")) as string[];
+      assert.equal(args.includes('model_reasoning_effort="medium"'), true);
       const prompt = args.at(-1) ?? "";
       assert.match(
         prompt,

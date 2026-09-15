@@ -89,13 +89,15 @@ Raccorder le choix au CTA `Continuer` et démontrer en conditions réelles que l
 
 ### Périmètre d’écriture
 
-- `tests/composition/auto-route-handoff.test.ts`
+- `src/loop/codex-cli-executor.ts`
+- `tests/loop/codex-cli-executor.test.ts`
+- `tests/composition/auto-subscription-execution.test.ts`
 - `docs/roadmap/auto-routing-v55.md`
 - `docs/roadmap/loop-engine.md`
 
 ### Hors périmètre
 
-- `src/**`
+- tout autre `src/**`
 - nouveau selector, routeur, scheduler, ledger ou stockage de progression ;
 - API payante implicite ;
 - modification des profils/runtime qualifiés hors preuve du burn-in ;
