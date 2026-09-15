@@ -69,9 +69,11 @@ test("durable AUTO publish replays the same terminal result without a second exe
   try {
     let publishCalls = 0;
     let historyCalls = 0;
+    let observedMaxModelAttempts: number | null = null;
     const application = {
-      async runLoopPublish() {
+      async runLoopPublish(_projectName: string, options: { maxModelAttempts?: number }) {
         publishCalls += 1;
+        observedMaxModelAttempts = options.maxModelAttempts ?? null;
         return completedResult();
       },
       recordLoopRunHistory() {
@@ -102,6 +104,7 @@ test("durable AUTO publish replays the same terminal result without a second exe
     assert.equal(second.report.runId, "run-1");
     assert.equal(publishCalls, 1);
     assert.equal(historyCalls, 1);
+    assert.equal(observedMaxModelAttempts, 2);
     assert.equal(
       first.report.idempotencyKey,
       durableAutoSubscriptionKey(
