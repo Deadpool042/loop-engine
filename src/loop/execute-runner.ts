@@ -364,10 +364,21 @@ export async function runLoopExecute(
   const governedExecution = cycle.authorizedBy === "execution_decision";
   decomposition = cycle.decomposition ?? null;
 
+  const policyCandidate =
+    cycle.decomposition === undefined
+      ? cycle.candidate
+      : Object.freeze({
+          ...cycle.candidate,
+          id: cycle.decomposition.parentCandidate.id,
+          path: cycle.decomposition.parentCandidate.path,
+          line: cycle.decomposition.parentCandidate.line,
+          text: cycle.decomposition.parentCandidate.text,
+        });
+
   agentPolicy = dependencies.resolvePolicy({
     policy: dependencies.agentPolicy,
     registry: dependencies.agentRegistry,
-    candidate: cycle.candidate,
+    candidate: policyCandidate,
     mode: "execute",
   });
 
