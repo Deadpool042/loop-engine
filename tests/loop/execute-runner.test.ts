@@ -1398,6 +1398,146 @@ describe("runLoopExecute", () => {
     }
   });
 
+  it("fails AUTO when a synthetic micro-lot remains selected after validation", async () => {
+    const cwd = await createGitWorktree();
+    const project = { ...fixtureProject(), path: cwd };
+    const parent = {
+      ...fixtureCandidate(),
+      id: "V55.2",
+      text: "- [ ] V55.2 — Parent governed objective",
+    };
+    const child = {
+      ...parent,
+      id: "V55.2.M1",
+      text: "- [ ] V55.2.M1 — First synthetic deliverable",
+    };
+    let planCalls = 0;
+
+    try {
+      const result = await runLoopExecute(project.name, {
+        ...deterministicOptions(),
+        loadConfig: () => fixtureConfig(project),
+        decomposeOversizedCandidate: true,
+        planLoopCycle: () => {
+          planCalls += 1;
+          return {
+            outcome: "ready" as const,
+            candidate: child,
+            plannedSteps: [],
+            snapshot: fixtureSnapshot(project, parent),
+            authorizedBy: "execution_decision" as const,
+            decomposition: {
+              schemaVersion: 1 as const,
+              strategy: "execution_decision_brief_v1" as const,
+              parentCandidate: {
+                id: parent.id,
+                path: parent.path,
+                line: parent.line,
+                text: parent.text,
+              },
+              sourceDocument: "roadmap.md",
+              selectedChildId: child.id,
+              children: [],
+            },
+          };
+        },
+        readModifiedWorktreeFiles: async () => ["roadmap.md"],
+        executor: async () => ({
+          status: "completed" as const,
+          modifiedFiles: ["roadmap.md"],
+          details: [],
+        }),
+        validator: async () => ({
+          status: "passed" as const,
+          failedCommand: null,
+          exitCode: 0,
+          details: [],
+        }),
+      });
+
+      assert.equal(planCalls, 2);
+      assert.equal(result.status, "failed");
+      assert.equal(result.failure?.code, "candidate_not_completed");
+      assert.match(
+        result.failure?.details.join("\n") ?? "",
+        /Synthetic micro-lot remains selected.*V55\.2\.M1/,
+      );
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("completes AUTO when validated synthetic decomposition advances to the next child", async () => {
+    const cwd = await createGitWorktree();
+    const project = { ...fixtureProject(), path: cwd };
+    const parent = {
+      ...fixtureCandidate(),
+      id: "V55.2",
+      text: "- [ ] V55.2 — Parent governed objective",
+    };
+    const firstChild = {
+      ...parent,
+      id: "V55.2.M1",
+      text: "- [ ] V55.2.M1 — First synthetic deliverable",
+    };
+    const secondChild = {
+      ...parent,
+      id: "V55.2.M2",
+      text: "- [ ] V55.2.M2 — Second synthetic deliverable",
+    };
+    let planCalls = 0;
+
+    try {
+      const result = await runLoopExecute(project.name, {
+        ...deterministicOptions(),
+        loadConfig: () => fixtureConfig(project),
+        decomposeOversizedCandidate: true,
+        planLoopCycle: () => {
+          planCalls += 1;
+          const selected = planCalls === 1 ? firstChild : secondChild;
+          return {
+            outcome: "ready" as const,
+            candidate: selected,
+            plannedSteps: [],
+            snapshot: fixtureSnapshot(project, parent),
+            authorizedBy: "execution_decision" as const,
+            decomposition: {
+              schemaVersion: 1 as const,
+              strategy: "execution_decision_brief_v1" as const,
+              parentCandidate: {
+                id: parent.id,
+                path: parent.path,
+                line: parent.line,
+                text: parent.text,
+              },
+              sourceDocument: "roadmap.md",
+              selectedChildId: selected.id,
+              children: [],
+            },
+          };
+        },
+        readModifiedWorktreeFiles: async () => ["roadmap.md"],
+        executor: async () => ({
+          status: "completed" as const,
+          modifiedFiles: ["roadmap.md"],
+          details: [],
+        }),
+        validator: async () => ({
+          status: "passed" as const,
+          failedCommand: null,
+          exitCode: 0,
+          details: [],
+        }),
+      });
+
+      assert.equal(planCalls, 2);
+      assert.equal(result.status, "completed");
+      assert.equal(result.failure, null);
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
   it("keeps AUTO policy classification anchored to the canonical parent when a synthetic micro-lot contains architecture wording", async () => {
     const parent = {
       ...fixtureCandidate(),

@@ -745,17 +745,28 @@ export async function runLoopExecute(
         options.decomposeOversizedCandidate === true &&
         typeof cycle.candidate.id === "string"
       ) {
+        const selectedSyntheticChildId = cycle.decomposition?.selectedChildId ?? null;
+        const completionCandidateId =
+          cycle.decomposition?.parentCandidate.id ?? cycle.candidate.id;
         const completion = dependencies.planLoopCycle(
           executionProject,
           Object.freeze({
-            candidateId: cycle.candidate.id,
+            candidateId: completionCandidateId,
             executionDecisionProjectPath: project.path,
+            ...(cycle.decomposition === undefined
+              ? {}
+              : { decomposeOversizedCandidate: true }),
           }),
         );
-        if (
-          completion.outcome !== "blocked" ||
-          completion.code !== "candidate_done"
-        ) {
+        const candidateCompleted =
+          completion.outcome === "blocked" && completion.code === "candidate_done";
+        const syntheticChildAdvanced =
+          selectedSyntheticChildId !== null &&
+          completion.outcome === "ready" &&
+          completion.decomposition?.selectedChildId !== undefined &&
+          completion.decomposition.selectedChildId !== selectedSyntheticChildId;
+
+        if (!candidateCompleted && !syntheticChildAdvanced) {
           transition("failed", "failed", "failed", [
             "Validated AUTO execution did not close its selected roadmap candidate.",
           ]);
@@ -764,9 +775,11 @@ export async function runLoopExecute(
             Object.freeze({
               code: "candidate_not_completed",
               message:
-                "Validated AUTO execution did not mark its selected roadmap candidate as done.",
+                "Validated AUTO execution did not close its selected roadmap work item.",
               details: Object.freeze([
-                `Candidate remains actionable after validation: ${cycle.candidate.id}`,
+                selectedSyntheticChildId === null
+                  ? `Candidate remains actionable after validation: ${cycle.candidate.id}`
+                  : `Synthetic micro-lot remains selected after validation: ${selectedSyntheticChildId}`,
               ]),
             }),
           );
