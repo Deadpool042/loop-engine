@@ -90,7 +90,9 @@ Raccorder le choix au CTA `Continuer` et démontrer en conditions réelles que l
 ### Périmètre d’écriture
 
 - `src/loop/codex-cli-executor.ts`
+- `src/loop/execute-runner.ts`
 - `tests/loop/codex-cli-executor.test.ts`
+- `tests/loop/execute-runner.test.ts`
 - `tests/composition/auto-subscription-execution.test.ts`
 - `docs/roadmap/auto-routing-v55.md`
 - `docs/roadmap/loop-engine.md`

@@ -1398,6 +1398,68 @@ describe("runLoopExecute", () => {
     }
   });
 
+  it("keeps AUTO policy classification anchored to the canonical parent when a synthetic micro-lot contains architecture wording", async () => {
+    const parent = {
+      ...fixtureCandidate(),
+      id: "V55.2",
+      text: "- [ ] V55.2 — Route bounded code work through the selected subscription runtime",
+    };
+    const child = {
+      ...parent,
+      id: "V55.2.M1",
+      text: "- [ ] V55.2.M1 — prove review/architecture handoff boundaries",
+    };
+    const registry = createAgentRegistry([
+      routingProfile("codex.economy", "luna", "economy"),
+    ]);
+
+    const result = await runLoopExecute("fixture-project", {
+      ...deterministicOptions(),
+      agentPolicy: DEFAULT_AGENT_POLICY,
+      agentRegistry: registry,
+      planLoopCycle: () => ({
+        outcome: "ready" as const,
+        candidate: child,
+        plannedSteps: [],
+        snapshot: fixtureSnapshot(fixtureProject(), parent),
+        decomposition: {
+          schemaVersion: 1 as const,
+          strategy: "execution_decision_brief_v1" as const,
+          parentCandidate: {
+            id: "V55.2",
+            path: parent.path,
+            line: parent.line,
+            text: parent.text,
+          },
+          sourceDocument: "roadmap.md",
+          selectedChildId: "V55.2.M1",
+          children: [],
+        },
+      }),
+      readModifiedWorktreeFiles: async () => ["src/feature.ts"],
+      executor: async (plan) => ({
+        status: "completed" as const,
+        modifiedFiles: ["src/feature.ts"],
+        details: [`Executed ${plan.model}.`],
+      }),
+      validator: async () => ({
+        status: "passed" as const,
+        failedCommand: null,
+        exitCode: 0,
+        details: [],
+      }),
+    });
+
+    assert.equal(result.status, "completed");
+    assert.equal(result.agentPolicy?.requirements.category, "code");
+    assert.equal(
+      result.agentPolicy?.selection?.outcome === "selected"
+        ? result.agentPolicy.selection.profile.model
+        : null,
+      "luna",
+    );
+  });
+
   it("caps the real AUTO model attempt budget at one and exposes it in run evidence", async () => {
     const registry = createAgentRegistry([
       routingProfile("codex.economy", "luna", "economy"),
