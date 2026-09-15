@@ -32,10 +32,10 @@ test("AUTO deterministically splits a G3-like oversized candidate into traceable
     brief: {
       objective: "Deliver G3 without a monolithic provider run.",
       deliverables: [
-        "Implement the G3 state contract.",
-        "Implement the G3 continuation flow.",
-        "Add the bounded G3 adapter.",
-        "Add the G3 regression coverage.",
+        "Implement the G3 state contract in src/g3/a.ts and src/g3/b.ts.",
+        "Implement the G3 continuation flow in src/g3/c.ts.",
+        "Add the bounded G3 adapter in src/g3/d.ts.",
+        "Add the G3 regression coverage in tests/g3.test.ts.",
         "Update docs/roadmap/vnext3.md candidate state.",
       ],
       outOfScope: ["Deployment"],
@@ -58,7 +58,7 @@ test("AUTO deterministically splits a G3-like oversized candidate into traceable
     })),
     [
       { id: "H3-L3.M1", status: "selected", pathCount: 3, deliverableCount: 1 },
-      { id: "H3-L3.M2", status: "pending", pathCount: 3, deliverableCount: 1 },
+      { id: "H3-L3.M2", status: "pending", pathCount: 2, deliverableCount: 1 },
       { id: "H3-L3.M3", status: "pending", pathCount: 2, deliverableCount: 1 },
       { id: "H3-L3.M4", status: "pending", pathCount: 2, deliverableCount: 1 },
     ],
@@ -69,7 +69,7 @@ test("AUTO deterministically splits a G3-like oversized candidate into traceable
     "src/g3/b.ts",
   ]);
   assert.deepEqual(first.brief?.deliverables, [
-    "Implement the G3 state contract.",
+    "Implement the G3 state contract in src/g3/a.ts and src/g3/b.ts.",
     "Update docs/roadmap/vnext3.md candidate state.",
   ]);
   assert.ok(
@@ -81,11 +81,13 @@ test("AUTO deterministically splits a G3-like oversized candidate into traceable
     first.decomposition!,
   );
   assert.ok(
-    instructions.includes("- [x] H3-L3.M1 — Implement the G3 state contract."),
+    instructions.includes(
+      "- [x] H3-L3.M1 — Implement the G3 state contract in src/g3/a.ts and src/g3/b.ts.",
+    ),
   );
   assert.ok(
     instructions.includes(
-      "- [ ] H3-L3.M2 — Implement the G3 continuation flow.",
+      "- [ ] H3-L3.M2 — Implement the G3 continuation flow in src/g3/c.ts.",
     ),
   );
   assert.ok(
@@ -151,6 +153,43 @@ test("AUTO keeps explicitly referenced writable paths with their deliverable", (
       "docs/testing/2026-09-08-vnext3-g3-gifting-staging-recipe.md",
     ),
   );
+});
+
+test("AUTO leaves an oversized brief intact when deliverables cannot be mapped to writable paths", () => {
+  const input = {
+    candidate: {
+      ...candidate,
+      id: "V55.2",
+      path: "docs/roadmap/loop-engine.md",
+      line: 327,
+      text: "- [ ] V55.2 — Governed AUTO continuation burn-in",
+    },
+    sourceDocument: "docs/roadmap/loop-engine.md",
+    allowedPaths: [
+      "docs/roadmap/auto-routing-v55.md",
+      "docs/roadmap/loop-engine.md",
+      "src/loop/codex-cli-executor.ts",
+      "src/loop/execute-runner.ts",
+      "tests/composition/auto-subscription-execution.test.ts",
+      "tests/loop/codex-cli-executor.test.ts",
+      "tests/loop/execute-runner.test.ts",
+    ],
+    brief: {
+      objective: "Complete the governed AUTO continuation burn-in.",
+      deliverables: [
+        "Add targeted coverage proving smallest-capable routing.",
+        "Verify the selected model and effort cannot be substituted.",
+        "Update the V55.2 checklist and roadmap with real burn-in evidence.",
+      ],
+      outOfScope: ["No new router."],
+    },
+  } as const;
+
+  const result = decomposeOversizedAutoCandidate(input);
+
+  assert.equal(result.candidate, input.candidate);
+  assert.equal(result.decomposition, undefined);
+  assert.deepEqual(result.allowedPaths, input.allowedPaths);
 });
 
 test("AUTO never recursively decomposes an existing micro-lot child", () => {
