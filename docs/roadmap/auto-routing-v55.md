@@ -81,6 +81,26 @@ Le handoff AUTO peut retourner soit `chatgpt_handoff`, soit un `direct_cli` Code
 
 Raccorder le choix au CTA `Continuer` et démontrer en conditions réelles que l’orchestrateur utilise la route sélectionnée sans bypass de gouvernance.
 
+### Livrables
+
+1. Ajouter une couverture ciblée prouvant qu’un lot non `review/architecture` atteint bien la route autonome `smallest_capable` lorsque le quota est frais, sans fallback ChatGPT prématuré.
+2. Vérifier dans cette couverture que le modèle/effort décidés restent ceux du handoff et qu’aucun caller ne peut les substituer.
+3. Mettre à jour la checklist V55.2 et la roadmap principale avec les preuves du burn-in réel.
+
+### Périmètre d’écriture
+
+- `tests/composition/auto-route-handoff.test.ts`
+- `docs/roadmap/auto-routing-v55.md`
+- `docs/roadmap/loop-engine.md`
+
+### Hors périmètre
+
+- `src/**`
+- nouveau selector, routeur, scheduler, ledger ou stockage de progression ;
+- API payante implicite ;
+- modification des profils/runtime qualifiés hors preuve du burn-in ;
+- modification de production, push, merge ou déploiement par le provider.
+
 ### Checklist
 
 - [ ] Adapter `roadmap.continue` pour transporter la nouvelle route sans choisir localement le provider.
