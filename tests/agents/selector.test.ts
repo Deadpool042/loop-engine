@@ -89,6 +89,47 @@ describe("selectAgentProfile", () => {
     );
   });
 
+  it("uses explicit runtime preference before deterministic id tie-break", () => {
+    const registry = createAgentRegistry([
+      profile({
+        id: "alpha-codex",
+        provider: "openai",
+        runtime: "codex",
+        fundingMode: "included_subscription",
+        economicTier: "economy",
+        capabilities: ["code_edit"],
+      }),
+      profile({
+        id: "zeta-openclaw",
+        provider: "openai",
+        runtime: "openclaw",
+        fundingMode: "included_subscription",
+        economicTier: "economy",
+        capabilities: ["code_edit"],
+      }),
+    ]);
+
+    const result = selectAgentProfile(registry, {
+      requiredCapabilities: ["code_edit"],
+      requiredPermissions: [],
+      preferredRuntimes: ["openclaw", "codex"],
+    });
+
+    assert.equal(
+      result.outcome === "selected" ? result.profile.id : null,
+      "zeta-openclaw",
+    );
+    assert.deepEqual(
+      result.outcome === "selected" ? result.notSelected : null,
+      [
+        {
+          profileId: "alpha-codex",
+          reason: "less_preferred_runtime_than_selected",
+        },
+      ],
+    );
+  });
+
   it("breaks ties deterministically by id", () => {
     const registry = createAgentRegistry([
       profile({ id: "zeta", capabilities: ["code_edit"] }),

@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
-import { basename, isAbsolute, resolve } from "node:path";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, isAbsolute, join, resolve } from "node:path";
 
 import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
@@ -11,7 +13,7 @@ import { readModifiedWorktreeFiles } from "./worktree-status.js";
 
 export type OpenClawNativeLoopExecutorOptions = Readonly<{
   executable: string;
-  configPath: string;
+  configPath?: string;
   timeoutMs?: number;
   hardKillGraceMs?: number;
   maxOutputBytes?: number;
@@ -72,6 +74,39 @@ function normalizeOpenAiModel(model: string): string | null {
 function openClawModelRef(model: string): string | null {
   const modelId = normalizeOpenAiModel(model);
   return modelId === null ? null : `openai/${modelId}`;
+}
+
+export function buildOpenClawNativeExecConfig(modelRef: string): string {
+  if (!modelRef.startsWith("openai/") || modelRef.length <= "openai/".length) {
+    throw new TypeError("OpenClaw native exec config requires an OpenAI model ref.");
+  }
+  return `${JSON.stringify(
+    {
+      memory: { search: { provider: "none" } },
+      agents: {
+        defaults: {
+          models: {
+            [modelRef]: { agentRuntime: { id: "openclaw" } },
+          },
+        },
+      },
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+async function createEphemeralConfig(modelRef: string): Promise<Readonly<{ path: string; cleanup: () => Promise<void> }>> {
+  const directory = await mkdtemp(join(tmpdir(), "loop-openclaw-native-"));
+  const configPath = join(directory, "openclaw.json");
+  await writeFile(configPath, buildOpenClawNativeExecConfig(modelRef), {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  return Object.freeze({
+    path: configPath,
+    cleanup: () => rm(directory, { recursive: true, force: true }),
+  });
 }
 
 function parseEnvelope(stdout: string): OpenClawExecEnvelope | null {
@@ -204,8 +239,11 @@ export function createOpenClawNativeLoopExecutor(
       "OpenClaw executable must resolve to a command named openclaw.",
     );
   }
-  if (!isNonEmptyString(options.configPath) || !isAbsolute(options.configPath.trim())) {
-    throw new TypeError("OpenClaw native executor requires an absolute config path.");
+  if (
+    options.configPath !== undefined &&
+    (!isNonEmptyString(options.configPath) || !isAbsolute(options.configPath.trim()))
+  ) {
+    throw new TypeError("OpenClaw native executor config path must be absolute when provided.");
   }
   const timeoutMs = options.timeoutMs ?? 360_000;
   const hardKillGraceMs = options.hardKillGraceMs ?? 60_000;
@@ -221,7 +259,8 @@ export function createOpenClawNativeLoopExecutor(
   }
 
   const executable = options.executable.trim();
-  const configPath = resolve(options.configPath.trim());
+  const configuredConfigPath =
+    options.configPath === undefined ? null : resolve(options.configPath.trim());
 
   return async (plan, executionCwd): Promise<LoopExecutorResult> => {
     if (plan.provider !== "openai" || plan.runtime !== "openclaw") {
@@ -254,11 +293,26 @@ export function createOpenClawNativeLoopExecutor(
     }
 
     const timeoutSeconds = Math.max(1, Math.ceil(timeoutMs / 1000));
+    let ephemeralConfig: Awaited<ReturnType<typeof createEphemeralConfig>> | null = null;
+    let runtimeConfigPath = configuredConfigPath;
+    if (runtimeConfigPath === null) {
+      try {
+        ephemeralConfig = await createEphemeralConfig(modelRef);
+        runtimeConfigPath = ephemeralConfig.path;
+      } catch {
+        return failure(
+          "runtime_unavailable",
+          "Unable to prepare the bounded OpenClaw native execution config.",
+          before,
+        );
+      }
+    }
+
     const args = [
       "agent",
       "exec",
       "--config",
-      configPath,
+      runtimeConfigPath,
       "--cwd",
       cwd,
       "--model",
@@ -271,14 +325,19 @@ export function createOpenClawNativeLoopExecutor(
       "--message-file",
       "-",
     ];
-    const result = await runProcess(
-      executable,
-      args,
-      cwd,
-      buildLoopExecutionPrompt(plan),
-      timeoutMs + hardKillGraceMs,
-      maxOutputBytes,
-    );
+    let result: ProcessResult;
+    try {
+      result = await runProcess(
+        executable,
+        args,
+        cwd,
+        buildLoopExecutionPrompt(plan),
+        timeoutMs + hardKillGraceMs,
+        maxOutputBytes,
+      );
+    } finally {
+      await ephemeralConfig?.cleanup();
+    }
 
     const modifiedFiles = await readModifiedWorktreeFiles(cwd);
     if (modifiedFiles === null) {
@@ -326,7 +385,7 @@ export function createOpenClawNativeLoopExecutor(
           : code === "provider_unavailable"
             ? "OpenClaw native OpenAI authentication is unavailable."
             : code === "runtime_unavailable"
-              ? "OpenClaw native Codex runtime is unavailable."
+              ? "OpenClaw native runtime is unavailable."
               : "OpenClaw native execution failed.",
         modifiedFiles,
       );
@@ -367,7 +426,7 @@ export function createOpenClawNativeLoopExecutor(
       status: "completed" as const,
       modifiedFiles,
       details: Object.freeze([
-        `OpenClaw native Codex completed execution plan for ${plan.profileId} (${expectedModel}).`,
+        `OpenClaw native runtime completed execution plan for ${plan.profileId} (${expectedModel}).`,
         ...(envelope.sessionId === undefined
           ? []
           : [`OpenClaw session: ${envelope.sessionId}.`]),
