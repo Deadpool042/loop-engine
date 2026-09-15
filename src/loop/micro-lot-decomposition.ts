@@ -118,6 +118,9 @@ export function decomposeOversizedAutoCandidate(
   const workDeliverables = brief.deliverables.filter(
     (deliverable) => !isPlanningStateDeliverable(deliverable, sourceDocument),
   );
+  const hasExplicitDeliverableAffinity = workDeliverables.every(
+    (deliverable) => referencedPaths([deliverable], workPaths).length > 0,
+  );
   const manifestlyOversized =
     workDeliverables.length > 2 ||
     workPaths.length > 3 ||
@@ -126,7 +129,8 @@ export function decomposeOversizedAutoCandidate(
   if (
     !manifestlyOversized ||
     workDeliverables.length === 0 ||
-    workPaths.length === 0
+    workPaths.length === 0 ||
+    !hasExplicitDeliverableAffinity
   ) {
     return input;
   }
@@ -156,11 +160,13 @@ export function decomposeOversizedAutoCandidate(
 
     const fallbackChunk =
       pathChunks[index] ?? pathChunks[pathChunks.length - 1] ?? [];
-    for (const path of fallbackChunk) {
-      if (childPaths.length >= AUTO_MICRO_LOT_MAX_PATHS) break;
-      if (claimedPaths.has(path)) continue;
-      childPaths.push(path);
-      claimedPaths.add(path);
+    if (childPaths.length === 0) {
+      for (const path of fallbackChunk) {
+        if (childPaths.length >= AUTO_MICRO_LOT_MAX_PATHS) break;
+        if (claimedPaths.has(path)) continue;
+        childPaths.push(path);
+        claimedPaths.add(path);
+      }
     }
 
     if (childPaths.length === 0 && fallbackChunk.length > 0) {
