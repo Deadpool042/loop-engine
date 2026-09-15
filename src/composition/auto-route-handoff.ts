@@ -249,29 +249,38 @@ export function generateAutoRouteHandoffProjection(
     return unknownProjection(`policy_${policy.status}`);
   }
 
-  const interactiveDecision = decideAutoContinuationRoute(
-    policy,
-    Object.freeze({
-      outcome: "no_match" as const,
-      selected: null,
-      notSelected: Object.freeze([]),
-    }),
-  );
-  if (interactiveDecision?.executionPath === "chatgpt_handoff") {
-    return Object.freeze({
-      status: "selected" as const,
-      reason: null,
-      decision: interactiveDecision,
-      notSelected: Object.freeze([]),
-      quotaBefore: Object.freeze({
-        status: "unknown" as const,
-        reason: "chatgpt_interactive_quota_not_modeled",
+  // Review/architecture are intentionally interactive. For every other
+  // category, evaluate the autonomous candidates first; otherwise feeding a
+  // synthetic no-match here would turn the ChatGPT fallback into an early
+  // return and make every executable lot interactive by construction.
+  if (
+    policy.requirements.category === "review" ||
+    policy.requirements.category === "architecture"
+  ) {
+    const interactiveDecision = decideAutoContinuationRoute(
+      policy,
+      Object.freeze({
+        outcome: "no_match" as const,
+        selected: null,
+        notSelected: Object.freeze([]),
       }),
-      estimatedImpact: Object.freeze({
-        status: "unknown" as const,
-        reason: "chatgpt_interactive_quota_not_modeled",
-      }),
-    });
+    );
+    if (interactiveDecision?.executionPath === "chatgpt_handoff") {
+      return Object.freeze({
+        status: "selected" as const,
+        reason: null,
+        decision: interactiveDecision,
+        notSelected: Object.freeze([]),
+        quotaBefore: Object.freeze({
+          status: "unknown" as const,
+          reason: "chatgpt_interactive_quota_not_modeled",
+        }),
+        estimatedImpact: Object.freeze({
+          status: "unknown" as const,
+          reason: "chatgpt_interactive_quota_not_modeled",
+        }),
+      });
+    }
   }
 
   const selectedLotDetail = generateProjectHandoffReport(project).roadmap.selectedLotDetail;
