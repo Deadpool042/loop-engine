@@ -125,8 +125,8 @@ Un `project_handoff(creatyss)` réel après promotion sélectionne `configured.o
 - [x] Comparer ces mesures à cinq runs Codex sur la même mission sans confondre temps de dispatch, temps provider et temps de validation.
 - [x] Décider le tie-break AUTO sur preuves : préférence OpenClaw uniquement à égalité après hard gates, avec Codex/Claude directs conservés en fallback.
 - [x] Nettoyer toutes les probes temporaires et conserver uniquement tests/evidence/docs durables.
-- [ ] Rejouer les validations finales Loop Engine + OpenClaw Control.
-- [ ] Décider le sort de V55.2 / #319 seulement après ces gates.
+- [x] Rejouer les validations finales Loop Engine + OpenClaw Control : OpenClaw Control `validate` vert (56/56 + syntaxe) ; Loop Engine `audit:strict` vert (560/560, score 100) et CI complète #321 verte.
+- [x] Décider le sort de V55.2 / #319 seulement après ces gates : V55.2 est clôturé ; #319 est supersédée par #321, dont le delta utile a été rebasé sur le `main` post-OC-25.2, validé puis mergé (`a254fc3`). #319 ne doit pas être mergée.
 
 ### Critère de fin
 
