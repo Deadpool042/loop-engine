@@ -72,6 +72,32 @@ test("durable envelope accepts a canonical record and fingerprint", () => {
   }
 });
 
+test("durable envelope accepts a pre-run failed record without a LoopRunResult", () => {
+  const failed = Object.freeze({
+    ...record(),
+    status: "failed" as const,
+    result: null,
+    failure: Object.freeze({
+      code: "durable_execution_failed",
+      message: "The durable execution callback failed.",
+      details: Object.freeze(["Execution diagnostics are redacted."]),
+    }),
+    events: Object.freeze([
+      record().events[0]!,
+      Object.freeze({
+        sequence: 2,
+        at: "2026-07-31T04:00:01.000Z",
+        type: "failed" as const,
+        owner: "worker-1",
+      }),
+    ]),
+  });
+  const decoded = decodeDurableExecutionEnvelope(
+    createDurableExecutionEnvelope(failed),
+  );
+  assert.equal(decoded.status, "accepted");
+});
+
 test("durable envelope rejects fingerprint drift", () => {
   const envelope = createDurableExecutionEnvelope(record());
   const drifted = {

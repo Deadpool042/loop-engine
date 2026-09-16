@@ -66,6 +66,7 @@ export type DurableAutoPublishInput = Readonly<{
   retryTerminal?: boolean;
   storeDirectory?: string;
   owner?: string;
+  prepareExecution?: () => Promise<void>;
 }>;
 
 export async function runDurableAutoSubscriptionPublish(
@@ -83,8 +84,10 @@ export async function runDurableAutoSubscriptionPublish(
     ),
   });
   const control = createDurableExecutionControlPlane(store, {
-    runLoopExecute: (projectName, options) =>
-      application.runLoopPublish(projectName, options),
+    runLoopExecute: async (projectName, options) => {
+      await input.prepareExecution?.();
+      return application.runLoopPublish(projectName, options);
+    },
   });
 
   const executionOptions = {

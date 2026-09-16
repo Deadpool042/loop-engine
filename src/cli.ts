@@ -890,13 +890,15 @@ else if (command === "review") {
       );
     }
 
-    const admission = await ensureAutoSubscriptionExecutionDecision(
-      project,
-      currentGitHead,
-      candidateId,
-    );
-    if (!admission.ok) {
-      failOption(json, admission.code, admission.message);
+    if (!durable) {
+      const admission = await ensureAutoSubscriptionExecutionDecision(
+        project,
+        currentGitHead,
+        candidateId,
+      );
+      if (!admission.ok) {
+        failOption(json, admission.code, admission.message);
+      }
     }
   }
 
@@ -1089,6 +1091,16 @@ else if (command === "review") {
         expectedGitHead: expectedGitHead!,
         maxRepairs,
         ...(retryTerminal ? { retryTerminal: true } : {}),
+        prepareExecution: async () => {
+          const admission = await ensureAutoSubscriptionExecutionDecision(
+            project,
+            expectedGitHead!,
+            candidateId!,
+          );
+          if (!admission.ok) {
+            throw new Error(`${admission.code}: ${admission.message}`);
+          }
+        },
       });
     if (json) {
       console.log(JSON.stringify(durableResult.report));
