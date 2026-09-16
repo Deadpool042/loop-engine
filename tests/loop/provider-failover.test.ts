@@ -8,13 +8,18 @@ import {
 import type { LoopExecutionPlan } from "../../src/loop/execution-plan.js";
 import type { LoopExecutor } from "../../src/loop/execution.js";
 
-function plan(provider: "openai" | "anthropic", model: string): LoopExecutionPlan {
+function plan(
+  provider: "openai" | "anthropic",
+  model: string,
+  runtime: "codex" | "openclaw" | "claude_code" =
+    provider === "openai" ? "codex" : "claude_code",
+): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1,
     runId: "run-failover-1",
     provider,
-    runtime: provider === "openai" ? "codex" : "claude_code",
-    profileId: `${provider}-profile`,
+    runtime,
+    profileId: `${provider}-${runtime}-profile`,
     model,
   }) as LoopExecutionPlan;
 }
@@ -265,7 +270,7 @@ test("enforces the global attempt budget", async () => {
   assert.equal(outcome.evidence.attempts.length, 1);
 });
 
-test("rejects duplicate providers before any effect", async () => {
+test("rejects duplicate provider/runtime targets before any effect", async () => {
   let calls = 0;
   const executor: LoopExecutor = async () => {
     calls += 1;
@@ -275,8 +280,8 @@ test("rejects duplicate providers before any effect", async () => {
   const outcome = await executeLoopProviderFailover({
     maxAttempts: 2,
     attempts: [
-      { plan: plan("openai", "a"), executor },
-      { plan: plan("openai", "b"), executor },
+      { plan: plan("openai", "a", "codex"), executor },
+      { plan: plan("openai", "b", "codex"), executor },
     ],
   });
 
@@ -285,6 +290,56 @@ test("rejects duplicate providers before any effect", async () => {
   if (outcome.result.status === "failed") {
     assert.equal(outcome.result.failure.code, "provider_attempt_duplicate");
   }
+});
+
+test("allows bounded failover between distinct runtimes on the same provider", async () => {
+  const outcome = await executeLoopProviderFailover({
+    maxAttempts: 2,
+    cwd: "/tmp",
+    createWorkspaceReset: cleanResetFactory,
+    attempts: [
+      {
+        plan: plan("openai", "gpt-5.6-luna", "openclaw"),
+        executor: failed("runtime_unavailable"),
+      },
+      {
+        plan: plan("openai", "gpt-5.6-luna", "codex"),
+        executor: completed("src/codex-fallback.ts"),
+      },
+    ],
+  });
+
+  assert.equal(outcome.result.status, "completed");
+  assert.deepEqual(outcome.evidence.attemptedProviders, ["openai", "openai"]);
+  assert.deepEqual(
+    outcome.evidence.attempts.map((attempt) => attempt.runtime),
+    ["openclaw", "codex"],
+  );
+});
+
+test("ignores invalid duplicate targets outside the bounded attempt budget", async () => {
+  const outcome = await executeLoopProviderFailover({
+    maxAttempts: 2,
+    cwd: "/tmp",
+    createWorkspaceReset: cleanResetFactory,
+    attempts: [
+      {
+        plan: plan("openai", "a", "openclaw"),
+        executor: failed("runtime_unavailable"),
+      },
+      {
+        plan: plan("anthropic", "b", "claude_code"),
+        executor: completed("src/fallback.ts"),
+      },
+      {
+        plan: plan("openai", "c", "openclaw"),
+        executor: completed("never.ts"),
+      },
+    ],
+  });
+
+  assert.equal(outcome.result.status, "completed");
+  assert.deepEqual(outcome.evidence.attemptedProviders, ["openai", "anthropic"]);
 });
 
 test("redacts thrown provider errors and permits reviewed recovery", async () => {
