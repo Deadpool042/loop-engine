@@ -137,7 +137,7 @@ function isDurableExecutionRecord(value: unknown): value is DurableExecutionReco
     return isRecord(value.result) && value.failure === null;
   }
   if (value.status === "failed") {
-    return isRecord(value.result) && isRecord(value.failure);
+    return (value.result === null || isRecord(value.result)) && isRecord(value.failure);
   }
   return value.result === null && isRecord(value.failure);
 }

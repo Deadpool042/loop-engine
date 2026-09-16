@@ -8,6 +8,7 @@ import {
   durableAutoSubscriptionKey,
   runDurableAutoSubscriptionPublish,
 } from "../../src/composition/durable-auto-publish.js";
+import { readFileDurableExecutionRecords } from "../../src/loop/file-durable-execution-store.js";
 import type { LoopRunResult } from "../../src/loop/types.js";
 
 function completedResult(runId = "run-1"): LoopRunResult {
@@ -131,9 +132,52 @@ test("durable AUTO publish replays the same terminal result without a second exe
   }
 });
 
-test("durable AUTO publish reports in_progress while another owner holds the lease", async () => {
+test("durable AUTO publish persists its running record before preparation starts", async () => {
   const root = mkdtempSync(join(tmpdir(), "loop-durable-auto-publish-"));
   try {
+    let publishCalls = 0;
+    let prepareCalls = 0;
+    const application = {
+      async runLoopPublish() {
+        publishCalls += 1;
+        return completedResult("run-prepared");
+      },
+      recordLoopRunHistory() {
+        return Object.freeze({ written: true, ok: true });
+      },
+    };
+
+    const result = await runDurableAutoSubscriptionPublish(application, {
+      project: "example",
+      candidateId: "H1-L1",
+      expectedGitHead: "a".repeat(40),
+      maxRepairs: 0,
+      storeDirectory: root,
+      owner: "worker:first",
+      prepareExecution: async () => {
+        prepareCalls += 1;
+        const records = await readFileDurableExecutionRecords(root, "example");
+        assert.equal(records.length, 1);
+        assert.equal(records[0]?.status, "running");
+        assert.equal(
+          records[0]?.idempotencyKey,
+          durableAutoSubscriptionKey("example", "H1-L1", "a".repeat(40)),
+        );
+      },
+    });
+
+    assert.equal(result.report.status, "completed");
+    assert.equal(prepareCalls, 1);
+    assert.equal(publishCalls, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("durable AUTO publish reports in_progress while preparation holds the lease", async () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-durable-auto-publish-"));
+  try {
+    let prepareCalls = 0;
     let publishCalls = 0;
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
@@ -142,7 +186,6 @@ test("durable AUTO publish reports in_progress while another owner holds the lea
     const application = {
       async runLoopPublish() {
         publishCalls += 1;
-        await gate;
         return completedResult("run-active");
       },
       recordLoopRunHistory() {
@@ -157,13 +200,18 @@ test("durable AUTO publish reports in_progress while another owner holds the lea
       maxRepairs: 0,
       storeDirectory: root,
       owner: "worker:first",
+      prepareExecution: async () => {
+        prepareCalls += 1;
+        await gate;
+      },
     } as const;
 
     const active = runDurableAutoSubscriptionPublish(application, input);
-    for (let attempt = 0; attempt < 50 && publishCalls === 0; attempt += 1) {
+    for (let attempt = 0; attempt < 50 && prepareCalls === 0; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
-    assert.equal(publishCalls, 1);
+    assert.equal(prepareCalls, 1);
+    assert.equal(publishCalls, 0);
 
     const duplicate = await runDurableAutoSubscriptionPublish(application, {
       ...input,
@@ -171,16 +219,59 @@ test("durable AUTO publish reports in_progress while another owner holds the lea
     });
     assert.equal(duplicate.exitCode, 0);
     assert.equal(duplicate.report.status, "in_progress");
-    assert.equal(publishCalls, 1);
+    assert.equal(prepareCalls, 1);
+    assert.equal(publishCalls, 0);
 
     release();
     const completed = await active;
     assert.equal(completed.report.status, "completed");
+    assert.equal(publishCalls, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
+
+test("durable AUTO publish terminalizes preparation failure without invoking the provider", async () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-durable-auto-publish-"));
+  try {
+    let publishCalls = 0;
+    const application = {
+      async runLoopPublish() {
+        publishCalls += 1;
+        return completedResult("unexpected-run");
+      },
+      recordLoopRunHistory() {
+        return Object.freeze({ written: true, ok: true });
+      },
+    };
+
+    const result = await runDurableAutoSubscriptionPublish(application, {
+      project: "example",
+      candidateId: "H1-L1",
+      expectedGitHead: "a".repeat(40),
+      maxRepairs: 0,
+      storeDirectory: root,
+      owner: "worker:first",
+      prepareExecution: async () => {
+        throw new Error("decision preparation failed");
+      },
+    });
+
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.report.status, "failed");
+    assert.equal(result.report.runId, null);
+    assert.equal(result.report.historyRecorded, null);
+    assert.equal(publishCalls, 0);
+
+    const records = await readFileDurableExecutionRecords(root, "example");
+    assert.equal(records.length, 1);
+    assert.equal(records[0]?.status, "failed");
+    assert.equal(records[0]?.failure?.code, "durable_execution_failed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("durable AUTO publish retries a failed terminal result only when explicitly requested", async () => {
   const root = mkdtempSync(join(tmpdir(), "loop-durable-auto-publish-"));
