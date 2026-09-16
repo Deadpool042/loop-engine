@@ -449,6 +449,9 @@ export function resolvePolicy(
     ...(allowedRuntimes === undefined
       ? {}
       : { allowedRuntimes: sortedUnique(allowedRuntimes) }),
+    ...(policy.preferredRuntimes === undefined
+      ? {}
+      : { preferredRuntimes: Object.freeze([...policy.preferredRuntimes]) }),
     ...(allowedFundingModes === undefined
       ? {}
       : { allowedFundingModes: sortedUnique(allowedFundingModes) }),

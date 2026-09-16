@@ -70,10 +70,18 @@ test("durable AUTO publish replays the same terminal result without a second exe
     let publishCalls = 0;
     let historyCalls = 0;
     let observedMaxModelAttempts: number | null = null;
+    let observedPreferredRuntimes: readonly string[] | null = null;
     const application = {
-      async runLoopPublish(_projectName: string, options: { maxModelAttempts?: number }) {
+      async runLoopPublish(
+        _projectName: string,
+        options: {
+          maxModelAttempts?: number;
+          agentPolicy?: { preferredRuntimes?: readonly string[] };
+        },
+      ) {
         publishCalls += 1;
         observedMaxModelAttempts = options.maxModelAttempts ?? null;
+        observedPreferredRuntimes = options.agentPolicy?.preferredRuntimes ?? null;
         return completedResult();
       },
       recordLoopRunHistory() {
@@ -105,6 +113,11 @@ test("durable AUTO publish replays the same terminal result without a second exe
     assert.equal(publishCalls, 1);
     assert.equal(historyCalls, 1);
     assert.equal(observedMaxModelAttempts, 2);
+    assert.deepEqual(observedPreferredRuntimes, [
+      "openclaw",
+      "codex",
+      "claude_code",
+    ]);
     assert.equal(
       first.report.idempotencyKey,
       durableAutoSubscriptionKey(

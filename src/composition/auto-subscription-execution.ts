@@ -19,7 +19,8 @@ import {
 } from "../agents/types.js";
 import { decideAgentRoute, type AgentRouteDecision } from "../agents/router.js";
 import type { AgentEfficiencySignal } from "../agents/selector.js";
-import type { AgentPolicyResolution } from "../policy/types.js";
+import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
+import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
 import {
   assembleLoopProviders,
   defaultLoopProviderRegistry,
@@ -29,6 +30,18 @@ import {
 
 export const AUTO_SUBSCRIPTION_PORTFOLIO_ENV =
   "LOOP_AUTO_SUBSCRIPTION_PORTFOLIO_JSON";
+
+export const AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE = Object.freeze([
+  "openclaw",
+  "codex",
+  "claude_code",
+] as const);
+
+export const AUTO_SUBSCRIPTION_AGENT_POLICY: AgentPolicy = Object.freeze({
+  ...DEFAULT_AGENT_POLICY,
+  id: "auto-subscription",
+  preferredRuntimes: AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE,
+});
 
 export type AutoSubscriptionModelProfile = Readonly<{
   id: string;
@@ -399,7 +412,7 @@ export function decideAutoSubscriptionRoute(
       ...policy.selectionRequest,
       preferredRuntimes:
         policy.selectionRequest.preferredRuntimes ??
-        Object.freeze(["openclaw", "codex", "claude_code"] as const),
+        AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE,
       requireKnownQuota: true,
     }),
     effort: policy.requirements.minimumEffort,

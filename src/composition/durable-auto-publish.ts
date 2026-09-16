@@ -7,6 +7,7 @@ import { createFileDurableExecutionStore } from "../loop/file-durable-execution-
 import type { LoopExecutor } from "../loop/execution.js";
 import { createDurableExecutionControlPlane } from "./durable-execution-control-plane.js";
 import type { IsolatedProviderRunPublish } from "./isolated-provider-publication.js";
+import { AUTO_SUBSCRIPTION_AGENT_POLICY } from "./auto-subscription-execution.js";
 
 const DURABLE_EXECUTION_DIRECTORY =
   resolveLoopEngineStatePath("durable-executions");
@@ -88,6 +89,7 @@ export async function runDurableAutoSubscriptionPublish(
 
   const executionOptions = {
     candidateId: input.candidateId,
+    agentPolicy: AUTO_SUBSCRIPTION_AGENT_POLICY,
     maxRepairs: input.maxRepairs,
     maxModelAttempts: 2,
     decomposeOversizedCandidate: true,

@@ -127,6 +127,8 @@ export type AgentPolicy = Readonly<{
   quotaReserve?: QuotaReservePolicy;
   allowedProviders?: readonly AgentProvider[];
   allowedRuntimes?: readonly AgentRuntime[];
+  /** Deterministic ranking preference only; never widens allowed runtimes. */
+  preferredRuntimes?: readonly AgentRuntime[];
   // Paid funding modes are never implicitly authorized. When omitted, the
   // resolver falls back to the safe included/unknown set from defaults.ts.
   allowedFundingModes?: readonly AgentFundingMode[];

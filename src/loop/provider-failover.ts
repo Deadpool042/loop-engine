@@ -96,24 +96,26 @@ function validateAttempts(
     );
   }
 
-  const providers = new Set<string>();
+  const executionTargets = new Set<string>();
   for (const attempt of attempts) {
     const provider = attempt.plan.provider.trim();
-    if (provider.length === 0) {
+    const runtime = attempt.plan.runtime.trim();
+    if (provider.length === 0 || runtime.length === 0) {
       return fail(
         "provider_attempt_invalid",
-        "Provider attempts require a non-empty provider id.",
-        "An execution plan exposed an empty provider id.",
+        "Provider attempts require non-empty provider and runtime ids.",
+        "An execution plan exposed an empty provider or runtime id.",
       );
     }
-    if (providers.has(provider)) {
+    const executionTarget = `${provider}/${runtime}`;
+    if (executionTargets.has(executionTarget)) {
       return fail(
         "provider_attempt_duplicate",
-        "Provider failover cannot attempt the same provider twice.",
-        `Duplicate provider: ${provider}`,
+        "Provider failover cannot attempt the same provider/runtime target twice.",
+        `Duplicate execution target: ${executionTarget}`,
       );
     }
-    providers.add(provider);
+    executionTargets.add(executionTarget);
   }
 
   return null;
@@ -155,7 +157,8 @@ export async function executeLoopProviderFailover(
     });
   }
 
-  const validationFailure = validateAttempts(options.attempts);
+  const boundedAttempts = options.attempts.slice(0, options.maxAttempts);
+  const validationFailure = validateAttempts(boundedAttempts);
   if (validationFailure) {
     return Object.freeze({
       result: validationFailure,
@@ -164,7 +167,6 @@ export async function executeLoopProviderFailover(
   }
 
   const classifier = options.isRecoverableFailure ?? defaultFailureClassifier;
-  const boundedAttempts = options.attempts.slice(0, options.maxAttempts);
   const evidence: LoopProviderFailoverAttemptEvidence[] = [];
   const modifiedFiles = new Set<string>();
   let resetWorkspace: LoopProviderWorkspaceReset | null = null;
