@@ -165,11 +165,15 @@ export async function runLoopRunCommand(
     );
   }
 
-  if (mode === "publish" && options.provider === undefined) {
+  if (
+    mode === "publish" &&
+    options.provider === undefined &&
+    options.autoSubscription !== true
+  ) {
     return printCommandError(
       json,
       "publish_requires_provider",
-      "Publish mode requires an explicit provider.",
+      "Publish mode requires an explicit provider unless AUTO subscription routing is active.",
     );
   }
 
