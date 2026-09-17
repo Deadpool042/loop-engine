@@ -386,6 +386,58 @@ describe("run command — publish mode", () => {
   });
 });
 
+describe("run command — AUTO publish fast path", () => {
+  it("allows governed AUTO publish without an explicit provider and forwards the AUTO bounds", async () => {
+    const observed: unknown[] = [];
+    const publishResult: LoopRunResult = {
+      ...fixtureCompletedResult(),
+      mode: "publish",
+      publication: {
+        kind: "candidate_ref",
+        ref: "refs/loop-engine/candidates/run-history-write-failure-fixture/run-auto-publish",
+        commitSha: "c".repeat(40),
+        baseSha: "b".repeat(40),
+      },
+      modelAttemptBudget: 1,
+    };
+    const application = {
+      loopExecutor: () => Promise.resolve({ modifiedFiles: [] }),
+      loopAgentRegistry: { profiles: [] },
+      runLoopPublish: (_projectName: string, options?: unknown) => {
+        observed.push(options);
+        return Promise.resolve(publishResult);
+      },
+      recordLoopRunHistory: () => ({ written: true, ok: true }),
+      generateExecutionReport: (runResult: LoopRunResult) => runResult,
+    } as unknown as LoopApplicationAssembly;
+
+    const log = captureConsoleLog();
+    try {
+      const exitCode = await runLoopRunCommand(
+        application,
+        FIXTURE_PROJECT,
+        "publish",
+        true,
+        { autoSubscription: true },
+      );
+      assert.equal(exitCode, 0);
+    } finally {
+      log.restore();
+    }
+
+    assert.equal(observed.length, 1);
+    assert.equal(
+      (observed[0] as { maxModelAttempts?: number }).maxModelAttempts,
+      1,
+    );
+    assert.equal(
+      (observed[0] as { decomposeOversizedCandidate?: boolean })
+        .decomposeOversizedCandidate,
+      true,
+    );
+  });
+});
+
 describe("run command — explicit provider registry narrowing", () => {
   it("keeps partial test assemblies compatible when registry profiles are absent", async () => {
     const publishResult: LoopRunResult = {
