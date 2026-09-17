@@ -88,6 +88,36 @@ export type AgentEfficiencySignal =
       reason: string;
     }>;
 
+export type AgentPerformanceSignal =
+  | Readonly<{
+      profileId: string;
+      status: "available";
+      terminalSuccessPercent: number;
+      firstPassValidationPercent: number | null;
+      medianDurationMs: number | null;
+      meanRepairAttempts: number | null;
+      scopeViolationPercent: number | null;
+      failoverPercent: number | null;
+      sampleSize: number;
+    }>
+  | Readonly<{
+      profileId: string;
+      status: "unknown";
+      reason: string;
+    }>;
+
+export type AgentPerformanceRankingResult = Readonly<{
+  rejected: readonly AgentRejection[];
+  ranked: readonly Extract<AgentPerformanceSignal, { status: "available" }>[];
+  unranked: readonly Readonly<{
+    profileId: string;
+    reason:
+      | "performance_unknown"
+      | "invalid_performance_signal"
+      | "frontier_not_required";
+  }>[];
+}>;
+
 export type AgentEfficiencyRankingResult = Readonly<{
   rejected: readonly AgentRejection[];
   ranked: readonly Readonly<{
@@ -351,6 +381,158 @@ function canonicalizeSelectedProfile(profile: AgentProfile): AgentProfile {
       ? {}
       : { quota: Object.freeze({ ...profile.quota }) }),
     budget: Object.freeze({ ...profile.budget }),
+  });
+}
+
+function isPercentage(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= 100;
+}
+
+function isNullableNonNegative(value: number | null): boolean {
+  return value === null || (Number.isFinite(value) && value >= 0);
+}
+
+function isNullablePercentage(value: number | null): boolean {
+  return value === null || isPercentage(value);
+}
+
+function isUsablePerformanceSignal(
+  signal: Extract<AgentPerformanceSignal, { status: "available" }>,
+): boolean {
+  return (
+    isPercentage(signal.terminalSuccessPercent) &&
+    isNullablePercentage(signal.firstPassValidationPercent) &&
+    isNullableNonNegative(signal.medianDurationMs) &&
+    isNullableNonNegative(signal.meanRepairAttempts) &&
+    isNullablePercentage(signal.scopeViolationPercent) &&
+    isNullablePercentage(signal.failoverPercent) &&
+    Number.isInteger(signal.sampleSize) &&
+    signal.sampleSize >= 5
+  );
+}
+
+function compareNullableHigherIsBetter(
+  left: number | null,
+  right: number | null,
+): number {
+  if (left === null || right === null || left === right) return 0;
+  return right - left;
+}
+
+function compareNullableLowerIsBetter(
+  left: number | null,
+  right: number | null,
+): number {
+  if (left === null || right === null || left === right) return 0;
+  return left - right;
+}
+
+export function rankAgentProfilesByPerformance(
+  registry: AgentRegistry,
+  request: AgentSelectionRequest,
+  signals: readonly AgentPerformanceSignal[],
+): AgentPerformanceRankingResult {
+  const rejected: AgentRejection[] = [];
+  const eligible: AgentProfile[] = [];
+
+  for (const profile of [...registry.profiles].sort((a, b) =>
+    a.id.localeCompare(b.id),
+  )) {
+    const evaluation = evaluateAgentProfile(profile, request);
+    if (evaluation.ok) eligible.push(profile);
+    else rejected.push({ profileId: profile.id, reason: evaluation.reason });
+  }
+
+  const signalBuckets = new Map<string, AgentPerformanceSignal[]>();
+  for (const signal of signals) {
+    const bucket = signalBuckets.get(signal.profileId) ?? [];
+    bucket.push(signal);
+    signalBuckets.set(signal.profileId, bucket);
+  }
+
+  const frontierGate = applyFrontierGate(eligible, request);
+  const profileById = new Map(eligible.map((profile) => [profile.id, profile]));
+  const ranked = frontierGate.competitive.flatMap((profile) => {
+    const bucket = signalBuckets.get(profile.id) ?? [];
+    if (bucket.length !== 1) return [];
+    const signal = bucket[0]!;
+    if (signal.status !== "available" || !isUsablePerformanceSignal(signal)) {
+      return [];
+    }
+    return [Object.freeze({ ...signal })];
+  });
+
+  ranked.sort((left, right) => {
+    const measured =
+      right.terminalSuccessPercent - left.terminalSuccessPercent ||
+      compareNullableHigherIsBetter(
+        left.firstPassValidationPercent,
+        right.firstPassValidationPercent,
+      ) ||
+      compareNullableLowerIsBetter(
+        left.scopeViolationPercent,
+        right.scopeViolationPercent,
+      ) ||
+      compareNullableLowerIsBetter(
+        left.meanRepairAttempts,
+        right.meanRepairAttempts,
+      ) ||
+      compareNullableLowerIsBetter(
+        left.failoverPercent,
+        right.failoverPercent,
+      ) ||
+      compareNullableLowerIsBetter(
+        left.medianDurationMs,
+        right.medianDurationMs,
+      );
+    if (measured !== 0) return measured;
+    return compareEligibleProfiles(
+      profileById.get(left.profileId)!,
+      profileById.get(right.profileId)!,
+      request.preferredProviders,
+      request.preferredRuntimes,
+    );
+  });
+
+  const rankedIds = new Set(ranked.map((entry) => entry.profileId));
+  const unrankedCompetitive = frontierGate.competitive
+    .filter((profile) => !rankedIds.has(profile.id))
+    .sort((left, right) =>
+      compareEligibleProfiles(
+        left,
+        right,
+        request.preferredProviders,
+        request.preferredRuntimes,
+      ),
+    )
+    .map((profile) => {
+      const bucket = signalBuckets.get(profile.id) ?? [];
+      const invalid =
+        bucket.length > 1 ||
+        (bucket.length === 1 &&
+          bucket[0]!.status === "available" &&
+          !isUsablePerformanceSignal(bucket[0]!));
+      return Object.freeze({
+        profileId: profile.id,
+        reason: invalid
+          ? ("invalid_performance_signal" as const)
+          : ("performance_unknown" as const),
+      });
+    });
+  const heldBackFrontier = frontierGate.heldBack
+    .slice()
+    .sort((left, right) => left.id.localeCompare(right.id))
+    .map((profile) =>
+      Object.freeze({
+        profileId: profile.id,
+        reason: "frontier_not_required" as const,
+      }),
+    );
+
+  return Object.freeze({
+    rejected: Object.freeze(rejected),
+    ranked: Object.freeze(ranked),
+    unranked: Object.freeze([...unrankedCompetitive, ...heldBackFrontier]),
   });
 }
 

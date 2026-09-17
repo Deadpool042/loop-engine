@@ -1,9 +1,13 @@
 import { createAgentRegistry } from "../agents/registry.js";
 import type { AgentRouteDecision } from "../agents/router.js";
-import type { AgentEfficiencySignal } from "../agents/selector.js";
+import type {
+  AgentEfficiencySignal,
+  AgentPerformanceSignal,
+} from "../agents/selector.js";
 import {
   classifyRunScopeSize,
   estimateExpectedRunEfficiency,
+  estimateExpectedRunPerformance,
   generateProjectHandoffReport,
   generateProjectReport,
   generateRunModelEfficiencyReport,
@@ -344,7 +348,48 @@ export function generateAutoRouteHandoffProjection(
     });
   });
 
-  const route = decideAutoSubscriptionRoute(portfolio, policy, signals);
+  const performanceSignals: AgentPerformanceSignal[] = candidates.map((entry) => {
+    if (scopeSize === null) {
+      return Object.freeze({
+        profileId: entry.profile.id,
+        status: "unknown" as const,
+        reason: "scope_size_unavailable",
+      });
+    }
+    const estimate = estimateExpectedRunPerformance(history.observations, {
+      provider: entry.profile.provider,
+      runtime: entry.profile.runtime,
+      model: entry.profile.model,
+      effort: policy.requirements.minimumEffort,
+      taskCategory: policy.requirements.category,
+      scopeSize,
+    });
+    if (estimate.status !== "available") {
+      return Object.freeze({
+        profileId: entry.profile.id,
+        status: "unknown" as const,
+        reason: estimate.reason,
+      });
+    }
+    return Object.freeze({
+      profileId: entry.profile.id,
+      status: "available" as const,
+      terminalSuccessPercent: estimate.terminalSuccessPercent,
+      firstPassValidationPercent: estimate.firstPassValidationPercent,
+      medianDurationMs: estimate.medianDurationMs,
+      meanRepairAttempts: estimate.meanRepairAttempts,
+      scopeViolationPercent: estimate.scopeViolationPercent,
+      failoverPercent: estimate.failoverPercent,
+      sampleSize: estimate.matchingRuns,
+    });
+  });
+
+  const route = decideAutoSubscriptionRoute(
+    portfolio,
+    policy,
+    signals,
+    performanceSignals,
+  );
   const continuationDecision = decideAutoContinuationRoute(policy, route);
   if (continuationDecision?.executionPath === "chatgpt_handoff") {
     return Object.freeze({
