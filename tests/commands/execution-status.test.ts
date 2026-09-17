@@ -183,6 +183,20 @@ function failedResult(): LoopRunResult {
       fallback: Object.freeze({ active: false, reason: null }),
     }),
     contextPackage: null,
+    quotaConsumptionEvidence: Object.freeze({
+      schemaVersion: 1 as const,
+      source: "openclaw_usage_status_delta" as const,
+      provider: "anthropic",
+      beforeUpdatedAt: Date.parse("2026-09-06T21:59:55.000Z"),
+      afterUpdatedAt: Date.parse("2026-09-06T22:02:05.000Z"),
+      windows: Object.freeze([
+        Object.freeze({
+          label: "Week",
+          consumedPercent: 1,
+          resetAt: Date.parse("2026-09-12T00:00:00.000Z"),
+        }),
+      ]),
+    }),
   });
 }
 
@@ -248,7 +262,16 @@ test("execution status persists active progress and estimates ETA without invent
     assert.deepEqual(report.execution?.timeline[1]?.details, [
       "Calling admitted executor.",
     ]);
+    assert.equal(report.telemetry.durationMs.status, "unavailable");
+    assert.equal(report.telemetry.runtime.status, "available");
+    assert.equal(report.telemetry.runtime.value, "claude_code");
+    assert.equal(report.telemetry.attempt.status, "available");
+    assert.equal(report.telemetry.attempt.value, 1);
+    assert.equal(report.telemetry.validation.status, "unavailable");
     assert.equal(report.telemetry.tokens.status, "unavailable");
+    assert.equal(report.telemetry.tokens.reason, "runtime_usage_not_reported");
+    assert.equal(report.telemetry.contextTokens.status, "unavailable");
+    assert.equal(report.telemetry.toolCalls.status, "unavailable");
     assert.equal(report.telemetry.costUsd.status, "unavailable");
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -283,6 +306,18 @@ test("execution status exposes a terminal failure instead of making the same can
     assert.deepEqual(report.execution?.timeline[0]?.details, [
       "Validation failed.",
     ]);
+    assert.equal(report.telemetry.durationMs.status, "available");
+    assert.equal(report.telemetry.durationMs.value, 120_000);
+    assert.equal(report.telemetry.durationMs.source, "loop_run_result");
+    assert.equal(report.telemetry.validation.status, "available");
+    assert.equal(report.telemetry.validation.value, "failed");
+    assert.equal(report.telemetry.repairAttempts.status, "available");
+    assert.equal(report.telemetry.repairAttempts.value, 0);
+    assert.equal(report.telemetry.quota.status, "available");
+    assert.equal(report.telemetry.quota.value?.provider, "anthropic");
+    assert.equal(report.telemetry.quota.value?.windows[0]?.consumedPercent, 1);
+    assert.equal(report.telemetry.tokens.status, "unavailable");
+    assert.equal(report.telemetry.costUsd.status, "unavailable");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
