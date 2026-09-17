@@ -230,6 +230,107 @@ function terminalSummary(record: DurableExecutionRecord) {
   });
 }
 
+type TelemetryUnavailableReason =
+  | "execution_not_terminal"
+  | "executor_identity_unavailable"
+  | "validation_not_recorded"
+  | "provider_failover_not_recorded"
+  | "quota_consumption_not_recorded"
+  | "runtime_usage_not_reported"
+  | "runtime_context_usage_not_reported"
+  | "runtime_tool_calls_not_reported"
+  | "runtime_cost_not_reported";
+
+function availableMetric<T>(
+  value: T,
+  source: string,
+  observedAt: string,
+) {
+  return Object.freeze({
+    status: "available" as const,
+    value,
+    source,
+    observedAt,
+    reason: null,
+  });
+}
+
+function unavailableMetric(
+  reason: TelemetryUnavailableReason,
+  source: string,
+) {
+  return Object.freeze({
+    status: "unavailable" as const,
+    value: null,
+    source,
+    observedAt: null,
+    reason,
+  });
+}
+
+function executionTelemetry(record: DurableExecutionRecord) {
+  const result = record.result;
+  const executor = executorFor(record);
+  const terminalObservedAt = result?.completedAt ?? record.updatedAt;
+  const durationMs =
+    result?.completedAt === null || result?.completedAt === undefined
+      ? null
+      : finiteDurationMs(result.startedAt, result.completedAt);
+  const validation = result?.validation ?? null;
+  const failoverAttempts = result?.providerFailoverEvidence?.attempts.length ?? null;
+  const quota = result?.quotaConsumptionEvidence ?? null;
+
+  return Object.freeze({
+    durationMs:
+      durationMs === null
+        ? unavailableMetric("execution_not_terminal", "durable_execution_record")
+        : availableMetric(durationMs, "loop_run_result", terminalObservedAt),
+    runtime:
+      executor === null
+        ? unavailableMetric("executor_identity_unavailable", "durable_execution_record")
+        : availableMetric(executor.runtime, "durable_execution_record", record.updatedAt),
+    provider:
+      executor === null
+        ? unavailableMetric("executor_identity_unavailable", "durable_execution_record")
+        : availableMetric(executor.provider, "durable_execution_record", record.updatedAt),
+    model:
+      executor === null
+        ? unavailableMetric("executor_identity_unavailable", "durable_execution_record")
+        : availableMetric(executor.model, "durable_execution_record", record.updatedAt),
+    effort:
+      executor === null
+        ? unavailableMetric("executor_identity_unavailable", "durable_execution_record")
+        : availableMetric(executor.effort, "durable_execution_record", record.updatedAt),
+    attempt: availableMetric(record.attempt, "durable_execution_record", record.updatedAt),
+    validation:
+      validation === null
+        ? unavailableMetric("validation_not_recorded", "loop_run_result")
+        : availableMetric(validation.status, "loop_run_result", terminalObservedAt),
+    repairAttempts:
+      validation === null
+        ? unavailableMetric("validation_not_recorded", "loop_run_result")
+        : availableMetric(validation.repairAttempts, "loop_run_result", terminalObservedAt),
+    failoverAttempts:
+      failoverAttempts === null
+        ? unavailableMetric("provider_failover_not_recorded", "loop_run_result")
+        : availableMetric(failoverAttempts, "loop_run_result", terminalObservedAt),
+    quota:
+      quota === null
+        ? unavailableMetric("quota_consumption_not_recorded", "loop_run_result")
+        : availableMetric(quota, quota.source, terminalObservedAt),
+    tokens: unavailableMetric("runtime_usage_not_reported", "runtime_contract"),
+    contextTokens: unavailableMetric(
+      "runtime_context_usage_not_reported",
+      "runtime_contract",
+    ),
+    toolCalls: unavailableMetric(
+      "runtime_tool_calls_not_reported",
+      "runtime_contract",
+    ),
+    costUsd: unavailableMetric("runtime_cost_not_reported", "runtime_contract"),
+  });
+}
+
 async function readExecutionRecords(
   project: string,
   directory?: string,
@@ -283,14 +384,26 @@ export async function buildExecutionStatusReport(
       project,
       execution: null,
       telemetry: Object.freeze({
-        tokens: Object.freeze({
-          status: "unavailable" as const,
-          reason: "provider_usage_not_recorded",
-        }),
-        costUsd: Object.freeze({
-          status: "unavailable" as const,
-          reason: "provider_usage_not_recorded",
-        }),
+        durationMs: unavailableMetric("execution_not_terminal", "durable_execution_record"),
+        runtime: unavailableMetric("executor_identity_unavailable", "durable_execution_record"),
+        provider: unavailableMetric("executor_identity_unavailable", "durable_execution_record"),
+        model: unavailableMetric("executor_identity_unavailable", "durable_execution_record"),
+        effort: unavailableMetric("executor_identity_unavailable", "durable_execution_record"),
+        attempt: unavailableMetric("execution_not_terminal", "durable_execution_record"),
+        validation: unavailableMetric("validation_not_recorded", "loop_run_result"),
+        repairAttempts: unavailableMetric("validation_not_recorded", "loop_run_result"),
+        failoverAttempts: unavailableMetric("provider_failover_not_recorded", "loop_run_result"),
+        quota: unavailableMetric("quota_consumption_not_recorded", "loop_run_result"),
+        tokens: unavailableMetric("runtime_usage_not_reported", "runtime_contract"),
+        contextTokens: unavailableMetric(
+          "runtime_context_usage_not_reported",
+          "runtime_contract",
+        ),
+        toolCalls: unavailableMetric(
+          "runtime_tool_calls_not_reported",
+          "runtime_contract",
+        ),
+        costUsd: unavailableMetric("runtime_cost_not_reported", "runtime_contract"),
       }),
     });
   }
@@ -323,15 +436,6 @@ export async function buildExecutionStatusReport(
       executor: executorFor(record),
       terminal: terminalSummary(record),
     }),
-    telemetry: Object.freeze({
-      tokens: Object.freeze({
-        status: "unavailable" as const,
-        reason: "provider_usage_not_recorded",
-      }),
-      costUsd: Object.freeze({
-        status: "unavailable" as const,
-        reason: "provider_usage_not_recorded",
-      }),
-    }),
+    telemetry: executionTelemetry(record),
   });
 }
