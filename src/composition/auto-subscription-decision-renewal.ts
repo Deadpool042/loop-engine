@@ -823,11 +823,11 @@ export async function ensureAutoSubscriptionExecutionDecision(
     return context.reason === "scope"
       ? failure(
           "auto_subscription_requires_detailed_scope",
-          "Autonomous execution decision renewal requires an explicit deterministic writable scope in the canonical lot detail.",
+          "Autonomous execution decision renewal requires a canonical `Périmètre d’écriture` section with an explicit deterministic writable scope.",
         )
       : failure(
           "auto_subscription_requires_detailed_brief",
-          "Autonomous execution decision renewal requires a documented canonical lot detail.",
+          "Autonomous execution decision renewal requires a documented canonical lot detail. New autonomous lots must provide `Objectif`, `Livrables`, `Hors périmètre`, and `Périmètre d’écriture` sections.",
         );
   }
 

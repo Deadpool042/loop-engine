@@ -933,6 +933,10 @@ test("refuses autonomous renewal when the canonical lot has no detailed brief", 
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.equal(result.code, "auto_subscription_requires_detailed_brief");
+      assert.match(result.message, /Objectif/);
+      assert.match(result.message, /Livrables/);
+      assert.match(result.message, /Hors périmètre/);
+      assert.match(result.message, /Périmètre d’écriture/);
     }
     assert.equal(calls, 0);
   } finally {
@@ -958,6 +962,7 @@ test("refuses autonomous renewal when the canonical lot has no deterministic wri
     assert.equal(result.ok, false);
     if (!result.ok) {
       assert.equal(result.code, "auto_subscription_requires_detailed_scope");
+      assert.match(result.message, /Périmètre d’écriture/);
     }
     assert.equal(calls, 0);
   } finally {
