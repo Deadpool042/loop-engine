@@ -179,6 +179,41 @@ export type ExpectedRunValueEstimate =
       expectedValuePercent: number;
     }>;
 
+export type ExpectedRunPerformanceQuery = Readonly<{
+  provider: string;
+  runtime: string;
+  model: string;
+  effort: AgentEffort;
+  taskCategory: LoopTaskCategory;
+  scopeSize: LoopRunScopeSize;
+}>;
+
+export type ExpectedRunPerformanceEstimate =
+  | Readonly<{
+      status: "unknown";
+      reason: "insufficient_samples";
+      minimumSampleSize: number;
+      matchingRuns: number;
+    }>
+  | Readonly<{
+      status: "available";
+      method: "terminal_performance_exact_match";
+      minimumSampleSize: number;
+      matchingRuns: number;
+      successfulRuns: number;
+      terminalSuccessPercent: number;
+      firstPassValidationObservedRuns: number;
+      firstPassValidationPercent: number | null;
+      durationObservedRuns: number;
+      medianDurationMs: number | null;
+      repairObservedRuns: number;
+      meanRepairAttempts: number | null;
+      scopeObservedRuns: number;
+      scopeViolationPercent: number | null;
+      failoverObservedRuns: number;
+      failoverPercent: number | null;
+    }>;
+
 export type ExpectedRunEfficiencyQuery = ExpectedQuotaConsumptionQuery &
   Readonly<{ quotaWindowLabel: string }>;
 
@@ -862,6 +897,96 @@ export function estimateExpectedRunValue(
     matchingRuns: matching.length,
     successfulRuns,
     expectedValuePercent: (successfulRuns / matching.length) * 100,
+  });
+}
+
+function matchesExpectedPerformanceQuery(
+  observation: LoopRunModelObservation,
+  query: ExpectedRunPerformanceQuery,
+): boolean {
+  return (
+    observation.provider === query.provider &&
+    observation.runtime === query.runtime &&
+    observation.model === query.model &&
+    observation.taskCategory === query.taskCategory &&
+    observation.scopeSize === query.scopeSize &&
+    (observation.effort === null || observation.effort === query.effort)
+  );
+}
+
+function mean(values: readonly number[]): number | null {
+  if (values.length === 0) return null;
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+export function estimateExpectedRunPerformance(
+  observations: readonly LoopRunModelObservation[],
+  query: ExpectedRunPerformanceQuery,
+): ExpectedRunPerformanceEstimate {
+  const matching = observations.filter((observation) =>
+    matchesExpectedPerformanceQuery(observation, query),
+  );
+
+  if (matching.length < MIN_EXPECTED_VALUE_SAMPLE_SIZE) {
+    return Object.freeze({
+      status: "unknown" as const,
+      reason: "insufficient_samples" as const,
+      minimumSampleSize: MIN_EXPECTED_VALUE_SAMPLE_SIZE,
+      matchingRuns: matching.length,
+    });
+  }
+
+  const successfulRuns = matching.filter(isGovernedSuccessfulObservation).length;
+  const firstPassValidation = matching.filter(
+    (observation) => observation.validation !== null,
+  );
+  const firstPassValidationSuccesses = firstPassValidation.filter(
+    (observation) =>
+      observation.validation?.status === "passed" &&
+      observation.validation.attempts === 1 &&
+      observation.validation.repairAttempts === 0,
+  ).length;
+  const durations = matching.flatMap((observation) =>
+    observation.durationMs === null ? [] : [observation.durationMs],
+  );
+  const repairAttempts = matching.flatMap((observation) =>
+    observation.validation === null ? [] : [observation.validation.repairAttempts],
+  );
+  const scopeObserved = matching.filter(
+    (observation) => observation.outOfScopeFileCount !== null,
+  );
+  const scopeViolations = scopeObserved.filter(
+    (observation) => (observation.outOfScopeFileCount ?? 0) > 0,
+  ).length;
+  const failoverObserved = matching.filter(
+    (observation) => observation.providerAttempt !== null,
+  );
+  const failovers = failoverObserved.filter(
+    (observation) => observation.selectedAfterFailover,
+  ).length;
+
+  return Object.freeze({
+    status: "available" as const,
+    method: "terminal_performance_exact_match" as const,
+    minimumSampleSize: MIN_EXPECTED_VALUE_SAMPLE_SIZE,
+    matchingRuns: matching.length,
+    successfulRuns,
+    terminalSuccessPercent: (successfulRuns / matching.length) * 100,
+    firstPassValidationObservedRuns: firstPassValidation.length,
+    firstPassValidationPercent:
+      firstPassValidation.length === 0
+        ? null
+        : (firstPassValidationSuccesses / firstPassValidation.length) * 100,
+    durationObservedRuns: durations.length,
+    medianDurationMs: durations.length === 0 ? null : median(durations),
+    repairObservedRuns: repairAttempts.length,
+    meanRepairAttempts: mean(repairAttempts),
+    scopeObservedRuns: scopeObserved.length,
+    scopeViolationPercent:
+      scopeObserved.length === 0 ? null : (scopeViolations / scopeObserved.length) * 100,
+    failoverObservedRuns: failoverObserved.length,
+    failoverPercent:
+      failoverObserved.length === 0 ? null : (failovers / failoverObserved.length) * 100,
   });
 }
 

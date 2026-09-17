@@ -5,6 +5,7 @@ import {
   buildRunModelEfficiencyReport,
   estimateExpectedQuotaConsumption,
   estimateExpectedRunEfficiency,
+  estimateExpectedRunPerformance,
   estimateExpectedRunValue,
   MIN_QUOTA_CONSUMPTION_SAMPLE_SIZE,
   projectRunModelObservation,
@@ -584,6 +585,138 @@ describe("run model efficiency evidence", () => {
         matchingRuns: 5,
         successfulRuns: 4,
         expectedValuePercent: 80,
+      },
+    );
+  });
+
+  it("keeps terminal performance unknown below five exact comparable runs", () => {
+    const observations = [1, 2, 3, 4]
+      .map((index) =>
+        run({
+          runId: `performance-${index}`,
+          agentPolicy: policyCategory("code"),
+          executionPlanEvidence: {
+            ...planEvidence(
+              "openai",
+              "codex",
+              "configured.codex.economy",
+              "gpt-5.6-luna",
+            ),
+            allowedPaths: ["src/**"],
+          },
+          validation: {
+            status: "passed",
+            attempts: 1,
+            repairAttempts: 0,
+            commands: ["pnpm run validate"],
+            failedCommand: null,
+            exitCode: 0,
+          },
+          writableFileScope: ["src/**"],
+        }),
+      )
+      .map(projectRunModelObservation)
+      .filter((value): value is NonNullable<typeof value> => value !== null);
+
+    assert.deepEqual(
+      estimateExpectedRunPerformance(observations, {
+        provider: "openai",
+        runtime: "codex",
+        model: "gpt-5.6-luna",
+        effort: "low",
+        taskCategory: "code",
+        scopeSize: "small",
+      }),
+      {
+        status: "unknown",
+        reason: "insufficient_samples",
+        minimumSampleSize: 5,
+        matchingRuns: 4,
+      },
+    );
+  });
+
+  it("summarizes comparable terminal performance without converting missing metrics to zero", () => {
+    const runs = [1, 2, 3, 4, 5].map((index) =>
+      run({
+        runId: `performance-${index}`,
+        status: index === 5 ? "failed" : "completed",
+        startedAt: "2026-09-05T10:00:00.000Z",
+        completedAt: `2026-09-05T10:00:${String(index * 2).padStart(2, "0")}.000Z`,
+        agentPolicy: policyCategory("code"),
+        executionPlanEvidence: {
+          ...planEvidence(
+            "openai",
+            "codex",
+            "configured.codex.economy",
+            "gpt-5.6-luna",
+          ),
+          allowedPaths: ["src/**"],
+        },
+        providerFailoverEvidence: failoverEvidence(
+          [
+            {
+              attempt: 1,
+              provider: "openai",
+              runtime: "codex",
+              profileId: "configured.codex.economy",
+              model: "gpt-5.6-luna",
+              status: "completed",
+              failureCode: null,
+              recoverable: false,
+            },
+          ],
+          "openai",
+        ),
+        validation:
+          index === 4
+            ? null
+            : {
+                status: "passed",
+                attempts: index === 3 ? 2 : 1,
+                repairAttempts: index === 3 ? 1 : 0,
+                commands: ["pnpm run validate"],
+                failedCommand: null,
+                exitCode: 0,
+              },
+        modifiedFiles: index === 5 ? ["outside.ts"] : ["src/a.ts"],
+        writableFileScope: ["src/**"],
+        failure:
+          index === 5
+            ? { code: "scope_violation", message: "fixture", details: [] }
+            : null,
+      }),
+    );
+    const observations = runs
+      .map(projectRunModelObservation)
+      .filter((value): value is NonNullable<typeof value> => value !== null);
+
+    assert.deepEqual(
+      estimateExpectedRunPerformance(observations, {
+        provider: "openai",
+        runtime: "codex",
+        model: "gpt-5.6-luna",
+        effort: "low",
+        taskCategory: "code",
+        scopeSize: "small",
+      }),
+      {
+        status: "available",
+        method: "terminal_performance_exact_match",
+        minimumSampleSize: 5,
+        matchingRuns: 5,
+        successfulRuns: 4,
+        terminalSuccessPercent: 80,
+        firstPassValidationObservedRuns: 4,
+        firstPassValidationPercent: 75,
+        durationObservedRuns: 5,
+        medianDurationMs: 6000,
+        repairObservedRuns: 4,
+        meanRepairAttempts: 0.25,
+        scopeObservedRuns: 5,
+        scopeViolationPercent: 20,
+        failoverObservedRuns: 5,
+        failoverPercent: 0,
       },
     );
   });

@@ -18,7 +18,10 @@ import {
   type AgentQuotaSnapshot,
 } from "../agents/types.js";
 import { decideAgentRoute, type AgentRouteDecision } from "../agents/router.js";
-import type { AgentEfficiencySignal } from "../agents/selector.js";
+import type {
+  AgentEfficiencySignal,
+  AgentPerformanceSignal,
+} from "../agents/selector.js";
 import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
 import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
 import {
@@ -392,6 +395,7 @@ export function decideAutoSubscriptionRoute(
   portfolio: AutoSubscriptionModelPortfolio,
   policy: AgentPolicyResolution,
   efficiencySignals: readonly AgentEfficiencySignal[],
+  performanceSignals: readonly AgentPerformanceSignal[] = [],
 ): AgentRouteDecision {
   if (policy.status !== "resolved") {
     throw new TypeError(
@@ -417,6 +421,7 @@ export function decideAutoSubscriptionRoute(
     }),
     effort: policy.requirements.minimumEffort,
     efficiencySignals,
+    performanceSignals,
   });
 }
 
