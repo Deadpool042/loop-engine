@@ -116,13 +116,27 @@ function progressRange(status: string): readonly [number, number] {
   }
 }
 
+function currentAttemptStartedAt(record: DurableExecutionRecord): string {
+  if (record.result?.startedAt) return record.result.startedAt;
+  for (let index = record.events.length - 1; index >= 0; index -= 1) {
+    const candidate = record.events[index];
+    if (
+      candidate?.type === "lease_acquired" ||
+      candidate?.type === "lease_recovered"
+    ) {
+      return candidate.at;
+    }
+  }
+  return record.createdAt;
+}
+
 function estimatedProgress(
   record: DurableExecutionRecord,
   nowMs: number,
   expectedMs: number | null,
 ) {
   const terminal = record.status !== "running";
-  const started = Date.parse(record.createdAt);
+  const started = Date.parse(currentAttemptStartedAt(record));
   const terminalAt = Date.parse(record.result?.completedAt ?? record.updatedAt);
   const observedNowMs =
     terminal && Number.isFinite(terminalAt) ? terminalAt : nowMs;
