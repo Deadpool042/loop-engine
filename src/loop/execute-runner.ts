@@ -12,6 +12,7 @@ import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
 import { createLoopExecutionPlan } from "./execution-plan.js";
 import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import { findOutOfScopeFiles } from "./file-scope.js";
+import { inspectCompletionEvidenceGate } from "./completion-evidence.js";
 import {
   createModelEscalationEvidence,
   resolveIntraProviderModelEscalation,
@@ -56,6 +57,8 @@ export type LoopRunExecuteOptions = LoopRunPlanOptions &
     exportPatchPath?: string;
     /** Test-only seam; production always uses the local Git worktree inventory. */
     readModifiedWorktreeFiles?: typeof readModifiedWorktreeFiles;
+    /** Test-only seam; production inspects explicit completion-evidence markers from the worktree. */
+    inspectCompletionEvidenceGate?: typeof inspectCompletionEvidenceGate;
     /**
      * Composition-only reset for an already isolated execution workspace.
      * When provided, model escalation restarts from the immutable source HEAD
@@ -105,6 +108,7 @@ type ExecuteDependencies = Readonly<{
   repairer: LoopRepairer | null;
   maxRepairs: number;
   readModifiedWorktreeFiles: typeof readModifiedWorktreeFiles;
+  inspectCompletionEvidenceGate: typeof inspectCompletionEvidenceGate;
   resetExecutionWorkspace:
     ((executionProjectPath: string) => Promise<void>) | null;
 }>;
@@ -127,6 +131,8 @@ function resolveDependencies(
     maxRepairs: options.maxRepairs ?? 0,
     readModifiedWorktreeFiles:
       options.readModifiedWorktreeFiles ?? readModifiedWorktreeFiles,
+    inspectCompletionEvidenceGate:
+      options.inspectCompletionEvidenceGate ?? inspectCompletionEvidenceGate,
     resetExecutionWorkspace: options.resetExecutionWorkspace ?? null,
   };
 }
@@ -770,6 +776,46 @@ export async function runLoopExecute(
           completion.decomposition.selectedChildId !== selectedSyntheticChildId;
 
         if (!candidateCompleted && !syntheticChildAdvanced) {
+          const completionEvidenceCandidate =
+            cycle.decomposition === undefined
+              ? cycle.candidate
+              : Object.freeze({
+                  ...cycle.candidate,
+                  id: cycle.decomposition.parentCandidate.id,
+                  path: cycle.decomposition.parentCandidate.path,
+                  line: cycle.decomposition.parentCandidate.line,
+                  text: cycle.decomposition.parentCandidate.text,
+                });
+          const completionEvidence = dependencies.inspectCompletionEvidenceGate(
+            executionProject.path,
+            completionEvidenceCandidate,
+          );
+          if (completionEvidence.status === "required") {
+            const details = [
+              "Validated AUTO execution still requires completion evidence.",
+              ...(completionEvidence.detailPath === null
+                ? []
+                : [`Completion detail: ${completionEvidence.detailPath}`]),
+              ...(completionEvidence.evidencePath === null
+                ? []
+                : [`Completion evidence: ${completionEvidence.evidencePath}`]),
+              ...(completionEvidence.unresolvedCount === null
+                ? []
+                : [`Unresolved evidence items: ${completionEvidence.unresolvedCount}`]),
+              `Completion evidence reason: ${completionEvidence.reason}`,
+            ];
+            transition("failed", "completion_evidence_required", "failed", details);
+            return finalize(
+              cycle.candidate,
+              Object.freeze({
+                code: "completion_evidence_required",
+                message:
+                  "Validated AUTO execution requires explicit completion evidence before roadmap closure.",
+                details: Object.freeze(details.slice(1)),
+              }),
+            );
+          }
+
           const completionSourcePath =
             cycle.decomposition?.sourceDocument ?? cycle.candidate.path;
           const completionSourceInScope =

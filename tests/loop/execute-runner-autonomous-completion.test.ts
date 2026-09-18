@@ -343,4 +343,60 @@ describe("V57 autonomous completion repair", () => {
       /shared repair budget is exhausted/,
     );
   });
+
+  it("does not spend a completion repair when explicit evidence is still unresolved", async () => {
+    let executorCalls = 0;
+    let validatorCalls = 0;
+
+    const result = await runLoopExecute("autonomous-completion", {
+      ...baseOptions(),
+      maxRepairs: 1,
+      planLoopCycle: () => openCycle(["roadmap.md"]),
+      inspectCompletionEvidenceGate: () => ({
+        status: "required" as const,
+        kind: "checklist" as const,
+        detailPath: "docs/roadmap/detail.md",
+        evidencePath: "docs/testing/evidence.md",
+        unresolvedCount: 12,
+        reason: "unresolved_checklist" as const,
+      }),
+      readModifiedWorktreeFiles: async () => ["roadmap.md"],
+      executor: async () => {
+        executorCalls += 1;
+        return {
+          status: "completed" as const,
+          modifiedFiles: ["roadmap.md"],
+          details: [],
+        };
+      },
+      validator: async () => {
+        validatorCalls += 1;
+        return {
+          status: "passed" as const,
+          failedCommand: null,
+          exitCode: 0,
+          details: [],
+        };
+      },
+    });
+
+    assert.equal(executorCalls, 1);
+    assert.equal(validatorCalls, 1);
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "completion_evidence_required");
+    assert.equal(result.validation?.repairAttempts, 0);
+    assert.equal(
+      result.steps.filter((step) => step.name === "completion_repair").length,
+      0,
+    );
+    assert.equal(
+      result.steps.filter((step) => step.name === "completion_evidence_required").length,
+      1,
+    );
+    assert.match(
+      result.failure?.details.join("\n") ?? "",
+      /Unresolved evidence items: 12/,
+    );
+  });
+
 });
