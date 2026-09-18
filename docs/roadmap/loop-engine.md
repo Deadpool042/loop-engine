@@ -334,3 +334,18 @@ Audit initial : [`../audits/2026-09-14-auto-routing-chatgpt-codex-claude-audit.m
 - Development Workspace transporte uniquement des preuves/contrats bornés ;
 - aucune réouverture des migrations natives Codex/Claude OC-15/OC-16 sur OpenClaw `2026.9.4` ;
 - aucun nouveau scheduler, ledger ou stockage de progression.
+
+## V56 — événements canoniques de progression live
+
+Cadrage et checklist : [`live-execution-events-v56.md`](./live-execution-events-v56.md).
+
+- [ ] [P0] V56.0 — Exposer les changements du durable execution record sous forme d’événements `execution.progressed` bornés et transport-neutral, émis uniquement après persistance réussie et identifiés par une révision monotone. Le payload ne duplique ni timeline, ni logs, ni Run History : le consommateur relit `execution-status` pour le snapshot complet. Aucun poller, watcher filesystem, nouveau stockage, transport réseau, provider ou logique OpenClaw dans Loop Engine.
+
+### Gates V56
+
+- Loop Engine reste l’unique source de vérité de l’état d’exécution ;
+- aucune émission avant persistance durable réussie ;
+- perte d’un événement récupérable par relecture de `execution-status` ;
+- une panne du sink événementiel n’interrompt jamais le run ;
+- aucune donnée provider sensible, stdout/stderr, prompt ou contenu fichier dans l’événement ;
+- aucun couplage à OpenClaw, Development Workspace, n8n ou un transport réseau dans Core.

@@ -4,6 +4,8 @@ import {
   type DurableExecutionCancellationResult,
   type DurableExecutionEvent,
   type DurableExecutionProgress,
+  type DurableExecutionProgressedEvent,
+  type DurableExecutionProgressedSink,
   type DurableExecutionRecord,
   type DurableExecutionRequest,
   type DurableExecutionResult,
@@ -11,6 +13,41 @@ import {
 } from "./durable-execution.js";
 
 const MAX_PROGRESS_EVENTS = 32;
+
+function progressedEvent(
+  record: DurableExecutionRecord,
+): DurableExecutionProgressedEvent {
+  const latest = record.progress;
+  return Object.freeze({
+    schemaVersion: 1 as const,
+    type: "execution.progressed" as const,
+    project: record.project,
+    idempotencyKey: record.idempotencyKey,
+    runId: latest?.runId ?? record.result?.runId ?? null,
+    revision: record.revision,
+    status: record.status,
+    step:
+      record.status === "running"
+        ? (latest?.step ?? "starting")
+        : (record.result?.steps.at(-1)?.name ?? latest?.step ?? record.status),
+    updatedAt: record.updatedAt,
+    terminal: record.status !== "running",
+  });
+}
+
+function emitProgressed(
+  sink: DurableExecutionProgressedSink | undefined,
+  record: DurableExecutionRecord,
+): void {
+  if (!sink) return;
+  try {
+    void Promise.resolve(sink(progressedEvent(record))).catch(() => {
+      // Event transport is auxiliary. Durable execution remains authoritative.
+    });
+  } catch {
+    // Event transport is auxiliary. Durable execution remains authoritative.
+  }
+}
 
 function nonEmpty(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
@@ -136,6 +173,7 @@ export async function runDurableLoopExecution(
     onProgress: (progress: DurableExecutionProgress) => void,
   ) => Promise<LoopRunResult>,
   now: () => string = () => new Date().toISOString(),
+  onProgressed?: DurableExecutionProgressedSink,
 ): Promise<DurableExecutionResult> {
   if (!validRequest(request)) {
     return reject("invalid_request", null, "Expected a valid idempotency key, project, owner and positive lease duration.");
@@ -167,12 +205,14 @@ export async function runDurableLoopExecution(
   if (!acquired) {
     return reject("record_conflict", await store.load(request.idempotencyKey.trim()), "The durable execution record changed while acquiring its lease.");
   }
+  emitProgressed(onProgressed, leased);
 
   if (leased.cancellationRequested) {
     const cancelled = finish(leased, now(), "cancelled", null, internalFailure("execution_cancelled", "Execution was cancelled before provider invocation."));
     if (!(await store.save(cancelled, leased.revision))) {
       return reject("record_conflict", await store.load(request.idempotencyKey.trim()), "The durable execution record changed while finalizing cancellation.");
     }
+    emitProgressed(onProgressed, cancelled);
     return Object.freeze({ status: "executed" as const, record: cancelled });
   }
 
@@ -202,7 +242,9 @@ export async function runDurableLoopExecution(
           progress,
           progressEvents,
         });
-        await store.save(updated, current.revision);
+        if (await store.save(updated, current.revision)) {
+          emitProgressed(onProgressed, updated);
+        }
       })
       .catch(() => {
         // Progress is auxiliary. A telemetry write must never fail the run.
@@ -239,6 +281,7 @@ export async function runDurableLoopExecution(
         "The durable execution record changed while persisting failure.",
       );
     }
+    emitProgressed(onProgressed, failed);
     return Object.freeze({ status: "executed" as const, record: failed });
   }
 
@@ -273,6 +316,7 @@ export async function runDurableLoopExecution(
       "The durable execution record changed while persisting its terminal result.",
     );
   }
+  emitProgressed(onProgressed, completed);
   return Object.freeze({ status: "executed" as const, record: completed });
 }
 
@@ -281,6 +325,7 @@ export async function requestDurableExecutionCancellation(
   idempotencyKey: string,
   requestedBy: string,
   now: () => string = () => new Date().toISOString(),
+  onProgressed?: DurableExecutionProgressedSink,
 ): Promise<DurableExecutionCancellationResult> {
   if (!nonEmpty(idempotencyKey) || !nonEmpty(requestedBy)) {
     return Object.freeze({ status: "rejected" as const, code: "invalid_request" as const, details: Object.freeze(["Expected a non-empty idempotency key and requester."]) });
@@ -306,5 +351,6 @@ export async function requestDurableExecutionCancellation(
   if (!(await store.save(updated, existing.revision))) {
     return Object.freeze({ status: "rejected" as const, code: "record_conflict" as const, details: Object.freeze(["The durable execution record changed while requesting cancellation."]) });
   }
+  emitProgressed(onProgressed, updated);
   return Object.freeze({ status: "requested" as const, record: updated });
 }
