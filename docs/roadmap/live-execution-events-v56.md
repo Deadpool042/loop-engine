@@ -68,7 +68,7 @@ L’événement ne duplique pas la timeline. Après réception, le consommateur 
 
 - [x] Couvrir ordre, déduplication, progression, terminal, recovery et perte/échec du sink.
 - [x] Vérifier qu’un snapshot `execution-status` permet toujours la resynchronisation après événement perdu.
-- [ ] Validation canonique complète verte.
+- [x] Validation canonique complète verte : CI PR #329, checks `Quality` et `CI gate` réussis.
 - [x] Aucun nouveau stockage ni modification de Run History.
 
 ## Critères de clôture
