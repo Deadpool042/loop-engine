@@ -74,3 +74,20 @@ L’événement ne duplique pas la timeline. Après réception, le consommateur 
 ## Critères de clôture
 
 V56 est terminé lorsque Loop Engine peut signaler de façon déterministe qu’une nouvelle révision d’exécution durable existe, sans transporter la timeline elle-même, sans polling et sans couplage OpenClaw. L’intégration OpenClaw/Feature Plugin reste explicitement hors de ce lot et sera réalisée dans OC-29.
+
+
+## V56.1 — Flux durable CLI
+
+Objectif : raccorder le sink V56 au chemin durable réellement utilisé par Development Workspace, en réutilisant l’option CLI `--progress-events` existante au lieu d’introduire un second protocole.
+
+### Checklist V56.1
+
+- [x] `DurableAutoPublishInput` accepte un sink `onProgressed` optionnel.
+- [x] Le sink est transmis au `DurableExecutionControlPlane` sans modifier le comportement lorsque absent.
+- [x] Le CLI durable `run ... --mode publish --auto-subscription --durable --json --progress-events` écrit chaque événement canonique sur stderr avec le préfixe `LOOP_EXECUTION_EVENT:`.
+- [x] stdout JSON terminal reste inchangé.
+- [x] Tests ciblés durable AUTO publish : 6/6.
+- [x] Typecheck vert.
+- [ ] CI complète verte.
+
+Le flux stderr reste un **adaptateur CLI**, pas une nouvelle source de vérité : chaque payload correspond à une révision persistée et peut être perdu sans empêcher la resynchronisation via `execution-status`.

@@ -341,6 +341,8 @@ Cadrage et checklist : [`live-execution-events-v56.md`](./live-execution-events-
 
 - [x] [P0] V56.0 — Exposer les changements du durable execution record sous forme d’événements `execution.progressed` bornés et transport-neutral, émis uniquement après persistance réussie et identifiés par une révision monotone. Le payload ne duplique ni timeline, ni logs, ni Run History : le consommateur relit `execution-status` pour le snapshot complet. Aucun poller, watcher filesystem, nouveau stockage, transport réseau, provider ou logique OpenClaw dans Loop Engine. **Clôture :** sink optionnel injecté au control plane, émission après chaque sauvegarde observable, recovery/annulation/terminal couverts, resynchronisation `execution-status` après perte d’événement prouvée, tests ciblés 5/5 et CI PR #329 verte.
 
+- [ ] [P0] V56.1 — Raccorder `execution.progressed` au chemin CLI durable existant via `--progress-events` : le worker `publish --durable --json` émet sur stderr des invalidations canoniques préfixées `LOOP_EXECUTION_EVENT:` après persistance, sans altérer stdout terminal ni ajouter de stockage, réseau ou scheduler. [Détail](./live-execution-events-v56.md)
+
 ### Gates V56
 
 - Loop Engine reste l’unique source de vérité de l’état d’exécution ;

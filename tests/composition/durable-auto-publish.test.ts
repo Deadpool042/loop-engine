@@ -321,3 +321,77 @@ test("durable AUTO publish retries a failed terminal result only when explicitly
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+
+test("durable AUTO publish forwards canonical execution.progressed events", async () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-durable-auto-publish-"));
+  try {
+    const events: Array<{
+      type: string;
+      revision: number;
+      status: string;
+      step: string;
+      terminal: boolean;
+    }> = [];
+    const application = {
+      async runLoopPublish(
+        _projectName: string,
+        options?: {
+          onProgress?: (event: {
+            status: "executing";
+            at: string;
+            runId: string;
+            step: string;
+            details: readonly string[];
+            executor: null;
+          }) => void;
+        },
+      ) {
+        options?.onProgress?.({
+          status: "executing",
+          at: "2026-09-18T06:10:01.000Z",
+          runId: "run-progressed",
+          step: "provider",
+          details: Object.freeze(["Provider invocation started."]),
+          executor: null,
+        });
+        return completedResult("run-progressed");
+      },
+      recordLoopRunHistory() {
+        return Object.freeze({ written: true, ok: true });
+      },
+    };
+
+    const result = await runDurableAutoSubscriptionPublish(application, {
+      project: "example",
+      candidateId: "H1-L1",
+      expectedGitHead: "a".repeat(40),
+      maxRepairs: 0,
+      storeDirectory: root,
+      owner: "worker:progressed",
+      onProgressed(event) {
+        events.push({
+          type: event.type,
+          revision: event.revision,
+          status: event.status,
+          step: event.step,
+          terminal: event.terminal,
+        });
+      },
+    });
+
+    assert.equal(result.report.status, "completed");
+    assert.deepEqual(
+      events.map((event) => event.type),
+      ["execution.progressed", "execution.progressed", "execution.progressed"],
+    );
+    assert.deepEqual(
+      events.map((event) => event.revision),
+      [1, 2, 3],
+    );
+    assert.equal(events[1]?.step, "provider");
+    assert.equal(events.at(-1)?.terminal, true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
