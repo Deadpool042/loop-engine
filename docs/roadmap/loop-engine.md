@@ -357,7 +357,7 @@ Cadrage et checklist : [`live-execution-events-v56.md`](./live-execution-events-
 
 Cadrage et checklist : [`autonomous-completion-v57.md`](./autonomous-completion-v57.md).
 
-- [ ] [P0] V57.0 — Étendre la boucle AUTO existante au cas `candidate_not_completed` sans créer de second orchestrateur : après validation technique verte, relire déterministement le candidat ; s'il est déjà fermé/avancé, terminer sans LLM ; sinon autoriser au plus une réparation de clôture dans le budget global existant, uniquement si la source canonique du candidat appartient au scope d'écriture gouverné. Revalider ensuite intégralement et relire la roadmap. Aucun auto-check aveugle, aucun nouveau scheduler/ledger/provider, aucun modèle local supposé disponible et aucun financement payant implicite.
+- [x] [P0] V57.0 — Étendre la boucle AUTO existante au cas `candidate_not_completed` sans créer de second orchestrateur : après validation technique verte, relire déterministement le candidat ; s'il est déjà fermé/avancé, terminer sans LLM ; sinon autoriser au plus une réparation de clôture dans le budget global existant, uniquement si la source canonique du candidat appartient au scope d'écriture gouverné. Revalider ensuite intégralement et relire la roadmap. Aucun auto-check aveugle, aucun nouveau scheduler/ledger/provider, aucun modèle local supposé disponible et aucun financement payant implicite. **Clôture :** tests V57 5/5, execute-runner 29/29, audit V57 6/6, `audit:strict` 560/560, typecheck/json-check verts et CI PR #331 verte.
 
 ### Gates V57
 

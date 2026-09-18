@@ -72,7 +72,7 @@ Un modèle local pourra ultérieurement être ajouté comme utility/advisory si 
 - [x] Budget 0 => aucun appel de réparation.
 - [x] Budget déjà consommé par validation => aucune réparation de clôture.
 - [x] Tests ciblés couvrant succès, budget, scope, toujours-ouvert et absence de second repair.
-- [ ] Validation canonique complète verte.
+- [x] Validation canonique complète verte : PR #331, `Quality` et `CI gate` réussis sur le SHA V57.
 
 ## Hors périmètre
 
