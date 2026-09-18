@@ -322,3 +322,107 @@ test("execution status exposes a terminal failure instead of making the same can
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+
+test("execution status measures elapsed time from the current durable attempt", async () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-execution-status-retry-"));
+  try {
+    const record = runningRecord();
+    const retryRecord: DurableExecutionRecord = Object.freeze({
+      ...record,
+      revision: 7,
+      attempt: 2,
+      createdAt: "2026-09-06T10:00:00.000Z",
+      updatedAt: "2026-09-06T22:00:30.000Z",
+      leaseOwner: "worker-2",
+      leaseExpiresAt: "2026-09-06T22:30:00.000Z",
+      events: Object.freeze([
+        Object.freeze({
+          sequence: 1,
+          at: "2026-09-06T10:00:00.000Z",
+          type: "lease_acquired" as const,
+          owner: "worker-1",
+        }),
+        Object.freeze({
+          sequence: 2,
+          at: "2026-09-06T22:00:00.000Z",
+          type: "lease_recovered" as const,
+          owner: "worker-2",
+        }),
+      ]),
+    });
+
+    const store = createFileDurableExecutionStore({ directory: root });
+    assert.equal(await store.save(retryRecord, null), true);
+
+    const report = await buildExecutionStatusReport("creatyss", {
+      directory: root,
+      nowMs: Date.parse("2026-09-06T22:00:30.000Z"),
+      expectedDurationMs: 120_000,
+    });
+
+    assert.equal(report.execution?.attempt, 2);
+    assert.equal(report.execution?.progress.elapsedMs, 30_000);
+    assert.equal(report.execution?.progress.remainingMs, 90_000);
+    assert.equal(report.execution?.progress.percent, 25);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("terminal elapsed time follows LoopRunResult startedAt on a retried durable record", async () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-execution-status-terminal-retry-"));
+  try {
+    const base = failedRecord();
+    const result = failedResult();
+    const retriedResult: LoopRunResult = Object.freeze({
+      ...result,
+      startedAt: "2026-09-06T22:00:00.000Z",
+      completedAt: "2026-09-06T22:02:00.000Z",
+    });
+    const retryRecord: DurableExecutionRecord = Object.freeze({
+      ...base,
+      revision: 9,
+      attempt: 2,
+      createdAt: "2026-09-06T10:00:00.000Z",
+      updatedAt: "2026-09-06T22:02:00.000Z",
+      result: retriedResult,
+      failure: retriedResult.failure,
+      events: Object.freeze([
+        Object.freeze({
+          sequence: 1,
+          at: "2026-09-06T10:00:00.000Z",
+          type: "lease_acquired" as const,
+          owner: "worker-1",
+        }),
+        Object.freeze({
+          sequence: 2,
+          at: "2026-09-06T22:00:00.000Z",
+          type: "lease_recovered" as const,
+          owner: "worker-2",
+        }),
+        Object.freeze({
+          sequence: 3,
+          at: "2026-09-06T22:02:00.000Z",
+          type: "failed" as const,
+          owner: "worker-2",
+        }),
+      ]),
+    });
+
+    const store = createFileDurableExecutionStore({ directory: root });
+    assert.equal(await store.save(retryRecord, null), true);
+
+    const report = await buildExecutionStatusReport("creatyss", {
+      directory: root,
+      nowMs: Date.parse("2026-09-06T22:03:00.000Z"),
+      expectedDurationMs: 120_000,
+    });
+
+    assert.equal(report.execution?.attempt, 2);
+    assert.equal(report.execution?.progress.elapsedMs, 120_000);
+    assert.equal(report.telemetry.durationMs.value, 120_000);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
