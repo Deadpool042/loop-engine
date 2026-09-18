@@ -61,6 +61,23 @@ export type DurableExecutionRecord = Readonly<{
   events: readonly DurableExecutionEvent[];
 }>;
 
+export type DurableExecutionProgressedEvent = Readonly<{
+  schemaVersion: 1;
+  type: "execution.progressed";
+  project: string;
+  idempotencyKey: string;
+  runId: string | null;
+  revision: number;
+  status: DurableExecutionRecord["status"];
+  step: string;
+  updatedAt: string;
+  terminal: boolean;
+}>;
+
+export type DurableExecutionProgressedSink = (
+  event: DurableExecutionProgressedEvent,
+) => void | Promise<void>;
+
 export type DurableExecutionStore = Readonly<{
   load(idempotencyKey: string): Promise<DurableExecutionRecord | null>;
   save(

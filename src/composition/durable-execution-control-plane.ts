@@ -5,6 +5,7 @@ import {
 } from "../loop/durable-execution-controller.js";
 import type {
   DurableExecutionCancellationResult,
+  DurableExecutionProgressedSink,
   DurableExecutionRequest,
   DurableExecutionResult,
   DurableExecutionStore,
@@ -31,11 +32,13 @@ export function createDurableExecutionControlPlane(
   dependencies: Readonly<{
     runLoopExecute?: typeof runLoopExecuteWithProviderFailoverEvidence;
     now?: () => string;
+    onProgressed?: DurableExecutionProgressedSink;
   }> = {},
 ): DurableExecutionControlPlane {
   const runLoopExecute =
     dependencies.runLoopExecute ?? runLoopExecuteWithProviderFailoverEvidence;
   const now = dependencies.now ?? (() => new Date().toISOString());
+  const onProgressed = dependencies.onProgressed;
 
   return Object.freeze({
     async execute(request, options = {}) {
@@ -58,6 +61,7 @@ export function createDurableExecutionControlPlane(
             }),
           ),
         now,
+        onProgressed,
       );
       return Object.freeze({
         outcome,
@@ -73,6 +77,7 @@ export function createDurableExecutionControlPlane(
         idempotencyKey,
         requestedBy,
         now,
+        onProgressed,
       );
     },
   });
