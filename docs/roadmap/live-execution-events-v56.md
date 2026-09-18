@@ -88,6 +88,6 @@ Objectif : raccorder le sink V56 au chemin durable réellement utilisé par Deve
 - [x] stdout JSON terminal reste inchangé.
 - [x] Tests ciblés durable AUTO publish : 6/6.
 - [x] Typecheck vert.
-- [ ] CI complète verte.
+- [x] CI complète verte : PR #330 fusionnée, checks `Quality` et `CI gate` réussis.
 
 Le flux stderr reste un **adaptateur CLI**, pas une nouvelle source de vérité : chaque payload correspond à une révision persistée et peut être perdu sans empêcher la resynchronisation via `execution-status`.
