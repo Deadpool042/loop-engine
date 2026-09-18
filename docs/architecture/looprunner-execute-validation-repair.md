@@ -156,6 +156,17 @@ idle -> planning -> ready -> executing -> validating
      -> repairing(completion_repair) -> validating -> completed
 ```
 
+V58 explicit completion evidence still pending:
+
+```text
+idle -> planning -> ready -> executing -> validating
+     -> failed(completion_evidence_required)
+```
+
+The V58 path is intentionally terminal-compatible with the durable execution
+record. It does not spend the completion-repair budget and does not invoke the
+executor again.
+
 One admitted model escalation after executor failure:
 
 ```text
@@ -257,6 +268,23 @@ same `repairAttempts` counter. A caller can therefore request fewer repairs
 additionally capped at one attempt per run even if a future policy allows a
 larger global repair budget.
 
+Before admitting a V57 completion repair, V58 optionally inspects a
+project-owned completion-evidence contract declared in the linked detail
+document:
+
+```md
+<!-- loop-engine:completion-evidence kind=checklist path=../testing/evidence.md -->
+```
+
+Only `kind=checklist` exists in V1. The referenced path is resolved relative
+to the detail document and must remain inside the project root. If the evidence
+file contains unresolved checklist markers (`- [ ]`, `☐`, or
+`À renseigner`), the run fails closed with
+`completion_evidence_required` **before** incrementing `repairAttempts` or
+invoking the executor again. Missing/malformed/out-of-project evidence also
+fails closed. Lots without this explicit marker keep the V57 behavior
+unchanged.
+
 When `repairAttempts >= effectiveMaxRepairs`, no further validation or
 completion repair is admitted. Infinite repair loops and policy/runtime budget
 divergence are impossible by construction and remain guarded by the existing
@@ -273,7 +301,8 @@ failures. Raw exceptions and stack traces are not exposed. Major failure codes:
 - `agent_policy_rejected`;
 - `executor_unavailable` / `executor_failed`;
 - `validation_error` / `validation_failed`;
-- `repairer_unavailable` / `repair_failed`.
+- `repairer_unavailable` / `repair_failed`;
+- `completion_evidence_required`.
 
 ## Git and publication boundary
 

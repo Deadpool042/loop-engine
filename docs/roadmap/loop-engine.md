@@ -368,3 +368,17 @@ Cadrage et checklist : [`autonomous-completion-v57.md`](./autonomous-completion-
 - un candidat ambigu ou toujours ouvert après la tentative échoue proprement ;
 - aucune métrique quota/token/coût inventée ;
 - modèles locaux utilisables plus tard uniquement lorsqu'ils sont réellement découverts et qualifiés par une gate légère.
+
+
+## V58 — clôture sensible aux preuves
+
+- [ ] [P0] V58.0 — Empêcher AUTO de consommer une `completion_repair` lorsque le lot déclare explicitement une preuve de clôture encore non résolue. Le contrat opt-in `loop-engine:completion-evidence` reste déterministe et project-owned : V1 supporte uniquement `kind=checklist` avec un fichier de preuve relatif au document de détail. Tant que le fichier contient des items non résolus (`☐`, `- [ ]`, `À renseigner`), le run termine avec `completion_evidence_required` avant tout second appel modèle. Aucune nouvelle IA, aucun scheduler, aucun provider ni stockage supplémentaire.
+
+### Gates V58
+
+- aucun changement de comportement pour les lots sans contrat `completion-evidence` ;
+- chemins de détail/preuve confinés au projet ;
+- preuve manquante, contrat malformé ou sortie de projet => fail-closed ;
+- checklist résolue => la réparation V57 historique redevient admissible ;
+- checklist non résolue => zéro `completion_repair` et zéro appel modèle supplémentaire ;
+- seul un fichier de preuve explicitement référencé peut bloquer la clôture.
