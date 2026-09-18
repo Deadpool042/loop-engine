@@ -1101,6 +1101,15 @@ else if (command === "review") {
             throw new Error(`${admission.code}: ${admission.message}`);
           }
         },
+        ...(progressEvents
+          ? {
+              onProgressed(event) {
+                process.stderr.write(
+                  `LOOP_EXECUTION_EVENT:${JSON.stringify(event)}\\n`,
+                );
+              },
+            }
+          : {}),
       });
     if (json) {
       console.log(JSON.stringify(durableResult.report));

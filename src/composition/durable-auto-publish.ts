@@ -5,6 +5,7 @@ import { resolveLoopEngineStatePath } from "../core/runtime-state.js";
 import type { LoopRunHistoryWriteOutcome } from "../core/run-history.js";
 import { createFileDurableExecutionStore } from "../loop/file-durable-execution-store.js";
 import type { LoopExecutor } from "../loop/execution.js";
+import type { DurableExecutionProgressedSink } from "../loop/durable-execution.js";
 import { createDurableExecutionControlPlane } from "./durable-execution-control-plane.js";
 import type { IsolatedProviderRunPublish } from "./isolated-provider-publication.js";
 import { AUTO_SUBSCRIPTION_AGENT_POLICY } from "./auto-subscription-execution.js";
@@ -67,6 +68,7 @@ export type DurableAutoPublishInput = Readonly<{
   storeDirectory?: string;
   owner?: string;
   prepareExecution?: () => Promise<void>;
+  onProgressed?: DurableExecutionProgressedSink;
 }>;
 
 export async function runDurableAutoSubscriptionPublish(
@@ -88,6 +90,7 @@ export async function runDurableAutoSubscriptionPublish(
       await input.prepareExecution?.();
       return application.runLoopPublish(projectName, options);
     },
+    ...(input.onProgressed === undefined ? {} : { onProgressed: input.onProgressed }),
   });
 
   const executionOptions = {
