@@ -40,9 +40,19 @@ describe("LoopRunner execute validation repair audit", () => {
       `${runner}\nawait dependencies.executor({});\nprocess.env.SECRET;`,
     );
 
-    assert.equal(baseline.executorCallSites, 4);
-    assert.equal(result.executorCallSites, 5);
+    assert.equal(baseline.executorCallSites, 5);
+    assert.equal(result.executorCallSites, 6);
     assert.deepEqual(result.forbidden, ["process.env"]);
+  });
+
+  it("requires completion repair to remain one-shot, scope-gated, and inside the shared budget", () => {
+    const runner = readFileSync(RUNNER_FILE, "utf8").replace(
+      "completionRepairAttempts < 1",
+      "completionRepairAttempts < Number.MAX_SAFE_INTEGER",
+    );
+    const result = inspect(runner);
+
+    assert.equal(result.boundedCompletionRepair, false);
   });
 
   it("requires model escalation to remain policy-bounded", () => {
@@ -57,14 +67,14 @@ describe("LoopRunner execute validation repair audit", () => {
 
   it("fails closed when the resolved policy repair ceiling is no longer enforced", () => {
     const runner = readFileSync(RUNNER_FILE, "utf8").replace(
-      "repairAttempts >= effectiveMaxRepairs",
-      "repairAttempts >= dependencies.maxRepairs",
+      "if (repairAttempts >= effectiveMaxRepairs)",
+      "if (repairAttempts >= dependencies.maxRepairs)",
     );
     const result = inspect(runner);
 
     assert.ok(
       result.missing.some((detail) =>
-        detail.includes("repairAttempts >= effectiveMaxRepairs"),
+        detail.includes("if (repairAttempts >= effectiveMaxRepairs)"),
       ),
     );
   });
