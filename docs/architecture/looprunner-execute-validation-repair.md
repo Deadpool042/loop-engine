@@ -93,12 +93,27 @@ no-op into a completed governed lot.
 The same invariant is rechecked after every successful repair. A repair that
 removes the entire delta cannot be revalidated as a successful completion.
 
+Since V57, AUTO also performs a deterministic post-validation reread of the
+selected roadmap work item. If the candidate is already closed, or an
+authorized synthetic micro-lot advanced to the next child, no extra model call
+is made. If the candidate remains open, Loop Engine may admit at most one
+`completion_repair` only when the shared repair budget still has capacity and
+the canonical planning source itself belongs to the governed writable scope.
+
+A completion repair reuses the already admitted executor with
+`worktreeMode = "repair_existing"`. It is explicitly instructed to reread the
+documented objective, deliverables and evidence and **not** mark the item done
+merely because technical validation passed. The runner then re-applies the
+worktree inventory, scope and content-policy guards, reruns the full configured
+validation, and rereads the roadmap. If the item remains open, the terminal
+result stays `candidate_not_completed`; there is no second completion repair.
+
 This rule applies only to cycles authorized by `execution_decision`. Legacy
 non-governed projects keep their historical empty-delta behavior; migrating
 that behavior globally would be a separate compatibility decision. The gate
 does not claim semantic proof that every deliverable is satisfied: scope,
-content policy and project validations remain the existing mechanical
-authorities, while semantic review stays at the orchestrator/human layer.
+content policy, configured validations and the canonical roadmap remain the
+mechanical authorities.
 
 ### LoopValidator
 
@@ -127,11 +142,18 @@ Successful execution:
 idle -> planning -> ready -> executing -> validating -> completed
 ```
 
-One successful repair:
+One successful validation repair:
 
 ```text
 idle -> planning -> ready -> executing -> validating
      -> repairing -> validating -> completed
+```
+
+One successful V57 completion repair:
+
+```text
+idle -> planning -> ready -> executing -> validating
+     -> repairing(completion_repair) -> validating -> completed
 ```
 
 One admitted model escalation after executor failure:
@@ -228,11 +250,17 @@ most restrictive value: when the resolved policy exposes a numeric
 validated request remains the ceiling.
 
 The same `effectiveMaxRepairs` is used for both the loop exhaustion check and
-the `LoopRepairer.maxRepairs` input. A caller can therefore request fewer
-repairs (including zero) but can never widen the policy ceiling. When
-`repairAttempts >= effectiveMaxRepairs`, the cycle fails with
-`validation_failed`. Infinite repair loops and policy/runtime budget divergence
-are impossible by construction and are guarded by `AUDIT-495`.
+the `LoopRepairer.maxRepairs` input. Since V57 it is also the **shared** budget
+for completion repair: validation repair and completion repair increment the
+same `repairAttempts` counter. A caller can therefore request fewer repairs
+(including zero) but can never widen the policy ceiling. A completion repair is
+additionally capped at one attempt per run even if a future policy allows a
+larger global repair budget.
+
+When `repairAttempts >= effectiveMaxRepairs`, no further validation or
+completion repair is admitted. Infinite repair loops and policy/runtime budget
+divergence are impossible by construction and remain guarded by the existing
+bounded-cycle invariants.
 
 ## Failure handling
 

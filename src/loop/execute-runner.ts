@@ -695,6 +695,7 @@ export async function runLoopExecute(
 
   let validationAttempts = 0;
   let repairAttempts = 0;
+  let completionRepairAttempts = 0;
 
   while (true) {
     validationAttempts += 1;
@@ -745,7 +746,8 @@ export async function runLoopExecute(
         options.decomposeOversizedCandidate === true &&
         typeof cycle.candidate.id === "string"
       ) {
-        const selectedSyntheticChildId = cycle.decomposition?.selectedChildId ?? null;
+        const selectedSyntheticChildId =
+          cycle.decomposition?.selectedChildId ?? null;
         const completionCandidateId =
           cycle.decomposition?.parentCandidate.id ?? cycle.candidate.id;
         const completion = dependencies.planLoopCycle(
@@ -759,7 +761,8 @@ export async function runLoopExecute(
           }),
         );
         const candidateCompleted =
-          completion.outcome === "blocked" && completion.code === "candidate_done";
+          completion.outcome === "blocked" &&
+          completion.code === "candidate_done";
         const syntheticChildAdvanced =
           selectedSyntheticChildId !== null &&
           completion.outcome === "ready" &&
@@ -767,22 +770,142 @@ export async function runLoopExecute(
           completion.decomposition.selectedChildId !== selectedSyntheticChildId;
 
         if (!candidateCompleted && !syntheticChildAdvanced) {
-          transition("failed", "failed", "failed", [
-            "Validated AUTO execution did not close its selected roadmap candidate.",
-          ]);
-          return finalize(
-            cycle.candidate,
-            Object.freeze({
-              code: "candidate_not_completed",
-              message:
-                "Validated AUTO execution did not close its selected roadmap work item.",
-              details: Object.freeze([
-                selectedSyntheticChildId === null
-                  ? `Candidate remains actionable after validation: ${cycle.candidate.id}`
-                  : `Synthetic micro-lot remains selected after validation: ${selectedSyntheticChildId}`,
+          const completionSourcePath =
+            cycle.decomposition?.sourceDocument ?? cycle.candidate.path;
+          const completionSourceInScope =
+            writableFileScope !== null &&
+            findOutOfScopeFiles(
+              [completionSourcePath],
+              writableFileScope,
+            ).length === 0;
+          const completionRepairAvailable =
+            completionRepairAttempts < 1 &&
+            repairAttempts < effectiveMaxRepairs &&
+            completionSourceInScope;
+
+          if (!completionRepairAvailable) {
+            transition("failed", "failed", "failed", [
+              "Validated AUTO execution did not close its selected roadmap candidate.",
+            ]);
+            return finalize(
+              cycle.candidate,
+              Object.freeze({
+                code: "candidate_not_completed",
+                message:
+                  "Validated AUTO execution did not close its selected roadmap work item.",
+                details: Object.freeze([
+                  selectedSyntheticChildId === null
+                    ? `Candidate remains actionable after validation: ${cycle.candidate.id}`
+                    : `Synthetic micro-lot remains selected after validation: ${selectedSyntheticChildId}`,
+                  repairAttempts >= effectiveMaxRepairs
+                    ? "Completion repair was not attempted because the shared repair budget is exhausted."
+                    : completionRepairAttempts >= 1
+                      ? "Completion repair was already attempted once for this run."
+                      : "Completion repair was not attempted because the canonical roadmap source is outside the governed writable scope.",
+                ]),
+              }),
+            );
+          }
+
+          completionRepairAttempts += 1;
+          repairAttempts += 1;
+          transition(
+            "repairing",
+            "completion_repair",
+            "completed",
+            [
+              `Completion repair attempt ${completionRepairAttempts}/1.`,
+              `Shared repair budget ${repairAttempts}/${effectiveMaxRepairs}.`,
+              `Canonical completion source: ${completionSourcePath}`,
+            ],
+          );
+
+          const completionRepairPlan = Object.freeze({
+            ...executionPlan,
+            worktreeMode: "repair_existing" as const,
+            policy: Object.freeze({
+              ...executionPlan.policy,
+              requiredCapabilities: Object.freeze([
+                ...executionPlan.policy.requiredCapabilities,
+              ]),
+              requiredPermissions: Object.freeze([
+                ...executionPlan.policy.requiredPermissions,
+              ]),
+              ...(executionPlan.policy.allowedFundingModes === undefined
+                ? {}
+                : {
+                    allowedFundingModes: Object.freeze([
+                      ...executionPlan.policy.allowedFundingModes,
+                    ]),
+                  }),
+              rationale: Object.freeze([
+                ...executionPlan.policy.rationale,
+                "Technical validation already passed, but the canonical roadmap work item remains open.",
+                "Re-read the documented objective, deliverables and completion evidence before editing the roadmap.",
+                "Close only the selected roadmap work item if its documented completion criteria are actually satisfied by the current worktree.",
+                "Do not mark a roadmap item complete merely because validation passed; if substantive work remains, leave it open.",
+                `Completion repair attempt ${completionRepairAttempts}/1 within shared repair budget ${repairAttempts}/${effectiveMaxRepairs}.`,
               ]),
             }),
+          });
+
+          let completionRepairResult;
+          try {
+            completionRepairResult = await dependencies.executor(
+              completionRepairPlan,
+              executionProject.path,
+            );
+          } catch {
+            transition("failed", "failed", "failed", [
+              "The bounded completion repair threw an error.",
+            ]);
+            return finalize(
+              cycle.candidate,
+              internalFailure(
+                "completion_repair_failed",
+                "The bounded completion repair failed.",
+                "Completion repair diagnostics are redacted from the public result.",
+              ),
+            );
+          }
+
+          const completionRepairWorktreeFailure =
+            await refreshModifiedFilesFromWorktree();
+          if (completionRepairWorktreeFailure !== null) {
+            return completionRepairWorktreeFailure;
+          }
+          const completionRepairScopeFailure = failForScopeViolation();
+          if (completionRepairScopeFailure !== null) {
+            return completionRepairScopeFailure;
+          }
+          if (completionRepairResult.status === "failed") {
+            transition("failed", "failed", "failed", [
+              completionRepairResult.failure.message,
+            ]);
+            return finalize(
+              cycle.candidate,
+              completionRepairResult.failure,
+            );
+          }
+
+          const completionRepairDeltaFailure =
+            failForMissingGovernedDelta();
+          if (completionRepairDeltaFailure !== null) {
+            return completionRepairDeltaFailure;
+          }
+          const completionRepairContentPolicyFailure =
+            await failForContentPolicyViolation();
+          if (completionRepairContentPolicyFailure !== null) {
+            return completionRepairContentPolicyFailure;
+          }
+
+          transition(
+            "validating",
+            "validating",
+            "completed",
+            completionRepairResult.details,
           );
+          continue;
         }
       }
 

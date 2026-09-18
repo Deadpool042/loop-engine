@@ -341,7 +341,7 @@ Cadrage et checklist : [`live-execution-events-v56.md`](./live-execution-events-
 
 - [x] [P0] V56.0 — Exposer les changements du durable execution record sous forme d’événements `execution.progressed` bornés et transport-neutral, émis uniquement après persistance réussie et identifiés par une révision monotone. Le payload ne duplique ni timeline, ni logs, ni Run History : le consommateur relit `execution-status` pour le snapshot complet. Aucun poller, watcher filesystem, nouveau stockage, transport réseau, provider ou logique OpenClaw dans Loop Engine. **Clôture :** sink optionnel injecté au control plane, émission après chaque sauvegarde observable, recovery/annulation/terminal couverts, resynchronisation `execution-status` après perte d’événement prouvée, tests ciblés 5/5 et CI PR #329 verte.
 
-- [ ] [P0] V56.1 — Raccorder `execution.progressed` au chemin CLI durable existant via `--progress-events` : le worker `publish --durable --json` émet sur stderr des invalidations canoniques préfixées `LOOP_EXECUTION_EVENT:` après persistance, sans altérer stdout terminal ni ajouter de stockage, réseau ou scheduler. [Détail](./live-execution-events-v56.md)
+- [x] [P0] V56.1 — Raccorder `execution.progressed` au chemin CLI durable existant via `--progress-events` : le worker `publish --durable --json` émet sur stderr des invalidations canoniques préfixées `LOOP_EXECUTION_EVENT:` après persistance, sans altérer stdout terminal ni ajouter de stockage, réseau ou scheduler. **Clôture :** livré et fusionné via #330 ; tests ciblés 6/6, typecheck et CI `Quality`/`CI gate` verts. [Détail](./live-execution-events-v56.md)
 
 ### Gates V56
 
@@ -351,3 +351,20 @@ Cadrage et checklist : [`live-execution-events-v56.md`](./live-execution-events-
 - une panne du sink événementiel n’interrompt jamais le run ;
 - aucune donnée provider sensible, stdout/stderr, prompt ou contenu fichier dans l’événement ;
 - aucun couplage à OpenClaw, Development Workspace, n8n ou un transport réseau dans Core.
+
+
+## V57 — clôture autonome bornée et économie de quota
+
+Cadrage et checklist : [`autonomous-completion-v57.md`](./autonomous-completion-v57.md).
+
+- [ ] [P0] V57.0 — Étendre la boucle AUTO existante au cas `candidate_not_completed` sans créer de second orchestrateur : après validation technique verte, relire déterministement le candidat ; s'il est déjà fermé/avancé, terminer sans LLM ; sinon autoriser au plus une réparation de clôture dans le budget global existant, uniquement si la source canonique du candidat appartient au scope d'écriture gouverné. Revalider ensuite intégralement et relire la roadmap. Aucun auto-check aveugle, aucun nouveau scheduler/ledger/provider, aucun modèle local supposé disponible et aucun financement payant implicite.
+
+### Gates V57
+
+- déterministe avant tout appel modèle ;
+- budget `maxRepairs` partagé entre validation et clôture, jamais dépassé ;
+- au plus une réparation de clôture par run ;
+- scope, content policy et validation restent autoritaires ;
+- un candidat ambigu ou toujours ouvert après la tentative échoue proprement ;
+- aucune métrique quota/token/coût inventée ;
+- modèles locaux utilisables plus tard uniquement lorsqu'ils sont réellement découverts et qualifiés par une gate légère.
