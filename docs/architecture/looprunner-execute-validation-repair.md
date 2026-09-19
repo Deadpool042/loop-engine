@@ -97,8 +97,9 @@ Since V57, AUTO also performs a deterministic post-validation reread of the
 selected roadmap work item. If the candidate is already closed, or an
 authorized synthetic micro-lot advanced to the next child, no extra model call
 is made. If the candidate remains open, Loop Engine may admit at most one
-`completion_repair` only when the shared repair budget still has capacity and
-the canonical planning source itself belongs to the governed writable scope.
+`completion_repair` after technical validation passes, independently from the
+validation-repair budget, and only when the canonical planning source itself
+belongs to the governed writable scope.
 
 A completion repair reuses the already admitted executor with
 `worktreeMode = "repair_existing"`. It is explicitly instructed to reread the
@@ -260,13 +261,12 @@ most restrictive value: when the resolved policy exposes a numeric
 `min(requestedMaxRepairs, policyMaxRepairs)`; otherwise the caller's already
 validated request remains the ceiling.
 
-The same `effectiveMaxRepairs` is used for both the loop exhaustion check and
-the `LoopRepairer.maxRepairs` input. Since V57 it is also the **shared** budget
-for completion repair: validation repair and completion repair increment the
-same `repairAttempts` counter. A caller can therefore request fewer repairs
-(including zero) but can never widen the policy ceiling. A completion repair is
-additionally capped at one attempt per run even if a future policy allows a
-larger global repair budget.
+The same `effectiveMaxRepairs` is used for both the validation-repair loop
+exhaustion check and the `LoopRepairer.maxRepairs` input. Canonical completion
+repair is a separate bounded control: after technical validation passes, at
+most one `completion_repair` may be admitted for the canonical roadmap source.
+It does not increment `repairAttempts` and therefore cannot consume or widen the
+policy-governed validation-repair budget.
 
 Before admitting a V57 completion repair, V58 optionally inspects a
 project-owned completion-evidence contract declared in the linked detail
@@ -280,15 +280,15 @@ Only `kind=checklist` exists in V1. The referenced path is resolved relative
 to the detail document and must remain inside the project root. If the evidence
 file contains unresolved checklist markers (`- [ ]`, `☐`, or
 `À renseigner`), the run fails closed with
-`completion_evidence_required` **before** incrementing `repairAttempts` or
-invoking the executor again. Missing/malformed/out-of-project evidence also
+`completion_evidence_required` **before** invoking the executor again. Missing/malformed/out-of-project evidence also
 fails closed. Lots without this explicit marker keep the V57 behavior
 unchanged.
 
-When `repairAttempts >= effectiveMaxRepairs`, no further validation or
-completion repair is admitted. Infinite repair loops and policy/runtime budget
-divergence are impossible by construction and remain guarded by the existing
-bounded-cycle invariants.
+When `repairAttempts >= effectiveMaxRepairs`, no further validation repair is
+admitted. Completion repair remains independently capped at one attempt and is
+available only after a green technical validation, with the canonical roadmap
+source in governed scope. Infinite repair loops and policy/runtime budget
+divergence remain impossible by construction.
 
 ## Failure handling
 
@@ -336,7 +336,7 @@ V14.4 does not add:
 3. Every model escalation stays on the same provider/runtime, preserves candidate/scope/permissions/validations and is observable through bounded evidence.
 4. Validation runs only after a completed executor result.
 5. Each repair is followed by validation, never by commit.
-6. The finite repair budget is the most restrictive of caller request and resolved policy ceiling, and the same effective value reaches the repairer.
+6. The finite validation-repair budget is the most restrictive of caller request and resolved policy ceiling, the same effective value reaches the repairer, and canonical completion repair has its own independent one-attempt ceiling.
 7. Modified files include executor and repairer reports without duplicates.
 8. Exceptions fail closed without exposing raw stack traces.
 9. `commit` and `publication` remain `null` for every result.

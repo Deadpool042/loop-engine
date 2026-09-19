@@ -26,7 +26,6 @@ const REQUIRED_RUNNER_TOKENS = Object.freeze([
   "if (repairAttempts >= effectiveMaxRepairs)",
   "maxRepairs: effectiveMaxRepairs",
   "completionRepairAttempts < 1",
-  "repairAttempts < effectiveMaxRepairs",
   "completionSourceInScope",
   '"completion_repair"',
   "commit: null",
@@ -119,7 +118,6 @@ export function inspectLoopRunnerExecuteInvariant(
       sourceIncludesToken(runnerSource, "maxAttempts: modelAttemptBudget"),
     boundedCompletionRepair:
       sourceIncludesToken(runnerSource, "completionRepairAttempts < 1") &&
-      sourceIncludesToken(runnerSource, "repairAttempts < effectiveMaxRepairs") &&
       sourceIncludesToken(runnerSource, "completionSourceInScope") &&
       sourceIncludesToken(runnerSource, '"completion_repair"'),
     repairBeforeRevalidation:
@@ -137,7 +135,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
     title:
       "LoopRunner execute mode validates and repairs within a finite budget",
     description:
-      "The execute runner must require policy admission, keep top-level model attempts bounded by policy, validate after execution, clamp the caller repair request to the resolved policy ceiling, keep validation and completion repair within that same finite budget, allow at most one scope-gated completion repair, revalidate after repair, report modified files, and never commit or publish itself.",
+      "The execute runner must require policy admission, keep top-level model attempts bounded by policy, validate after execution, clamp validation repair to the resolved policy ceiling, keep canonical completion repair independently one-shot and scope-gated, revalidate after repair, report modified files, and never commit or publish itself.",
     metadata: {
       introducedIn: "V14.4",
       tags: ["architecture", "contract", "execution", "policy", "ci"],
@@ -182,7 +180,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
           : [`${RUNNER_FILE} -> model escalation must be policy-bounded`]),
         ...(result.boundedCompletionRepair
           ? []
-          : [`${RUNNER_FILE} -> completion repair must be one-shot, scope-gated, and share the effective repair budget`]),
+          : [`${RUNNER_FILE} -> completion repair must be independently one-shot and scope-gated`]),
         ...(result.repairBeforeRevalidation
           ? []
           : [`${RUNNER_FILE} -> repair must precede revalidation`]),
@@ -193,7 +191,7 @@ export const LOOP_RUNNER_EXECUTE_VALIDATION_REPAIR_RULE: AuditRule = (() => {
             rule,
             `${rule.title}.`,
             details,
-            "Keep one fail-closed execute/validate/repair boundary: admit policy before execution, bound top-level model attempts through the resolved policy, clamp the requested repair count to the resolved repair ceiling, keep completion repair one-shot and scope-gated inside that shared budget, revalidate after each bounded repair or admitted model escalation, and leave commit/publication null inside the execute runner; route explicit publication outside it.",
+            "Keep one fail-closed execute/validate/repair boundary: admit policy before execution, bound top-level model attempts through the resolved policy, clamp validation repair to the resolved repair ceiling, keep canonical completion repair independently one-shot and scope-gated after green validation, revalidate after each bounded repair or admitted model escalation, and leave commit/publication null inside the execute runner; route explicit publication outside it.",
           )
         : pass(
             rule,
