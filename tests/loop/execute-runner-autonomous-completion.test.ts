@@ -267,7 +267,7 @@ describe("V57 autonomous completion repair", () => {
         executorCalls += 1;
         if (executorCalls === 2) {
           assert.equal(plan.worktreeMode, "repair_existing");
-          assert.deepEqual(plan.allowedPaths, ["roadmap.md", "src/feature.ts"]);
+          assert.deepEqual(plan.allowedPaths, ["roadmap.md"]);
         }
         return {
           status: "completed" as const,
@@ -289,6 +289,42 @@ describe("V57 autonomous completion repair", () => {
     assert.equal(result.status, "completed");
     assert.equal(result.failure, null);
     assert.equal(executorCalls, 2);
+  });
+
+  it("fails when completion repair leaves the roadmap unchanged", async () => {
+    let executorCalls = 0;
+
+    const result = await runLoopExecute("autonomous-completion", {
+      ...baseOptions(),
+      maxRepairs: 1,
+      planLoopCycle: () => openCycle(["roadmap.md", "src/**"]),
+      readModifiedWorktreeFiles: async () => ["src/feature.ts"],
+      executor: async (plan) => {
+        executorCalls += 1;
+        if (executorCalls === 2) {
+          assert.deepEqual(plan.allowedPaths, ["roadmap.md"]);
+        }
+        return {
+          status: "completed" as const,
+          modifiedFiles: executorCalls === 1 ? ["src/feature.ts"] : [],
+          details: [],
+        };
+      },
+      validator: async () => ({
+        status: "passed" as const,
+        failedCommand: null,
+        exitCode: 0,
+        details: [],
+      }),
+    });
+
+    assert.equal(executorCalls, 2);
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "completion_repair_no_effect");
+    assert.equal(
+      result.steps.some((step) => step.name === "completion_repair_no_effect"),
+      true,
+    );
   });
 
   it("does not repair completion when the canonical roadmap source is outside governed scope", async () => {

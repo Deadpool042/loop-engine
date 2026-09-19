@@ -893,9 +893,7 @@ export async function runLoopExecute(
 
           const completionRepairPlan = Object.freeze({
             ...executionPlan,
-            allowedPaths: Object.freeze(
-              [...new Set([...modifiedFiles, completionSourcePath])].sort(),
-            ),
+            allowedPaths: Object.freeze([completionSourcePath]),
             worktreeMode: "repair_existing" as const,
             policy: Object.freeze({
               ...executionPlan.policy,
@@ -951,6 +949,23 @@ export async function runLoopExecute(
           const completionRepairScopeFailure = failForScopeViolation();
           if (completionRepairScopeFailure !== null) {
             return completionRepairScopeFailure;
+          }
+          if (!modifiedFiles.has(completionSourcePath)) {
+            transition("failed", "completion_repair_no_effect", "failed", [
+              "Completion repair did not modify the canonical roadmap source.",
+              `Expected roadmap change: ${completionSourcePath}`,
+            ]);
+            return finalize(
+              cycle.candidate,
+              Object.freeze({
+                code: "completion_repair_no_effect",
+                message:
+                  "Completion repair did not modify the canonical roadmap source.",
+                details: Object.freeze([
+                  `Expected roadmap change: ${completionSourcePath}`,
+                ]),
+              }),
+            );
           }
           if (completionRepairResult.status === "failed") {
             transition("failed", "failed", "failed", [
