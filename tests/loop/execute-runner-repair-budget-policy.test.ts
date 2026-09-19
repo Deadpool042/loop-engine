@@ -202,6 +202,54 @@ describe("runLoopExecute — policy repair budget parity", () => {
     assert.equal(result.steps.some((step) => step.name === "repairing"), true);
   });
 
+  it("fails closed without repair or model escalation when validation tooling is unavailable", async () => {
+    let executorCalls = 0;
+    let repairCalls = 0;
+
+    const result = await runLoopExecute("repair-budget-fixture", {
+      ...deterministicOptions(),
+      maxRepairs: 1,
+      executor: async () => {
+        executorCalls += 1;
+        return {
+          status: "completed" as const,
+          modifiedFiles: [],
+          details: [],
+        };
+      },
+      validator: async () => ({
+        status: "failed" as const,
+        failedCommand: "go test ./...",
+        exitCode: 127,
+        details: ["fixture missing tool"],
+      }),
+      repairer: async () => {
+        repairCalls += 1;
+        return {
+          status: "completed" as const,
+          modifiedFiles: [],
+          details: [],
+        };
+      },
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "validation_tool_unavailable");
+    assert.equal(executorCalls, 1);
+    assert.equal(repairCalls, 0);
+    assert.equal(result.validation?.repairAttempts, 0);
+    assert.equal(
+      result.steps.some(
+        (step) => step.name === "validation_environment_unavailable",
+      ),
+      true,
+    );
+    assert.equal(
+      result.steps.some((step) => step.name === "model_escalation"),
+      false,
+    );
+  });
+
   it("preserves a stricter caller request of zero repairs", async () => {
     let repairCalls = 0;
 

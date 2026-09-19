@@ -64,8 +64,8 @@ projects:
       - README.md
       - docs
     validation:
-      - go test ./...
-      - go vet ./...
+      - bash scripts/validate-go.sh test
+      - bash scripts/validate-go.sh vet
       - git diff HEAD --check
       - bash -n templates/infra/backup-offsite-template.sh
       - bash -n templates/infra/deploy-vps-template.sh

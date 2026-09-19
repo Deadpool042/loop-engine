@@ -746,6 +746,31 @@ export async function runLoopExecute(
       repairAttempts,
     );
 
+    if (
+      validationAttempt.status === "failed" &&
+      validationAttempt.exitCode === 127
+    ) {
+      transition("failed", "validation_environment_unavailable", "failed", [
+        "Validation tooling is unavailable in the execution environment.",
+        ...(validationAttempt.failedCommand === null
+          ? []
+          : [`Failed command: ${validationAttempt.failedCommand}`]),
+      ]);
+      return finalize(
+        cycle.candidate,
+        Object.freeze({
+          code: "validation_tool_unavailable",
+          message:
+            "Validation could not run because required project tooling is unavailable.",
+          details: Object.freeze(
+            validationAttempt.failedCommand === null
+              ? []
+              : [`Failed command: ${validationAttempt.failedCommand}`],
+          ),
+        }),
+      );
+    }
+
     if (validationAttempt.status === "passed") {
       if (
         governedExecution &&
