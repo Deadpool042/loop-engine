@@ -70,6 +70,7 @@ projects:
     roadmap:
       - docs/roadmap/README.md
       - docs/roadmap/projet-lp-infra.md
+      - docs/roadmap/lp-infra-product-v1.md
 
   - name: n8n
     path: ../n8n
