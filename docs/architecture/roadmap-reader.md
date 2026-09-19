@@ -31,7 +31,7 @@ Les lignes candidates peuvent être détectées via :
 - titres de lot ;
 - marqueurs de statut ;
 - sections explicites.
-- lignes de tableau structurées `| H<n>-L<n><suffixe?> | livrable | état |`.
+- lignes de tableau structurées `| H<n>-L<n><suffixe?> | livrable | état |` ou `| V<n>-P<n>-L<n><suffixe?> | livrable | état |`.
 
 Exemples :
 
@@ -60,8 +60,8 @@ Dans une ligne de tableau structurée, `✅` ou `Terminé` signifie `done` et
 Lorsqu'une roadmap contient de telles lignes, ses puces descriptives non
 explicites ne sont pas ajoutées à l'inventaire des lots.
 
-Les lots de tableau structurés exposent leur première cellule `H<n>-L<n>`
-(suffixe alphabétique optionnel) comme identifiant stable `candidate.id`.
+Les lots de tableau structurés exposent leur première cellule `H<n>-L<n>` ou
+`V<n>-P<n>-L<n>` (suffixe alphabétique optionnel) comme identifiant stable `candidate.id`.
 
 Les lignes Markdown explicites peuvent aussi exposer un identifiant stable
 lorsque le libellé commence, après les marqueurs de statut/priorité, par un

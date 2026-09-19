@@ -69,6 +69,7 @@ projects:
       - bash -n templates/infra/deploy-vps-template.sh
     roadmap:
       - docs/roadmap/README.md
+      - docs/roadmap/lp-infra-product-v1.md
       - docs/roadmap/projet-lp-infra.md
 
   - name: n8n
