@@ -528,11 +528,32 @@ async function prepareDecisionDraft(
 function ensureLocalDecisionDirectory(
   current: ProductionCurrent,
 ): AutoSubscriptionDecisionFailure | null {
-  if (dirname(current.executionDecisionPath) !== ".loop-engine") {
+  const relativeDirectory = dirname(current.executionDecisionPath);
+  if (relativeDirectory === ".") {
     return null;
   }
 
-  const directory = resolve(current.projectPath, ".loop-engine");
+  if (
+    relativeDirectory.includes("/") ||
+    relativeDirectory.includes("\\") ||
+    relativeDirectory === ".." ||
+    relativeDirectory.startsWith("../")
+  ) {
+    return failure(
+      "auto_subscription_decision_write_failed",
+      "Execution decision directory must be a direct project child.",
+    );
+  }
+
+  const resolved = resolveContextPath(current.projectPath, relativeDirectory);
+  if (!resolved.insideProject) {
+    return failure(
+      "auto_subscription_decision_write_failed",
+      "Execution decision directory must stay inside the project.",
+    );
+  }
+
+  const directory = resolved.absolutePath;
   try {
     const stat = lstatSync(directory);
     if (!stat.isDirectory() || stat.isSymbolicLink()) {
