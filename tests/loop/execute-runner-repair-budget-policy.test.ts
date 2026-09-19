@@ -222,6 +222,7 @@ describe("runLoopExecute — policy repair budget parity", () => {
         failedCommand: "go test ./...",
         exitCode: 127,
         details: ["fixture missing tool"],
+        repairDiagnostics: ["bash: go: command not found"],
       }),
       repairer: async () => {
         repairCalls += 1;
@@ -238,6 +239,13 @@ describe("runLoopExecute — policy repair budget parity", () => {
     assert.equal(executorCalls, 1);
     assert.equal(repairCalls, 0);
     assert.equal(result.validation?.repairAttempts, 0);
+    assert.deepEqual(result.validation?.diagnostics, [
+      "bash: go: command not found",
+    ]);
+    assert.deepEqual(result.failure?.details, [
+      "Failed command: go test ./...",
+      "bash: go: command not found",
+    ]);
     assert.equal(
       result.steps.some(
         (step) => step.name === "validation_environment_unavailable",
@@ -266,6 +274,7 @@ describe("runLoopExecute — policy repair budget parity", () => {
         failedCommand: "fixture-validation",
         exitCode: 1,
         details: ["fixture failure"],
+        repairDiagnostics: ["expected 2, got 3"],
       }),
       repairer: async () => {
         repairCalls += 1;
@@ -281,6 +290,11 @@ describe("runLoopExecute — policy repair budget parity", () => {
     assert.equal(result.failure?.code, "validation_failed");
     assert.equal(repairCalls, 0);
     assert.equal(result.validation?.repairAttempts, 0);
+    assert.deepEqual(result.validation?.diagnostics, ["expected 2, got 3"]);
+    assert.deepEqual(result.failure?.details, [
+      "fixture failure",
+      "expected 2, got 3",
+    ]);
     assert.equal(
       result.steps.some((step) =>
         step.details.includes("Repair budget: requested=0, effective=0"),

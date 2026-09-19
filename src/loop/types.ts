@@ -45,6 +45,8 @@ export type LoopRunValidation = Readonly<{
   commands: readonly string[];
   failedCommand: string | null;
   exitCode: number;
+  /** Sanitized, bounded diagnostics from the most recent validation attempt. */
+  diagnostics?: readonly string[];
 }>;
 export type LoopRunCommit = Readonly<{ sha: string; message: string }>;
 export type LoopRunPatchExport = Readonly<{

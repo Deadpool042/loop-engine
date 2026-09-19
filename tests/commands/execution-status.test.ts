@@ -117,6 +117,9 @@ function failedResult(): LoopRunResult {
       commands: Object.freeze(["pnpm run typecheck"]),
       failedCommand: "pnpm run typecheck",
       exitCode: 1,
+      diagnostics: Object.freeze([
+        "src/feature.ts(42,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+      ]),
     }),
     modifiedFiles: Object.freeze(["src/feature.ts"]),
     commit: null,
@@ -299,6 +302,9 @@ test("execution status exposes a terminal failure instead of making the same can
     assert.equal(report.execution?.progress.elapsedMs, 120_000);
     assert.equal(report.execution?.terminal?.failure?.code, "validation_failed");
     assert.equal(report.execution?.terminal?.validation?.failedCommand, "pnpm run typecheck");
+    assert.deepEqual(report.execution?.terminal?.validation?.diagnostics, [
+      "src/feature.ts(42,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+    ]);
     assert.deepEqual(report.execution?.terminal?.modifiedFiles, ["src/feature.ts"]);
     assert.equal(report.execution?.executor?.model, "claude-sonnet-5");
     assert.equal(report.execution?.timeline.length, 1);

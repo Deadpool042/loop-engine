@@ -154,6 +154,7 @@ function createValidationResult(
   attempts: number,
   repairAttempts: number,
 ): LoopRunValidation {
+  const diagnostics = result.repairDiagnostics ?? [];
   return Object.freeze({
     status: result.status,
     attempts,
@@ -161,6 +162,9 @@ function createValidationResult(
     commands: Object.freeze([...project.validation]),
     failedCommand: result.failedCommand,
     exitCode: result.exitCode,
+    ...(diagnostics.length === 0
+      ? {}
+      : { diagnostics: Object.freeze([...diagnostics]) }),
   });
 }
 
@@ -750,11 +754,15 @@ export async function runLoopExecute(
       validationAttempt.status === "failed" &&
       validationAttempt.exitCode === 127
     ) {
-      transition("failed", "validation_environment_unavailable", "failed", [
-        "Validation tooling is unavailable in the execution environment.",
+      const diagnosticDetails = [
         ...(validationAttempt.failedCommand === null
           ? []
           : [`Failed command: ${validationAttempt.failedCommand}`]),
+        ...(validationAttempt.repairDiagnostics ?? []).slice(-8),
+      ];
+      transition("failed", "validation_environment_unavailable", "failed", [
+        "Validation tooling is unavailable in the execution environment.",
+        ...diagnosticDetails,
       ]);
       return finalize(
         cycle.candidate,
@@ -762,11 +770,7 @@ export async function runLoopExecute(
           code: "validation_tool_unavailable",
           message:
             "Validation could not run because required project tooling is unavailable.",
-          details: Object.freeze(
-            validationAttempt.failedCommand === null
-              ? []
-              : [`Failed command: ${validationAttempt.failedCommand}`],
-          ),
+          details: Object.freeze(diagnosticDetails),
         }),
       );
     }
@@ -1073,7 +1077,10 @@ export async function runLoopExecute(
           code: "validation_failed",
           message:
             "Validation failed after the bounded repair and model escalation cycle.",
-          details: Object.freeze([...validationAttempt.details]),
+          details: Object.freeze([
+            ...validationAttempt.details,
+            ...(validationAttempt.repairDiagnostics ?? []).slice(-8),
+          ]),
         }),
       );
     }
@@ -1082,7 +1089,10 @@ export async function runLoopExecute(
       "repairing",
       "repairing",
       "completed",
-      validationAttempt.details,
+      Object.freeze([
+        ...validationAttempt.details,
+        ...(validationAttempt.repairDiagnostics ?? []).slice(-4),
+      ]),
     );
 
     repairAttempts += 1;
