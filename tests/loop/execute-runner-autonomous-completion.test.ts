@@ -148,6 +148,7 @@ describe("V57 autonomous completion repair", () => {
         executorCalls += 1;
         if (executorCalls === 2) {
           assert.equal(plan.worktreeMode, "repair_existing");
+          assert.deepEqual(plan.allowedPaths, ["roadmap.md"]);
           assert.equal(
             plan.policy.rationale.some((reason) =>
               reason.includes("Technical validation already passed"),
