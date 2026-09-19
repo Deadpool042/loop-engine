@@ -893,7 +893,9 @@ export async function runLoopExecute(
 
           const completionRepairPlan = Object.freeze({
             ...executionPlan,
-            allowedPaths: Object.freeze([completionSourcePath]),
+            allowedPaths: Object.freeze(
+              [...new Set([...modifiedFiles, completionSourcePath])].sort(),
+            ),
             worktreeMode: "repair_existing" as const,
             policy: Object.freeze({
               ...executionPlan.policy,
