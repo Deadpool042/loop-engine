@@ -484,6 +484,32 @@ describe("roadmap structured markdown tables", () => {
     }
   });
 
+  it("recognizes Vn-Pn-Ln structured product lots and preserves their phase id", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "| Lot | Deliverable | State |",
+        "| --- | --- | --- |",
+        "| V1-P1-L1 | Bootstrap | ✅ Terminé |",
+        "| V1-P1-L2 | SQLite WAL | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+      const selected = selectRoadmapCandidate(candidates);
+
+      assert.equal(candidates.length, 2);
+      assert.equal(candidates[0]?.id, "V1-P1-L1");
+      assert.equal(candidates[0]?.phaseId, "V1-P1");
+      assert.equal(candidates[0]?.status, "done");
+      assert.equal(selected?.id, "V1-P1-L2");
+      assert.equal(selected?.phaseId, "V1-P1");
+      assert.equal(selected?.status, "todo");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("keeps an unrecognized table state explicit as unknown", () => {
     const { project, projectPath, cleanup } = setupRoadmap(
       [
