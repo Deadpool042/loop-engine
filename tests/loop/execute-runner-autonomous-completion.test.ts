@@ -123,7 +123,7 @@ function openCycle(allowedPaths: readonly string[]) {
 }
 
 describe("V57 autonomous completion repair", () => {
-  it("uses one shared-budget completion repair and completes only after deterministic reread", async () => {
+  it("uses one dedicated completion repair and completes only after deterministic reread", async () => {
     let planCalls = 0;
     let executorCalls = 0;
     let validatorCalls = 0;
@@ -184,20 +184,32 @@ describe("V57 autonomous completion repair", () => {
     assert.equal(planCalls, 3);
     assert.equal(executorCalls, 2);
     assert.equal(validatorCalls, 2);
-    assert.equal(result.validation?.repairAttempts, 1);
+    assert.equal(result.validation?.repairAttempts, 0);
     assert.equal(
       result.steps.filter((step) => step.name === "completion_repair").length,
       1,
     );
   });
 
-  it("does not spend a completion repair when the shared budget is zero", async () => {
+  it("keeps one completion repair available when the validation repair budget is zero", async () => {
+    let planCalls = 0;
     let executorCalls = 0;
 
     const result = await runLoopExecute("autonomous-completion", {
       ...baseOptions(),
       maxRepairs: 0,
-      planLoopCycle: () => openCycle(["roadmap.md"]),
+      planLoopCycle: () => {
+        planCalls += 1;
+        if (planCalls === 3) {
+          return {
+            outcome: "blocked" as const,
+            candidate: { ...candidate(), status: "done" as const },
+            code: "candidate_done" as const,
+            reason: "Roadmap candidate is already done: VNEXT4-S6A",
+          };
+        }
+        return openCycle(["roadmap.md"]);
+      },
       readModifiedWorktreeFiles: async () => ["roadmap.md"],
       executor: async () => {
         executorCalls += 1;
@@ -215,12 +227,13 @@ describe("V57 autonomous completion repair", () => {
       }),
     });
 
-    assert.equal(executorCalls, 1);
-    assert.equal(result.status, "failed");
-    assert.equal(result.failure?.code, "candidate_not_completed");
-    assert.match(
-      result.failure?.details.join("\n") ?? "",
-      /shared repair budget is exhausted/,
+    assert.equal(executorCalls, 2);
+    assert.equal(result.status, "completed");
+    assert.equal(result.failure, null);
+    assert.equal(result.validation?.repairAttempts, 0);
+    assert.equal(
+      result.steps.filter((step) => step.name === "completion_repair").length,
+      1,
     );
   });
 
@@ -257,14 +270,26 @@ describe("V57 autonomous completion repair", () => {
     );
   });
 
-  it("shares the budget with validation repair and refuses an extra completion repair", async () => {
+  it("keeps completion repair available after the validation repair budget is spent", async () => {
+    let planCalls = 0;
     let executorCalls = 0;
     let validatorCalls = 0;
 
     const result = await runLoopExecute("autonomous-completion", {
       ...baseOptions(),
       maxRepairs: 1,
-      planLoopCycle: () => openCycle(["roadmap.md"]),
+      planLoopCycle: () => {
+        planCalls += 1;
+        if (planCalls === 3) {
+          return {
+            outcome: "blocked" as const,
+            candidate: { ...candidate(), status: "done" as const },
+            code: "candidate_done" as const,
+            reason: "Roadmap candidate is already done: VNEXT4-S6A",
+          };
+        }
+        return openCycle(["roadmap.md"]);
+      },
       readModifiedWorktreeFiles: async () => ["roadmap.md"],
       executor: async () => {
         executorCalls += 1;
@@ -292,18 +317,18 @@ describe("V57 autonomous completion repair", () => {
       },
     });
 
-    assert.equal(executorCalls, 2);
-    assert.equal(validatorCalls, 2);
-    assert.equal(result.status, "failed");
-    assert.equal(result.failure?.code, "candidate_not_completed");
+    assert.equal(executorCalls, 3);
+    assert.equal(validatorCalls, 3);
+    assert.equal(result.status, "completed");
+    assert.equal(result.failure, null);
     assert.equal(result.validation?.repairAttempts, 1);
     assert.equal(
       result.steps.filter((step) => step.name === "completion_repair").length,
-      0,
+      1,
     );
   });
 
-  it("never performs a second completion repair when the candidate stays open and the effective budget is exhausted", async () => {
+  it("never performs a second completion repair when the candidate stays open", async () => {
     let executorCalls = 0;
     let validatorCalls = 0;
 
@@ -341,7 +366,7 @@ describe("V57 autonomous completion repair", () => {
     );
     assert.match(
       result.failure?.details.join("\n") ?? "",
-      /shared repair budget is exhausted/,
+      /Completion repair was already attempted once for this run./,
     );
   });
 
