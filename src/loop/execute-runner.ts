@@ -855,7 +855,6 @@ export async function runLoopExecute(
             ).length === 0;
           const completionRepairAvailable =
             completionRepairAttempts < 1 &&
-            repairAttempts < effectiveMaxRepairs &&
             completionSourceInScope;
 
           if (!completionRepairAvailable) {
@@ -872,25 +871,22 @@ export async function runLoopExecute(
                   selectedSyntheticChildId === null
                     ? `Candidate remains actionable after validation: ${cycle.candidate.id}`
                     : `Synthetic micro-lot remains selected after validation: ${selectedSyntheticChildId}`,
-                  repairAttempts >= effectiveMaxRepairs
-                    ? "Completion repair was not attempted because the shared repair budget is exhausted."
-                    : completionRepairAttempts >= 1
-                      ? "Completion repair was already attempted once for this run."
-                      : "Completion repair was not attempted because the canonical roadmap source is outside the governed writable scope.",
+                  completionRepairAttempts >= 1
+                    ? "Completion repair was already attempted once for this run."
+                    : "Completion repair was not attempted because the canonical roadmap source is outside the governed writable scope.",
                 ]),
               }),
             );
           }
 
           completionRepairAttempts += 1;
-          repairAttempts += 1;
           transition(
             "repairing",
             "completion_repair",
             "completed",
             [
               `Completion repair attempt ${completionRepairAttempts}/1.`,
-              `Shared repair budget ${repairAttempts}/${effectiveMaxRepairs}.`,
+              `Validation repair budget used: ${repairAttempts}/${effectiveMaxRepairs}.`,
               `Canonical completion source: ${completionSourcePath}`,
             ],
           );
@@ -920,7 +916,7 @@ export async function runLoopExecute(
                 "Re-read the documented objective, deliverables and completion evidence before editing the roadmap.",
                 "Close only the selected roadmap work item if its documented completion criteria are actually satisfied by the current worktree.",
                 "Do not mark a roadmap item complete merely because validation passed; if substantive work remains, leave it open.",
-                `Completion repair attempt ${completionRepairAttempts}/1 within shared repair budget ${repairAttempts}/${effectiveMaxRepairs}.`,
+                `Completion repair attempt ${completionRepairAttempts}/1 is independent from the validation repair budget ${repairAttempts}/${effectiveMaxRepairs}.`,
               ]),
             }),
           });

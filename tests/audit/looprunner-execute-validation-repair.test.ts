@@ -45,7 +45,7 @@ describe("LoopRunner execute validation repair audit", () => {
     assert.deepEqual(result.forbidden, ["process.env"]);
   });
 
-  it("requires completion repair to remain one-shot, scope-gated, and inside the shared budget", () => {
+  it("requires completion repair to remain independently one-shot and scope-gated", () => {
     const runner = readFileSync(RUNNER_FILE, "utf8").replace(
       "completionRepairAttempts < 1",
       "completionRepairAttempts < Number.MAX_SAFE_INTEGER",
