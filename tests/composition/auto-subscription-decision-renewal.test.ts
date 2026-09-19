@@ -46,7 +46,7 @@ function fixture(
   const root = mkdtempSync(join(tmpdir(), "loop-auto-decision-"));
   const candidateText = options.candidateText ?? "Finish bounded continuation.";
   mkdirSync(join(root, "docs", "roadmap"), { recursive: true });
-  writeFileSync(join(root, ".gitignore"), ".loop-engine/\n", "utf8");
+  writeFileSync(join(root, ".gitignore"), ".loop-engine/\n.governance/\n", "utf8");
   writeFileSync(join(root, "OBJECTIVE.md"), "# Objective\n\nKeep the workflow governed.\n", "utf8");
   writeFileSync(
     join(root, "docs", "roadmap", "README.md"),
@@ -255,6 +255,38 @@ test("renews a missing decision through read-only Claude subscription proposal",
       ]);
       assert.ok(parsed.decision.decision.brief);
     }
+    assert.equal(git(root, ["status", "--short"]), "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("creates a configured direct-child governance directory before renewing a missing decision", async () => {
+  const { root, project, head } = fixture();
+  try {
+    const governanceProject: ProjectConfig = {
+      ...project,
+      execution_decision: ".governance/execution-decision.yaml",
+    };
+    let calls = 0;
+    const result = await ensureAutoSubscriptionExecutionDecision(
+      governanceProject,
+      head,
+      "H1-L1",
+      {
+        runClaude: async () => {
+          calls += 1;
+          return claudeSuccess();
+        },
+      },
+    );
+
+    assert.equal(result.ok, true);
+    assert.equal(calls, 1);
+    assert.equal(
+      existsSync(join(root, ".governance", "execution-decision.yaml")),
+      true,
+    );
     assert.equal(git(root, ["status", "--short"]), "");
   } finally {
     rmSync(root, { recursive: true, force: true });

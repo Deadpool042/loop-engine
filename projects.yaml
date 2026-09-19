@@ -55,7 +55,7 @@ projects:
     workspace:
       mode: source_only
       dependencies: none
-    execution_decision: .loop-engine/execution-decision.yaml
+    execution_decision: .governance/execution-decision.yaml
     type: infra
     planning:
       mode: roadmap
