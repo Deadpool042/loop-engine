@@ -237,6 +237,60 @@ describe("V57 autonomous completion repair", () => {
     );
   });
 
+  it("admits a completion repair when validated worktree files already exist inside the original scope", async () => {
+    let planCalls = 0;
+    let executorCalls = 0;
+    let worktreeReads = 0;
+
+    const result = await runLoopExecute("autonomous-completion", {
+      ...baseOptions(),
+      maxRepairs: 1,
+      planLoopCycle: () => {
+        planCalls += 1;
+        if (planCalls === 3) {
+          return {
+            outcome: "blocked" as const,
+            candidate: { ...candidate(), status: "done" as const },
+            code: "candidate_done" as const,
+            reason: "Roadmap candidate is already done: VNEXT4-S6A",
+          };
+        }
+        return openCycle(["roadmap.md", "src/**"]);
+      },
+      readModifiedWorktreeFiles: async () => {
+        worktreeReads += 1;
+        return worktreeReads === 1
+          ? ["src/feature.ts"]
+          : ["roadmap.md", "src/feature.ts"];
+      },
+      executor: async (plan) => {
+        executorCalls += 1;
+        if (executorCalls === 2) {
+          assert.equal(plan.worktreeMode, "repair_existing");
+          assert.deepEqual(plan.allowedPaths, ["roadmap.md", "src/feature.ts"]);
+        }
+        return {
+          status: "completed" as const,
+          modifiedFiles:
+            executorCalls === 1
+              ? ["src/feature.ts"]
+              : ["roadmap.md"],
+          details: [],
+        };
+      },
+      validator: async () => ({
+        status: "passed" as const,
+        failedCommand: null,
+        exitCode: 0,
+        details: [],
+      }),
+    });
+
+    assert.equal(result.status, "completed");
+    assert.equal(result.failure, null);
+    assert.equal(executorCalls, 2);
+  });
+
   it("does not repair completion when the canonical roadmap source is outside governed scope", async () => {
     let executorCalls = 0;
 
