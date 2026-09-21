@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { buildExecutionStatusReport } from "../../src/composition/execution-status.js";
+import {
+  buildExecutionStatusReport,
+  selectLatestDurableExecutionRecords,
+} from "../../src/composition/execution-status.js";
 import { createFileDurableExecutionStore } from "../../src/loop/file-durable-execution-store.js";
 import type { DurableExecutionRecord } from "../../src/loop/durable-execution.js";
 import type { LoopRunResult } from "../../src/loop/types.js";
@@ -327,6 +330,28 @@ test("execution status exposes a terminal failure instead of making the same can
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("execution status keeps a newer terminal durable revision over a stale running mirror", () => {
+  const staleRunning: DurableExecutionRecord = Object.freeze({
+    ...runningRecord(),
+    revision: 10,
+    updatedAt: "2026-09-06T22:04:00.000Z",
+  });
+  const terminal: DurableExecutionRecord = Object.freeze({
+    ...failedRecord(),
+    revision: 11,
+    updatedAt: "2026-09-06T22:03:00.000Z",
+  });
+
+  const selected = selectLatestDurableExecutionRecords([
+    terminal,
+    staleRunning,
+  ]);
+
+  assert.equal(selected.length, 1);
+  assert.equal(selected[0]?.revision, 11);
+  assert.equal(selected[0]?.status, "failed");
 });
 
 

@@ -345,6 +345,30 @@ function executionTelemetry(record: DurableExecutionRecord) {
   });
 }
 
+export function selectLatestDurableExecutionRecords(
+  records: readonly DurableExecutionRecord[],
+): readonly DurableExecutionRecord[] {
+  const byKey = new Map<string, DurableExecutionRecord>();
+  for (const record of records) {
+    const existing = byKey.get(record.idempotencyKey);
+    if (
+      existing === undefined ||
+      record.revision > existing.revision ||
+      (record.revision === existing.revision &&
+        record.updatedAt > existing.updatedAt)
+    ) {
+      byKey.set(record.idempotencyKey, record);
+    }
+  }
+  return Object.freeze(
+    [...byKey.values()].sort(
+      (left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        left.idempotencyKey.localeCompare(right.idempotencyKey),
+    ),
+  );
+}
+
 async function readExecutionRecords(
   project: string,
   directory?: string,
@@ -360,25 +384,7 @@ async function readExecutionRecords(
       project,
     ),
   ]);
-  const byKey = new Map<string, DurableExecutionRecord>();
-  for (const record of [...legacy, ...current]) {
-    const existing = byKey.get(record.idempotencyKey);
-    if (
-      existing === undefined ||
-      record.updatedAt > existing.updatedAt ||
-      (record.updatedAt === existing.updatedAt &&
-        record.revision > existing.revision)
-    ) {
-      byKey.set(record.idempotencyKey, record);
-    }
-  }
-  return Object.freeze(
-    [...byKey.values()].sort(
-      (left, right) =>
-        right.updatedAt.localeCompare(left.updatedAt) ||
-        left.idempotencyKey.localeCompare(right.idempotencyKey),
-    ),
-  );
+  return selectLatestDurableExecutionRecords([...legacy, ...current]);
 }
 
 export async function buildExecutionStatusReport(
