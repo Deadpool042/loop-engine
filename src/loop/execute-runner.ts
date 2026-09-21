@@ -180,6 +180,22 @@ function internalFailure(
   });
 }
 
+function safeWorkspaceResetDiagnostic(error: unknown): string | null {
+  if (typeof error !== "object" || error === null) return null;
+  const value = error as Readonly<Record<string, unknown>>;
+  if (
+    !Number.isInteger(value.trackedDirty) ||
+    (value.trackedDirty as number) < 0 ||
+    !Number.isInteger(value.untracked) ||
+    (value.untracked as number) < 0 ||
+    typeof value.baseSha !== "string" ||
+    !/^[a-f0-9]{40,64}$/i.test(value.baseSha)
+  ) {
+    return null;
+  }
+  return `trackedDirty=${value.trackedDirty} untracked=${value.untracked} baseSha=${value.baseSha}`;
+}
+
 /**
  * Runs one execute-mode LoopRunner cycle through injected executor and repair
  * ports. The runner never commits or publishes and all validation failures fail
@@ -586,7 +602,8 @@ export async function runLoopExecute(
 
     try {
       await dependencies.resetExecutionWorkspace(executionProject.path);
-    } catch {
+    } catch (error) {
+      const diagnostic = safeWorkspaceResetDiagnostic(error);
       transition("failed", "failed", "failed", [
         "Unable to restore the isolated worktree before model escalation.",
       ]);
@@ -595,7 +612,7 @@ export async function runLoopExecute(
         internalFailure(
           "model_escalation_workspace_reset_failed",
           "Unable to restore the isolated worktree before model escalation.",
-          "Workspace reset diagnostics are redacted from the public result.",
+          diagnostic ?? "Workspace reset diagnostics are redacted from the public result.",
         ),
       );
     }

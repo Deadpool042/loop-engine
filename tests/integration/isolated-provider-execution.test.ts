@@ -17,11 +17,17 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { createLoopApplicationAssembly } from "../../src/composition/index.js";
-import { IsolatedWorkspaceDependencyPreparationError } from "../../src/composition/isolated-provider-execution.js";
+import {
+  createIsolatedProviderRunExecute,
+  IsolatedWorkspaceDependencyPreparationError,
+} from "../../src/composition/isolated-provider-execution.js";
+import { createAgentRegistry } from "../../src/agents/registry.js";
+import type { AgentProfile } from "../../src/agents/types.js";
 import type { Config, ProjectConfig } from "../../src/core/config.js";
 import type { RoadmapCandidate } from "../../src/intelligence/roadmap.js";
 import type { ProjectSnapshot } from "../../src/intelligence/snapshot.js";
 import type { LoopRunExecuteOptions } from "../../src/loop/execute-runner.js";
+import { DEFAULT_AGENT_POLICY } from "../../src/policy/defaults.js";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const FAKE_CLAUDE = resolve(
@@ -125,6 +131,31 @@ function optionsFor(projects: readonly ProjectConfig[]): LoopRunExecuteOptions {
   };
 }
 
+function escalationProfile(
+  id: string,
+  model: string,
+  economicTier: NonNullable<AgentProfile["economicTier"]>,
+): AgentProfile {
+  return {
+    id,
+    runtime: "codex",
+    provider: "openai",
+    model,
+    effort: economicTier === "economy" ? "low" : "medium",
+    economicTier,
+    availability: "available",
+    capabilities: ["code_edit", "shell_exec", "test_execution"],
+    permissions: ["read_only", "write_worktree", "shell_exec"],
+    budget: {
+      maxTokens: null,
+      maxCostUsd: null,
+      maxDurationMs: 30_000,
+      maxCalls: 1,
+      maxRepairs: 0,
+    },
+  };
+}
+
 function application(
   projects: readonly ProjectConfig[],
   root: string,
@@ -189,6 +220,89 @@ function normalizeMacTemporaryPath(path: string): string {
 }
 
 describe("isolated provider execution", () => {
+  it("restores the immutable base before a model escalation after the first model moves HEAD", async () => {
+    const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
+    const project = await createRepository(root, "source");
+    const baseSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: project.path,
+      encoding: "utf8",
+    }).trim();
+    const runExecute = createIsolatedProviderRunExecute({
+      executor: async () => ({ status: "completed", modifiedFiles: [], details: [] }),
+      agentRegistry: createAgentRegistry([
+        escalationProfile("codex.economy", "luna", "economy"),
+        escalationProfile("codex.standard", "terra", "standard"),
+      ]),
+      resolveRepositoryPath: () => project.path,
+      lockRoot: join(root, "locks"),
+      workspaceRoot: join(root, "workspaces"),
+      createAttemptId: () => "v58-reset",
+    });
+    let modelAttempts = 0;
+
+    try {
+      const result = await runExecute(project.name, {
+        ...optionsFor([project]),
+        agentPolicy: DEFAULT_AGENT_POLICY,
+        maxRepairs: 0,
+        executor: async (plan, workspacePath) => {
+          modelAttempts += 1;
+          if (modelAttempts === 1) {
+            await writeFile(join(workspacePath, "README.md"), "model A delta\n");
+            await writeFile(join(workspacePath, "model-a.tmp"), "temporary\n");
+            execFileSync("git", ["add", "README.md"], { cwd: workspacePath });
+            execFileSync("git", ["commit", "-qm", "test: model A invalid delta"], {
+              cwd: workspacePath,
+            });
+          } else {
+            assert.equal(
+              execFileSync("git", ["rev-parse", "HEAD"], {
+                cwd: workspacePath,
+                encoding: "utf8",
+              }).trim(),
+              baseSha,
+              "model B must restart from the immutable base SHA",
+            );
+            assert.equal(
+              execFileSync("git", ["status", "--porcelain=v1"], {
+                cwd: workspacePath,
+                encoding: "utf8",
+              }),
+              "",
+              "tracked, staged, and generated untracked files must be absent",
+            );
+            await writeFile(join(workspacePath, "model-b.txt"), "fresh delta\n");
+          }
+          return {
+            status: "completed" as const,
+            modifiedFiles: modelAttempts === 1 ? ["README.md", "model-a.tmp"] : ["model-b.txt"],
+            details: [`Model ${plan.model} completed.`],
+          };
+        },
+        validator: async ({ attempt }) =>
+          attempt === 1
+            ? {
+                status: "failed" as const,
+                failedCommand: "test validation",
+                exitCode: 1,
+                details: ["Model A validation failed."],
+              }
+            : {
+                status: "passed" as const,
+                failedCommand: null,
+                exitCode: 0,
+                details: ["Model B validation passed."],
+              },
+      });
+      assert.equal(result.status, "completed");
+      assert.equal(modelAttempts, 2);
+      await assertCleanSource(project, "model-b.txt");
+      await assertNoOrphans(root);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("allows an uncommitted execution decision as the only dirty source artifact", async () => {
     const root = await mkdtemp(join(tmpdir(), "loop-isolated-provider-"));
     const project = await createRepository(root, "source");

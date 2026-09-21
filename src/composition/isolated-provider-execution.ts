@@ -15,7 +15,6 @@ import type { LoopRunExecuteOptions } from "../loop/execute-runner.js";
 import type { LoopExecutor } from "../loop/execution.js";
 import { runLoopExecuteWithProviderFailoverEvidence } from "../loop/provider-failover-runner.js";
 import type { LoopRunResult } from "../loop/types.js";
-import { readModifiedWorktreeFiles } from "../loop/worktree-status.js";
 import type { AgentRegistry } from "../agents/registry.js";
 import { loadConfig, type ProjectConfig } from "../core/config.js";
 import { findProject } from "../core/project.js";
@@ -56,21 +55,40 @@ async function runOfflinePnpmInstall(
   });
 }
 
-export async function resetIsolatedProviderWorkspace(
-  workspacePath: string,
-): Promise<void> {
-  await execFileAsync("git", ["reset", "--hard", "HEAD"], {
-    cwd: workspacePath,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024,
-    timeout: 30_000,
-  });
-  await execFileAsync("git", ["clean", "-fd", "--"], {
-    cwd: workspacePath,
-    encoding: "utf8",
-    maxBuffer: 1024 * 1024,
-    timeout: 30_000,
-  });
+export class IsolatedProviderWorkspaceResetError extends Error {
+  readonly trackedDirty: number;
+  readonly untracked: number;
+  readonly baseSha: string;
+
+  constructor(
+    trackedDirty: number,
+    untracked: number,
+    baseSha: string,
+  ) {
+    super("The isolated provider worktree is not clean after baseline reset.");
+    this.name = "IsolatedProviderWorkspaceResetError";
+    this.trackedDirty = trackedDirty;
+    this.untracked = untracked;
+    this.baseSha = baseSha;
+  }
+}
+
+function summarizePorcelain(output: string): Readonly<{
+  trackedDirty: number;
+  untracked: number;
+}> {
+  let trackedDirty = 0;
+  let untracked = 0;
+  const entries = output.split("\0");
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index];
+    if (!entry) continue;
+    const status = entry.slice(0, 2);
+    if (status === "??") untracked += 1;
+    else trackedDirty += 1;
+    if (status.includes("R") || status.includes("C")) index += 1;
+  }
+  return Object.freeze({ trackedDirty, untracked });
 }
 
 export async function createIsolatedProviderWorkspaceReset(
@@ -103,10 +121,30 @@ export async function createIsolatedProviderWorkspaceReset(
       timeout: 30_000,
     });
 
-    const modified = await readModifiedWorktreeFiles(workspacePath);
-    if (modified === null || modified.length > 0) {
-      throw new Error(
-        "The isolated provider worktree is not clean after baseline reset.",
+    const [headResult, statusResult] = await Promise.all([
+      execFileAsync("git", ["rev-parse", "--verify", "HEAD"], {
+        cwd: workspacePath,
+        encoding: "utf8",
+        maxBuffer: 1024,
+        timeout: 30_000,
+      }),
+      execFileAsync("git", ["status", "--porcelain=v1", "-z"], {
+        cwd: workspacePath,
+        encoding: "utf8",
+        maxBuffer: 1024 * 1024,
+        timeout: 30_000,
+      }),
+    ]);
+    const summary = summarizePorcelain(statusResult.stdout);
+    if (
+      headResult.stdout.trim() !== baseline ||
+      summary.trackedDirty > 0 ||
+      summary.untracked > 0
+    ) {
+      throw new IsolatedProviderWorkspaceResetError(
+        summary.trackedDirty,
+        summary.untracked,
+        baseline,
       );
     }
   };
@@ -288,14 +326,16 @@ export function createIsolatedProviderRunExecute(
             throw error;
           }
 
+          const resetExecutionWorkspace =
+            runOptions.resetExecutionWorkspace ??
+            (await createIsolatedProviderWorkspaceReset(workspace.path));
+
           const result = await execute(projectName, {
             ...runOptions,
             executor,
             agentRegistry: runOptions.agentRegistry ?? options.agentRegistry,
             executionProjectPath: workspace.path,
-            resetExecutionWorkspace:
-              runOptions.resetExecutionWorkspace ??
-              resetIsolatedProviderWorkspace,
+            resetExecutionWorkspace,
           });
 
           if (
