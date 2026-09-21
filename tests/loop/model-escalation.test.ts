@@ -240,6 +240,7 @@ describe("bounded intra-provider model escalation", () => {
       "provider_unavailable",
       "runtime_unavailable",
       "executor_unavailable",
+      "scope_violation",
     ]) {
       const decision = resolveIntraProviderModelEscalation({
         registry,
