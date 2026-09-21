@@ -12,7 +12,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, it } from "node:test";
 
-import { createCodexCliLoopExecutor } from "../../src/loop/codex-cli-executor.js";
+import {
+  createCodexCliLoopExecutor,
+  resolveCodexExecutionTimeoutMs,
+} from "../../src/loop/codex-cli-executor.js";
 import type { LoopExecutionPlan } from "../../src/loop/execution-plan.js";
 
 function setupCleanWorktree(): {
@@ -144,6 +147,13 @@ describe("createCodexCliLoopExecutor", () => {
         }),
       /output limit must be a positive integer/,
     );
+  });
+
+  it("bounds default Codex execution time by effort while preserving an explicit override", () => {
+    assert.equal(resolveCodexExecutionTimeoutMs("low"), 90_000);
+    assert.equal(resolveCodexExecutionTimeoutMs("medium"), 150_000);
+    assert.equal(resolveCodexExecutionTimeoutMs("high"), 240_000);
+    assert.equal(resolveCodexExecutionTimeoutMs("low", 12_345), 12_345);
   });
 
   it("uses the qualified worktree-only Codex AUTO permission profile", async () => {

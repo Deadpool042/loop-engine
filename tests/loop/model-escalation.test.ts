@@ -125,14 +125,24 @@ function planFromResolution(
 }
 
 describe("bounded intra-provider model escalation", () => {
-  it("uses the policy call ceiling but never allows more than one escalation", () => {
+  it("uses the policy call ceiling but never allows more than one escalation above low effort", () => {
     const registry = createAgentRegistry([
-      profile("codex.economy", "luna", "economy"),
+      profile("codex.standard", "terra", "standard"),
     ]);
     const resolution = resolved(registry, 8);
 
     assert.equal(resolveModelAttemptBudget(resolution, true), 2);
     assert.equal(resolveModelAttemptBudget(resolution, false), 1);
+  });
+
+  it("keeps low-effort executions to a single model attempt", () => {
+    const registry = createAgentRegistry([
+      profile("codex.economy", "luna", "economy"),
+      profile("codex.standard", "terra", "standard"),
+    ]);
+    const resolution = resolved(registry, 8);
+
+    assert.equal(resolveModelAttemptBudget(resolution, true), 1);
   });
 
   it("moves directly to the next admissible economic tier on provider_max_turns", () => {
@@ -240,6 +250,7 @@ describe("bounded intra-provider model escalation", () => {
       "provider_unavailable",
       "runtime_unavailable",
       "executor_unavailable",
+      "scope_violation",
     ]) {
       const decision = resolveIntraProviderModelEscalation({
         registry,

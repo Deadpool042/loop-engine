@@ -42,6 +42,16 @@ function isQuotaOrRateLimitFailure(output: string): boolean {
   );
 }
 
+export function resolveCodexExecutionTimeoutMs(
+  effort: string,
+  configuredTimeoutMs?: number,
+): number {
+  if (configuredTimeoutMs !== undefined) return configuredTimeoutMs;
+  if (effort === "low") return 90_000;
+  if (effort === "medium") return 150_000;
+  return 240_000;
+}
+
 export function buildLoopExecutionPrompt(plan: LoopExecutionPlan): string {
   const files = plan.contextPackage.files.map((file) => file.path).join(", ");
   return [
@@ -165,9 +175,12 @@ export function createCodexCliLoopExecutor(
       "Codex executable must resolve to a command named codex.",
     );
   }
-  const timeoutMs = options.timeoutMs ?? 300_000;
+  const configuredTimeoutMs = options.timeoutMs;
   const maxOutputBytes = options.maxOutputBytes ?? 1_000_000;
-  if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
+  if (
+    configuredTimeoutMs !== undefined &&
+    (!Number.isInteger(configuredTimeoutMs) || configuredTimeoutMs <= 0)
+  ) {
     throw new TypeError("Codex timeout must be a positive integer.");
   }
   if (!Number.isInteger(maxOutputBytes) || maxOutputBytes <= 0) {
@@ -226,7 +239,7 @@ export function createCodexCliLoopExecutor(
       options.executable.trim(),
       args,
       cwd,
-      timeoutMs,
+      resolveCodexExecutionTimeoutMs(plan.effort, configuredTimeoutMs),
       maxOutputBytes,
     );
     const modifiedFiles = await readModifiedWorktreeFiles(cwd);

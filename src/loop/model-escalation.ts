@@ -18,7 +18,6 @@ export const LOOP_MODEL_ESCALATION_TRIGGERS = [
   "provider_max_turns",
   "provider_limit_exceeded",
   "validation_failed",
-  "scope_violation",
 ] as const;
 
 export type LoopModelEscalationTrigger =
@@ -69,6 +68,12 @@ export function resolveModelAttemptBudget(
   allowEscalation: boolean,
 ): number {
   if (!allowEscalation) return 1;
+  if (
+    resolution.selection?.outcome === "selected" &&
+    resolution.selection.profile.effort === "low"
+  ) {
+    return 1;
+  }
 
   const configured = resolution.selectionRequest.budgetCeiling?.maxCalls;
   if (
