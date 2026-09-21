@@ -487,7 +487,7 @@ describe("createCodexCliLoopExecutor", () => {
       assert.equal(result.status, "failed");
       assert.equal(
         result.status === "failed" ? result.failure.code : null,
-        "provider_limit_exceeded",
+        "provider_timeout",
       );
     } finally {
       delete process.env.FAKE_CODEX_MODE;

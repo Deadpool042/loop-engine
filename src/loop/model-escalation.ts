@@ -68,12 +68,6 @@ export function resolveModelAttemptBudget(
   allowEscalation: boolean,
 ): number {
   if (!allowEscalation) return 1;
-  if (
-    resolution.selection?.outcome === "selected" &&
-    resolution.selection.profile.effort === "low"
-  ) {
-    return 1;
-  }
 
   const configured = resolution.selectionRequest.budgetCeiling?.maxCalls;
   if (

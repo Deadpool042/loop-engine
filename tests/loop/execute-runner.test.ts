@@ -788,7 +788,7 @@ describe("runLoopExecute", () => {
     assert.deepEqual(result.modifiedFiles, []);
   });
 
-  it("automatically retries a first scope violation from a clean baseline with the next model", async () => {
+  it("fails closed on a scope violation without spending a second model attempt", async () => {
     const registry = createAgentRegistry([
       routingProfile("codex.economy", "luna", "economy"),
       routingProfile("codex.standard", "terra", "standard"),
@@ -819,15 +819,7 @@ describe("runLoopExecute", () => {
       executor: async (plan) => {
         observedModels.push(plan.model);
         executorCalls += 1;
-        assert.deepEqual(
-          modified,
-          [],
-          "each scope-retry attempt must start from a clean baseline",
-        );
-
-        modified =
-          executorCalls === 1 ? ["docs/outside.md"] : ["src/feature.ts"];
-
+        modified = ["docs/outside.md"];
         return {
           status: "completed" as const,
           modifiedFiles: [...modified],
@@ -845,24 +837,17 @@ describe("runLoopExecute", () => {
       },
     });
 
-    assert.equal(result.status, "completed");
-    assert.equal(executorCalls, 2);
-    assert.equal(resetCalls, 1);
-    assert.equal(validatorCalls, 1);
-    assert.deepEqual(observedModels, ["luna", "terra"]);
-    assert.deepEqual(result.modifiedFiles, ["src/feature.ts"]);
-    assert.equal(
-      result.modelEscalationEvidence?.attempts[0]?.trigger,
-      "scope_violation",
-    );
-    assert.equal(
-      JSON.stringify(result).includes("docs/outside.md"),
-      false,
-      "the rejected first-attempt delta must not survive the reset",
-    );
+    assert.equal(result.status, "failed");
+    assert.equal(result.failure?.code, "scope_violation");
+    assert.equal(executorCalls, 1);
+    assert.equal(resetCalls, 0);
+    assert.equal(validatorCalls, 0);
+    assert.deepEqual(observedModels, ["luna"]);
+    assert.deepEqual(result.modifiedFiles, ["docs/outside.md"]);
+    assert.equal(result.modelEscalationEvidence, null);
   });
 
-  it("stops after one clean scope retry when the escalated model still violates scope", async () => {
+  it("does not invoke reset or a higher model for a governed scope violation", async () => {
     const registry = createAgentRegistry([
       routingProfile("codex.economy", "luna", "economy"),
       routingProfile("codex.standard", "terra", "standard"),
@@ -890,11 +875,7 @@ describe("runLoopExecute", () => {
       },
       executor: async () => {
         executorCalls += 1;
-        modified = [
-          executorCalls === 1
-            ? "docs/first-outside.md"
-            : "docs/second-outside.md",
-        ];
+        modified = ["docs/first-outside.md"];
         return {
           status: "completed" as const,
           modifiedFiles: [...modified],
@@ -905,16 +886,13 @@ describe("runLoopExecute", () => {
 
     assert.equal(result.status, "failed");
     assert.equal(result.failure?.code, "scope_violation");
-    assert.equal(executorCalls, 2);
-    assert.equal(resetCalls, 1);
+    assert.equal(executorCalls, 1);
+    assert.equal(resetCalls, 0);
     assert.match(
       result.failure?.details.join("\n") ?? "",
-      /docs\/second-outside\.md/,
+      /docs\/first-outside\.md/,
     );
-    assert.equal(
-      JSON.stringify(result).includes("docs/first-outside.md"),
-      false,
-    );
+    assert.equal(result.modelEscalationEvidence, null);
   });
 
   it("escalates after provider_limit_exceeded once lower-tier provider attempts are exhausted", async () => {
