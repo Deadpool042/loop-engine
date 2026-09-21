@@ -42,6 +42,16 @@ function isQuotaOrRateLimitFailure(output: string): boolean {
   );
 }
 
+export function resolveCodexExecutionTimeoutMs(
+  effort: string,
+  configuredTimeoutMs?: number,
+): number {
+  if (configuredTimeoutMs !== undefined) return configuredTimeoutMs;
+  if (effort === "low") return 90_000;
+  if (effort === "medium") return 150_000;
+  return 240_000;
+}
+
 export function buildLoopExecutionPrompt(plan: LoopExecutionPlan): string {
   const files = plan.contextPackage.files.map((file) => file.path).join(", ");
   return [
@@ -114,7 +124,14 @@ function runProcess(
   cwd: string,
   timeoutMs: number,
   maxOutputBytes: number,
-): Promise<Readonly<{ exitCode: number; stdout: string; stderr: string }>> {
+): Promise<
+  Readonly<{
+    exitCode: number;
+    stdout: string;
+    stderr: string;
+    limitReason: "timeout" | "output" | null;
+  }>
+> {
   return new Promise((resolvePromise) => {
     const child = spawn(executable, [...args], {
       cwd,
@@ -127,17 +144,22 @@ function runProcess(
     let observedBytes = 0;
     let settled = false;
     let timer: NodeJS.Timeout | null = null;
-    const settle = (exitCode: number): void => {
+    const settle = (
+      exitCode: number,
+      limitReason: "timeout" | "output" | null = null,
+    ): void => {
       if (settled) return;
       settled = true;
       if (timer !== null) clearTimeout(timer);
-      resolvePromise(Object.freeze({ exitCode, stdout, stderr }));
+      resolvePromise(
+        Object.freeze({ exitCode, stdout, stderr, limitReason }),
+      );
     };
     const consume = (chunk: Buffer, channel: "stdout" | "stderr"): void => {
       observedBytes += chunk.byteLength;
       if (observedBytes > maxOutputBytes) {
         child.kill("SIGTERM");
-        settle(124);
+        settle(124, "output");
         return;
       }
       if (channel === "stdout") stdout += chunk.toString("utf8");
@@ -149,7 +171,7 @@ function runProcess(
     child.once("close", (code) => settle(code ?? 1));
     timer = setTimeout(() => {
       child.kill("SIGTERM");
-      settle(124);
+      settle(124, "timeout");
     }, timeoutMs);
   });
 }
@@ -165,9 +187,12 @@ export function createCodexCliLoopExecutor(
       "Codex executable must resolve to a command named codex.",
     );
   }
-  const timeoutMs = options.timeoutMs ?? 300_000;
+  const configuredTimeoutMs = options.timeoutMs;
   const maxOutputBytes = options.maxOutputBytes ?? 1_000_000;
-  if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) {
+  if (
+    configuredTimeoutMs !== undefined &&
+    (!Number.isInteger(configuredTimeoutMs) || configuredTimeoutMs <= 0)
+  ) {
     throw new TypeError("Codex timeout must be a positive integer.");
   }
   if (!Number.isInteger(maxOutputBytes) || maxOutputBytes <= 0) {
@@ -226,7 +251,7 @@ export function createCodexCliLoopExecutor(
       options.executable.trim(),
       args,
       cwd,
-      timeoutMs,
+      resolveCodexExecutionTimeoutMs(plan.effort, configuredTimeoutMs),
       maxOutputBytes,
     );
     const modifiedFiles = await readModifiedWorktreeFiles(cwd);
@@ -235,10 +260,16 @@ export function createCodexCliLoopExecutor(
         "worktree_status_failed",
         "Unable to inspect provider modifications.",
       );
+    if (result.exitCode === 124 && result.limitReason === "timeout")
+      return failure(
+        "provider_timeout",
+        "Codex execution exceeded its configured time budget.",
+        modifiedFiles,
+      );
     if (result.exitCode === 124)
       return failure(
         "provider_limit_exceeded",
-        "Codex execution exceeded a configured limit.",
+        "Codex execution exceeded a configured output limit.",
         modifiedFiles,
       );
     if (
