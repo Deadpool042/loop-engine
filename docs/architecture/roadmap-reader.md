@@ -61,7 +61,10 @@ Lorsqu'une roadmap contient de telles lignes, ses puces descriptives non
 explicites ne sont pas ajoutées à l'inventaire des lots.
 
 Les lots de tableau structurés exposent leur première cellule `H<n>-L<n>` ou
-`V<n>-P<n>-L<n>` (suffixe alphabétique optionnel) comme identifiant stable `candidate.id`.
+`V<n>-P<n>-L<n>` comme identifiant stable `candidate.id`. Le lot (`L<n>`) et,
+pour le format versionné, le numéro de phase (`P<n>`) acceptent chacun un
+suffixe alphabétique optionnel (ex. `V1-P3A-L1`), pour représenter une
+sous-phase lettrée sans introduire de grammaire libre.
 
 Les lignes Markdown explicites peuvent aussi exposer un identifiant stable
 lorsque le libellé commence, après les marqueurs de statut/priorité, par un
@@ -84,10 +87,12 @@ Les seules formes valides sont :
 <!-- loop-engine:phase-gate phase=H1 state=closed blockedBy=H0-RC -->
 ```
 
-`phase` est un identifiant d'horizon (`H<n>`), `state` vaut `open` ou
-`closed`, et une phase fermée exige un identifiant de gate stable dans
-`blockedBy`. Cette déclaration est opt-in : une roadmap sans gate conserve
-strictement son comportement historique.
+`phase` est un identifiant borné en majuscules (`H<n>` historique, ou tout
+identifiant du type `V<n>-P<n>`/`V<n>-P<n><lettre>` pour une roadmap produit
+versionnée, ex. `V1-P3A`), `state` vaut `open` ou `closed`, et une phase
+fermée exige un identifiant de gate stable dans `blockedBy`. Cette
+déclaration est opt-in : une roadmap sans gate conserve strictement son
+comportement historique.
 
 L'état documentaire d'un lot et son admissibilité sont distincts. Ainsi,
 `H1-L4` marqué `todo` reste présent dans l'inventaire, mais devient
