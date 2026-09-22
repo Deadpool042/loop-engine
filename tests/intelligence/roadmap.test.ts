@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { describe, it } from "node:test";
@@ -505,6 +511,174 @@ describe("roadmap structured markdown tables", () => {
       assert.equal(selected?.id, "V1-P1-L2");
       assert.equal(selected?.phaseId, "V1-P1");
       assert.equal(selected?.status, "todo");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("recognizes a lettered sub-phase (V1-P3A/V1-P3B) and preserves its phase id", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "| Lot | Deliverable | State |",
+        "| --- | --- | --- |",
+        "| V1-P2-L4 | Docker logging proof | ⬜ À faire |",
+        "| V1-P3A-L1 | RBAC + preflight + confirmation + audit | ⬜ À faire |",
+        "| V1-P3A-L4 | idempotence + locks + reconciliation | ⬜ À faire |",
+        "| V1-P3B-L1 | staging deployment | ⬜ À faire |",
+        "| V1-P4-L1 | acceptance security tests | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.id, "V1-P2-L4");
+      assert.equal(candidates[0]?.phaseId, "V1-P2");
+      assert.equal(candidates[1]?.id, "V1-P3A-L1");
+      assert.equal(candidates[1]?.phaseId, "V1-P3A");
+      assert.equal(candidates[2]?.id, "V1-P3A-L4");
+      assert.equal(candidates[2]?.phaseId, "V1-P3A");
+      assert.equal(candidates[3]?.id, "V1-P3B-L1");
+      assert.equal(candidates[3]?.phaseId, "V1-P3B");
+      assert.equal(candidates[4]?.id, "V1-P4-L1");
+      assert.equal(candidates[4]?.phaseId, "V1-P4");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("gates a lettered sub-phase independently: open sub-phase admissible, closed sub-phase blocked", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "<!-- loop-engine:phase-gate phase=V1-P3A state=open -->",
+        "<!-- loop-engine:phase-gate phase=V1-P3B state=closed blockedBy=V1-P2-L4-and-gate-P2-and-gate-P3A -->",
+        "| Lot | Deliverable | State |",
+        "| --- | --- | --- |",
+        "| V1-P3A-L1 | RBAC + preflight + confirmation + audit | ⬜ À faire |",
+        "| V1-P3B-L1 | staging deployment | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+      const selected = selectRoadmapCandidate(candidates);
+
+      assert.deepEqual(candidates[0]?.admissibility, {
+        state: "admissible",
+        reason: "phase_open",
+      });
+      assert.deepEqual(candidates[1]?.admissibility, {
+        state: "not_admissible",
+        reason: "phase_closed",
+        blockedBy: "V1-P2-L4-and-gate-P2-and-gate-P3A",
+      });
+      assert.equal(selected?.id, "V1-P3A-L1");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("combines a historical roadmap and a versioned product roadmap without one gate masking the other, when the product roadmap is declared first", () => {
+    const projectPath = mkdtempSync(join(tmpdir(), "loop-roadmap-multi-"));
+    const historicalPath = "docs/roadmap/projet-lp-infra.md";
+    const productPath = "docs/roadmap/lp-infra-product-v1.md";
+
+    mkdirSync(join(projectPath, "docs", "roadmap"), { recursive: true });
+    writeFileSync(
+      join(projectPath, historicalPath),
+      [
+        "<!-- loop-engine:phase-gate phase=H5 state=closed blockedBy=retours-terrain-2027 -->",
+        "| H5-L1 | Revue terrain | ⬜ À faire |",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(projectPath, productPath),
+      [
+        "<!-- loop-engine:phase-gate phase=V1-P3A state=open -->",
+        "| V1-P3A-L1 | RBAC + preflight + confirmation + audit | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    const project: ProjectConfig = {
+      name: "test",
+      path: ".",
+      type: "test",
+      required_docs: [],
+      validation: [],
+      roadmap: [productPath, historicalPath],
+    };
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+      const h5Candidate = candidates.find((c) => c.id === "H5-L1");
+      const productCandidate = candidates.find((c) => c.id === "V1-P3A-L1");
+
+      assert.deepEqual(h5Candidate?.admissibility, {
+        state: "not_admissible",
+        reason: "phase_closed",
+        blockedBy: "retours-terrain-2027",
+      });
+      assert.deepEqual(productCandidate?.admissibility, {
+        state: "admissible",
+        reason: "phase_open",
+      });
+      assert.equal(selectRoadmapCandidate(candidates)?.id, "V1-P3A-L1");
+    } finally {
+      rmSync(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  it("selection stays sequential across roadmap files: an earlier-declared closed phase blocks a later admissible one", () => {
+    const projectPath = mkdtempSync(join(tmpdir(), "loop-roadmap-multi-order-"));
+    const historicalPath = "docs/roadmap/projet-lp-infra.md";
+    const productPath = "docs/roadmap/lp-infra-product-v1.md";
+
+    mkdirSync(join(projectPath, "docs", "roadmap"), { recursive: true });
+    writeFileSync(
+      join(projectPath, historicalPath),
+      [
+        "<!-- loop-engine:phase-gate phase=H5 state=closed blockedBy=retours-terrain-2027 -->",
+        "| H5-L1 | Revue terrain | ⬜ À faire |",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(projectPath, productPath),
+      [
+        "<!-- loop-engine:phase-gate phase=V1-P3A state=open -->",
+        "| V1-P3A-L1 | RBAC + preflight + confirmation + audit | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    const project: ProjectConfig = {
+      name: "test",
+      path: ".",
+      type: "test",
+      required_docs: [],
+      validation: [],
+      roadmap: [historicalPath, productPath],
+    };
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+      assert.equal(selectRoadmapCandidate(candidates), null);
+    } finally {
+      rmSync(projectPath, { recursive: true, force: true });
+    }
+  });
+
+  it("does not treat a malformed lettered phase id as a structured table lot", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      [
+        "| Lot | Deliverable | State |",
+        "| --- | --- | --- |",
+        "| V1-P3AB-L1 | Two-letter sub-phase suffix is not supported | ⬜ À faire |",
+        "| v1-p3a-L1 | Lowercase phase id is not supported | ⬜ À faire |",
+      ].join("\n"),
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+      assert.equal(candidates.length, 0);
     } finally {
       cleanup();
     }
