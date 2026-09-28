@@ -43,6 +43,10 @@ import type {
 
 export type LoopRunExecuteOptions = LoopRunPlanOptions &
   Readonly<{
+    agentPolicy?: AgentPolicy;
+    agentRegistry?: AgentRegistry;
+    resolvePolicy?: typeof resolvePolicy;
+    buildMinimalContext?: typeof buildMinimalContext;
     executor?: LoopExecutor;
     validator?: LoopValidator;
     repairer?: LoopRepairer;

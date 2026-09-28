@@ -110,22 +110,8 @@ describe("runLoopPlan", () => {
     assert.equal(result.commit, null);
     assert.equal(result.publication, null);
     assert.equal(result.failure, null);
-    assert.ok(
-      result.agentPolicy,
-      "a completed plan cycle exposes an agent policy forecast",
-    );
-    assert.equal(result.agentPolicy?.mode, "plan");
-    // The forecast never implies a real call: this run's own budget stays 0.
-    assert.equal(result.agentPolicy?.requirements.executionBudget.maxCalls, 0);
-    assert.ok(
-      result.contextPackage,
-      "a completed plan cycle exposes a context package",
-    );
-    assert.equal(result.contextPackage?.project, project.name);
-    assert.deepEqual(
-      result.contextPackage?.budget,
-      result.agentPolicy?.requirements.contextBudget,
-    );
+    assert.equal(result.agentPolicy, null);
+    assert.equal(result.contextPackage, null);
     assert.ok(result.steps.length >= 3);
     assert.equal(result.steps.at(-1)?.name, "completed");
     assert.deepEqual(result.steps.at(-1)?.details, [
@@ -263,17 +249,9 @@ describe("runLoopPlan", () => {
     }
   });
 
-  it("computes the agent policy forecast via the injectable resolvePolicy — never a hardcoded call", () => {
+  it("keeps agent/provider selection out of the deterministic planning path", () => {
     const project = fixtureProject();
     const candidate = fixtureCandidate("safe");
-    let calls = 0;
-
-    const contextBudget = {
-      maxFiles: 1,
-      maxCharacters: 1,
-      maxEstimatedTokens: 1,
-      includeFullFiles: false,
-    };
 
     const result = runLoopPlan(project.name, {
       ...deterministicOptions(),
@@ -284,93 +262,10 @@ describe("runLoopPlan", () => {
         plannedSteps: [],
         snapshot: fixtureSnapshot(project, candidate),
       }),
-      resolvePolicy: (input) => {
-        calls += 1;
-        return {
-          policyId: "fixture-policy",
-          mode: input.mode,
-          status: "no_compatible_agent",
-          requirements: {
-            category: "code",
-            mode: input.mode,
-            requiredCapabilities: [],
-            requiredPermissions: [],
-            minimumEffort: "low",
-            maximumEffort: "low",
-            contextBudget,
-            executionBudget: {
-              maxTokens: null,
-              maxCostUsd: null,
-              maxDurationMs: null,
-              maxCalls: 0,
-              maxRepairs: 0,
-            },
-            rationale: ["fixture"],
-          },
-          selectionRequest: {
-            requiredCapabilities: [],
-            requiredPermissions: [],
-          },
-          selection: null,
-          reasons: ["fixture reason"],
-        };
-      },
     });
 
-    assert.equal(calls, 1);
-    assert.equal(result.agentPolicy?.policyId, "fixture-policy");
-    assert.equal(result.agentPolicy?.status, "no_compatible_agent");
-    // The context package always uses whatever contextBudget resolvePolicy
-    // returned — resolvePolicy is the single source of truth for the budget,
-    // never re-derived independently by the context builder integration.
-    assert.deepEqual(result.contextPackage?.budget, contextBudget);
-  });
-
-  it("computes the context package via the injectable buildMinimalContext — never a hardcoded call", () => {
-    const project = fixtureProject();
-    const candidate = fixtureCandidate("safe");
-    const snapshot = fixtureSnapshot(project, candidate);
-    let calls = 0;
-    let receivedBudget: unknown;
-
-    const fixturePackage = {
-      project: project.name,
-      budget: {
-        maxFiles: 0,
-        maxCharacters: 0,
-        maxEstimatedTokens: 0,
-        includeFullFiles: false,
-      },
-      files: [],
-      omitted: [],
-      totalCharacters: 0,
-      estimatedTokens: 0,
-      truncated: false,
-    };
-
-    const result = runLoopPlan(project.name, {
-      ...deterministicOptions(),
-      loadConfig: () => fixtureConfig(project),
-      planLoopCycle: () => ({
-        outcome: "ready",
-        candidate,
-        plannedSteps: [],
-        snapshot,
-      }),
-      buildMinimalContext: (receivedSnapshot, budget) => {
-        calls += 1;
-        receivedBudget = budget;
-        assert.equal(receivedSnapshot, snapshot);
-        return fixturePackage;
-      },
-    });
-
-    assert.equal(calls, 1);
-    assert.deepEqual(
-      receivedBudget,
-      result.agentPolicy?.requirements.contextBudget,
-    );
-    assert.deepEqual(result.contextPackage, fixturePackage);
+    assert.equal(result.agentPolicy, null);
+    assert.equal(result.contextPackage, null);
   });
 
   it("keeps the historical LoopRunResult shape free of runtime handoff fields", () => {

@@ -7,9 +7,7 @@ import { createExecutionPlan } from "../executor/index.js";
 import type { MinimalContextPackage } from "../context/types.js";
 import { loadConfig, type Config, type ProjectConfig } from "../core/config.js";
 import { findProject } from "../core/project.js";
-import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
-import { resolvePolicy } from "../policy/resolver.js";
-import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
+import type { AgentPolicyResolution } from "../policy/types.js";
 import { planLoopCycle, type LoopPlan } from "./planner.js";
 import { canTransition } from "./state-machine.js";
 import { executePlan } from "../execution/pipeline.js";
@@ -31,10 +29,6 @@ export type LoopRunPlanOptions = Readonly<{
     project: ProjectConfig,
     options?: { candidateId?: string },
   ) => LoopPlan;
-  agentPolicy?: AgentPolicy;
-  agentRegistry?: AgentRegistry;
-  resolvePolicy?: typeof resolvePolicy;
-  buildMinimalContext?: typeof buildMinimalContext;
 }>;
 
 export function runLoopPlan(
@@ -45,11 +39,6 @@ export function runLoopPlan(
   const generateRunId = options.generateRunId ?? (() => randomUUID());
   const resolveConfig = options.loadConfig ?? loadConfig;
   const plan = options.planLoopCycle ?? planLoopCycle;
-  const policy = options.agentPolicy ?? DEFAULT_AGENT_POLICY;
-  const registry = options.agentRegistry ?? defaultAgentRegistry;
-  const resolveAgentPolicy = options.resolvePolicy ?? resolvePolicy;
-  const buildContextPackage =
-    options.buildMinimalContext ?? buildMinimalContext;
 
   const mode: LoopRunMode = "plan";
   const runId = generateRunId();
@@ -171,32 +160,15 @@ export function runLoopPlan(
   // through executing/validating.
   transition("completed", "completed", "completed", cycle.plannedSteps);
 
-  // Forecast-only: resolves which agent profile *would* be selected for this
-  // candidate, without ever calling it. Pure lookup against a local
-  // registry — no network, no process, no side effect. See
-  // docs/architecture/agent-policy-engine.md.
-  const agentPolicy = resolveAgentPolicy({
-    policy,
-    registry,
-    candidate: cycle.candidate,
-    mode: "plan",
-  });
-
-  // Bounded, deterministic, local: builds the Minimal Context Package (V7.5)
-  // from the same snapshot the planner already computed, using the context
-  // budget the policy forecast just derived. No file read outside the
-  // project, no network, no agent call. See
-  // docs/architecture/minimal-context-builder.md.
-  const contextPackage = buildContextPackage(
-    cycle.snapshot,
-    agentPolicy.requirements.contextBudget,
-  );
-
+  // R1: the deterministic planning path stops at the bounded project
+  // decision. Agent/provider/model selection and agent-specific context
+  // construction belong to the interactive runtime (Hermes), not Loop Engine.
+  // The historical result fields remain present as null for wire compatibility.
   return finalize(
     cycle.candidate,
     null,
-    agentPolicy,
-    contextPackage,
+    null,
+    null,
     cycle.allowedPaths ?? null,
     cycle.brief === undefined
       ? null
