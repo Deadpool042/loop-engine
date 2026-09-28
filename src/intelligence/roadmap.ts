@@ -84,11 +84,11 @@ function detectCandidatePriority(line: string): RoadmapPriority {
 }
 
 function detectCandidateStatus(line: string): RoadmapCandidateStatus {
-  if (line.includes("- [ ]")) {
+  if (/^\s*-\s*\[\s\]\s*/.test(line)) {
     return "todo";
   }
 
-  if (line.includes("- [x]") || line.includes("- [X]")) {
+  if (/^\s*-\s*\[[xX]\]\s*/.test(line)) {
     return "done";
   }
 

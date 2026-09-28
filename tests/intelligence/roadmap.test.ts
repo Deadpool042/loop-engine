@@ -762,6 +762,21 @@ describe("roadmap markdown headings", () => {
     }
   });
 
+  it("keeps a completed candidate done when its description contains an inline open-checkbox example", () => {
+    const { project, projectPath, cleanup } = setupRoadmap(
+      "- [x] V58.0 — Exemple inline: `- [ ]` ne doit pas rouvrir ce lot",
+    );
+
+    try {
+      const candidates = findRoadmapCandidates(project, projectPath);
+
+      assert.equal(candidates[0]?.status, "done");
+      assert.equal(selectRoadmapCandidate(candidates), null);
+    } finally {
+      cleanup();
+    }
+  });
+
   it("does not turn a completed - [x] line into an active candidate", () => {
     const { project, projectPath, cleanup } = setupRoadmap(
       "- [x] Tâche déjà terminée",
