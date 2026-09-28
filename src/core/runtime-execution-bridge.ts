@@ -41,6 +41,50 @@ function createMappedRuntimeRequest(
   });
 }
 
+/**
+ * Compatibility projection for the explicit legacy policy-bound runtime bridge.
+ *
+ * R1 deliberately removes agent/provider selection and agent-specific context
+ * construction from the normal deterministic runLoopPlan path. The legacy
+ * bridge already receives an explicit resolved admission policy from its
+ * caller, so it may adapt that policy into the historical V10 request shape
+ * without asking Loop Engine to select an agent again.
+ */
+function projectPolicyBoundRuntimeLoopResult(
+  result: LoopRunResult,
+  policy: AgentPolicyResolution,
+): LoopRunResult {
+  if (result.agentPolicy !== null && result.contextPackage !== null) {
+    return result;
+  }
+
+  if (
+    result.candidate === null ||
+    policy.status !== "resolved" ||
+    policy.selection?.outcome !== "selected"
+  ) {
+    return result;
+  }
+
+  const contextPackage =
+    result.contextPackage ??
+    Object.freeze({
+      project: result.project,
+      budget: Object.freeze({ ...policy.requirements.contextBudget }),
+      files: Object.freeze([]),
+      omitted: Object.freeze([]),
+      totalCharacters: 0,
+      estimatedTokens: 0,
+      truncated: false,
+    });
+
+  return Object.freeze({
+    ...result,
+    agentPolicy: result.agentPolicy ?? policy,
+    contextPackage,
+  });
+}
+
 export const DECLARATIVE_RUNTIME_EXECUTION_BRIDGE_ERROR_CODES = [
   "declarative_runtime_request_invalid",
   "declarative_runtime_no_compatible_descriptor",
@@ -1622,7 +1666,10 @@ export function resolvePolicyAwareDeclarativeRuntimeExecution(
   }
 
   const runtimeRequest = createMappedRuntimeRequest(
-    input.loopRunResult,
+    projectPolicyBoundRuntimeLoopResult(
+      input.loopRunResult,
+      input.admission.policy,
+    ),
     runtimeId,
     input.runtimeRequestOptions,
   );
