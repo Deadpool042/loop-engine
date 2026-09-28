@@ -128,4 +128,18 @@ describe("completion evidence gate", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("does nothing when the linked detail document is missing without a known contract", () => {
+    const root = mkdtempSync(join(tmpdir(), "loop-evidence-detail-missing-"));
+    try {
+      const result = inspectCompletionEvidenceGate(
+        root,
+        fixtureCandidate("- [ ] VNEXT4-S6A — [detail](./missing.md)"),
+      );
+
+      assert.deepEqual(result, { status: "none" });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
