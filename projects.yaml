@@ -126,3 +126,20 @@ projects:
       objective_source: PROJECT-BRIEF.md
     roadmap:
       - docs/roadmap/README.md
+  - name: hermes-wizard-burnin
+    path: ../hermes-wizard-burnin
+    type: evaluation-fixture
+    workspace:
+      mode: source_only
+      dependencies: on_demand
+    required_docs:
+      - AGENTS.md
+      - README.md
+      - PROJECT-BRIEF.md
+      - docs/roadmap/README.md
+    validation: []
+    planning:
+      mode: roadmap
+      objective_source: PROJECT-BRIEF.md
+    roadmap:
+      - docs/roadmap/README.md
