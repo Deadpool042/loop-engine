@@ -1,8 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { defaultAgentRegistry } from "../agents/registry.js";
-import type { AgentRegistry } from "../agents/registry.js";
-import { buildMinimalContext } from "../context/builder.js";
 import { createExecutionPlan } from "../executor/index.js";
 import type { MinimalContextPackage } from "../context/types.js";
 import { loadConfig, type Config, type ProjectConfig } from "../core/config.js";

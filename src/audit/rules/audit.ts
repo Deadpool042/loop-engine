@@ -3127,9 +3127,9 @@ export const AUDIT_POLICY_FORECAST_INTEGRATION_RULE: AuditRule = {
   id: "AUDIT-060",
   category: "architecture",
   severity: "warning",
-  title: "LoopRunner computes a forecast-only agent policy in mode plan",
+  title: "Deterministic LoopRunner plan stays decoupled from agent routing",
   description:
-    "runLoopPlan should resolve an agent policy for the selected candidate in mode plan and expose it as an additive LoopRunResult field, without ever invoking an agent.",
+    "runLoopPlan should preserve the additive agentPolicy result field for compatibility while leaving agent/provider/model selection to the interactive runtime.",
   check: () => {
     const expectations = [
       {
@@ -3138,10 +3138,19 @@ export const AUDIT_POLICY_FORECAST_INTEGRATION_RULE: AuditRule = {
       },
       {
         file: "src/loop/runner.ts",
+        token: "Agent/provider/model selection and agent-specific context",
+      },
+      { file: "src/core/loop.ts", token: "agentPolicy: result.agentPolicy" },
+    ];
+    const forbidden = [
+      {
+        file: "src/loop/runner.ts",
         token: 'import { resolvePolicy } from "../policy/resolver.js";',
       },
-      { file: "src/loop/runner.ts", token: 'mode: "plan",' },
-      { file: "src/core/loop.ts", token: "agentPolicy: result.agentPolicy" },
+      {
+        file: "src/loop/runner.ts",
+        token: "const agentPolicy = resolveAgentPolicy(",
+      },
     ];
 
     const missing = expectations
@@ -3150,20 +3159,29 @@ export const AUDIT_POLICY_FORECAST_INTEGRATION_RULE: AuditRule = {
           !existsSync(file) || !readFileSync(file, "utf8").includes(token),
       )
       .map(({ file, token }) => `${file} -> ${token}`);
+    const violations = forbidden
+      .filter(
+        ({ file, token }) =>
+          existsSync(file) && readFileSync(file, "utf8").includes(token),
+      )
+      .map(({ file, token }) => `${file} -> forbidden ${token}`);
 
-    if (missing.length > 0) {
+    if (missing.length > 0 || violations.length > 0) {
       return fail(
         AUDIT_POLICY_FORECAST_INTEGRATION_RULE,
-        "The forecast-only agent policy integration is incomplete.",
-        missing,
-        "Ensure LoopRunResult exposes agentPolicy, runLoopPlan resolves it in mode plan via resolvePolicy, and the Core execution report exposes it in JSON output.",
+        "The deterministic planning boundary still depends on agent routing or is missing its compatibility contract.",
+        [...missing, ...violations],
+        "Keep agentPolicy as an additive nullable result field, but keep resolvePolicy and agent/provider/model selection out of runLoopPlan.",
       );
     }
 
     return pass(
       AUDIT_POLICY_FORECAST_INTEGRATION_RULE,
-      "LoopRunner computes a forecast-only agent policy in mode plan.",
-      expectations.map(({ file, token }) => `${file} -> ${token}`),
+      "Deterministic LoopRunner planning is decoupled from agent routing.",
+      [
+        ...expectations.map(({ file, token }) => `${file} -> ${token}`),
+        ...forbidden.map(({ file, token }) => `${file} -> absent ${token}`),
+      ],
     );
   },
 };
@@ -3505,9 +3523,9 @@ export const CONTEXT_BUILDER_LOOP_INTEGRATION_RULE: AuditRule = {
   id: "AUDIT-067",
   category: "architecture",
   severity: "warning",
-  title: "LoopRunner builds a Minimal Context Package in mode plan",
+  title: "Deterministic LoopRunner plan stays decoupled from agent-specific context",
   description:
-    "runLoopPlan should build a MinimalContextPackage for a completed plan cycle using agentPolicy.requirements.contextBudget, and expose it as an additive LoopRunResult field.",
+    "runLoopPlan should preserve the additive contextPackage result field for compatibility while leaving agent-specific context construction outside the deterministic planning path.",
   check: () => {
     const expectations = [
       {
@@ -3517,15 +3535,21 @@ export const CONTEXT_BUILDER_LOOP_INTEGRATION_RULE: AuditRule = {
       { file: "src/loop/planner.ts", token: "snapshot: ProjectSnapshot;" },
       {
         file: "src/loop/runner.ts",
+        token: "Agent/provider/model selection and agent-specific context",
+      },
+      {
+        file: "src/core/loop.ts",
+        token: "contextPackage: result.contextPackage",
+      },
+    ];
+    const forbidden = [
+      {
+        file: "src/loop/runner.ts",
         token: 'import { buildMinimalContext } from "../context/builder.js";',
       },
       {
         file: "src/loop/runner.ts",
         token: "agentPolicy.requirements.contextBudget",
-      },
-      {
-        file: "src/core/loop.ts",
-        token: "contextPackage: result.contextPackage",
       },
     ];
 
@@ -3535,20 +3559,29 @@ export const CONTEXT_BUILDER_LOOP_INTEGRATION_RULE: AuditRule = {
           !existsSync(file) || !readFileSync(file, "utf8").includes(token),
       )
       .map(({ file, token }) => `${file} -> ${token}`);
+    const violations = forbidden
+      .filter(
+        ({ file, token }) =>
+          existsSync(file) && readFileSync(file, "utf8").includes(token),
+      )
+      .map(({ file, token }) => `${file} -> forbidden ${token}`);
 
-    if (missing.length > 0) {
+    if (missing.length > 0 || violations.length > 0) {
       return fail(
         CONTEXT_BUILDER_LOOP_INTEGRATION_RULE,
-        "The Minimal Context Package integration is incomplete.",
-        missing,
-        "Ensure LoopRunResult exposes contextPackage, LoopPlan's ready outcome carries a snapshot, runLoopPlan builds the package via buildMinimalContext(snapshot, agentPolicy.requirements.contextBudget), and the Core execution report exposes it in JSON output.",
+        "The deterministic planning boundary still builds agent-specific context or is missing its compatibility contract.",
+        [...missing, ...violations],
+        "Keep contextPackage as an additive nullable result field, but keep buildMinimalContext and agent-specific context budgets out of runLoopPlan.",
       );
     }
 
     return pass(
       CONTEXT_BUILDER_LOOP_INTEGRATION_RULE,
-      "LoopRunner builds a Minimal Context Package in mode plan.",
-      expectations.map(({ file, token }) => `${file} -> ${token}`),
+      "Deterministic LoopRunner planning is decoupled from agent-specific context.",
+      [
+        ...expectations.map(({ file, token }) => `${file} -> ${token}`),
+        ...forbidden.map(({ file, token }) => `${file} -> absent ${token}`),
+      ],
     );
   },
 };
