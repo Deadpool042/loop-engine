@@ -119,6 +119,15 @@ function buildPrompt(input: TextOnlyProviderInput): string {
   ].join("\n");
 }
 
+function hermesModelArgs(model: string): readonly string[] {
+  const separator = model.indexOf("/");
+  const provider = model.slice(0, separator);
+  const providerModel = model.slice(separator + 1);
+  return provider === "openai"
+    ? ["--provider", "openai-codex", "--model", providerModel]
+    : ["--model", model];
+}
+
 function normalizeHermesOutput(stdout: string): string | null {
   const trimmed = stdout.trim();
   if (trimmed.length === 0) return null;
@@ -211,8 +220,10 @@ export function createHermesInferProvider(
         "--quiet",
         "--toolsets",
         "",
-        "--model",
-        model,
+        ...hermesModelArgs(model),
+        ...(input.effort === undefined
+          ? []
+          : ["--reasoning", input.effort]),
         "-q",
         buildPrompt(input),
       ];
