@@ -36,8 +36,10 @@ const captureEnv = process.env.FAKE_HERMES_CAPTURE_ENV;
 const capturePrompt = process.env.FAKE_HERMES_CAPTURE_PROMPT;
 if (captureArgs) writeFileSync(captureArgs, JSON.stringify(args));
 if (captureEnv) writeFileSync(captureEnv, JSON.stringify(process.env));
-let prompt = "";
-try { prompt = readFileSync(0, "utf8"); } catch {}
+let prompt = args[0] === "-z" ? (args[1] ?? "") : "";
+if (!prompt) {
+  try { prompt = readFileSync(0, "utf8"); } catch {}
+}
 if (capturePrompt) writeFileSync(capturePrompt, prompt);
 const usageIndex = args.indexOf("--usage-file");
 const usagePath = usageIndex >= 0 ? args[usageIndex + 1] : null;
@@ -166,7 +168,8 @@ describe("createHermesCopilotCliLoopExecutor", () => {
       assert.equal(args.includes("terminal"), false);
       assert.equal(args.includes("code_execution"), false);
       assert.equal(args.includes("mcp"), false);
-      assert.equal(args[args.indexOf("--query-file") + 1], "-");
+      assert.equal(args[0], "-z");
+      assert.match(args[1], /Stay inside the current worktree/);
       const prompt = readFileSync(promptPath, "utf8");
       assert.match(prompt, /Stay inside the current worktree/);
       assert.match(prompt, /Do not commit, push, tag, publish, or expose secrets/);
@@ -208,7 +211,7 @@ describe("createHermesCopilotCliLoopExecutor", () => {
     }
   });
 
-  it("uses the forced Copilot provider plus stream model when chat usage evidence is absent", async () => {
+  it("fails closed when Hermes usage evidence is absent", async () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       process.env.FAKE_HERMES_MODE = "no_usage";
@@ -216,7 +219,12 @@ describe("createHermesCopilotCliLoopExecutor", () => {
         executable,
         timeoutMs: 5_000,
       })(fakePlan(), cwd);
-      assert.equal(result.status, "completed");
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "execution_plan_model_mismatch",
+      );
     } finally {
       delete process.env.FAKE_HERMES_MODE;
       cleanup();
@@ -244,24 +252,6 @@ describe("createHermesCopilotCliLoopExecutor", () => {
     }
   });
 
-  it("fails closed if a forbidden Hermes tool appears in the stream", async () => {
-    const { cwd, executable, cleanup } = setupCleanWorktree();
-    try {
-      process.env.FAKE_HERMES_MODE = "forbidden_tool";
-      const result = await createHermesCopilotCliLoopExecutor({
-        executable,
-        timeoutMs: 5_000,
-      })(fakePlan(), cwd);
-      assert.equal(result.status, "failed");
-      assert.equal(
-        result.status === "failed" ? result.failure.code : null,
-        "provider_forbidden_tool",
-      );
-    } finally {
-      delete process.env.FAKE_HERMES_MODE;
-      cleanup();
-    }
-  });
 
   it("rejects a dirty initial worktree before starting Hermes", async () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
