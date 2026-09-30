@@ -208,7 +208,7 @@ describe("createHermesCopilotCliLoopExecutor", () => {
     }
   });
 
-  it("uses the forced Copilot provider plus stream model when chat usage evidence is absent", async () => {
+  it("fails closed when Hermes usage evidence is absent", async () => {
     const { cwd, executable, cleanup } = setupCleanWorktree();
     try {
       process.env.FAKE_HERMES_MODE = "no_usage";
@@ -216,7 +216,12 @@ describe("createHermesCopilotCliLoopExecutor", () => {
         executable,
         timeoutMs: 5_000,
       })(fakePlan(), cwd);
-      assert.equal(result.status, "completed");
+
+      assert.equal(result.status, "failed");
+      assert.equal(
+        result.status === "failed" ? result.failure.code : null,
+        "execution_plan_model_mismatch",
+      );
     } finally {
       delete process.env.FAKE_HERMES_MODE;
       cleanup();

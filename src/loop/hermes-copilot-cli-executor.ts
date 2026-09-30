@@ -343,12 +343,19 @@ export function createHermesCopilotCliLoopExecutor(
         modifiedFiles,
       );
     }
+    if (usage === null) {
+      return failure(
+        "execution_plan_model_mismatch",
+        "Hermes did not provide usage evidence for the governed Copilot execution.",
+        modifiedFiles,
+      );
+    }
+
     if (
-      usage !== null &&
-      (usage.completed !== true ||
-        usage.failed === true ||
-        usage.provider !== "copilot" ||
-        usage.model !== plan.model)
+      usage.completed !== true ||
+      usage.failed === true ||
+      usage.provider !== "copilot" ||
+      usage.model !== plan.model
     ) {
       return failure(
         "execution_plan_model_mismatch",
