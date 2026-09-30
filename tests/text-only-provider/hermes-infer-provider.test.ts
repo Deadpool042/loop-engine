@@ -47,20 +47,54 @@ describe("createHermesInferProvider", () => {
 
     assert.ok(observed);
     assert.match(observed.executable, /\.local\/bin\/hermes$/);
-    assert.deepEqual(observed.args.slice(0, 7), [
+    assert.deepEqual(observed.args.slice(0, 9), [
       "chat",
       "--oneshot",
       "--quiet",
       "--toolsets",
       "",
+      "--provider",
+      "openai-codex",
       "--model",
-      "openai/gpt-5.6-sol",
+      "gpt-5.6-sol",
     ]);
-    assert.equal(observed.args.includes("--provider"), false);
+    assert.equal(observed.args.includes("--reasoning"), true);
+    assert.equal(
+      observed.args[observed.args.indexOf("--reasoning") + 1],
+      "low",
+    );
     const prompt = observed.args[observed.args.indexOf("-q") + 1] ?? "";
     assert.match(prompt, /System contract\./);
     assert.match(prompt, /Keep the roadmap bounded/);
     assert.match(prompt, /Return exactly one JSON object matching this JSON Schema/);
+  });
+
+  it("unwraps one JSON markdown fence without accepting surrounding commentary", async () => {
+    const provider = createHermesInferProvider({
+      runProcess: async () => ({
+        exitCode: 0,
+        stdout: "```json\n{\"status\":\"ok\"}\n```\n",
+        killedReason: null,
+      }),
+    });
+
+    const result = await provider.invoke(INPUT);
+
+    assert.equal(result.status, "completed");
+    if (result.status !== "completed") return;
+    assert.equal(result.output, JSON.stringify({ status: "ok" }));
+
+    const rejected = createHermesInferProvider({
+      runProcess: async () => ({
+        exitCode: 0,
+        stdout: "Here is the JSON:\n```json\n{\"status\":\"ok\"}\n```",
+        killedReason: null,
+      }),
+    });
+    const rejectedResult = await rejected.invoke(INPUT);
+    assert.equal(rejectedResult.status, "completed");
+    if (rejectedResult.status !== "completed") return;
+    assert.match(rejectedResult.output, /^Here is the JSON:/);
   });
 
   it("rejects a model that is not an explicit provider/model reference before invoking Hermes", async () => {
