@@ -209,6 +209,9 @@ function withFreshRuntimeQuota(
     ...(portfolio.codex === undefined
       ? {}
       : { codex: Object.freeze(updateProfiles(portfolio.codex, "openai")!) }),
+    ...(portfolio.copilot === undefined
+      ? {}
+      : { copilot: Object.freeze(updateProfiles(portfolio.copilot, "github")!) }),
     ...(portfolio.claude_code === undefined
       ? {}
       : { claude_code: Object.freeze(updateProfiles(portfolio.claude_code, "anthropic")!) }),

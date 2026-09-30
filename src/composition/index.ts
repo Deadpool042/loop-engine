@@ -44,10 +44,12 @@ export {
   assembleLoopProviders,
   claudeCodeProviderRegistration,
   codexProviderRegistration,
+  copilotProviderRegistration,
   createLoopProviderRegistry,
   defaultLoopProviderRegistry,
   type ClaudeCodeProviderConfiguration,
   type CodexProviderConfiguration,
+  type CopilotProviderConfiguration,
   type LoopProviderAssembly,
   type LoopProviderConfiguration,
   type LoopProviderId,
@@ -77,3 +79,8 @@ export {
   createOpenClawNativeLoopExecutor,
   type OpenClawNativeLoopExecutorOptions,
 } from "../loop/openclaw-native-executor.js";
+
+export {
+  createHermesCopilotCliLoopExecutor,
+  type HermesCopilotCliLoopExecutorOptions,
+} from "../loop/hermes-copilot-cli-executor.js";
