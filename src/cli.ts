@@ -70,6 +70,7 @@ import {
 import {
   ANTHROPIC_EFFORT_VALUES,
   createAnthropicApiProvider,
+  createHermesInferProvider,
   createOpenClawInferProvider,
   hasAnthropicApiCredential,
 } from "./text-only-provider/index.js";
@@ -461,17 +462,24 @@ else if (command === "workspace" && process.argv[3] === "status") {
     const model = optionValue("--provider-model");
     const effort = optionValue("--provider-effort");
     const timeoutValue = optionValue("--provider-timeout-ms");
-    if (provider !== "anthropic_api" && provider !== "openclaw_agent")
+    if (
+      provider !== "anthropic_api" &&
+      provider !== "hermes_agent" &&
+      provider !== "openclaw_agent"
+    )
       failOption(
         json,
         "unsupported_provider",
-        "--provider must be anthropic_api or openclaw_agent with --request-proposal.",
+        "--provider must be anthropic_api, hermes_agent, or openclaw_agent with --request-proposal.",
       );
-    if (provider === "openclaw_agent" && model === undefined)
+    if (
+      (provider === "hermes_agent" || provider === "openclaw_agent") &&
+      model === undefined
+    )
       failOption(
         json,
         "missing_provider_model",
-        "--provider-model is required with --provider openclaw_agent.",
+        `--provider-model is required with --provider ${provider}.`,
       );
     if (hasOption("--provider-timeout-ms") && timeoutValue === undefined)
       failOption(
@@ -522,15 +530,20 @@ else if (command === "workspace" && process.argv[3] === "status") {
       },
     };
     const proposalApplication =
-      provider === "openclaw_agent"
+      provider === "hermes_agent"
         ? createLoopApplicationAssembly({
-            textOnlyProvider: createOpenClawInferProvider(),
+            textOnlyProvider: createHermesInferProvider(),
             textOnlyProviderCredentialAvailable: () => true,
           })
-        : createLoopApplicationAssembly({
-            textOnlyProvider: createAnthropicApiProvider(),
-            textOnlyProviderCredentialAvailable: hasAnthropicApiCredential,
-          });
+        : provider === "openclaw_agent"
+          ? createLoopApplicationAssembly({
+              textOnlyProvider: createOpenClawInferProvider(),
+              textOnlyProviderCredentialAvailable: () => true,
+            })
+          : createLoopApplicationAssembly({
+              textOnlyProvider: createAnthropicApiProvider(),
+              textOnlyProviderCredentialAvailable: hasAnthropicApiCredential,
+            });
     json
       ? await printRoadmapDecisionJson(proposalApplication, project, input)
       : await printRoadmapDecision(proposalApplication, project, input);
