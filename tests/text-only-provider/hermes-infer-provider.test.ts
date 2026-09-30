@@ -63,6 +63,34 @@ describe("createHermesInferProvider", () => {
     assert.match(prompt, /Return exactly one JSON object matching this JSON Schema/);
   });
 
+  it("unwraps one JSON markdown fence without accepting surrounding commentary", async () => {
+    const provider = createHermesInferProvider({
+      runProcess: async () => ({
+        exitCode: 0,
+        stdout: "```json\n{\"status\":\"ok\"}\n```\n",
+        killedReason: null,
+      }),
+    });
+
+    const result = await provider.invoke(INPUT);
+
+    assert.equal(result.status, "completed");
+    if (result.status !== "completed") return;
+    assert.equal(result.output, JSON.stringify({ status: "ok" }));
+
+    const rejected = createHermesInferProvider({
+      runProcess: async () => ({
+        exitCode: 0,
+        stdout: "Here is the JSON:\n```json\n{\"status\":\"ok\"}\n```",
+        killedReason: null,
+      }),
+    });
+    const rejectedResult = await rejected.invoke(INPUT);
+    assert.equal(rejectedResult.status, "completed");
+    if (rejectedResult.status !== "completed") return;
+    assert.match(rejectedResult.output, /^Here is the JSON:/);
+  });
+
   it("rejects a model that is not an explicit provider/model reference before invoking Hermes", async () => {
     let calls = 0;
     const provider = createHermesInferProvider({
