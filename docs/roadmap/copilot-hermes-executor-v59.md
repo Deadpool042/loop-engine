@@ -59,3 +59,10 @@ Le fichier d'usage Hermes est lu après le run afin de vérifier que le provider
 9. Aucun nom de modèle n'est inventé par Loop ; `gpt-6-luna` vient de l'evidence runtime.
 10. Un burn-in VPS réel modifie uniquement un fichier dans un dépôt temporaire et confirme provider/modèle.
 11. `pnpm run ci` est vert avant merge.
+
+## Preuves de clôture
+
+- Burn-in réel `vps-main` : `V59 real Hermes Copilot file-only burn-in`, 1/1 PASS ; le dépôt temporaire ne contient que le delta autorisé `proof.txt` avec `V59_COPILOT_OK`.
+- Tests ciblés V59 : 40/40 PASS ; test de replay durable AUTO mis à jour pour le runtime Copilot : 6/6 PASS.
+- TypeScript et `git diff --check` : PASS.
+- GitHub Actions PR #352, run #1599 : `Quality` PASS et `CI gate` PASS (`pnpm run ci`).

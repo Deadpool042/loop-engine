@@ -376,7 +376,7 @@ Cadrage et checklist : [`autonomous-completion-v57.md`](./autonomous-completion-
 
 ## V59 — executor Copilot abonnement gouverné via Hermes
 
-- [ ] [P0] V59.0 — Ajouter GitHub Copilot comme executor AUTO réellement qualifié en utilisant Hermes uniquement comme runtime headless file-only : Loop Engine choisit et vérifie `runtime=copilot`, `provider=github`, modèle, effort, availability, quota et capacités ; Hermes reçoit ce choix explicitement et ne route aucun fallback. Aucun Terminal/code_execution/MCP externe, aucune API payante, aucun modèle ou quota inventé. Burn-in VPS réel obligatoire avant clôture. [Détail](./copilot-hermes-executor-v59.md)
+- [x] [P0] V59.0 — Ajouter GitHub Copilot comme executor AUTO réellement qualifié en utilisant Hermes uniquement comme runtime headless file-only : Loop Engine choisit et vérifie `runtime=copilot`, `provider=github`, modèle, effort, availability, quota et capacités ; Hermes reçoit ce choix explicitement et ne route aucun fallback. Aucun Terminal/code_execution/MCP externe, aucune API payante, aucun modèle ou quota inventé. Burn-in VPS réel obligatoire avant clôture. [Détail](./copilot-hermes-executor-v59.md)
 
 ### Gates V58
 
