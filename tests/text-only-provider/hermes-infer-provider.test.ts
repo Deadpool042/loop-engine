@@ -47,16 +47,22 @@ describe("createHermesInferProvider", () => {
 
     assert.ok(observed);
     assert.match(observed.executable, /\.local\/bin\/hermes$/);
-    assert.deepEqual(observed.args.slice(0, 7), [
+    assert.deepEqual(observed.args.slice(0, 9), [
       "chat",
       "--oneshot",
       "--quiet",
       "--toolsets",
       "",
+      "--provider",
+      "openai-codex",
       "--model",
-      "openai/gpt-5.6-sol",
+      "gpt-5.6-sol",
     ]);
-    assert.equal(observed.args.includes("--provider"), false);
+    assert.equal(observed.args.includes("--reasoning"), true);
+    assert.equal(
+      observed.args[observed.args.indexOf("--reasoning") + 1],
+      "low",
+    );
     const prompt = observed.args[observed.args.indexOf("-q") + 1] ?? "";
     assert.match(prompt, /System contract\./);
     assert.match(prompt, /Keep the roadmap bounded/);
