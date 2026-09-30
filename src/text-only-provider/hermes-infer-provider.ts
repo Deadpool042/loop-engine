@@ -119,6 +119,17 @@ function buildPrompt(input: TextOnlyProviderInput): string {
   ].join("\n");
 }
 
+function normalizeHermesOutput(stdout: string): string | null {
+  const trimmed = stdout.trim();
+  if (trimmed.length === 0) return null;
+  if (!trimmed.startsWith("```")) return trimmed;
+
+  const match = /^```(?:json)?\s*\n([\s\S]*?)\n```$/i.exec(trimmed);
+  if (!match) return null;
+  const inner = match[1]?.trim() ?? "";
+  return inner.length === 0 ? null : inner;
+}
+
 function defaultRunProcess(
   request: HermesInferProcessRequest,
 ): Promise<HermesInferProcessResult> {
@@ -223,8 +234,11 @@ export function createHermesInferProvider(
       if (processResult.exitCode !== 0)
         return failure(model, "provider_request_failed", "Hermes inference failed.", now() - startedAt);
 
-      const output = processResult.stdout.trim();
-      if (output.length === 0 || byteLength(output) > MAX_TEXT_ONLY_OUTPUT_BYTES)
+      const output = normalizeHermesOutput(processResult.stdout);
+      if (
+        output === null ||
+        byteLength(output) > MAX_TEXT_ONLY_OUTPUT_BYTES
+      )
         return failure(model, "provider_response_invalid", "Hermes inference response was invalid.", now() - startedAt);
 
       return Object.freeze({
