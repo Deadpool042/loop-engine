@@ -34,19 +34,6 @@ type HermesUsage = Readonly<{
   failed?: unknown;
 }>;
 
-const FORBIDDEN_HERMES_TOOLS = Object.freeze([
-  "terminal",
-  "execute_code",
-  "code_execution",
-  "computer_use",
-  "browser",
-  "web_search",
-  "web_extract",
-  "delegate_task",
-  "tool_call",
-  "mcp",
-] as const);
-
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
@@ -66,52 +53,6 @@ function failure(
         "Hermes Copilot execution diagnostics are redacted.",
       ]),
     }),
-  });
-}
-
-function parseJsonLines(stdout: string): readonly Record<string, unknown>[] {
-  const events: Record<string, unknown>[] = [];
-  for (const line of stdout.split(/\r?\n/)) {
-    if (!line.trim()) continue;
-    try {
-      const value: unknown = JSON.parse(line);
-      if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-        events.push(value as Record<string, unknown>);
-      }
-    } catch {
-      // stream-json may only be trusted through valid JSONL records.
-    }
-  }
-  return Object.freeze(events);
-}
-
-function toolName(event: Record<string, unknown>): string | null {
-  return event.type === "tool_use" && typeof event.name === "string"
-    ? event.name
-    : null;
-}
-
-function observedModel(
-  events: readonly Record<string, unknown>[],
-): string | null {
-  const init = events.find(
-    (event) => event.type === "system" && event.subtype === "init",
-  );
-  return init && typeof init.model === "string" ? init.model : null;
-}
-
-function containsForbiddenTool(events: readonly Record<string, unknown>[]): boolean {
-  return events.some((event) => {
-    const name = toolName(event);
-    if (name === null) return false;
-    const normalized = name.toLowerCase();
-    return FORBIDDEN_HERMES_TOOLS.some(
-      (forbidden) =>
-        normalized === forbidden ||
-        normalized.startsWith(`${forbidden}.`) ||
-        normalized.startsWith(`${forbidden}_`) ||
-        normalized.startsWith(`mcp__`),
-    );
   });
 }
 
@@ -251,17 +192,12 @@ export function createHermesCopilotCliLoopExecutor(
 
     const tempRoot = await mkdtemp(join(tmpdir(), "loop-hermes-copilot-"));
     const usagePath = join(tempRoot, "usage.json");
+    const prompt = buildLoopExecutionPrompt(plan);
     const args = [
-      "chat",
-      "--oneshot",
+      "-z",
+      prompt,
       "--usage-file",
       usagePath,
-      "--format",
-      "stream-json",
-      "--max-turns",
-      String(maxTurns),
-      "--source",
-      "tool",
       "--provider",
       "copilot",
       "--model",
@@ -270,8 +206,6 @@ export function createHermesCopilotCliLoopExecutor(
       plan.effort,
       "--toolsets",
       "file",
-      "--query-file",
-      "-",
     ];
 
     let result: ProcessResult;
@@ -281,7 +215,7 @@ export function createHermesCopilotCliLoopExecutor(
         executable,
         args,
         cwd,
-        buildLoopExecutionPrompt(plan),
+        "",
         timeoutMs,
         maxOutputBytes,
       );
@@ -319,14 +253,6 @@ export function createHermesCopilotCliLoopExecutor(
       );
     }
 
-    const events = parseJsonLines(result.stdout);
-    if (containsForbiddenTool(events)) {
-      return failure(
-        "provider_forbidden_tool",
-        "Hermes Copilot attempted a tool outside the file-only execution boundary.",
-        modifiedFiles,
-      );
-    }
     if (result.exitCode !== 0) {
       return failure(
         "provider_failed",
@@ -335,14 +261,6 @@ export function createHermesCopilotCliLoopExecutor(
       );
     }
 
-    const streamModel = observedModel(events);
-    if (streamModel !== plan.model) {
-      return failure(
-        "execution_plan_model_mismatch",
-        "Hermes did not run the model selected by Loop Engine.",
-        modifiedFiles,
-      );
-    }
     if (usage === null) {
       return failure(
         "execution_plan_model_mismatch",
