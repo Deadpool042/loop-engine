@@ -17,8 +17,9 @@ import type {
 import type { LoopExecutor } from "../core/index.js";
 import { createClaudeCodeCliLoopExecutor } from "../loop/claude-code-cli-executor.js";
 import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";
+import { createHermesCopilotCliLoopExecutor } from "../loop/hermes-copilot-cli-executor.js";
 import { createOpenClawNativeLoopExecutor } from "../loop/openclaw-native-executor.js";
-export const LOOP_PROVIDER_IDS = ["codex", "claude_code", "openclaw"] as const;
+export const LOOP_PROVIDER_IDS = ["codex", "claude_code", "openclaw", "copilot"] as const;
 export type LoopProviderId = (typeof LOOP_PROVIDER_IDS)[number];
 
 // This is the conservative capability envelope of the concrete Loop Engine
@@ -32,6 +33,28 @@ const EXECUTABLE_PROVIDER_CAPABILITIES: readonly AgentCapability[] =
 
 const EXECUTABLE_PROVIDER_PERMISSIONS: readonly AgentPermission[] =
   Object.freeze(["read_only", "write_worktree", "shell_exec"]);
+
+const COPILOT_PROVIDER_CAPABILITIES: readonly AgentCapability[] =
+  Object.freeze(["code_edit"]);
+
+const COPILOT_PROVIDER_PERMISSIONS: readonly AgentPermission[] =
+  Object.freeze(["read_only", "write_worktree"]);
+
+function requiredCapabilitiesForProvider(
+  configuration: LoopProviderConfiguration,
+): readonly AgentCapability[] {
+  return configuration.id === "copilot"
+    ? COPILOT_PROVIDER_CAPABILITIES
+    : EXECUTABLE_PROVIDER_CAPABILITIES;
+}
+
+function defaultPermissionsForProvider(
+  configuration: LoopProviderConfiguration,
+): readonly AgentPermission[] {
+  return configuration.id === "copilot"
+    ? COPILOT_PROVIDER_PERMISSIONS
+    : EXECUTABLE_PROVIDER_PERMISSIONS;
+}
 
 export type LoopProviderModelProfileConfiguration = Readonly<{
   id: string;
@@ -81,10 +104,22 @@ export type OpenClawProviderConfiguration = Readonly<{
   timeoutMs?: number;
 }>;
 
+export type CopilotProviderConfiguration = Readonly<{
+  id: "copilot";
+  executable: string;
+  model?: string;
+  profiles?: readonly LoopProviderModelProfileConfiguration[];
+  fundingMode?: AgentFundingMode;
+  quota?: AgentQuotaSnapshot;
+  timeoutMs?: number;
+  maxTurns?: number;
+}>;
+
 export type LoopProviderConfiguration =
   | CodexProviderConfiguration
   | ClaudeCodeProviderConfiguration
-  | OpenClawProviderConfiguration;
+  | OpenClawProviderConfiguration
+  | CopilotProviderConfiguration;
 
 export type LoopProviderAssembly = Readonly<{
   id: LoopProviderId;
@@ -165,9 +200,9 @@ function validateConfiguredProfiles(
       );
     }
 
-    const missingBaseCapabilities = EXECUTABLE_PROVIDER_CAPABILITIES.filter(
-      (capability) => !profile.capabilities.includes(capability),
-    );
+    const missingBaseCapabilities = requiredCapabilitiesForProvider(
+      configuration,
+    ).filter((capability) => !profile.capabilities.includes(capability));
     if (missingBaseCapabilities.length > 0) {
       throw new TypeError(
         `Configured provider profile ${id} is missing executable capabilities: ${missingBaseCapabilities.join(", ")}`,
@@ -182,8 +217,15 @@ function configuredProfiles(
   configuration: LoopProviderConfiguration,
 ): readonly AgentProfile[] {
   const runtime = configuration.id;
-  const provider = configuration.id === "claude_code" ? "anthropic" : "openai";
+  const provider =
+    configuration.id === "claude_code"
+      ? "anthropic"
+      : configuration.id === "copilot"
+        ? "github"
+        : "openai";
   const configured = validateConfiguredProfiles(configuration);
+  const defaultPermissions = defaultPermissionsForProvider(configuration);
+  const defaultCapabilities = requiredCapabilitiesForProvider(configuration);
 
   if (configured !== null) {
     return Object.freeze(
@@ -209,7 +251,7 @@ function configuredProfiles(
           ]),
           permissions:
             profile.permissions === undefined
-              ? EXECUTABLE_PROVIDER_PERMISSIONS
+              ? defaultPermissions
               : Object.freeze([...new Set(profile.permissions)]),
           budget:
             profile.budget === undefined
@@ -236,8 +278,8 @@ function configuredProfiles(
       ...(configuration.quota === undefined
         ? {}
         : { quota: Object.freeze({ ...configuration.quota }) }),
-      capabilities: EXECUTABLE_PROVIDER_CAPABILITIES,
-      permissions: EXECUTABLE_PROVIDER_PERMISSIONS,
+      capabilities: defaultCapabilities,
+      permissions: defaultPermissions,
       budget: configuredBudget(configuration),
     }),
   ]);
@@ -293,6 +335,32 @@ export const claudeCodeProviderRegistration: LoopProviderRegistration =
     },
   });
 
+export const copilotProviderRegistration: LoopProviderRegistration =
+  Object.freeze({
+    id: "copilot",
+    assemble(configuration): LoopProviderAssembly {
+      if (configuration.id !== "copilot") {
+        throw new TypeError(
+          "Copilot registration received another provider configuration.",
+        );
+      }
+      const profiles = configuredProfiles(configuration);
+      const executor = createHermesCopilotCliLoopExecutor({
+        executable: configuration.executable,
+        ...(configuration.profiles === undefined && configuration.model
+          ? { model: configuration.model }
+          : {}),
+        ...(configuration.timeoutMs ? { timeoutMs: configuration.timeoutMs } : {}),
+        ...(configuration.maxTurns ? { maxTurns: configuration.maxTurns } : {}),
+      });
+      return Object.freeze({
+        id: "copilot",
+        executor,
+        agentRegistry: createAgentRegistry(profiles),
+      });
+    },
+  });
+
 export const openClawProviderRegistration: LoopProviderRegistration =
   Object.freeze({
     id: "openclaw",
@@ -332,6 +400,7 @@ export const defaultLoopProviderRegistry = createLoopProviderRegistry([
   codexProviderRegistration,
   claudeCodeProviderRegistration,
   openClawProviderRegistration,
+  copilotProviderRegistration,
 ]);
 
 export function assembleLoopProvider(

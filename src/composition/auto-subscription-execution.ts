@@ -37,6 +37,7 @@ export const AUTO_SUBSCRIPTION_PORTFOLIO_ENV =
 export const AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE = Object.freeze([
   "openclaw",
   "codex",
+  "copilot",
   "claude_code",
 ] as const);
 
@@ -66,6 +67,7 @@ export type AutoSubscriptionNativeOpenClawProfile =
 
 export type AutoSubscriptionModelPortfolio = Readonly<{
   codex?: readonly AutoSubscriptionModelProfile[];
+  copilot?: readonly AutoSubscriptionModelProfile[];
   claude_code?: readonly AutoSubscriptionModelProfile[];
   openclaw?: readonly AutoSubscriptionNativeOpenClawProfile[];
 }>;
@@ -170,7 +172,7 @@ function parseProfile(value: unknown): AutoSubscriptionModelProfile {
 
 function parseProviderProfiles(
   value: unknown,
-  provider: "codex" | "claude_code",
+  provider: "codex" | "copilot" | "claude_code",
 ): readonly AutoSubscriptionModelProfile[] | undefined {
   if (value === undefined) return undefined;
   if (!Array.isArray(value) || value.length === 0) {
@@ -279,15 +281,22 @@ export function parseAutoSubscriptionModelPortfolio(
     throw new TypeError("AUTO subscription portfolio must be an object.");
   }
   const codex = parseProviderProfiles(value.codex, "codex");
+  const copilot = parseProviderProfiles(value.copilot, "copilot");
   const claudeCode = parseProviderProfiles(value.claude_code, "claude_code");
   const openclaw = parseOpenClawProfiles(value.openclaw);
-  if (codex === undefined && claudeCode === undefined && openclaw === undefined) {
+  if (
+    codex === undefined &&
+    copilot === undefined &&
+    claudeCode === undefined &&
+    openclaw === undefined
+  ) {
     throw new TypeError(
       "AUTO subscription portfolio contains no explicitly observed runtime profiles.",
     );
   }
   return Object.freeze({
     ...(codex === undefined ? {} : { codex }),
+    ...(copilot === undefined ? {} : { copilot }),
     ...(claudeCode === undefined ? {} : { claude_code: claudeCode }),
     ...(openclaw === undefined ? {} : { openclaw }),
   });
@@ -454,6 +463,17 @@ export function buildAutoSubscriptionProviderConfigurations(
         executable: "codex",
         timeoutMs: 360_000,
         profiles: asConfiguredProfiles(portfolio.codex),
+      }),
+    );
+  }
+  if (portfolio.copilot !== undefined) {
+    configurations.push(
+      Object.freeze({
+        id: "copilot" as const,
+        executable: "hermes",
+        timeoutMs: 360_000,
+        maxTurns: 12,
+        profiles: asConfiguredProfiles(portfolio.copilot),
       }),
     );
   }
