@@ -252,10 +252,10 @@ export function createHermesCopilotCliLoopExecutor(
     const tempRoot = await mkdtemp(join(tmpdir(), "loop-hermes-copilot-"));
     const usagePath = join(tempRoot, "usage.json");
     const args = [
-      "--usage-file",
-      usagePath,
       "chat",
       "--oneshot",
+      "--usage-file",
+      usagePath,
       "--format",
       "stream-json",
       "--max-turns",
