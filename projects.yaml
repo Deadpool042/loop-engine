@@ -161,3 +161,20 @@ projects:
     roadmap:
       - docs/roadmap/README.md
     archived: true
+  - name: dw-v10-2-1-burnin-20261001
+    path: ../dw-v10-2-1-burnin-20261001
+    type: static-site
+    workspace:
+      mode: source_only
+      dependencies: on_demand
+    required_docs:
+      - AGENTS.md
+      - README.md
+      - PROJECT-BRIEF.md
+      - docs/roadmap/README.md
+    validation: []
+    planning:
+      mode: roadmap
+      objective_source: PROJECT-BRIEF.md
+    roadmap:
+      - docs/roadmap/README.md
