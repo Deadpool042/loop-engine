@@ -110,6 +110,7 @@ import {
 } from "./commands/workspace.js";
 import { registerProjectEnvelopeCommand } from "./commands/project-register.js";
 import { archiveProjectCommand } from "./commands/project-archive.js";
+import { setProjectRepositoryCommand } from "./commands/project-set-repository.js";
 import { recordCiTerminalEventCommand } from "./commands/ci-event.js";
 
 const application = createLoopApplicationAssembly();
@@ -369,6 +370,33 @@ else if (command === "workspace" && process.argv[3] === "status") {
     application,
     process.cwd(),
     projectName,
+    true,
+    json,
+  );
+  if (exitCode !== 0) process.exitCode = exitCode;
+} else if (command === "project" && process.argv[3] === "set-repository") {
+  const json = process.argv.includes("--json");
+  const projectName = process.argv[4];
+  const repository = optionValue("--repository");
+  const confirmed = hasOption("--confirm-set-repository");
+  if (!projectName || projectName.startsWith("--")) {
+    failOption(json, "missing_project", "Missing project argument for project set-repository");
+  }
+  if (!repository) {
+    failOption(json, "missing_repository", "--repository is required for project set-repository");
+  }
+  if (!confirmed) {
+    failOption(
+      json,
+      "project_set_repository_confirmation_required",
+      "--confirm-set-repository is required for project set-repository",
+    );
+  }
+  const exitCode = setProjectRepositoryCommand(
+    application,
+    process.cwd(),
+    projectName,
+    repository,
     true,
     json,
   );

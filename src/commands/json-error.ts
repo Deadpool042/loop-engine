@@ -57,6 +57,9 @@ export type JsonErrorCode =
   | "project_registration_failed"
   | "project_archive_confirmation_required"
   | "project_archive_failed"
+  | "missing_repository"
+  | "project_set_repository_confirmation_required"
+  | "project_set_repository_failed"
   | "missing_ci_event_value"
   | "invalid_ci_event_value"
   | "ci_event_record_failed";

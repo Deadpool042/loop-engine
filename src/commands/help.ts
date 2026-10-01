@@ -34,6 +34,9 @@ export function printHelp(): void {
   terminal.info(
     "pnpm loop project archive <project> --confirm-archive [--json] — archive canoniquement un projet sans supprimer son workspace",
   );
+  terminal.info(
+    "pnpm loop project set-repository <project> --repository <owner/repo> --confirm-set-repository [--json] — renseigne le dépôt GitHub d'un projet actif sans autre modification",
+  );
   terminal.info("pnpm loop context <project> --json — contexte projet en JSON");
   terminal.info(
     "pnpm loop validate <project>       — lance les validations configurées",
