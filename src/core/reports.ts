@@ -83,7 +83,9 @@ export function generateProjectReport(project: ProjectConfig) {
 }
 
 export function generateWorkspaceReports(config: Config) {
-  return config.projects.map((project) => generateProjectReport(project));
+  return config.projects
+    .filter((project) => project.archived !== true)
+    .map((project) => generateProjectReport(project));
 }
 
 export function generateWorkspaceSummaryReport(config: Config) {

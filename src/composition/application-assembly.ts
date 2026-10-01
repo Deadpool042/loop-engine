@@ -84,6 +84,7 @@ import {
 } from "./candidate-publication-review.js";
 import { materializeWorkspaceProject } from "../workspace/materialization.js";
 import { registerProjectEnvelope } from "../workspace/project-registration.js";
+import { archiveProject } from "../workspace/project-archive.js";
 import { buildExecutionStatusReport } from "./execution-status.js";
 import {
   runDurableAutoSubscriptionPublish,
@@ -188,6 +189,7 @@ export type LoopApplicationAssembly = Readonly<{
   loadConfig: typeof loadConfig;
   materializeWorkspaceProject: typeof materializeWorkspaceProject;
   registerProjectEnvelope: typeof registerProjectEnvelope;
+  archiveProject: typeof archiveProject;
   loopAgentRegistry?: AgentRegistry;
   loopExecutor?: LoopExecutor;
   loopProviderId?: LoopProviderId;
@@ -365,6 +367,7 @@ export function createLoopApplicationAssembly(
     loadConfig,
     materializeWorkspaceProject,
     registerProjectEnvelope,
+    archiveProject,
     ...(providerDependency === undefined
       ? {}
       : {

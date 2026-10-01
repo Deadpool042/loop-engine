@@ -22,6 +22,7 @@ export type ProjectConfig = {
   name: string;
   path: string;
   type: string;
+  archived?: boolean;
   required_docs: string[];
   validation: string[];
   roadmap?: string[];

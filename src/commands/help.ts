@@ -31,6 +31,9 @@ export function printHelp(): void {
   terminal.info(
     "pnpm loop project register <project> --type <type> --confirm-brief-approved [--json] — enregistre une enveloppe approuvée dans projects.yaml sur une branche dédiée",
   );
+  terminal.info(
+    "pnpm loop project archive <project> --confirm-archive [--json] — archive canoniquement un projet sans supprimer son workspace",
+  );
   terminal.info("pnpm loop context <project> --json — contexte projet en JSON");
   terminal.info(
     "pnpm loop validate <project>       — lance les validations configurées",
