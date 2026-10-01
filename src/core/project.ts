@@ -5,7 +5,9 @@ export function findProject(
   projectName: string,
 ): ProjectConfig | null {
   return (
-    config.projects.find((candidate) => candidate.name === projectName) ?? null
+    config.projects.find(
+      (candidate) => candidate.name === projectName && candidate.archived !== true,
+    ) ?? null
   );
 }
 
