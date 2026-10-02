@@ -216,3 +216,21 @@ projects:
     roadmap:
       - docs/roadmap/README.md
     repository: Deadpool042/dw-v10-2-3-node-burnin-20261002
+  - name: dw-g1-r5-burnin-20261002
+    path: ../dw-g1-r5-burnin-20261002
+    type: static-site
+    workspace:
+      mode: source_only
+      dependencies: on_demand
+    required_docs:
+      - AGENTS.md
+      - README.md
+      - PROJECT-BRIEF.md
+      - docs/roadmap/README.md
+    validation: []
+    planning:
+      mode: roadmap
+      objective_source: PROJECT-BRIEF.md
+    roadmap:
+      - docs/roadmap/README.md
+    repository: Deadpool042/dw-g1-r5-burnin-20261002
