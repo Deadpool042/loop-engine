@@ -198,3 +198,20 @@ projects:
     roadmap:
       - docs/roadmap/README.md
     repository: Deadpool042/dw-v10-2-2-q-burnin-20261001
+  - name: dw-v10-2-3-node-burnin-20261002
+    path: ../dw-v10-2-3-node-burnin-20261002
+    type: node-service
+    workspace:
+      mode: source_only
+      dependencies: on_demand
+    required_docs:
+      - AGENTS.md
+      - README.md
+      - PROJECT-BRIEF.md
+      - docs/roadmap/README.md
+    validation: []
+    planning:
+      mode: roadmap
+      objective_source: PROJECT-BRIEF.md
+    roadmap:
+      - docs/roadmap/README.md
