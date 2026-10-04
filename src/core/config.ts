@@ -23,6 +23,8 @@ export type ProjectConfig = {
   path: string;
   type: string;
   archived?: boolean;
+  /** Tombstone: identity burned after a full hard-delete; implies archived, never reusable. */
+  retired?: boolean;
   required_docs: string[];
   validation: string[];
   roadmap?: string[];

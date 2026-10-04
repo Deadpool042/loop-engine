@@ -57,6 +57,8 @@ export type JsonErrorCode =
   | "project_registration_failed"
   | "project_archive_confirmation_required"
   | "project_archive_failed"
+  | "project_retire_confirmation_required"
+  | "project_retire_failed"
   | "missing_repository"
   | "project_set_repository_confirmation_required"
   | "project_set_repository_failed"

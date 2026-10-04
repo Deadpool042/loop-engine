@@ -127,6 +127,9 @@ export function registerProjectEnvelope(
   const original = readFileSync(registryPath, "utf8");
   const config = parseYaml(original) as Config;
   const relativePath = `../${name}`;
+  if (config.projects.some((project) => project.name === name && project.retired === true)) {
+    throw new Error("Project identity is retired and can never be registered again.");
+  }
   if (config.projects.some((project) => project.name === name)) {
     throw new Error("Project identity is already registered.");
   }
