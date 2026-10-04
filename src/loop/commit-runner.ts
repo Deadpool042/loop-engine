@@ -52,7 +52,9 @@ export async function runLoopCommit(
   }
 
   const config = (options.loadConfig ?? loadConfig)();
-  const project = config.projects.find((candidate) => candidate.name === projectName);
+  const project = config.projects.find(
+    (candidate) => candidate.name === projectName && candidate.retired !== true,
+  );
   if (!project) {
     return failedCommitResult(
       execution,

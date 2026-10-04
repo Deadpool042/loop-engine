@@ -51,7 +51,9 @@ export function printWorkspacePortfolioStatusJson(
   console.log(
     JSON.stringify({
       schemaVersion: 1,
-      projects: config.projects.map((project) =>
+      projects: config.projects
+        .filter((project) => project.retired !== true)
+        .map((project) =>
         projectWorkspaceSnapshot(application, project),
       ),
     }),

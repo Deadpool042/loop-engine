@@ -229,7 +229,7 @@ export async function generateCompletionEventsReport(
     code: "overview_failed" | "execution_status_failed" | "ci_event_failed";
   }[] = [];
 
-  for (const project of config.projects) {
+  for (const project of config.projects.filter((entry) => entry.retired !== true)) {
     const ciReader = options.readCiEvent ?? application.readCiTerminalEvent;
     if (typeof ciReader === "function") {
       try {

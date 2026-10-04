@@ -84,7 +84,7 @@ export function generateProjectReport(project: ProjectConfig) {
 
 export function generateWorkspaceReports(config: Config) {
   return config.projects
-    .filter((project) => project.archived !== true)
+    .filter((project) => project.archived !== true && project.retired !== true)
     .map((project) => generateProjectReport(project));
 }
 
@@ -916,7 +916,10 @@ export type DoctorProjectReport = Readonly<{
 }>;
 
 export function generateDoctorReport(config: Config) {
-  const projects: DoctorProjectReport[] = config.projects.map((project) => {
+  // A retired identity has no workspace by design: it is not a health concern.
+  const projects: DoctorProjectReport[] = config.projects
+    .filter((project) => project.retired !== true)
+    .map((project) => {
     const path = resolve(project.path);
     const exists = existsSync(path);
     return {

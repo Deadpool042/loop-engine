@@ -110,6 +110,7 @@ import {
 } from "./commands/workspace.js";
 import { registerProjectEnvelopeCommand } from "./commands/project-register.js";
 import { archiveProjectCommand } from "./commands/project-archive.js";
+import { retireProjectCommand } from "./commands/project-retire.js";
 import { setProjectRepositoryCommand } from "./commands/project-set-repository.js";
 import { recordCiTerminalEventCommand } from "./commands/ci-event.js";
 
@@ -367,6 +368,28 @@ else if (command === "workspace" && process.argv[3] === "status") {
     );
   }
   const exitCode = archiveProjectCommand(
+    application,
+    process.cwd(),
+    projectName,
+    true,
+    json,
+  );
+  if (exitCode !== 0) process.exitCode = exitCode;
+} else if (command === "project" && process.argv[3] === "retire") {
+  const json = process.argv.includes("--json");
+  const projectName = process.argv[4];
+  const confirmed = hasOption("--confirm-retire");
+  if (!projectName || projectName.startsWith("--")) {
+    failOption(json, "missing_project", "Missing project argument for project retire");
+  }
+  if (!confirmed) {
+    failOption(
+      json,
+      "project_retire_confirmation_required",
+      "--confirm-retire is required for project retire",
+    );
+  }
+  const exitCode = retireProjectCommand(
     application,
     process.cwd(),
     projectName,

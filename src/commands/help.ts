@@ -35,6 +35,9 @@ export function printHelp(): void {
     "pnpm loop project archive <project> --confirm-archive [--json] — archive canoniquement un projet sans supprimer son workspace",
   );
   terminal.info(
+    "pnpm loop project retire <project> --confirm-retire [--json] — tombstone d'identité d'un projet DÉJÀ archivé (dernière étape d'un hard-delete) : l'entrée et son historique restent, le nom n'est plus réutilisable",
+  );
+  terminal.info(
     "pnpm loop project set-repository <project> --repository <owner/repo> --confirm-set-repository [--json] — renseigne le dépôt GitHub d'un projet actif sans autre modification",
   );
   terminal.info("pnpm loop context <project> --json — contexte projet en JSON");

@@ -85,6 +85,7 @@ import {
 import { materializeWorkspaceProject } from "../workspace/materialization.js";
 import { registerProjectEnvelope } from "../workspace/project-registration.js";
 import { archiveProject } from "../workspace/project-archive.js";
+import { retireProject } from "../workspace/project-retire.js";
 import { setProjectRepository } from "../workspace/project-set-repository.js";
 import { buildExecutionStatusReport } from "./execution-status.js";
 import {
@@ -191,6 +192,7 @@ export type LoopApplicationAssembly = Readonly<{
   materializeWorkspaceProject: typeof materializeWorkspaceProject;
   registerProjectEnvelope: typeof registerProjectEnvelope;
   archiveProject: typeof archiveProject;
+  retireProject: typeof retireProject;
   setProjectRepository: typeof setProjectRepository;
   loopAgentRegistry?: AgentRegistry;
   loopExecutor?: LoopExecutor;
@@ -370,6 +372,7 @@ export function createLoopApplicationAssembly(
     materializeWorkspaceProject,
     registerProjectEnvelope,
     archiveProject,
+    retireProject,
     setProjectRepository,
     ...(providerDependency === undefined
       ? {}
