@@ -234,3 +234,20 @@ projects:
     roadmap:
       - docs/roadmap/README.md
     repository: Deadpool042/dw-g1-r5-burnin-20261002
+  - name: oc30-12-delete-burnin-20261004
+    path: ../oc30-12-delete-burnin-20261004
+    type: static-site
+    workspace:
+      mode: source_only
+      dependencies: on_demand
+    required_docs:
+      - AGENTS.md
+      - README.md
+      - PROJECT-BRIEF.md
+      - docs/roadmap/README.md
+    validation: []
+    planning:
+      mode: roadmap
+      objective_source: PROJECT-BRIEF.md
+    roadmap:
+      - docs/roadmap/README.md
