@@ -37,7 +37,7 @@ Loop Engine sait notamment :
 - produire des candidates/reports/evidences sans modifier implicitement une branche utilisateur ;
 - exposer des contrats JSON stables à OpenClaw et aux autres consommateurs.
 
-La roadmap interne contient désormais un cycle V48 actif consacré à la qualification des executors réels et au routage multi-modèles orienté capacité, coût et quota. L’état courant doit être lu depuis `pnpm loop roadmap status loop-engine --json` plutôt que recopié ici sous forme de compteurs susceptibles de devenir obsolètes.
+La roadmap canonique est [`docs/roadmap/loop-engine.md`](docs/roadmap/loop-engine.md). Au 2026-10-06, ses 80 candidats sont terminés; le lecteur renvoie `roadmap_exhausted_objective_available` et aucun prochain lot n’est sélectionné. Il faut renouveler la roadmap après décision sur l’objectif, sans inventer de travail. `pnpm loop roadmap status loop-engine --json` et `pnpm loop next loop-engine --json` donnent l’état calculé courant. La PR #319 est supersédée par #321 (déjà fusionnée); elle est encore ouverte avec `CI gate` en échec et ne constitue pas du travail restant à fusionner.
 
 ## Principes
 
