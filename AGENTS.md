@@ -129,3 +129,12 @@ For every code lot:
 - run `pnpm run validate`;
 - list modified files;
 - do not commit unless explicitly asked.
+
+## Git / worktrees — cleanup obligatoire (Project Factory)
+
+Source canonique : `/Users/laurent/Projects/project-factory/CONTRACT.md` §3.9 et `task-policy.yaml` (`git.worktree`). En cas de divergence, Project Factory prévaut.
+
+- 1 tâche = 1 worktree temporaire maximum ; le checkout canonique reste sur `main` et ne sert jamais de worktree de tâche.
+- Après merge ou abandon : `git status --short` (refuser si dirty), `git worktree remove <chemin>` (jamais `--force`), supprimer la branche locale devenue inutile, `git worktree prune`, `git worktree list`, puis vérifier le checkout canonique sain sur `main`.
+- Ne jamais supprimer automatiquement un worktree dirty, lié à une PR ouverte ou à une tâche active ; signaler les orphelins puis les nettoyer explicitement.
+- Une tâche n'est pas DONE tant que : PR fusionnée ou abandonnée, aucun changement utile non commité, worktree supprimé, métadonnées prunées, checkout canonique sain sur `main`.
