@@ -24,7 +24,8 @@ Aucun runtime IA n’est primaire par statut. Provider, modèle et effort sont d
 
 - aucun appel IA automatique par défaut ;
 - `plan` reste déterministe et sans appel agent ;
-- aucune écriture générale sur les projets surveillés ;
+- les projets surveillés restent read-only sauf artefact explicitement gouverné ;
+- `execute` exige un provider admis ; `commit` reste explicite ; `publish` ne pousse ni ne merge une branche utilisateur ;
 - aucun commit/push implicite ;
 - les validations locales précèdent toute review IA, commit ou publication ;
 - l’humain reste maître des décisions ;
@@ -115,6 +116,8 @@ Après modification :
 - résumer fichiers modifiés, validations exécutées et points non vérifiés.
 
 Ne jamais annoncer PASS sur la seule base d’une compilation ou d’une hypothèse.
+
+Pour le dépôt lui-même, commit/push/merge uniquement lorsque le brief courant les demande ou les autorise explicitement ; ne pas redemander une autorisation déjà donnée.
 
 ## Sources structurantes
 
