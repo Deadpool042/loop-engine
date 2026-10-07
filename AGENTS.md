@@ -1,140 +1,139 @@
 # AGENTS.md
 
-This file provides guidance to any assistant or runtime working with code in this repository.
+## Statut et objectif
 
-## Objectif final
+Ce fichier guide tout assistant ou runtime travaillant dans ce dépôt. Pour chaque tâche, appliquer aussi `/Users/laurent/Projects/AGENTS.md`.
 
-Voir `docs/architecture/final-objective.md`.
+La source de vérité produit est `docs/architecture/final-objective.md`. La lire avant toute évolution structurante.
 
-Cette page constitue la source de vérité du produit et définit l'objectif final de Loop Engine.
+## Rôle de Loop Engine
 
-Tout assistant ou runtime doit s’y référer avant toute évolution structurante.
+Loop Engine est un moteur local, déterministe, de gouvernance et d’orchestration des projets déclarés dans `projects.yaml`.
 
-## What this is
+Il :
+- calcule l’état projet et les candidats de roadmap ;
+- produit contexte, handoff et prompts bornés ;
+- valide et audite ;
+- expose des chemins d’exécution explicitement gouvernés.
 
-Loop Engine is a local, deterministic governance and orchestration engine over projects declared in `projects.yaml`. It reports Git state, checks required docs, surfaces roadmap candidates, prepares bounded context/prompt payloads, and exposes explicit execution contracts. Read/plan paths remain non-destructive by default; write-capable paths exist only behind explicit governed modes and scope guards. It now also covers:
+Les chemins read/plan restent non destructifs par défaut. Les mutations n’existent que derrière des modes explicites, des garde-fous de scope et des validations.
 
-- project piloting (`summary`, `status`, `doctor`, `context`, `validate`, `review`, `next`);
-- context and handoff generation (`context`, `handoff`, `prompt`) for pasting into an assistant;
-- a local RAG index and search (`rag-index`, `rag-search`);
-- an executable Audit Engine with human and JSON reports, profiles, and a strict CI mode (`audit`);
-- human-readable and JSON reports across the CLI (`--json` on most commands).
+Aucun runtime IA n’est primaire par statut. Provider, modèle et effort sont des dimensions gouvernées. Aucun fallback silencieux ni runtime payant implicite.
 
-Loop Engine supports governed orchestration by small lots — see `docs/architecture/looprunner-execute-validation-repair.md` for the current execution contract and `docs/architecture/autonomous-loop-runner.md` for the historical LoopRunner architecture. `plan` remains the default and never calls an agent. An explicitly configured Codex or Claude Code provider can run `execute` in a temporary isolated Git worktree; explicit `commit` remains bounded and `publish` can create only a validated internal candidate ref, never a push/merge or user-branch mutation.
+## Invariants non négociables
 
-## Routage IA cible
+- aucun appel IA automatique par défaut ;
+- `plan` reste déterministe et sans appel agent ;
+- watched projects are **read-only by default** ; la seule exception d’écriture actuelle est l’artefact de gouvernance explicitement configuré `execution_decision`, borné par chemin, approbation humaine, publication transactionnelle et validation post-publication ;
+- `execute` exige un provider admis ; `commit` reste explicite ; `publish` ne pousse ni ne merge une branche utilisateur ;
+- aucun commit/push implicite ;
+- les validations locales précèdent toute review IA, commit ou publication ;
+- l’humain reste maître des décisions ;
+- la roadmap est volontairement conservatrice ;
+- ne pas contourner les contrats d’admission, de scope ou d’evidence.
 
-Aucun runtime IA n'est primaire par statut. Loop Engine fournit la gouvernance, les contrats déterministes, l'admission et les validations ; lorsqu'une exécution IA est admise, runtime/provider/modèle/effort sont des dimensions de sélection gouvernées plutôt qu'un choix ChatGPT/Claude/Codex codé en dur.
+Si une tâche semble exiger de violer un invariant, signaler le conflit au lieu de le contourner.
 
-**ChatGPT + Development Workspace** reste une surface d'orchestration interactive possible, au même titre que les runtimes explicitement qualifiés. Claude Code, Codex, OpenClaw natif et les autres candidats doivent respecter les mêmes contraintes de capacités, permissions, budget, disponibilité et evidence. Aucun fallback silencieux ni aucune API IA payante implicite n'est autorisé.
+## Exécution par défaut
 
-**Core philosophy (non-negotiable, enforced throughout the codebase):**
+Appliquer le fast-path global :
+1. vérifier l’état Git et le HEAD ;
+2. lire les fichiers exacts concernés ;
+3. faire le plus petit changement fiable ;
+4. exécuter les validations ciblées ;
+5. élargir vers audit, sous-agent ou suite complète seulement si le risque ou un échec le justifie.
 
-- No automatic AI calls by default — deterministic planning, roadmap, policy, gates, history and validation stay model-free; an AI runtime is invoked only through an explicit admitted execution path.
-- No automatic commit, no automatic push.
-- Commit and push only happen under an explicitly selected mode (`commit`, `publish`); the default mode (`plan`) never commits or pushes.
-- Watched projects are read-only by default. The only current write exception is the explicitly configured `execution_decision` governance artifact: after human approval, Loop Engine may publish that single file at the configured in-project path using the bounded transactional/validated publication path. This does not authorize general writes or business-logic changes in the watched project.
-- Zero token consumption by default.
-- Local validations always come before any AI review, and always before any commit or publication.
-- Human stays in control of decisions; the roadmap reader is deliberately naive/conservative rather than clever.
+Pour les tâches spécialisées, utiliser les skills disponibles dans `.agents/skills/` quand ils apportent une vraie valeur, notamment `diagnosing-bugs`, `code-review`, `tdd`, `domain-modeling` ou `prototype`.
 
-When adding a feature, do not silently violate any of the above — if a task seems to require it, flag it instead of implementing it.
+## Commandes utiles
 
-## Commands
-
+Commandes de base :
 ```bash
-pnpm loop <command>            # run the CLI (tsx src/cli.ts)
-pnpm run typecheck             # tsc --noEmit
-pnpm run test                  # tsx --test tests/**/*.test.ts
-pnpm run validate              # typecheck + test + json-check
-pnpm run audit:strict          # tsx src/cli.ts audit --json --strict
-pnpm run audit:profiles        # scripts/audit-profile-check.ts (checks all public audit profiles)
-pnpm run audit:release-check   # scripts/audit-release-check.ts (release worktree check)
-pnpm run ci                    # validate + audit:strict + audit:profiles — the full reference validation
+pnpm loop <command>
+pnpm run typecheck
+pnpm run test
+pnpm run validate
+pnpm run ci
 ```
 
-Run a single test file directly: `pnpm exec tsx --test tests/intelligence/roadmap.test.ts`
+`pnpm run ci` est la validation de référence complète. Ne pas la lancer par défaut pour un micro-lot si des validations ciblées suffisent ; elle doit en revanche passer avant une release ou quand le contrat du lot l’exige.
 
-`pnpm run ci` is the full reference validation and must pass before any commit or release.
-
-CLI commands (see `src/cli.ts` for the full routing table): `help`, `summary [--json]`, `status`, `doctor`, `json-check`, `rag-index`, `rag-search`, `audit [--json] [--strict] [--profile <name>]`, `handoff <project> [--json]`, `context <project> [--json]`, `validate <project>`, `review <project> [--json]`, `next <project> [--json]`, `prompt <project> [--json]`, `run <project> [--mode plan|execute|commit|publish] [--json]`. `execute` requires an explicit provider executable; `commit` additionally requires an explicit message; `publish` creates only a bounded validated candidate ref and never pushes or merges it.
-
-Loop Engine is self-hosted: it's declared in `projects.yaml` as project `loop-engine` (path `.`), so `pnpm loop context loop-engine`, `pnpm loop validate loop-engine`, etc. all work against this repo itself.
+Pour la liste exacte des commandes et options, lire `src/cli.ts` et `package.json` plutôt que maintenir ici une copie exhaustive.
 
 ## Architecture
 
-Layering is strict and one-directional: `cli.ts` → `commands/` →
-`composition/` → Core application services and internal domain layers. Never
-skip the application assembly boundary from a command.
+Dépendances strictement orientées :
 
-- **`src/cli.ts`** — routes argv to a command handler. Contains no business logic, no direct Git/doc/roadmap access. Just: read command → resolve project (if needed) → call the command.
-- **`src/commands/`** — one file per user-facing command (`summary`, `status`, `doctor`, `context`, `validate`, `review`, `next`, `prompt`, `run`, `help`). Each command consumes only the injected `LoopApplicationAssembly`, loads a `ProjectSnapshot` (or, for `run`, a `LoopRunResult`) through that contract, and renders it (text or `--json`); it must not import Core or internal implementation layers directly.
-- **`src/composition/`** — the single concrete application assembly layer. `createLoopApplicationAssembly(...)` wires Core application services and optional concrete providers behind the immutable `LoopApplicationAssembly` contract. Core must never depend on this layer.
-- **`src/loop/`** — the LoopRunner core for `plan`, explicit `execute`, bounded validation/repair, `commit` and candidate `publish`. It owns execution plans, evidence, scope/content guards and run-state transitions while delegating project-state computation to `intelligence/project-snapshot.ts`. See `docs/architecture/looprunner-execute-validation-repair.md`.
-- **`src/intelligence/`** — the engine. `project-snapshot.ts` builds the central `ProjectSnapshot` (see `src/intelligence/snapshot.ts` for the type) by merging declarative config (`projects.yaml`) with computed state (Git, docs, roadmap). `roadmap.ts` is the roadmap reader (see below). **This is the single source of truth commands must consume — never have a command re-read Git/docs/roadmap directly.**
-- **`src/core/`** — small, deterministic low-level primitives: `config.ts` (loads/parses `projects.yaml`), `git.ts` (shells out to `git`, always fails soft to `"unknown"`/`null`), `docs.ts` (file existence checks), `project.ts` (project lookup/arg parsing).
-- **`src/ui/terminal.ts`** — the only place that formats terminal output; commands call `terminal.*` rather than inlining styling.
+```text
+cli.ts
+  → commands/
+  → composition/
+  → services applicatifs / domaine
+```
 
-Before adding a new command: check whether the data already exists on `ProjectSnapshot`; if not, extend `intelligence/` rather than computing it ad hoc inside the command.
+Invariants :
+- `src/cli.ts` route les arguments, sans logique métier ;
+- `src/commands/` consomme uniquement l’assembly injecté ;
+- `src/composition/` est l’unique couche d’assemblage concrète ;
+- `src/loop/` porte les contrats d’exécution, validations/réparations et transitions d’état ;
+- `src/intelligence/project-snapshot.ts` construit le `ProjectSnapshot`, source de vérité des commandes pour l’état projet ;
+- `src/core/` contient des primitives déterministes de bas niveau ;
+- `src/ui/terminal.ts` centralise le rendu terminal.
 
-### Roadmap reader (`src/intelligence/roadmap.ts`)
+Avant d’ajouter une commande ou de recalculer un état, vérifier si la donnée appartient déjà à `ProjectSnapshot`. Ne pas relire Git/docs/roadmap ad hoc depuis une commande.
 
-Deterministic, keyword-based, intentionally naive — no NLP, no dependency resolution between lots.
+Pour les changements structurels, lire les documents ciblés de `docs/architecture/**` au lieu de charger toute l’architecture.
 
-- A line becomes a **candidate** if it matches patterns like `- [ ]`, `TODO`, `Prochain`, `Lot `, `H1-L`/`H2-L`/`H3-L`, `⏳`, etc. (`CANDIDATE_PATTERNS`).
-- Each candidate gets a **status**: `todo` / `in_progress` (`⏳`, "en cours") / `done` (`- [x]`) / `unknown`.
-- Each candidate gets a **kind** via keyword matching on the lowercased line:
-  - `blocked`: `production finale`, `mise en production`, `paiement`, `migration`, `delete`, `supprimer`. Note `prod` alone is _not_ blocking (avoids false positives on `produit`).
-  - `warning`: `déploiement`/`deploiement`, `vps`, `dns`, `bascule`, `sécurité`/`securite`.
-  - otherwise `safe`.
-- `selectRoadmapCandidate` preserves the canonical declaration order: it ignores completed candidates, examines the first remaining candidate only, and never skips it because a later lot is safer or has a higher priority marker. If that first open candidate is not admissible, no later candidate is selected. `kind` and `priority` remain descriptive/risk metadata, not a license to reorder the roadmap.
+## Roadmap reader
 
-When adjusting keyword lists, favor precision (avoid blocking ordinary work) over recall, and keep any new pattern covered by a test in `tests/intelligence/roadmap.test.ts`.
+Le reader est volontairement déterministe et naïf. Il classe les lignes candidates et respecte l’ordre canonique de déclaration.
 
-## JSON output contract
+Règle essentielle : ne jamais sauter le premier candidat encore ouvert pour sélectionner un lot ultérieur jugé plus simple ou plus sûr. `kind` et `priority` décrivent le risque/priorité ; ils ne donnent pas le droit de réordonner la roadmap.
 
-`summary`, `context`, `next`, `prompt`, and `review` support `--json` for external consumers (scripts, OpenClaw, n8n, a future dashboard). Rules:
+Tout changement de classification doit privilégier la précision et être couvert par des tests dans `tests/intelligence/roadmap.test.ts`.
 
-- Every JSON payload includes `schemaVersion: 1`.
-- Never remove a field without bumping `schemaVersion`; prefer adding optional fields.
-- Any new/changed JSON output must be covered in `tests/commands/json-output.test.ts`.
-- JSON consumers are read-only by contract: they must never trigger a commit, push, deletion, or automatic AI call. See `docs/integrations/json-consumers.md` for consumer-specific usage (OpenClaw, n8n).
+## JSON
 
-## Docs worth reading before structural changes
+Les sorties JSON publiques conservent `schemaVersion: 1`.
 
-- `docs/architecture/final-objective.md` — final objective and product source of truth (see top of this file).
-- `docs/architecture/autonomous-loop-runner.md` — LoopRunner architecture and contracts for the autonomous small-lot cycle (plan/execute/commit/publish modes, state machine, `LoopRunResult`).
-- `docs/architecture/application-assembly-contract.md` — application assembly contract, provider wiring and dependency direction.
-- `docs/architecture/commands.md` — layering rules for `cli.ts` / `commands/` / `composition/` / Core / `ui/`.
-- `docs/architecture/project-intelligence.md` — `ProjectSnapshot` contract and roadmap candidate classification.
-- `docs/architecture/roadmap-reader.md` — roadmap reader formats, states, and keyword refinement history.
-- `docs/architecture/audit-engine.md` — Audit Engine architecture, profiles, and CI integration.
-- `docs/audits/release-checklist.md` — release checklist to follow before publishing an audit tag.
-- `docs/audits/stable-tags.md` — source of truth for the current stable audit tags.
-- `docs/integrations/json-consumers.md` — JSON contract and per-consumer (OpenClaw/n8n) expectations.
+Ne jamais supprimer ou changer sémantiquement un champ existant sans évolution explicite du contrat ; préférer les champs optionnels compatibles et couvrir les changements dans les tests JSON.
 
-## Working method
+Les consommateurs JSON restent read-only par contrat et ne doivent pas déclencher commit, push, suppression ou appel IA automatique.
 
-Work in small, reversible lots.
+## Validation et méthode
 
-Before a significant change:
+Travailler en petits lots réversibles.
 
-- read the relevant docs and source files;
-- prefer an audit/design lot when architecture is unclear;
-- avoid broad refactors unless explicitly requested.
+Avant un changement significatif :
+- lire les sources ciblées ;
+- identifier les invariants et contrats touchés ;
+- préférer un audit/design seulement quand l’architecture est réellement incertaine.
 
-For every code lot:
+Après modification :
+- exécuter les validations proportionnées ;
+- pour un changement de code standard, au minimum les tests/typecheck ciblés pertinents ;
+- utiliser `pnpm run validate` ou `pnpm run ci` lorsque le scope ou le risque le justifie ;
+- résumer fichiers modifiés, validations exécutées et points non vérifiés.
 
-- keep the patch minimal;
-- run `pnpm run validate`;
-- list modified files;
-- do not commit unless explicitly asked.
+Ne jamais annoncer PASS sur la seule base d’une compilation ou d’une hypothèse.
 
-## Git / worktrees — cleanup obligatoire (Project Factory)
+Pour le dépôt lui-même, commit/push/merge uniquement lorsque le brief courant les demande ou les autorise explicitement ; ne pas redemander une autorisation déjà donnée.
 
-Source canonique : `/Users/laurent/Projects/project-factory/CONTRACT.md` §3.9 et `task-policy.yaml` (`git.worktree`). En cas de divergence, Project Factory prévaut.
+## Sources structurantes
 
-- 1 tâche = 1 worktree temporaire maximum ; le checkout canonique reste sur `main` et ne sert jamais de worktree de tâche.
-- Après merge ou abandon : `git status --short` (refuser si dirty), `git worktree remove <chemin>` (jamais `--force`), supprimer la branche locale devenue inutile, `git worktree prune`, `git worktree list`, puis vérifier le checkout canonique sain sur `main`.
-- Ne jamais supprimer automatiquement un worktree dirty, lié à une PR ouverte ou à une tâche active ; signaler les orphelins puis les nettoyer explicitement.
-- Une tâche n'est pas DONE tant que : PR fusionnée ou abandonnée, aucun changement utile non commité, worktree supprimé, métadonnées prunées, checkout canonique sain sur `main`.
+Consulter seulement quand pertinent :
+- `docs/architecture/final-objective.md` — objectif produit ;
+- `docs/architecture/application-assembly-contract.md` — assembly et dépendances ;
+- `docs/architecture/project-intelligence.md` — `ProjectSnapshot` ;
+- `docs/architecture/roadmap-reader.md` — roadmap ;
+- `docs/architecture/looprunner-execute-validation-repair.md` — exécution actuelle ;
+- `docs/architecture/audit-engine.md` — audit ;
+- `docs/integrations/json-consumers.md` — contrats JSON.
+
+Éviter de lire toute cette liste pour une tâche localisée.
+
+## Git / worktrees
+
+La source canonique est `/Users/laurent/Projects/project-factory/CONTRACT.md` §3.9 et `task-policy.yaml` (`git.worktree`).
+
+En bref : le checkout canonique reste sur `main`, une tâche utilise au plus un worktree temporaire, et le cleanup complet est une condition de DONE. Ne jamais forcer la suppression d’un worktree dirty, actif ou lié à une PR ouverte.
