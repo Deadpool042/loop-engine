@@ -24,7 +24,7 @@ Aucun runtime IA n’est primaire par statut. Provider, modèle et effort sont d
 
 - aucun appel IA automatique par défaut ;
 - `plan` reste déterministe et sans appel agent ;
-- les projets surveillés restent read-only sauf artefact explicitement gouverné ;
+- watched projects are **read-only by default** ; la seule exception d’écriture actuelle est l’artefact de gouvernance explicitement configuré `execution_decision`, borné par chemin, approbation humaine, publication transactionnelle et validation post-publication ;
 - `execute` exige un provider admis ; `commit` reste explicite ; `publish` ne pousse ni ne merge une branche utilisateur ;
 - aucun commit/push implicite ;
 - les validations locales précèdent toute review IA, commit ou publication ;
