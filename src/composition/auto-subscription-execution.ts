@@ -35,7 +35,6 @@ export const AUTO_SUBSCRIPTION_PORTFOLIO_ENV =
   "LOOP_AUTO_SUBSCRIPTION_PORTFOLIO_JSON";
 
 export const AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE = Object.freeze([
-  "openclaw",
   "codex",
   "copilot",
   "claude_code",
@@ -274,12 +273,25 @@ function parseOpenClawProfiles(
   return Object.freeze(profiles);
 }
 
+// Retirement gate: an old persisted OpenClaw portfolio must fail closed,
+// rather than silently selecting a different provider or execution path.
+function assertNoRetiredOpenClawPortfolio(
+  value: { readonly openclaw?: unknown },
+): void {
+  if (value.openclaw !== undefined) {
+    throw new TypeError(
+      "AUTO OpenClaw runtime is retired; remove the openclaw portfolio entry explicitly.",
+    );
+  }
+}
+
 export function parseAutoSubscriptionModelPortfolio(
   value: unknown,
 ): AutoSubscriptionModelPortfolio {
   if (!isRecord(value)) {
     throw new TypeError("AUTO subscription portfolio must be an object.");
   }
+  assertNoRetiredOpenClawPortfolio(value);
   const codex = parseProviderProfiles(value.codex, "codex");
   const copilot = parseProviderProfiles(value.copilot, "copilot");
   const claudeCode = parseProviderProfiles(value.claude_code, "claude_code");
@@ -367,8 +379,8 @@ function asOpenClawConfiguredProfiles(
 
 /**
  * Builds the executable subscription runtime set from externally observed
- * evidence. OpenClaw-native remains a distinct runtime identity; it is not
- * collapsed into Codex merely because both use OpenAI subscription auth.
+ * evidence. Legacy OpenClaw entries are explicitly rejected before candidate
+ * assembly; the historical adapter remains available for staged retirement.
  */
 export function buildAutoSubscriptionExecutionCandidates(
   portfolio: AutoSubscriptionModelPortfolio,
@@ -443,6 +455,7 @@ export function decideAutoSubscriptionRoute(
 export function buildAutoSubscriptionProviderConfigurations(
   portfolio: AutoSubscriptionModelPortfolio,
 ): readonly LoopProviderConfiguration[] {
+  assertNoRetiredOpenClawPortfolio(portfolio);
   const configurations: LoopProviderConfiguration[] = [];
 
   if (portfolio.claude_code !== undefined) {
