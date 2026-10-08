@@ -73,9 +73,9 @@ export type AutoSubscriptionModelPortfolio = Readonly<{
 
 export type AutoSubscriptionExecutionCandidate = Readonly<{
   profile: AgentProfile;
-  executionPath: "direct_cli" | "openclaw_native";
+  executionPath: "direct_cli";
   executableNow: boolean;
-  reason: "direct_cli_binding_configured" | "openclaw_native_binding_configured";
+  reason: "direct_cli_binding_configured";
 }>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -391,16 +391,11 @@ export function buildAutoSubscriptionExecutionCandidates(
   );
   const candidates = assemblies.flatMap((assembly) =>
     assembly.agentRegistry.profiles.map((profile) => {
-      const openClawNative = profile.runtime === "openclaw";
       return Object.freeze({
         profile,
-        executionPath: openClawNative
-          ? ("openclaw_native" as const)
-          : ("direct_cli" as const),
+        executionPath: "direct_cli" as const,
         executableNow: true,
-        reason: openClawNative
-          ? ("openclaw_native_binding_configured" as const)
-          : ("direct_cli_binding_configured" as const),
+        reason: "direct_cli_binding_configured" as const,
       });
     }),
   );
@@ -490,17 +485,6 @@ export function buildAutoSubscriptionProviderConfigurations(
       }),
     );
   }
-  if (portfolio.openclaw !== undefined) {
-    configurations.push(
-      Object.freeze({
-        id: "openclaw" as const,
-        executable: "openclaw",
-        timeoutMs: 360_000,
-        profiles: asOpenClawConfiguredProfiles(portfolio.openclaw),
-      }),
-    );
-  }
-
   if (configurations.length === 0) {
     throw new TypeError(
       "AUTO subscription portfolio produced no provider configuration.",

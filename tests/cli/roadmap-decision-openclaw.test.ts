@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -47,8 +48,14 @@ function setupFixture(): Readonly<{
       "",
     ].join("\n"),
   );
-  writeFileSync(join(projectPath, "objective.md"), "Keep the project stable.\n");
-  writeFileSync(join(projectPath, "roadmap.md"), "- [x] Existing work is complete.\n");
+  writeFileSync(
+    join(projectPath, "objective.md"),
+    "Keep the project stable.\n",
+  );
+  writeFileSync(
+    join(projectPath, "roadmap.md"),
+    "- [x] Existing work is complete.\n",
+  );
 
   const modelOutput = JSON.stringify({
     assessment: { observedGaps: [], assumptions: [] },
@@ -62,6 +69,7 @@ function setupFixture(): Readonly<{
     fakeOpenClaw,
     [
       "#!/usr/bin/env node",
+      "require('node:fs').writeFileSync(process.env.OPENCLAW_INVOKED_PATH, 'called');",
       `process.stdout.write(${JSON.stringify(
         JSON.stringify({
           ok: true,
@@ -82,13 +90,15 @@ function setupFixture(): Readonly<{
   };
 }
 
-test("roadmap decision accepts the explicit OpenClaw text-only provider without Anthropic credentials", () => {
+test("roadmap decision rejects the retired OpenClaw provider before invoking it", () => {
   const fixture = setupFixture();
   try {
     const env = { ...process.env };
     delete env.ANTHROPIC_API_KEY;
     env.HOME = join(fixture.root, "home");
     env.PATH = `${fixture.fakeBin}${delimiter}${env.PATH ?? ""}`;
+    const invocationMarker = join(fixture.root, "openclaw-invoked");
+    env.OPENCLAW_INVOKED_PATH = invocationMarker;
 
     const result = spawnSync(
       tsxPath,
@@ -116,30 +126,16 @@ test("roadmap decision accepts the explicit OpenClaw text-only provider without 
       },
     );
 
-    assert.equal(result.status, 0, result.stderr || result.stdout);
-    const report = JSON.parse(result.stdout) as {
-      decision?: string;
-      reason?: string;
-      providerCall?: {
-        requested?: boolean;
-        provider?: string;
-        model?: string;
-        effort?: string | null;
-        status?: string;
-      };
+    assert.equal(result.status, 1);
+    const error = JSON.parse(result.stdout) as {
+      error?: { code?: string; message?: string };
     };
-    assert.equal(report.decision, "no_proposal");
-    assert.equal(
-      report.reason,
-      "No material gap is demonstrated by the supplied context.",
+    assert.equal(error.error?.code, "unsupported_provider");
+    assert.match(
+      error.error?.message ?? "",
+      /OpenClaw proposal provider is retired/,
     );
-    assert.deepEqual(report.providerCall, {
-      requested: true,
-      status: "completed",
-      provider: "openclaw_agent",
-      model: "openai/gpt-5.6-sol",
-      effort: "low",
-    });
+    assert.equal(existsSync(invocationMarker), false);
   } finally {
     fixture.cleanup();
   }
