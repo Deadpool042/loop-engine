@@ -115,7 +115,6 @@ test("durable AUTO publish replays the same terminal result without a second exe
     assert.equal(historyCalls, 1);
     assert.equal(observedMaxModelAttempts, 2);
     assert.deepEqual(observedPreferredRuntimes, [
-      "openclaw",
       "codex",
       "copilot",
       "claude_code",
