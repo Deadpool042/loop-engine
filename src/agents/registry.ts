@@ -157,22 +157,6 @@ export const DEFAULT_AGENT_PROFILES: readonly AgentProfile[] = [
     },
   },
   {
-    id: "openclaw.medium",
-    runtime: "openclaw",
-    provider: "local",
-    model: "openclaw-default",
-    effort: "medium",
-    capabilities: ["code_edit", "shell_exec"],
-    permissions: ["read_only", "write_worktree", "shell_exec"],
-    budget: {
-      maxTokens: null,
-      maxCostUsd: null,
-      maxDurationMs: 300_000,
-      maxCalls: 2,
-      maxRepairs: 1,
-    },
-  },
-  {
     id: "copilot.low",
     runtime: "copilot",
     provider: "github",

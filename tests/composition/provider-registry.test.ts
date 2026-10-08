@@ -11,6 +11,22 @@ import {
 } from "../../src/composition/provider-registry.js";
 
 describe("LoopProviderRegistry", () => {
+  it("does not expose or assemble a retired OpenClaw execution route", () => {
+    assert.deepEqual(
+      defaultLoopProviderRegistry.registrations.map(({ id }) => id),
+      ["codex", "claude_code", "copilot"],
+    );
+    assert.throws(
+      () =>
+        assembleLoopProvider(defaultLoopProviderRegistry, {
+          id: "openclaw",
+          executable: "/usr/local/bin/openclaw",
+          model: "openclaw-default",
+        } as never),
+      /Provider is not registered: openclaw/,
+    );
+  });
+
   it("registers Codex once and assembles an executor with its matching agent profile", () => {
     const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
       id: "codex",
@@ -289,7 +305,6 @@ describe("LoopProviderRegistry", () => {
       ],
     );
   });
-
 
   it("selects the cheapest admissible configured profile independently of declaration order", () => {
     const profiles = [

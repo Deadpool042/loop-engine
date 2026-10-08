@@ -18,8 +18,7 @@ import type { LoopExecutor } from "../core/index.js";
 import { createClaudeCodeCliLoopExecutor } from "../loop/claude-code-cli-executor.js";
 import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";
 import { createHermesCopilotCliLoopExecutor } from "../loop/hermes-copilot-cli-executor.js";
-import { createOpenClawNativeLoopExecutor } from "../loop/openclaw-native-executor.js";
-export const LOOP_PROVIDER_IDS = ["codex", "claude_code", "openclaw", "copilot"] as const;
+export const LOOP_PROVIDER_IDS = ["codex", "claude_code", "copilot"] as const;
 export type LoopProviderId = (typeof LOOP_PROVIDER_IDS)[number];
 
 // This is the conservative capability envelope of the concrete Loop Engine
@@ -94,16 +93,6 @@ export type ClaudeCodeProviderConfiguration = Readonly<{
   maxTurns?: number;
 }>;
 
-export type OpenClawProviderConfiguration = Readonly<{
-  id: "openclaw";
-  executable: string;
-  model?: string;
-  profiles?: readonly LoopProviderModelProfileConfiguration[];
-  fundingMode?: AgentFundingMode;
-  quota?: AgentQuotaSnapshot;
-  timeoutMs?: number;
-}>;
-
 export type CopilotProviderConfiguration = Readonly<{
   id: "copilot";
   executable: string;
@@ -118,7 +107,6 @@ export type CopilotProviderConfiguration = Readonly<{
 export type LoopProviderConfiguration =
   | CodexProviderConfiguration
   | ClaudeCodeProviderConfiguration
-  | OpenClawProviderConfiguration
   | CopilotProviderConfiguration;
 
 export type LoopProviderAssembly = Readonly<{
@@ -190,16 +178,6 @@ function validateConfiguredProfiles(
       throw new TypeError(`Duplicate configured provider profile id: ${id}`);
     }
     ids.add(id);
-    if (
-      configuration.id === "openclaw" &&
-      profile.provider !== undefined &&
-      profile.provider !== "openai"
-    ) {
-      throw new TypeError(
-        `Configured OpenClaw profile ${id} must use provider openai.`,
-      );
-    }
-
     const missingBaseCapabilities = requiredCapabilitiesForProvider(
       configuration,
     ).filter((capability) => !profile.capabilities.includes(capability));
@@ -361,28 +339,6 @@ export const copilotProviderRegistration: LoopProviderRegistration =
     },
   });
 
-export const openClawProviderRegistration: LoopProviderRegistration =
-  Object.freeze({
-    id: "openclaw",
-    assemble(configuration): LoopProviderAssembly {
-      if (configuration.id !== "openclaw") {
-        throw new TypeError(
-          "OpenClaw registration received another provider configuration.",
-        );
-      }
-      const profiles = configuredProfiles(configuration);
-      const executor = createOpenClawNativeLoopExecutor({
-        executable: configuration.executable,
-        ...(configuration.timeoutMs ? { timeoutMs: configuration.timeoutMs } : {}),
-      });
-      return Object.freeze({
-        id: "openclaw",
-        executor,
-        agentRegistry: createAgentRegistry(profiles),
-      });
-    },
-  });
-
 export function createLoopProviderRegistry(
   registrations: readonly LoopProviderRegistration[],
 ): LoopProviderRegistry {
@@ -399,7 +355,6 @@ export function createLoopProviderRegistry(
 export const defaultLoopProviderRegistry = createLoopProviderRegistry([
   codexProviderRegistration,
   claudeCodeProviderRegistration,
-  openClawProviderRegistration,
   copilotProviderRegistration,
 ]);
 
