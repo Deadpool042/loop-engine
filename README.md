@@ -12,16 +12,16 @@ Tout assistant ou runtime qui fait évoluer Loop Engine doit s’y référer ava
 
 Le contrat courant du cycle d’exécution est documenté dans `docs/architecture/looprunner-execute-validation-repair.md`. L’architecture historique du LoopRunner reste disponible dans `docs/architecture/autonomous-loop-runner.md`.
 
-## Runtime principal et spécialistes
+## Interface interactive et exécutants spécialisés
 
-Dans le workflow normal :
+Dans le workflow normal, ChatGPT + Development Workspace peut fournir l'interface interactive. Cette interface ne remplace ni la source GitHub ni les décisions déterministes de Loop Engine.
 
-- **ChatGPT + Development Workspace** constitue le runtime IA interactif principal ;
-- **Loop Engine** fournit gouvernance, roadmap, contexte, politique, gates, historique et validations déterministes ;
+- **Loop Engine** possède la gouvernance des micro-lots : admissibilité, contexte, politique, gates, historique et validations déterministes ;
+- **ChatGPT + Development Workspace** fournit une surface conversationnelle et des primitives bornées pour demander ou exécuter une action explicitement admise ;
 - **Claude Code** et **Codex** restent des exécutants spécialisés opt-in lorsqu’un lot justifie leur usage ;
 - aucun provider IA payant n’est un fallback implicite.
 
-Loop Engine ne déclenche donc pas un second modèle simplement parce que ChatGPT pilote déjà une tâche.
+Une interface ne sélectionne pas un lot ou un provider en parallèle des règles de Loop Engine.
 
 ## Positionnement actuel
 
