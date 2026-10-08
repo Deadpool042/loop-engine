@@ -9,6 +9,7 @@ import {
 } from "../../src/composition/auto-route-handoff.js";
 import {
   AUTO_SUBSCRIPTION_PORTFOLIO_ENV,
+  AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE,
   buildAutoSubscriptionExecutionCandidates,
   buildAutoSubscriptionProviderConfigurations,
   decideAutoSubscriptionRoute,
@@ -347,159 +348,59 @@ test("AUTO does not pretend file-only Copilot can satisfy shell execution requir
   );
 });
 
-test("AUTO represents OpenClaw native as a distinct non-CLI execution candidate", () => {
-  const portfolio = parseAutoSubscriptionModelPortfolio({
-    openclaw: [
-      {
-        id: "native-openclaw",
-        provider: "openai",
-        model: "runtime-observed-openclaw-model",
-        economicTier: "standard",
-        availability: "available",
-        quota: { state: "available", source: "runtime_report" },
-        capabilities: ["code_edit", "shell_exec", "test_execution"],
-        permissions: ["read_only", "write_worktree", "shell_exec"],
-        budget: {
-          maxTokens: null,
-          maxCostUsd: null,
-          maxDurationMs: 300_000,
-          maxCalls: 1,
-          maxRepairs: 1,
-        },
-      },
-    ],
-  });
-
-  const candidates = buildAutoSubscriptionExecutionCandidates(portfolio);
-  assert.equal(candidates.length, 1);
-  assert.deepEqual(
-    candidates.map((candidate) => ({
-      id: candidate.profile.id,
-      runtime: candidate.profile.runtime,
-      provider: candidate.profile.provider,
-      model: candidate.profile.model,
-      executionPath: candidate.executionPath,
-      executableNow: candidate.executableNow,
-      reason: candidate.reason,
-    })),
-    [
-      {
-        id: "configured.openclaw.native-openclaw",
-        runtime: "openclaw",
-        provider: "openai",
-        model: "runtime-observed-openclaw-model",
-        executionPath: "openclaw_native",
-        executableNow: true,
-        reason: "openclaw_native_binding_configured",
-      },
-    ],
+test("AUTO rejects retired OpenClaw-only portfolios explicitly", () => {
+  assert.throws(
+    () => parseAutoSubscriptionModelPortfolio({ openclaw: [] }),
+    /AUTO OpenClaw runtime is retired/,
   );
-  const [configuration] = buildAutoSubscriptionProviderConfigurations(portfolio);
-  assert.equal(configuration?.id, "openclaw");
-  assert.equal(configuration?.executable, "openclaw");
-});
-
-test("AUTO candidate portfolio can compare direct CLI and OpenClaw runtimes without collapsing their identities", () => {
-  const portfolio = parseAutoSubscriptionModelPortfolio({
-    codex: [
-      {
-        id: "direct-codex",
-        model: "observed-codex-model",
-        availability: "available",
-        quota: { state: "available", source: "runtime_report" },
-        capabilities: BASE_CAPABILITIES,
-      },
-    ],
-    openclaw: [
-      {
-        id: "native-openclaw",
-        provider: "openai",
-        model: "observed-openclaw-model",
-        availability: "available",
-        quota: { state: "available", source: "runtime_report" },
-        capabilities: BASE_CAPABILITIES,
-        permissions: ["read_only", "write_worktree", "shell_exec"],
-        budget: {
-          maxTokens: null,
-          maxCostUsd: null,
-          maxDurationMs: 300_000,
-          maxCalls: 1,
-          maxRepairs: 1,
-        },
-      },
-    ],
-  });
-
-  const candidates = buildAutoSubscriptionExecutionCandidates(portfolio);
-  assert.deepEqual(
-    candidates.map((candidate) => ({
-      runtime: candidate.profile.runtime,
-      path: candidate.executionPath,
-      executableNow: candidate.executableNow,
-    })),
-    [
-      { runtime: "codex", path: "direct_cli", executableNow: true },
-      { runtime: "openclaw", path: "openclaw_native", executableNow: true },
-    ],
+  assert.throws(
+    () => loadAutoSubscriptionModelPortfolioFromEnvironment({
+      [AUTO_SUBSCRIPTION_PORTFOLIO_ENV]: JSON.stringify({ openclaw: [] }),
+    }),
+    /AUTO OpenClaw runtime is retired/,
   );
 });
 
-test("AUTO prefers qualified OpenClaw native over Codex only on an otherwise equal smallest-capable tie", () => {
-  const portfolio = parseAutoSubscriptionModelPortfolio({
-    codex: [
-      {
-        id: "same-capability-codex",
-        model: "same-luna-model",
-        economicTier: "economy",
-        availability: "available",
-        quota: { state: "available", source: "runtime_report" },
-        capabilities: BASE_CAPABILITIES,
-      },
-    ],
-    openclaw: [
-      {
-        id: "same-capability-openclaw",
-        provider: "openai",
-        model: "same-luna-model",
-        economicTier: "economy",
-        availability: "available",
-        quota: { state: "available", source: "runtime_report" },
-        capabilities: BASE_CAPABILITIES,
-        permissions: ["read_only", "write_worktree", "shell_exec"],
-        budget: {
-          maxTokens: null,
-          maxCostUsd: null,
-          maxDurationMs: 360_000,
-          maxCalls: 1,
-          maxRepairs: 1,
-        },
-      },
-    ],
-  });
+test("AUTO refuses a mixed legacy OpenClaw portfolio rather than silently falling back to Codex", () => {
+  const mixed = {
+    ...observedPortfolio(),
+    openclaw: [],
+  };
+  assert.throws(
+    () => parseAutoSubscriptionModelPortfolio(mixed),
+    /AUTO OpenClaw runtime is retired/,
+  );
+  assert.throws(
+    () => buildAutoSubscriptionProviderConfigurations(mixed),
+    /AUTO OpenClaw runtime is retired/,
+  );
+  assert.throws(
+    () => buildAutoSubscriptionExecutionCandidates(mixed),
+    /AUTO OpenClaw runtime is retired/,
+  );
+  assert.throws(
+    () => decideAutoSubscriptionRoute(mixed, resolvedPolicy("low"), []),
+    /AUTO OpenClaw runtime is retired/,
+  );
+});
 
+test("AUTO without OpenClaw keeps explicit direct-CLI candidates and fails closed on unknown quota", () => {
+  assert.deepEqual(AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE, [
+    "codex",
+    "copilot",
+    "claude_code",
+  ]);
+  const safe = buildAutoSubscriptionExecutionCandidates(observedPortfolio());
+  assert.equal(safe.length, 2);
+  assert.ok(safe.every((candidate) => candidate.executionPath === "direct_cli"));
+  assert.ok(safe.every((candidate) => candidate.profile.runtime !== "openclaw"));
   const decision = decideAutoSubscriptionRoute(
-    portfolio,
+    { claude_code: observedPortfolio().claude_code },
     resolvedPolicy("low"),
     [],
   );
-
-  assert.equal(decision.outcome, "selected");
-  assert.equal(decision.selected?.runtime, "openclaw");
-  assert.equal(decision.selected?.executionPath, "openclaw_native");
-  assert.deepEqual(
-    decision.notSelected.map((candidate) => ({
-      runtime: candidate.runtime,
-      reason: candidate.reason,
-      detail: candidate.detail,
-    })),
-    [
-      {
-        runtime: "codex",
-        reason: "lower_preference",
-        detail: "less_preferred_runtime_than_selected",
-      },
-    ],
-  );
+  assert.equal(decision.outcome, "no_match");
+  assert.equal(decision.selected, null);
 });
 
 test("AUTO route derives runtime/provider/model/effort from the resolved policy and observed portfolio", () => {
