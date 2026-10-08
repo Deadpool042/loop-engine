@@ -1,5 +1,11 @@
 # Project Intelligence Engine
 
+## Portée du registre
+
+`projects.yaml` est le registre opérationnel de Loop Engine : il décrit les projets connus de ce moteur, leur identité technique, leur checkout et les paramètres de lecture, planification et exécution. Il ne constitue pas le portefeuille global de Projects ni le manifest lifecycle de Project Factory.
+
+Les flags Loop `archived` et `retired` ne suppriment ni ne modifient les assets d'un projet et ne mettent pas à jour son manifest Factory. Les handlers Loop appliquent seulement leurs effets locaux au registre et à l'admissibilité de Loop; leur correspondance avec les états lifecycle Factory n'est pas synchronisée aujourd'hui. La réconciliation et la projection entre ces sources sont différées à G5.6.
+
 ## Statut
 
 Architecture V1 cible.
@@ -63,7 +69,7 @@ Un projet absent en mode `on_demand` ou `none` expose `expectedAbsent: true` et 
 
 ## Project registration
 
-Le registre `projects.yaml` reste la source de vérité déclarative du portefeuille. Un nouveau projet n'y entre qu'après création de son enveloppe Git et approbation explicite de son `PROJECT-BRIEF.md`.
+Le registre `projects.yaml` est la source de vérité opérationnelle de Loop Engine pour les projets inscrits dans ce moteur. Un nouveau projet n'y entre qu'après création de son enveloppe Git et approbation explicite de son `PROJECT-BRIEF.md`; cette inscription ne remplace pas le manifest ni le statut lifecycle possédés par Project Factory.
 
 La commande `loop project register <project> --type <type> --confirm-brief-approved` ne crée pas de projet, de dépôt distant, de framework ou de roadmap. Elle enregistre uniquement une enveloppe locale déjà approuvée. Elle exige que le projet soit un enfant direct du workspace, sur `main`, propre, et que le type corresponde au brief approuvé.
 
