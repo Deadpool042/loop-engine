@@ -81,6 +81,8 @@ Mode de financement explicite et indépendant du modèle : `included_subscriptio
 
 Evidence bornée `{ state, source }` avec `state = available | exhausted | unknown` et une provenance fermée (`runtime_report | operator_assertion | unavailable`). Un quota explicitement `exhausted` est un hard gate. Un quota `unknown` reste admissible : Loop Engine ne déduit jamais un pourcentage restant, un nombre de crédits ou une fenêtre temporelle à partir du temps écoulé. Les pourcentages 5h/semaine ne doivent être projetés que lorsqu'un runtime externe fournit réellement cette donnée.
 
+**B5 — admission AUTO (2026-10-10) :** dans le chemin `auto-subscription` uniquement, `source=operator_assertion` est systématiquement refusé, même si `state=available`, `availability=available` ou que la déclaration est récente. Ce contrôle s'applique aux portefeuilles JSON chargés de l'environnement **et** aux objets directement remis au routeur/assembleur. Les autres politiques génériques conservent leur type de source historique ; cette modification ne prétend pas attester `runtime_report`, ne prouve pas le financement de chaque modèle et ne lève pas `G3.2 / AUTO NO-GO` tant que les producteurs, les environnements VPS actifs et l'E2E local ne sont pas qualifiés.
+
 ### `AgentBudget`
 
 Limites optionnelles associées à un profil : `maxTokens`, `maxCostUsd`, `maxDurationMs`, `maxCalls`, `maxRepairs`. Chaque champ est `number | null` — `null` signifie "non borné". Un budget n'est jamais appliqué dans ce lot (pas d'exécution) ; il sert de critère de filtrage pour le sélecteur lorsqu'un appelant fournit un plafond (`budgetCeiling`).

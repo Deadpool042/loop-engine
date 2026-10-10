@@ -118,6 +118,13 @@ function parseProfile(value: unknown): AutoSubscriptionModelProfile {
       `AUTO subscription profile ${id} has invalid quota evidence.`,
     );
   }
+  // B5: operator claims are never admissible as subscription quota evidence,
+  // including when they report an available quota or an available model.
+  if (value.quota.source === "operator_assertion") {
+    throw new TypeError(
+      `AUTO subscription profile ${id} rejects operator-asserted quota evidence.`,
+    );
+  }
   if (
     !Array.isArray(value.capabilities) ||
     !value.capabilities.every(
@@ -441,9 +448,30 @@ export function decideAutoSubscriptionRoute(
   });
 }
 
+function assertNoOperatorAssertedAutoQuotas(
+  portfolio: AutoSubscriptionModelPortfolio,
+): void {
+  // Parse guards cannot protect callers that construct typed portfolios
+  // directly. Enforce the same policy at the last provider assembly boundary.
+  for (const profiles of [
+    portfolio.codex,
+    portfolio.copilot,
+    portfolio.claude_code,
+    portfolio.openclaw,
+  ]) {
+    for (const profile of profiles ?? []) {
+      if (profile.quota?.source === "operator_assertion") {
+        throw new TypeError(
+          "AUTO subscription rejects operator-asserted quota evidence.",
+        );
+      }
+    }
+  }
+}
+
 /**
- * Builds the subscription-only provider set from an externally observed or
- * operator-approved portfolio. No provider model, tier, availability, quota or
+ * Builds the subscription-only provider set from an externally observed
+ * portfolio. Operator assertions never authorize AUTO execution. No provider model, tier, availability, quota or
  * capability is inferred here. The only policy owned by this layer is that
  * AUTO subscription never authorizes paid API/additional-credit funding.
  */
@@ -451,6 +479,7 @@ export function buildAutoSubscriptionProviderConfigurations(
   portfolio: AutoSubscriptionModelPortfolio,
 ): readonly LoopProviderConfiguration[] {
   assertNoRetiredOpenClawPortfolio(portfolio);
+  assertNoOperatorAssertedAutoQuotas(portfolio);
   const configurations: LoopProviderConfiguration[] = [];
 
   if (portfolio.claude_code !== undefined) {
