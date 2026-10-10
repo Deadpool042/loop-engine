@@ -106,26 +106,6 @@ projects:
       - pnpm run validate
     roadmap:
       - docs/roadmap/loop-engine.md
-  - name: openclaw-control
-    path: ../openclaw-control
-    repository: Deadpool042/openclaw-control
-    execution_decision: .loop-engine/execution-decision.yaml
-    type: openclaw-extension
-    workspace:
-      mode: source_only
-      dependencies: on_demand
-    required_docs:
-      - AGENTS.md
-      - README.md
-      - PROJECT-BRIEF.md
-      - docs/roadmap/README.md
-    validation:
-      - pnpm run validate
-    planning:
-      mode: roadmap
-      objective_source: PROJECT-BRIEF.md
-    roadmap:
-      - docs/roadmap/README.md
   - name: hermes-wizard-burnin
     path: ../hermes-wizard-burnin
     type: evaluation-fixture
