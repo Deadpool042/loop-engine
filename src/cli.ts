@@ -93,6 +93,7 @@ import {
 import { terminal } from "./ui/terminal.js";
 import {
   buildAutoSubscriptionProviderConfigurations,
+  hasVerifiedAutoSubscriptionExecutionEvidence,
   loadAutoSubscriptionModelPortfolioFromEnvironment,
 } from "./composition/auto-subscription-execution.js";
 import { ensureAutoSubscriptionExecutionDecision } from "./composition/auto-subscription-decision-renewal.js";
@@ -948,6 +949,15 @@ else if (command === "review") {
         json,
         "auto_subscription_conflict",
         "--auto-subscription cannot be combined with explicit provider or fallback options.",
+      );
+    }
+    // B5: raw LOOP_AUTO_* JSON is not an authenticated report. Refuse before
+    // touching the candidate, decision record or any provider executable.
+    if (!hasVerifiedAutoSubscriptionExecutionEvidence()) {
+      failOption(
+        json,
+        "auto_subscription_evidence_not_qualified",
+        "G3.2 AUTO is disabled until model, subscription funding and quota provenance are independently qualified.",
       );
     }
     const canonicalCandidate =

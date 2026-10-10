@@ -12,6 +12,7 @@ import {
   AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE,
   buildAutoSubscriptionExecutionCandidates,
   buildAutoSubscriptionProviderConfigurations,
+  hasVerifiedAutoSubscriptionExecutionEvidence,
   decideAutoSubscriptionRoute,
   loadAutoSubscriptionModelPortfolioFromEnvironment,
   parseAutoSubscriptionModelPortfolio,
@@ -167,6 +168,36 @@ test("AUTO builds only the explicitly observed subscription portfolio", () => {
       },
     ],
   );
+});
+
+test("B5 executable AUTO gate stays closed even if an environment claims a runtime report", () => {
+  const original = process.env.LOOP_AUTO_SUBSCRIPTION_PORTFOLIO_JSON;
+  process.env.LOOP_AUTO_SUBSCRIPTION_PORTFOLIO_JSON = JSON.stringify({
+    codex: [{
+      id: "forged",
+      model: "gpt-6.1-sol",
+      availability: "available",
+      quota: { source: "runtime_report", state: "available" },
+      capabilities: BASE_CAPABILITIES,
+    }],
+  });
+  try {
+    assert.equal(hasVerifiedAutoSubscriptionExecutionEvidence(), false);
+  } finally {
+    if (original === undefined) delete process.env.LOOP_AUTO_SUBSCRIPTION_PORTFOLIO_JSON;
+    else process.env.LOOP_AUTO_SUBSCRIPTION_PORTFOLIO_JSON = original;
+  }
+});
+
+test("executable CLI checks B5 gate before consulting the canonical candidate or a runtime", () => {
+  const code = readFileSync(new URL("../../src/cli.ts", import.meta.url), "utf8");
+  const anchor = code.indexOf('if (!hasVerifiedAutoSubscriptionExecutionEvidence())');
+  const candidate = code.indexOf("const canonicalCandidate =", anchor);
+  const provider = code.indexOf("buildAutoSubscriptionProviderConfigurations(", anchor);
+  assert.ok(anchor > 0);
+  assert.ok(candidate > anchor);
+  assert.ok(provider > anchor);
+  assert.match(code.slice(anchor, candidate), /auto_subscription_evidence_not_qualified/);
 });
 
 test("AUTO rejects operator assertions even when the model and quota claim availability", () => {
