@@ -40,6 +40,16 @@ export const AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE = Object.freeze([
   "claude_code",
 ] as const);
 
+/**
+ * G3.2/B5 fail-closed execution gate. No independently verifiable native
+ * evidence producer is connected to the AUTO CLI yet. A raw environment JSON
+ * claiming runtime_report is an operator-supplied string, not attestation.
+ * Parsing, planning and diagnostics remain available; executing is forbidden.
+ */
+export function hasVerifiedAutoSubscriptionExecutionEvidence(): boolean {
+  return false;
+}
+
 export const AUTO_SUBSCRIPTION_AGENT_POLICY: AgentPolicy = Object.freeze({
   ...DEFAULT_AGENT_POLICY,
   id: "auto-subscription",
