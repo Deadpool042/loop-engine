@@ -169,6 +169,69 @@ test("AUTO builds only the explicitly observed subscription portfolio", () => {
   );
 });
 
+test("AUTO rejects operator assertions even when the model and quota claim availability", () => {
+  const claimed = {
+    codex: [{
+      id: "asserted-codex",
+      model: "gpt-6.1-sol",
+      availability: "available",
+      quota: { state: "available", source: "operator_assertion" },
+      capabilities: [...BASE_CAPABILITIES],
+    }],
+  };
+  assert.throws(
+    () => parseAutoSubscriptionModelPortfolio(claimed),
+    /rejects operator-asserted quota evidence/,
+  );
+  assert.throws(
+    () => loadAutoSubscriptionModelPortfolioFromEnvironment({
+      [AUTO_SUBSCRIPTION_PORTFOLIO_ENV]: JSON.stringify(claimed),
+    }),
+    /rejects operator-asserted quota evidence/,
+  );
+});
+
+test("AUTO rejects direct typed portfolios containing operator assertions", () => {
+  const asserted: AutoSubscriptionModelPortfolio = {
+    claude_code: [{
+      id: "asserted-claude",
+      model: "claude-sonnet",
+      availability: "available",
+      quota: { state: "available", source: "operator_assertion" },
+      capabilities: BASE_CAPABILITIES,
+    }],
+  };
+  assert.throws(
+    () => buildAutoSubscriptionProviderConfigurations(asserted),
+    /rejects operator-asserted quota evidence/,
+  );
+  assert.throws(
+    () => buildAutoSubscriptionExecutionCandidates(asserted),
+    /rejects operator-asserted quota evidence/,
+  );
+  assert.throws(
+    () => decideAutoSubscriptionRoute(asserted, resolvedPolicy(), []),
+    /rejects operator-asserted quota evidence/,
+  );
+});
+
+test("AUTO rejects operator assertions even when the quota is unknown or exhausted", () => {
+  for (const state of ["unknown", "exhausted"] as const) {
+    assert.throws(
+      () => parseAutoSubscriptionModelPortfolio({
+        codex: [{
+          id: "claimed",
+          model: "reported-model",
+          availability: "unavailable",
+          quota: { state, source: "operator_assertion" },
+          capabilities: BASE_CAPABILITIES,
+        }],
+      }),
+      /rejects operator-asserted quota evidence/,
+    );
+  }
+});
+
 test("AUTO never infers a portfolio when runtime/deployment evidence is missing", () => {
   assert.throws(
     () => loadAutoSubscriptionModelPortfolioFromEnvironment({}),
