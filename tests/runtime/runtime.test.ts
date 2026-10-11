@@ -6,7 +6,6 @@ import {
   ClaudeRuntime,
   CodexRuntime,
   createSimulatedRuntimeAdapter,
-  OpenClawRuntime,
   RUNTIME_REGISTRY,
   SimulatedRuntime,
   selectRuntime,
@@ -107,7 +106,7 @@ function runtimeRequest(runtime: AgentRuntime = "codex"): RuntimeRequest {
 }
 
 describe("runtime stubs", () => {
-  const adapters = [OpenClawRuntime, ClaudeRuntime, CodexRuntime];
+  const adapters = [ClaudeRuntime, CodexRuntime];
 
   for (const adapter of adapters) {
     it(`${adapter.runtimeId} is deterministic and never executes a task`, () => {
@@ -131,7 +130,7 @@ describe("runtime registry and selector", () => {
   it("has static deterministic declaration order", () => {
     assert.deepEqual(
       RUNTIME_REGISTRY.adapters.map((adapter) => adapter.runtimeId),
-      ["openclaw", "claude_code", "codex", "local-process", "custom"],
+      ["claude_code", "codex", "local-process", "custom"],
     );
   });
 
@@ -246,7 +245,6 @@ describe("runtime invariants", () => {
   const runtimeFiles = [
     "src/runtime/types.ts",
     "src/runtime/result.ts",
-    "src/runtime/openclaw.ts",
     "src/runtime/claude.ts",
     "src/runtime/codex.ts",
     "src/runtime/simulated.ts",

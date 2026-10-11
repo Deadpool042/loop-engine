@@ -1,6 +1,5 @@
 import { ClaudeRuntime } from "./claude.js";
 import { CodexRuntime } from "./codex.js";
-import { OpenClawRuntime } from "./openclaw.js";
 import { LocalProcessRuntime } from "./local-process.js";
 import { SimulatedRuntime } from "./simulated.js";
 import {
@@ -29,7 +28,6 @@ export function createRuntimeRegistry(
 // Static declaration order is the only registry order. No discovery, loading,
 // reflection, or dependency injection is permitted in this architecture lot.
 export const RUNTIME_REGISTRY: RuntimeRegistry = createRuntimeRegistry([
-  OpenClawRuntime,
   ClaudeRuntime,
   CodexRuntime,
   LocalProcessRuntime,

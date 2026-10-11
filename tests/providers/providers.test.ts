@@ -10,7 +10,6 @@ import {
   ClaudeCodeProviderAdapter,
   CodexProviderAdapter,
   getProviderAdapter,
-  OpenClawProviderAdapter,
   PROVIDER_REGISTRY,
   selectProvider,
   type ProviderId,
@@ -24,7 +23,6 @@ import type {
 import type { RuntimeRequest } from "../../src/runtime/types.js";
 
 const providerByRuntime = {
-  openclaw: "local",
   claude_code: "anthropic",
   codex: "openai",
 } as const;
@@ -126,7 +124,7 @@ function providerRequest(
 describe("provider registry and deterministic selection", () => {
   it("uses a fixed unique declaration order", () => {
     const ids = PROVIDER_REGISTRY.adapters.map((adapter) => adapter.id);
-    assert.deepEqual(ids, ["openclaw", "claude-code", "codex"]);
+    assert.deepEqual(ids, ["claude-code", "codex"]);
     assert.equal(new Set(ids).size, ids.length);
   });
 
@@ -190,7 +188,6 @@ describe("provider registry and deterministic selection", () => {
 
 describe("provider stubs", () => {
   const fixtures = [
-    [OpenClawProviderAdapter, providerRequest("openclaw")],
     [ClaudeCodeProviderAdapter, providerRequest("claude_code")],
     [CodexProviderAdapter, providerRequest("codex")],
   ] as const;
@@ -245,6 +242,23 @@ describe("Core provider integration", () => {
   });
 });
 
+describe("unsupported provider plans", () => {
+  it("requires an explicit provider instead of guessing a label", () => {
+    const request = createProviderRequest(runtimeRequest("codex"), {
+      requestedProvider: undefined,
+    });
+
+    assert.throws(
+      () =>
+        createProviderExecutionPlan({
+          ...request,
+          requiredCapabilities: ["shell_exec"],
+        }),
+      /explicit requestedProvider/,
+    );
+  });
+});
+
 describe("provider invariants", () => {
   const providerFiles = [
     "src/providers/types.ts",
@@ -252,7 +266,6 @@ describe("provider invariants", () => {
     "src/providers/support.ts",
     "src/providers/registry.ts",
     "src/providers/selector.ts",
-    "src/providers/openclaw.ts",
     "src/providers/claude-code.ts",
     "src/providers/codex.ts",
   ];

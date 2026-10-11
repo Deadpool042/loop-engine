@@ -1,6 +1,5 @@
 import { ClaudeCodeProviderAdapter } from "./claude-code.js";
 import { CodexProviderAdapter } from "./codex.js";
-import { OpenClawProviderAdapter } from "./openclaw.js";
 import {
   createStaticRegistryEntries,
   findStaticRegistryEntry,
@@ -26,7 +25,6 @@ export function createProviderRegistry(
 // Declaration order is the deterministic fallback order. No dynamic loading,
 // filesystem discovery, dependency injection, reflection, or network discovery.
 export const PROVIDER_REGISTRY = createProviderRegistry([
-  OpenClawProviderAdapter,
   ClaudeCodeProviderAdapter,
   CodexProviderAdapter,
 ]);

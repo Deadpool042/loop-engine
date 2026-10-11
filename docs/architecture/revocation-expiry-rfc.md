@@ -1,5 +1,7 @@
 # Revocation & Expiry Lifecycle RFC
 
+> **Status: retired (G3.6).** The OpenClaw provider and the OpenClaw-only V10 declarative chain this document describes (intent, mapping, authorization, transport request, review, provenance, handoff eligibility, dispatch, boundary, authority and bridge modules) were removed from the source tree. This page is kept as historical design context only; it does not describe code that exists.
+
 ## Purpose and architectural position
 
 V13.3 defines immutable declarative governance lifecycle evidence for execution authority and operator approval. It sits between those artifacts and Authority Verification, with no implementation edge to Authority Verification, Dispatch, Boundary, Runtime, Transport, Provider, CLI or LoopRunner.

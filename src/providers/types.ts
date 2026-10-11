@@ -15,7 +15,7 @@ import type {
   RuntimeRequest,
 } from "../runtime/types.js";
 
-export const PROVIDER_IDS = ["openclaw", "claude-code", "codex"] as const;
+export const PROVIDER_IDS = ["claude-code", "codex"] as const;
 
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 

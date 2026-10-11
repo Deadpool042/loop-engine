@@ -57,11 +57,18 @@ export function createProviderExecutionPlan(
     "selected"
       ? request.runtimeRequest.resolvedAgentPolicy.selection.profile.runtime
       : "custom");
-  const providerId = request.requestedProvider ?? "openclaw";
   const provider =
     request.runtimeRequest.resolvedAgentPolicy.selection?.outcome === "selected"
       ? request.runtimeRequest.resolvedAgentPolicy.selection.profile.provider
       : request.runtimeRequest.provider;
+  // Nothing was selected, so the rejected plan can only be labelled with the
+  // provider the caller named; guessing one would be a silent fallback.
+  const providerId = request.requestedProvider;
+  if (providerId === undefined) {
+    throw new TypeError(
+      "An explicit requestedProvider is required to describe an unsupported provider plan.",
+    );
+  }
 
   return createUnsupportedProviderPlan(
     providerId,

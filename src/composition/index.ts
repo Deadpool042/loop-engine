@@ -67,18 +67,12 @@ export {
   type AutoSubscriptionExecutionCandidate,
   type AutoSubscriptionModelPortfolio,
   type AutoSubscriptionModelProfile,
-  type AutoSubscriptionNativeOpenClawProfile,
 } from "./auto-subscription-execution.js";
 
 export {
   createIsolatedProviderRunExecute,
   type IsolatedProviderExecutionOptions,
 } from "./isolated-provider-execution.js";
-
-export {
-  createOpenClawNativeLoopExecutor,
-  type OpenClawNativeLoopExecutorOptions,
-} from "../loop/openclaw-native-executor.js";
 
 export {
   createHermesCopilotCliLoopExecutor,

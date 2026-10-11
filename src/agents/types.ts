@@ -5,6 +5,7 @@
 export const AGENT_RUNTIMES = [
   "claude_code",
   "codex",
+  // Retired runtime: kept only so persisted reports and run history still parse.
   "openclaw",
   "chatgpt",
   "copilot",
