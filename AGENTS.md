@@ -134,6 +134,6 @@ Consulter seulement quand pertinent :
 
 ## Git / worktrees
 
-La source canonique est `/Users/laurent/Projects/project-factory/CONTRACT.md` §3.9 et `task-policy.yaml` (`git.worktree`).
+La source canonique est [Project Factory — `CONTRACT.md` §3.9](https://github.com/LP-WEB-STUDIO/project-factory/blob/main/CONTRACT.md) et [`task-policy.yaml` (`git.worktree`)](https://github.com/LP-WEB-STUDIO/project-factory/blob/main/task-policy.yaml). Pour une opération locale, résoudre le checkout Factory effectivement présent plutôt que supposer son emplacement dans `~/Projects`.
 
 En bref : le checkout canonique reste sur `main`, une tâche utilise au plus un worktree temporaire, et le cleanup complet est une condition de DONE. Ne jamais forcer la suppression d’un worktree dirty, actif ou lié à une PR ouverte.
