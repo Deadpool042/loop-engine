@@ -66,19 +66,10 @@ export type AutoSubscriptionModelProfile = Readonly<{
   capabilities: readonly AgentCapability[];
 }>;
 
-export type AutoSubscriptionNativeOpenClawProfile =
-  AutoSubscriptionModelProfile &
-    Readonly<{
-      provider: AgentProvider;
-      permissions: readonly AgentPermission[];
-      budget: AgentBudget;
-    }>;
-
 export type AutoSubscriptionModelPortfolio = Readonly<{
   codex?: readonly AutoSubscriptionModelProfile[];
   copilot?: readonly AutoSubscriptionModelProfile[];
   claude_code?: readonly AutoSubscriptionModelProfile[];
-  openclaw?: readonly AutoSubscriptionNativeOpenClawProfile[];
 }>;
 
 export type AutoSubscriptionExecutionCandidate = Readonly<{
@@ -206,96 +197,10 @@ function parseProviderProfiles(
   return Object.freeze(profiles);
 }
 
-function parseBudget(value: unknown, id: string): AgentBudget {
-  if (!isRecord(value)) {
-    throw new TypeError(
-      `AUTO OpenClaw profile ${id} requires an explicit execution budget.`,
-    );
-  }
-  const dimensions = [
-    "maxTokens",
-    "maxCostUsd",
-    "maxDurationMs",
-    "maxCalls",
-    "maxRepairs",
-  ] as const;
-  const budget = Object.fromEntries(
-    dimensions.map((dimension) => {
-      const candidate = value[dimension];
-      if (
-        candidate !== null &&
-        (typeof candidate !== "number" ||
-          !Number.isFinite(candidate) ||
-          candidate < 0)
-      ) {
-        throw new TypeError(
-          `AUTO OpenClaw profile ${id} has invalid budget.${dimension}.`,
-        );
-      }
-      return [dimension, candidate];
-    }),
-  ) as AgentBudget;
-  return Object.freeze(budget);
-}
-
-function parseOpenClawProfiles(
-  value: unknown,
-): readonly AutoSubscriptionNativeOpenClawProfile[] | undefined {
-  if (value === undefined) return undefined;
-  if (!Array.isArray(value) || value.length === 0) {
-    throw new TypeError(
-      "AUTO subscription portfolio openclaw profiles must be a non-empty array.",
-    );
-  }
-  const profiles = value.map((candidate) => {
-    if (!isRecord(candidate)) {
-      throw new TypeError("AUTO OpenClaw profile must be an object.");
-    }
-    const base = parseProfile(candidate);
-    if (
-      typeof candidate.provider !== "string" ||
-      !(AGENT_PROVIDERS as readonly string[]).includes(candidate.provider)
-    ) {
-      throw new TypeError(
-        `AUTO OpenClaw profile ${base.id} requires an explicit valid provider.`,
-      );
-    }
-    if (
-      !Array.isArray(candidate.permissions) ||
-      !candidate.permissions.every(
-        (permission) =>
-          typeof permission === "string" &&
-          (AGENT_PERMISSIONS as readonly string[]).includes(permission),
-      )
-    ) {
-      throw new TypeError(
-        `AUTO OpenClaw profile ${base.id} requires explicit valid permissions.`,
-      );
-    }
-    return Object.freeze({
-      ...base,
-      provider: candidate.provider as AgentProvider,
-      permissions: Object.freeze([
-        ...new Set(candidate.permissions as AgentPermission[]),
-      ]),
-      budget: parseBudget(candidate.budget, base.id),
-    });
-  });
-  const ids = profiles.map((profile) => profile.id);
-  if (new Set(ids).size !== ids.length) {
-    throw new TypeError(
-      "AUTO subscription portfolio openclaw contains duplicate profile ids.",
-    );
-  }
-  return Object.freeze(profiles);
-}
-
 // Retirement gate: an old persisted OpenClaw portfolio must fail closed,
 // rather than silently selecting a different provider or execution path.
-function assertNoRetiredOpenClawPortfolio(
-  value: { readonly openclaw?: unknown },
-): void {
-  if (value.openclaw !== undefined) {
+function assertNoRetiredOpenClawPortfolio(value: object): void {
+  if ((value as { readonly openclaw?: unknown }).openclaw !== undefined) {
     throw new TypeError(
       "AUTO OpenClaw runtime is retired; remove the openclaw portfolio entry explicitly.",
     );
@@ -312,12 +217,10 @@ export function parseAutoSubscriptionModelPortfolio(
   const codex = parseProviderProfiles(value.codex, "codex");
   const copilot = parseProviderProfiles(value.copilot, "copilot");
   const claudeCode = parseProviderProfiles(value.claude_code, "claude_code");
-  const openclaw = parseOpenClawProfiles(value.openclaw);
   if (
     codex === undefined &&
     copilot === undefined &&
-    claudeCode === undefined &&
-    openclaw === undefined
+    claudeCode === undefined
   ) {
     throw new TypeError(
       "AUTO subscription portfolio contains no explicitly observed runtime profiles.",
@@ -327,7 +230,6 @@ export function parseAutoSubscriptionModelPortfolio(
     ...(codex === undefined ? {} : { codex }),
     ...(copilot === undefined ? {} : { copilot }),
     ...(claudeCode === undefined ? {} : { claude_code: claudeCode }),
-    ...(openclaw === undefined ? {} : { openclaw }),
   });
 }
 
@@ -370,34 +272,10 @@ function asConfiguredProfiles(
   );
 }
 
-function asOpenClawConfiguredProfiles(
-  profiles: readonly AutoSubscriptionNativeOpenClawProfile[],
-): readonly LoopProviderModelProfileConfiguration[] {
-  return Object.freeze(
-    profiles.map((profile) =>
-      Object.freeze({
-        id: profile.id,
-        model: profile.model,
-        provider: profile.provider,
-        ...(profile.economicTier === undefined
-          ? {}
-          : { economicTier: profile.economicTier }),
-        availability: profile.availability,
-        fundingMode: "included_subscription" as const,
-        quota: Object.freeze({ ...profile.quota }),
-        ...(profile.effort === undefined ? {} : { effort: profile.effort }),
-        capabilities: Object.freeze([...profile.capabilities]),
-        permissions: Object.freeze([...profile.permissions]),
-        budget: Object.freeze({ ...profile.budget }),
-      }),
-    ),
-  );
-}
-
 /**
  * Builds the executable subscription runtime set from externally observed
  * evidence. Legacy OpenClaw entries are explicitly rejected before candidate
- * assembly; the historical adapter remains available for staged retirement.
+ * assembly.
  */
 export function buildAutoSubscriptionExecutionCandidates(
   portfolio: AutoSubscriptionModelPortfolio,
@@ -467,7 +345,6 @@ function assertNoOperatorAssertedAutoQuotas(
     portfolio.codex,
     portfolio.copilot,
     portfolio.claude_code,
-    portfolio.openclaw,
   ]) {
     for (const profile of profiles ?? []) {
       if (profile.quota?.source === "operator_assertion") {

@@ -1,5 +1,7 @@
 # Bridge Contract RFC
 
+> **Status: retired (G3.6).** The OpenClaw provider and the OpenClaw-only V10 declarative chain this document describes (intent, mapping, authorization, transport request, review, provenance, handoff eligibility, dispatch, boundary, authority and bridge modules) were removed from the source tree. This page is kept as historical design context only; it does not describe code that exists.
+
 ## Purpose, scope, and terminology
 
 V13.4 defines an immutable, serializable Bridge Contract: a candidate declarative handoff after governance evidence has been assessed. It is not authorization, not execution, not runtime, not transport, not provider dispatch, and not side effects. It introduces no operational bridge.

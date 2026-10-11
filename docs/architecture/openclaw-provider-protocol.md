@@ -1,5 +1,7 @@
 # OpenClaw Provider Protocol
 
+> **Status: retired (G3.6).** The OpenClaw provider and the OpenClaw-only V10 declarative chain this document describes (intent, mapping, authorization, transport request, review, provenance, handoff eligibility, dispatch, boundary, authority and bridge modules) were removed from the source tree. This page is kept as historical design context only; it does not describe code that exists.
+
 ## Statut V10.4
 
 V10.4 définit un contrat interne de planification OpenClaw. Ce contrat est une

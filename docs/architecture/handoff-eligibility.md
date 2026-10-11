@@ -1,5 +1,7 @@
 # Handoff Eligibility V11.5
 
+> **Status: retired (G3.6).** The OpenClaw provider and the OpenClaw-only V10 declarative chain this document describes (intent, mapping, authorization, transport request, review, provenance, handoff eligibility, dispatch, boundary, authority and bridge modules) were removed from the source tree. This page is kept as historical design context only; it does not describe code that exists.
+
 `HandoffEligibility` is a declarative assessment of reviewed evidence. It
 answers whether existing local contracts are internally consistent enough for a
 possible future handoff to be considered.

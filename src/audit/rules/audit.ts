@@ -46,19 +46,133 @@ function formatAuditRuleId(value: number): string {
   return `AUDIT-${String(value).padStart(3, "0")}`;
 }
 
+// Ids retired with the OpenClaw-only V10 declarative chain (G3.6). They are
+// never reused: the contiguity check tolerates these gaps and rejects any
+// registered rule that reintroduces one of them.
+export const RETIRED_AUDIT_RULE_IDS: readonly string[] = Object.freeze([
+  "AUDIT-123",
+  "AUDIT-124",
+  "AUDIT-125",
+  "AUDIT-126",
+  "AUDIT-127",
+  "AUDIT-128",
+  "AUDIT-129",
+  "AUDIT-130",
+  "AUDIT-131",
+  "AUDIT-142",
+  "AUDIT-144",
+  "AUDIT-146",
+  "AUDIT-147",
+  "AUDIT-148",
+  "AUDIT-149",
+  "AUDIT-150",
+  "AUDIT-157",
+  "AUDIT-158",
+  "AUDIT-161",
+  "AUDIT-162",
+  "AUDIT-163",
+  "AUDIT-164",
+  "AUDIT-165",
+  "AUDIT-166",
+  "AUDIT-174",
+  "AUDIT-175",
+  "AUDIT-177",
+  "AUDIT-178",
+  "AUDIT-179",
+  "AUDIT-180",
+  "AUDIT-181",
+  "AUDIT-182",
+  "AUDIT-183",
+  "AUDIT-191",
+  "AUDIT-192",
+  "AUDIT-193",
+  "AUDIT-194",
+  "AUDIT-195",
+  "AUDIT-196",
+  "AUDIT-197",
+  "AUDIT-203",
+  "AUDIT-204",
+  "AUDIT-210",
+  "AUDIT-211",
+  "AUDIT-217",
+  "AUDIT-218",
+  "AUDIT-219",
+  "AUDIT-225",
+  "AUDIT-226",
+  "AUDIT-227",
+  "AUDIT-233",
+  "AUDIT-234",
+  "AUDIT-235",
+  "AUDIT-237",
+  "AUDIT-238",
+  "AUDIT-239",
+  "AUDIT-251",
+  "AUDIT-252",
+  "AUDIT-253",
+  "AUDIT-254",
+  "AUDIT-255",
+  "AUDIT-256",
+  "AUDIT-263",
+  "AUDIT-264",
+  "AUDIT-265",
+  "AUDIT-273",
+  "AUDIT-274",
+  "AUDIT-275",
+  "AUDIT-276",
+  "AUDIT-277",
+  "AUDIT-285",
+  "AUDIT-294",
+  "AUDIT-296",
+  "AUDIT-297",
+  "AUDIT-298",
+  "AUDIT-300",
+  "AUDIT-302",
+  "AUDIT-304",
+  "AUDIT-305",
+  "AUDIT-306",
+  "AUDIT-307",
+  "AUDIT-310",
+  "AUDIT-311",
+  "AUDIT-312",
+  "AUDIT-314",
+  "AUDIT-315",
+  "AUDIT-316",
+  "AUDIT-317",
+  "AUDIT-318",
+  "AUDIT-320",
+  "AUDIT-321",
+  "AUDIT-322",
+  "AUDIT-323",
+  "AUDIT-324",
+  "AUDIT-325",
+  "AUDIT-326",
+  "AUDIT-327",
+  "AUDIT-329",
+  "AUDIT-330",
+  "AUDIT-331",
+  "AUDIT-332",
+  "AUDIT-333",
+  "AUDIT-334",
+  "AUDIT-335",
+  "AUDIT-337",
+]);
+
 export type AuditRuleIdIntegrityReport = Readonly<{
   ids: readonly string[];
   duplicateIds: readonly string[];
   invalidIds: readonly string[];
   outOfOrderIds: readonly string[];
   missingIds: readonly string[];
+  reintroducedRetiredIds: readonly string[];
   hasAudit420: boolean;
 }>;
 
 export function inspectAuditRuleIdIntegrity(
   rules: readonly { readonly id: string }[],
   minimumId = 1,
+  retiredIds: readonly string[] = RETIRED_AUDIT_RULE_IDS,
 ): AuditRuleIdIntegrityReport {
+  const retired = new Set(retiredIds);
   const auditIds = rules
     .map((rule) => rule.id)
     .filter((id) => id.startsWith("AUDIT-"));
@@ -96,7 +210,7 @@ export function inspectAuditRuleIdIntegrity(
     const presentIds = new Set(uniqueNumericIds);
 
     for (let value = minimumId; value <= highestId; value += 1) {
-      if (!presentIds.has(value)) {
+      if (!presentIds.has(value) && !retired.has(formatAuditRuleId(value))) {
         missingIds.push(formatAuditRuleId(value));
       }
     }
@@ -108,6 +222,9 @@ export function inspectAuditRuleIdIntegrity(
     invalidIds: Object.freeze([...invalidIds]),
     outOfOrderIds: Object.freeze([...outOfOrderIds]),
     missingIds: Object.freeze([...missingIds]),
+    reintroducedRetiredIds: Object.freeze(
+      auditIds.filter((id) => retired.has(id)),
+    ),
     hasAudit420: auditIds.includes("AUDIT-420"),
   });
 }
@@ -1758,7 +1875,7 @@ export const AUDIT_RULE_ID_SEQUENCE_RULE: AuditRule = {
   severity: "warning",
   title: "Audit rule ids are contiguous within the AUDIT prefix",
   description:
-    "AUDIT-prefixed rule ids should form a contiguous sequence without gaps, in the registered audit rule inventory.",
+    "AUDIT-prefixed rule ids should form a contiguous sequence without gaps, in the registered audit rule inventory, apart from explicitly retired ids that must never be reused.",
   check: () => {
     const registry = registeredAuditRulesForIntegrityCheck;
 
@@ -1776,6 +1893,7 @@ export const AUDIT_RULE_ID_SEQUENCE_RULE: AuditRule = {
       ...report.invalidIds.map((id) => `invalid: ${id}`),
       ...report.duplicateIds.map((id) => `duplicate: ${id}`),
       ...report.missingIds.map((id) => `missing: ${id}`),
+      ...report.reintroducedRetiredIds.map((id) => `retired id reused: ${id}`),
       ...(report.hasAudit420 ? [] : ["missing: AUDIT-420"]),
     ];
 
@@ -4459,7 +4577,7 @@ export const PROVIDER_MODULE_PRESENCE_RULE: AuditRule = {
   severity: "error",
   title: "Provider adapter module is present",
   description:
-    "The V10.2 provider contracts, static registry, selector, errors, and three stubs must be present.",
+    "The V10.2 provider contracts, static registry, selector, errors, and the Claude Code and Codex stubs must be present.",
   metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-090"] },
   check: () => {
     const files = [
@@ -4467,7 +4585,6 @@ export const PROVIDER_MODULE_PRESENCE_RULE: AuditRule = {
       "src/providers/errors.ts",
       "src/providers/registry.ts",
       "src/providers/selector.ts",
-      "src/providers/openclaw.ts",
       "src/providers/claude-code.ts",
       "src/providers/codex.ts",
     ];
@@ -4502,7 +4619,6 @@ export const PROVIDER_STATIC_REGISTRY_RULE: AuditRule = {
       [
         "createProviderRegistry",
         "Duplicate provider adapter id",
-        "OpenClawProviderAdapter",
         "ClaudeCodeProviderAdapter",
         "CodexProviderAdapter",
       ],
@@ -4566,11 +4682,10 @@ export const PROVIDER_STUBS_INERT_RULE: AuditRule = {
   severity: "error",
   title: "Provider adapters remain inert stubs",
   description:
-    "OpenClaw, Claude Code, and Codex adapters must only construct not-implemented plans in V10.2.",
+    "Claude Code and Codex adapters must only construct not-implemented plans in V10.2.",
   metadata: { ...PROVIDER_AUDIT_METADATA, dependsOn: ["AUDIT-091"] },
   check: () => {
     const files = [
-      "src/providers/openclaw.ts",
       "src/providers/claude-code.ts",
       "src/providers/codex.ts",
     ];
@@ -4608,7 +4723,6 @@ export const PROVIDER_NO_PROCESS_RULE: AuditRule = {
       "src/providers/support.ts",
       "src/providers/registry.ts",
       "src/providers/selector.ts",
-      "src/providers/openclaw.ts",
       "src/providers/claude-code.ts",
       "src/providers/codex.ts",
     ];
@@ -4653,7 +4767,6 @@ export const PROVIDER_NO_NETWORK_RULE: AuditRule = {
       "src/providers/support.ts",
       "src/providers/registry.ts",
       "src/providers/selector.ts",
-      "src/providers/openclaw.ts",
       "src/providers/claude-code.ts",
       "src/providers/codex.ts",
     ];
@@ -4693,7 +4806,6 @@ export const PROVIDER_NO_SECRET_LOADING_RULE: AuditRule = {
       "src/providers/support.ts",
       "src/providers/registry.ts",
       "src/providers/selector.ts",
-      "src/providers/openclaw.ts",
       "src/providers/claude-code.ts",
       "src/providers/codex.ts",
     ];
@@ -4809,7 +4921,6 @@ export const PROVIDER_DEPENDENCY_DIRECTION_RULE: AuditRule = {
       "src/providers/support.ts",
       "src/providers/registry.ts",
       "src/providers/selector.ts",
-      "src/providers/openclaw.ts",
       "src/providers/claude-code.ts",
       "src/providers/codex.ts",
     ];
@@ -5434,186 +5545,12 @@ function protocolContains(
       );
 }
 
-export const OPENCLAW_PROTOCOL_MODULE_RULE: AuditRule = openClawProtocolRule(
-  "AUDIT-123",
-  "OpenClaw protocol module is present",
-  "V10.4 must provide internal OpenClaw protocol types, registry, normalization, validation, diagnostics, and planning.",
-  ["AUDIT-122"],
-  (rule) => {
-    const files = [
-      "src/providers/openclaw/types.ts",
-      "src/providers/openclaw/protocol.ts",
-      "src/providers/openclaw/normalization.ts",
-      "src/providers/openclaw/validation.ts",
-      "src/providers/openclaw/diagnostics.ts",
-      "src/providers/openclaw/planning.ts",
-    ];
-    const missing = files.filter((path) => !existsSync(path));
-    return missing.length === 0
-      ? pass(rule, "OpenClaw protocol module is present.", files)
-      : fail(
-          rule,
-          "OpenClaw protocol module is incomplete.",
-          missing,
-          "Restore all V10.4 OpenClaw protocol modules.",
-        );
-  },
-);
-
-export const OPENCLAW_PROTOCOL_VERSION_RULE: AuditRule = openClawProtocolRule(
-  "AUDIT-124",
-  "OpenClaw protocol versions are typed and static",
-  "The internal planning schema must declare supported versions without environment or binary negotiation.",
-  ["AUDIT-123"],
-  (rule) =>
-    protocolContains(
-      rule,
-      "src/providers/openclaw/types.ts",
-      [
-        "OPENCLAW_PROTOCOL_VERSIONS",
-        "OpenClawProtocolVersion",
-        "loop-engine-openclaw-planning/v1",
-      ],
-      "OpenClaw protocol versions are typed and static.",
-    ),
-);
-
-export const OPENCLAW_PROTOCOL_OPERATION_RULE: AuditRule = openClawProtocolRule(
-  "AUDIT-125",
-  "OpenClaw operations are typed and static",
-  "Only a closed abstract operation registry justified by Loop Engine planning may be accepted.",
-  ["AUDIT-124"],
-  (rule) =>
-    protocolContains(
-      rule,
-      "src/providers/openclaw/protocol.ts",
-      ["OPENCLAW_OPERATION_REGISTRY", 'operation: "plan"', "executable: false"],
-      "OpenClaw operations are typed and static.",
-    ),
-);
-
-export const OPENCLAW_PROTOCOL_NORMALIZATION_RULE: AuditRule =
-  openClawProtocolRule(
-    "AUDIT-126",
-    "OpenClaw request normalization is deterministic",
-    "Normalization must derive a safe envelope from ProviderRequest without task content, process discovery, or timestamps.",
-    ["AUDIT-125"],
-    (rule) =>
-      protocolContains(
-        rule,
-        "src/providers/openclaw/normalization.ts",
-        [
-          "normalizeOpenClawRequest",
-          "taskId",
-          "correlationId",
-          "Object.freeze",
-        ],
-        "OpenClaw request normalization is deterministic.",
-      ),
-  );
-
-export const OPENCLAW_PROTOCOL_VALIDATION_RULE: AuditRule =
-  openClawProtocolRule(
-    "AUDIT-127",
-    "OpenClaw protocol validation is pure and structured",
-    "Validation must check versions, operations, identity, context, capabilities, permissions, runtime, and transport compatibility without throwing expected errors.",
-    ["AUDIT-126"],
-    (rule) =>
-      protocolContains(
-        rule,
-        "src/providers/openclaw/validation.ts",
-        [
-          "validateOpenClawProtocolRequest",
-          "OPENCLAW_PROTOCOL_VERSIONS",
-          "OPENCLAW_OPERATION_REGISTRY",
-          "openclaw_context_invalid",
-          "openclaw_permission_denied",
-        ],
-        "OpenClaw protocol validation is pure and structured.",
-      ),
-  );
-
-export const OPENCLAW_PROTOCOL_ERROR_RULE: AuditRule = openClawProtocolRule(
-  "AUDIT-128",
-  "OpenClaw protocol errors are typed and non-executing",
-  "Protocol errors require stable codes, safe details, and executionStarted false.",
-  ["AUDIT-127"],
-  (rule) =>
-    protocolContains(
-      rule,
-      "src/providers/openclaw/types.ts",
-      [
-        "OPENCLAW_PROTOCOL_ERROR_CODES",
-        "openclaw_executable_mapping_missing",
-        "executionStarted: false",
-      ],
-      "OpenClaw protocol errors are typed and non-executing.",
-    ),
-);
-
-export const OPENCLAW_PROTOCOL_DIAGNOSTIC_RULE: AuditRule =
-  openClawProtocolRule(
-    "AUDIT-129",
-    "OpenClaw diagnostics are structured and safe",
-    "Protocol diagnostics must identify validation outcomes without prompt, context, command, or secret content.",
-    ["AUDIT-128"],
-    (rule) =>
-      protocolContains(
-        rule,
-        "src/providers/openclaw/diagnostics.ts",
-        [
-          "OpenClawProtocolDiagnostic",
-          "validProtocolDiagnostic",
-          "diagnosticFromError",
-        ],
-        "OpenClaw diagnostics are structured and safe.",
-      ),
-  );
-
-export const OPENCLAW_PROTOCOL_NO_MAPPING_RULE: AuditRule =
-  openClawProtocolRule(
-    "AUDIT-130",
-    "OpenClaw has no executable mapping by default",
-    "A protocol-valid request must still expose an absent executable mapping in V10.4.",
-    ["AUDIT-129"],
-    (rule) =>
-      protocolContains(
-        rule,
-        "src/providers/openclaw/planning.ts",
-        [
-          'executableMapping: "absent"',
-          "openclaw_executable_mapping_missing",
-          "valid_non_executable",
-        ],
-        "OpenClaw has no executable mapping by default.",
-      ),
-  );
-
-export const OPENCLAW_PROTOCOL_INERT_PLAN_RULE: AuditRule =
-  openClawProtocolRule(
-    "AUDIT-131",
-    "OpenClaw Provider plans remain inert",
-    "The OpenClaw adapter may use protocol planning but must still return a non-ready ProviderExecutionPlan.",
-    ["AUDIT-130"],
-    (rule) =>
-      protocolContains(
-        rule,
-        "src/providers/openclaw.ts",
-        [
-          "createOpenClawProtocolPlan",
-          "createNotImplementedProviderPlan",
-          "openclawProtocol",
-        ],
-        "OpenClaw Provider plans remain inert.",
-      ),
-  );
-
 export const OPENCLAW_PROTOCOL_INVALID_PLAN_RULE: AuditRule =
   openClawProtocolRule(
     "AUDIT-132",
     "Invalid OpenClaw protocol plans cannot reach Transport",
     "Protocol-invalid and non-executable plans must contain no transport intent or direct transport resolution.",
-    ["AUDIT-131"],
+    [],
     (rule) => {
       const source = openClawProtocolSource("src/providers/openclaw.ts");
       return !/transports\/|resolveTransport|executeTransport|transportIntent:/.test(
@@ -5858,45 +5795,12 @@ export const OPENCLAW_PROTOCOL_OTHER_STUBS_RULE: AuditRule =
     },
   );
 
-export const OPENCLAW_PROTOCOL_POLICY_SEPARATION_RULE: AuditRule =
-  openClawProtocolRule(
-    "AUDIT-142",
-    "OpenClaw protocol validity remains separate from policy authorization",
-    "Protocol validation must not import policy resolution while the Provider adapter keeps restrictive policy support",
-    ["AUDIT-141"],
-    (rule) => {
-      const protocol = openClawProtocolSource(
-        "src/providers/openclaw/validation.ts",
-      );
-      const adapter = openClawProtocolSource("src/providers/openclaw.ts");
-      return !/isProviderAllowed|resolvePolicy/.test(protocol) &&
-        adapter.includes("isProviderAllowed")
-        ? pass(
-            rule,
-            "OpenClaw protocol validity remains separate from policy authorization.",
-            [
-              "src/providers/openclaw/validation.ts",
-              "src/providers/openclaw.ts",
-            ],
-          )
-        : fail(
-            rule,
-            "OpenClaw protocol and policy authorization are not separated.",
-            [
-              "src/providers/openclaw/validation.ts",
-              "src/providers/openclaw.ts",
-            ],
-            "Keep protocol validation pure and preserve Provider policy checks separately.",
-          );
-    },
-  );
-
 export const OPENCLAW_PROTOCOL_DEPENDENCY_RULE: AuditRule =
   openClawProtocolRule(
     "AUDIT-143",
     "OpenClaw protocol dependencies remain unidirectional",
     "Protocol modules may consume Provider/Runtime types but never Core, Transport, CLI, LoopRunner, reports, or audit",
-    ["AUDIT-142"],
+    [],
     (rule) => {
       const files = [
         "src/providers/openclaw/types.ts",
@@ -5926,31 +5830,12 @@ export const OPENCLAW_PROTOCOL_DEPENDENCY_RULE: AuditRule =
     },
   );
 
-export const OPENCLAW_PROTOCOL_ADAPTER_INTEGRATION_RULE: AuditRule =
-  openClawProtocolRule(
-    "AUDIT-144",
-    "OpenClaw adapter consumes the internal protocol only",
-    "The adapter must normalize and plan internally without direct Runtime or Transport execution",
-    ["AUDIT-143"],
-    (rule) =>
-      protocolContains(
-        rule,
-        "src/providers/openclaw.ts",
-        [
-          "normalizeOpenClawRequest",
-          "createOpenClawProtocolPlan",
-          "createNotImplementedProviderPlan",
-        ],
-        "OpenClaw adapter consumes the internal protocol only.",
-      ),
-  );
-
 export const OPENCLAW_PROTOCOL_NO_PUBLIC_REPORT_RULE: AuditRule =
   openClawProtocolRule(
     "AUDIT-145",
     "OpenClaw protocol does not change public reports",
     "Protocol design must remain internal and absent from report generators",
-    ["AUDIT-144"],
+    [],
     (rule) => {
       const files = [
         "src/core/reports.ts",
@@ -6018,104 +5903,6 @@ function mappingContains(
       );
 }
 
-export const EXECUTABLE_MAPPING_MODULE_RULE: AuditRule = executableMappingRule(
-  "AUDIT-146",
-  "Executable mapping module is present",
-  "V10.5 must expose the deterministic mapping contracts and Core integration helper.",
-  ["AUDIT-145"],
-  (rule) => {
-    const files = [
-      "src/providers/mapping/types.ts",
-      "src/providers/mapping/errors.ts",
-      "src/providers/mapping/registry.ts",
-      "src/providers/mapping/selector.ts",
-      "src/providers/mapping/validation.ts",
-      "src/providers/mapping/support.ts",
-      "src/providers/mapping/index.ts",
-      "src/providers/mapping/index.ts",
-      "src/core/mapping.ts",
-    ];
-    const missing = files.filter((path) => !existsSync(path));
-    return missing.length === 0
-      ? pass(rule, "Executable mapping module is present.", files)
-      : fail(
-          rule,
-          "Executable mapping module is incomplete.",
-          missing,
-          "Restore all V10.5 mapping modules.",
-        );
-  },
-);
-
-export const EXECUTABLE_MAPPING_REGISTRY_RULE: AuditRule =
-  executableMappingRule(
-    "AUDIT-147",
-    "Executable mapping registry is static and deterministic",
-    "Mapping registration must retain fixed declaration order without discovery or plugins.",
-    ["AUDIT-146"],
-    (rule) =>
-      mappingContains(
-        rule,
-        "src/providers/mapping/registry.ts",
-        [
-          "createExecutableMappingRegistry",
-          "EXECUTABLE_MAPPING_REGISTRY",
-          "OpenClawExecutableMapping",
-        ],
-        "Executable mapping registry is static and deterministic.",
-      ),
-  );
-
-export const EXECUTABLE_MAPPING_UNIQUENESS_RULE: AuditRule =
-  executableMappingRule(
-    "AUDIT-148",
-    "Executable mapping registry enforces unique identifiers",
-    "Mappings must be uniquely declared in the static registry.",
-    ["AUDIT-147"],
-    (rule) =>
-      mappingContains(
-        rule,
-        "src/providers/mapping/registry.ts",
-        ["createStaticRegistryEntries", "Duplicate executable mapping id"],
-        "Executable mapping registry enforces unique identifiers.",
-      ),
-  );
-
-export const EXECUTABLE_MAPPING_VALIDATION_RULE: AuditRule =
-  executableMappingRule(
-    "AUDIT-149",
-    "Executable mapping validation is explicit and structured",
-    "Validation must distinguish protocol, mapping, compatibility, and policy gates without execution.",
-    ["AUDIT-148"],
-    (rule) =>
-      mappingContains(
-        rule,
-        "src/providers/mapping/validation.ts",
-        [
-          "validateExecutableMapping",
-          "mapping_disabled",
-          "mapping_policy_denied",
-          "mapping_not_configured",
-        ],
-        "Executable mapping validation is explicit and structured.",
-      ),
-  );
-
-export const EXECUTABLE_MAPPING_DISABLED_DEFAULT_RULE: AuditRule =
-  executableMappingRule(
-    "AUDIT-150",
-    "Executable mappings are disabled by default",
-    "Registered mappings may not become enabled or configured implicitly.",
-    ["AUDIT-149"],
-    (rule) =>
-      mappingContains(
-        rule,
-        "src/providers/mapping/registry.ts",
-        ["enabled: false", "configured: false"],
-        "Executable mappings are disabled by default.",
-      ),
-  );
-
 function noExecutableMappingIoRule(
   id: string,
   title: string,
@@ -6153,7 +5940,7 @@ export const EXECUTABLE_MAPPING_NO_EXECUTION_RULE: AuditRule =
     "AUDIT-151",
     "Executable mapping never invokes a transport",
     "Mapping code may not construct, resolve, or invoke a transport execution path.",
-    ["AUDIT-150"],
+    [],
     [
       /createTransportRequest\s*\(/,
       /resolveTransport\s*\(/,
@@ -6236,44 +6023,12 @@ export const EXECUTABLE_MAPPING_LOOP_BOUNDARY_RULE: AuditRule =
           );
     },
   );
-export const EXECUTABLE_MAPPING_OPENCLAW_RULE: AuditRule =
-  executableMappingRule(
-    "AUDIT-157",
-    "OpenClaw executable mapping exists",
-    "The static registry must declare exactly the documented OpenClaw protocol compatibility.",
-    ["AUDIT-156"],
-    (rule) =>
-      mappingContains(
-        rule,
-        "src/providers/mapping/registry.ts",
-        [
-          "OpenClawExecutableMapping",
-          "loop-engine-openclaw-planning/v1",
-          'operation: "plan"',
-        ],
-        "OpenClaw executable mapping exists.",
-      ),
-  );
-export const EXECUTABLE_MAPPING_OPENCLAW_DISABLED_RULE: AuditRule =
-  executableMappingRule(
-    "AUDIT-158",
-    "OpenClaw executable mapping remains disabled",
-    "OpenClaw mapping must remain non-executable and unconfigured in V10.5.",
-    ["AUDIT-157"],
-    (rule) =>
-      mappingContains(
-        rule,
-        "src/providers/mapping/registry.ts",
-        ["enabled: false", "configured: false"],
-        "OpenClaw executable mapping remains disabled.",
-      ),
-  );
 export const EXECUTABLE_MAPPING_OTHER_PROVIDERS_RULE: AuditRule =
   executableMappingRule(
     "AUDIT-159",
     "Claude Code and Codex remain unmapped",
     "The V10.5 mapping registry must not register Claude Code or Codex mappings.",
-    ["AUDIT-158"],
+    [],
     (rule) => {
       const source = executableMappingSource(
         "src/providers/mapping/registry.ts",
@@ -6373,119 +6128,6 @@ function intentContains(
       );
 }
 
-export const TRANSPORT_INTENT_MODULE_RULE: AuditRule = transportIntentRule(
-  "AUDIT-161",
-  "Transport intent module is present",
-  "V10.6 must expose declarative intent contracts and Core-only helpers.",
-  ["AUDIT-160"],
-  (rule) => {
-    const files = [
-      "types.ts",
-      "errors.ts",
-      "registry.ts",
-      "selector.ts",
-      "validation.ts",
-      "support.ts",
-      "index.ts",
-    ]
-      .map((file) => `src/providers/intent/${file}`)
-      .concat("src/core/intent.ts");
-    const missing = files.filter((path) => !existsSync(path));
-    return missing.length === 0
-      ? pass(rule, "Transport intent module is present.", files)
-      : fail(
-          rule,
-          "Transport intent module is incomplete.",
-          missing,
-          "Restore all V10.6 intent modules.",
-        );
-  },
-);
-export const TRANSPORT_INTENT_CONTRACT_RULE: AuditRule = transportIntentRule(
-  "AUDIT-162",
-  "Transport intent contracts are typed and immutable",
-  "Intent contracts must model identity, requirements, policy, validation, resolution, and structured errors only.",
-  ["AUDIT-161"],
-  (rule) =>
-    intentContains(
-      rule,
-      "src/providers/intent/types.ts",
-      [
-        "TransportIntentId",
-        "TransportIntent",
-        "TransportIntentRequest",
-        "TransportIntentResult",
-        "TransportIntentValidation",
-        "TransportIntentPolicy",
-        "TransportIntentError",
-        "executionStarted: false",
-      ],
-      "Transport intent contracts are typed and immutable.",
-    ),
-);
-export const TRANSPORT_INTENT_REGISTRY_RULE: AuditRule = transportIntentRule(
-  "AUDIT-163",
-  "Transport intent registry is static and deterministic",
-  "Intent registration must use fixed declaration order without discovery or plugins.",
-  ["AUDIT-162"],
-  (rule) =>
-    intentContains(
-      rule,
-      "src/providers/intent/registry.ts",
-      [
-        "createTransportIntentRegistry",
-        "TRANSPORT_INTENT_REGISTRY",
-        "OpenClawTransportIntent",
-      ],
-      "Transport intent registry is static and deterministic.",
-    ),
-);
-export const TRANSPORT_INTENT_UNIQUENESS_RULE: AuditRule = transportIntentRule(
-  "AUDIT-164",
-  "Transport intent registry enforces unique identifiers",
-  "Intent identifiers must be unique in the static registry.",
-  ["AUDIT-163"],
-  (rule) =>
-    intentContains(
-      rule,
-      "src/providers/intent/registry.ts",
-      ["createStaticRegistryEntries", "Duplicate transport intent id"],
-      "Transport intent registry enforces unique identifiers.",
-    ),
-);
-export const TRANSPORT_INTENT_VALIDATION_RULE: AuditRule = transportIntentRule(
-  "AUDIT-165",
-  "Transport intent validation is explicit and structured",
-  "Validation must check provider, runtime, mapping, policy, capability, activity, and configuration without execution.",
-  ["AUDIT-164"],
-  (rule) =>
-    intentContains(
-      rule,
-      "src/providers/intent/validation.ts",
-      [
-        "validateTransportIntent",
-        "intent_disabled",
-        "intent_policy_denied",
-        "intent_not_configured",
-      ],
-      "Transport intent validation is explicit and structured.",
-    ),
-);
-export const TRANSPORT_INTENT_INACTIVE_DEFAULT_RULE: AuditRule =
-  transportIntentRule(
-    "AUDIT-166",
-    "Transport intents are inactive by default",
-    "Registered intents may not become active or configured implicitly.",
-    ["AUDIT-165"],
-    (rule) =>
-      intentContains(
-        rule,
-        "src/providers/intent/registry.ts",
-        ["active: false", "configured: false"],
-        "Transport intents are inactive by default.",
-      ),
-  );
-
 function noTransportIntentSurfaceRule(
   id: string,
   title: string,
@@ -6524,7 +6166,7 @@ export const TRANSPORT_INTENT_NO_COMMAND_RULE: AuditRule =
     "AUDIT-167",
     "Transport intent has no command metadata",
     "Intent code may not encode commands, arguments, flags, environments, or working directories.",
-    ["AUDIT-166"],
+    [],
     [
       /\bcommand\s*:/,
       /\bargs\s*:/,
@@ -6616,43 +6258,11 @@ export const TRANSPORT_INTENT_LOOP_BOUNDARY_RULE: AuditRule =
             "Keep intent out of LoopRunner.",
           ),
   );
-export const TRANSPORT_INTENT_OPENCLAW_RULE: AuditRule = transportIntentRule(
-  "AUDIT-174",
-  "OpenClaw transport intent exists",
-  "The static registry must declare the documented OpenClaw intent only.",
-  ["AUDIT-173"],
-  (rule) =>
-    intentContains(
-      rule,
-      "src/providers/intent/registry.ts",
-      [
-        "OpenClawTransportIntent",
-        'id: "openclaw-plan"',
-        'mappingId: "openclaw-planning"',
-        'transportId: "local-process"',
-      ],
-      "OpenClaw transport intent exists.",
-    ),
-);
-export const TRANSPORT_INTENT_OPENCLAW_INACTIVE_RULE: AuditRule =
-  transportIntentRule(
-    "AUDIT-175",
-    "OpenClaw transport intent remains inactive",
-    "OpenClaw intent must remain non-executable and unconfigured in V10.6.",
-    ["AUDIT-174"],
-    (rule) =>
-      intentContains(
-        rule,
-        "src/providers/intent/registry.ts",
-        ["active: false", "configured: false"],
-        "OpenClaw transport intent remains inactive.",
-      ),
-  );
 export const TRANSPORT_INTENT_DEPENDENCY_RULE: AuditRule = transportIntentRule(
   "AUDIT-176",
   "Transport intent dependencies remain unidirectional",
   "Intent modules may depend on Provider, mapping, policy, and transport contracts only, never upper layers or implementations.",
-  ["AUDIT-175"],
+  [],
   (rule) => {
     const files = [
       "types.ts",
@@ -6742,141 +6352,6 @@ const CAPABILITY_POLICY_FILES = [
   "index.ts",
 ].map((file) => `src/policy/${file}`);
 
-export const CAPABILITY_POLICY_MODULE_RULE: AuditRule = capabilityPolicyRule(
-  "AUDIT-177",
-  "Capability policy module is present",
-  "V10.7 must expose deterministic capability, policy, and authorization contracts with Core helpers.",
-  ["AUDIT-176"],
-  (rule) => {
-    const files = CAPABILITY_POLICY_FILES.concat("src/core/policy.ts");
-    const missing = files.filter((path) => !existsSync(path));
-    return missing.length === 0
-      ? pass(rule, "Capability policy module is present.", files)
-      : fail(
-          rule,
-          "Capability policy module is incomplete.",
-          missing,
-          "Restore all V10.7 policy modules.",
-        );
-  },
-);
-
-export const CAPABILITY_POLICY_CAPABILITY_REGISTRY_RULE: AuditRule =
-  capabilityPolicyRule(
-    "AUDIT-178",
-    "Capability registry is static and deterministic",
-    "Capability identifiers must come from a fixed immutable registry.",
-    ["AUDIT-177"],
-    (rule) =>
-      policyContains(
-        rule,
-        "src/policy/registry.ts",
-        ["CAPABILITY_REGISTRY", "AGENT_CAPABILITIES"],
-        "Capability registry is static and deterministic.",
-      ),
-  );
-
-export const CAPABILITY_POLICY_POLICY_REGISTRY_RULE: AuditRule =
-  capabilityPolicyRule(
-    "AUDIT-179",
-    "Policy registry is static and deterministic",
-    "Policy rules must use fixed declaration order and reject duplicate identifiers.",
-    ["AUDIT-178"],
-    (rule) =>
-      policyContains(
-        rule,
-        "src/policy/registry.ts",
-        [
-          "DEFAULT_DENY_POLICY",
-          "createPolicyRegistry",
-          "POLICY_REGISTRY",
-          "Duplicate policy id",
-        ],
-        "Policy registry is static and deterministic.",
-      ),
-  );
-
-export const CAPABILITY_POLICY_CONTRACT_RULE: AuditRule = capabilityPolicyRule(
-  "AUDIT-180",
-  "Authorization contracts are typed and immutable",
-  "Capability, policy, and authorization contracts must model a non-executing decision only.",
-  ["AUDIT-179"],
-  (rule) =>
-    policyContains(
-      rule,
-      "src/policy/types.ts",
-      [
-        "CapabilityId",
-        "CapabilityRequirement",
-        "CapabilitySet",
-        "CapabilityEvaluation",
-        "PolicyId",
-        "PolicyRule",
-        "PolicyDecision",
-        "AuthorizationDecision",
-        "AuthorizationStatus",
-        "AuthorizationSummary",
-        "executionStarted: false",
-      ],
-      "Authorization contracts are typed and immutable.",
-    ),
-);
-
-export const CAPABILITY_POLICY_EVALUATION_RULE: AuditRule =
-  capabilityPolicyRule(
-    "AUDIT-181",
-    "Authorization evaluation is explicit and deterministic",
-    "Evaluation must check compatibility, capabilities, permissions, activation, configuration, and policy without execution.",
-    ["AUDIT-180"],
-    (rule) =>
-      policyContains(
-        rule,
-        "src/policy/evaluation.ts",
-        [
-          "evaluateCapabilities",
-          "evaluatePolicies",
-          "evaluateAuthorization",
-          "mapping_disabled",
-          "intent_inactive",
-          "policy_denied",
-        ],
-        "Authorization evaluation is explicit and deterministic.",
-      ),
-  );
-
-export const CAPABILITY_POLICY_DEFAULT_DENY_RULE: AuditRule =
-  capabilityPolicyRule(
-    "AUDIT-182",
-    "Capability policy defaults to deny",
-    "The shipped policy rule must be disabled with empty allow-lists.",
-    ["AUDIT-181"],
-    (rule) =>
-      policyContains(
-        rule,
-        "src/policy/registry.ts",
-        [
-          "enabled: false",
-          "allowedProviders: Object.freeze([])",
-          "allowedTransports: Object.freeze([])",
-        ],
-        "Capability policy defaults to deny.",
-      ),
-  );
-
-export const CAPABILITY_POLICY_OPENCLAW_RULE: AuditRule = capabilityPolicyRule(
-  "AUDIT-183",
-  "OpenClaw remains not authorized",
-  "The disabled OpenClaw executable mapping must result in a non-authorized decision.",
-  ["AUDIT-182"],
-  (rule) =>
-    policyContains(
-      rule,
-      "src/policy/evaluation.ts",
-      ["not_authorized", "mapping_disabled"],
-      "OpenClaw remains not authorized.",
-    ),
-);
-
 function noCapabilityPolicySurfaceRule(
   id: string,
   title: string,
@@ -6906,7 +6381,7 @@ export const CAPABILITY_POLICY_NO_TRANSPORT_REQUEST_RULE: AuditRule =
     "AUDIT-184",
     "Capability policy has no transport request",
     "Policy code may not create, resolve, or execute a transport request.",
-    ["AUDIT-183"],
+    [],
     [
       /TransportRequest/,
       /createTransportRequest\s*\(/,
@@ -7063,148 +6538,6 @@ const AUTHORIZATION_CONFIGURATION_FILES = [
   "index.ts",
 ].map((file) => `src/authorization/${file}`);
 
-export const AUTHORIZATION_CONFIGURATION_MODULE_RULE: AuditRule =
-  authorizationConfigurationRule(
-    "AUDIT-191",
-    "Authorization configuration module is present",
-    "V10.8 must expose declarative configuration contracts and Core-only helpers.",
-    ["AUDIT-190"],
-    (rule) => {
-      const files = AUTHORIZATION_CONFIGURATION_FILES.concat(
-        "src/core/authorization.ts",
-      );
-      const missing = files.filter((path) => !existsSync(path));
-      return missing.length === 0
-        ? pass(rule, "Authorization configuration module is present.", files)
-        : fail(
-            rule,
-            "Authorization configuration module is incomplete.",
-            missing,
-            "Restore all V10.8 authorization configuration modules.",
-          );
-    },
-  );
-
-export const AUTHORIZATION_CONFIGURATION_REGISTRY_RULE: AuditRule =
-  authorizationConfigurationRule(
-    "AUDIT-192",
-    "Authorization configuration registry is static and deterministic",
-    "Configuration registration must use a fixed declaration order and unique identifiers.",
-    ["AUDIT-191"],
-    (rule) =>
-      authorizationConfigurationContains(
-        rule,
-        "src/authorization/registry.ts",
-        [
-          "OpenClawAuthorizationConfiguration",
-          "createAuthorizationConfigurationRegistry",
-          "AUTHORIZATION_CONFIGURATION_REGISTRY",
-          "Duplicate authorization configuration id",
-        ],
-        "Authorization configuration registry is static and deterministic.",
-      ),
-  );
-
-export const AUTHORIZATION_CONFIGURATION_CONTRACT_RULE: AuditRule =
-  authorizationConfigurationRule(
-    "AUDIT-193",
-    "Authorization configuration contracts are typed and immutable",
-    "Configuration contracts must describe reviewable identity and version requirements only.",
-    ["AUDIT-192"],
-    (rule) =>
-      authorizationConfigurationContains(
-        rule,
-        "src/authorization/types.ts",
-        [
-          "AuthorizationConfigurationId",
-          "AuthorizationConfiguration",
-          "AuthorizationConfigurationStatus",
-          "AuthorizationConfigurationMetadata",
-          "AuthorizationConfigurationRegistry",
-          "AuthorizationConfigurationSelection",
-          "AuthorizationConfigurationResolution",
-          "AuthorizationConfigurationValidation",
-          "AuthorizationConfigurationResult",
-          "AuthorizationConfigurationSummary",
-          "AuthorizationConfigurationRequirement",
-          "AuthorizationConfigurationPolicy",
-          "executionStarted: false",
-        ],
-        "Authorization configuration contracts are typed and immutable.",
-      ),
-  );
-
-export const AUTHORIZATION_CONFIGURATION_VALIDATION_RULE: AuditRule =
-  authorizationConfigurationRule(
-    "AUDIT-194",
-    "Authorization configuration validation is explicit",
-    "Validation must check decision, activation, policy, approval, and review without execution.",
-    ["AUDIT-193"],
-    (rule) =>
-      authorizationConfigurationContains(
-        rule,
-        "src/authorization/validation.ts",
-        [
-          "validateAuthorizationConfiguration",
-          "configuration_not_authorized",
-          "configuration_inactive",
-          "configuration_unapproved",
-          "configuration_review_required",
-        ],
-        "Authorization configuration validation is explicit.",
-      ),
-  );
-
-export const AUTHORIZATION_CONFIGURATION_DEFAULT_DENY_RULE: AuditRule =
-  authorizationConfigurationRule(
-    "AUDIT-195",
-    "Authorization configurations default to deny",
-    "The OpenClaw declaration must remain inactive, unapproved, and unconfigured.",
-    ["AUDIT-194"],
-    (rule) =>
-      authorizationConfigurationContains(
-        rule,
-        "src/authorization/registry.ts",
-        ["active: false", "approved: false", "configured: false"],
-        "Authorization configurations default to deny.",
-      ),
-  );
-
-export const AUTHORIZATION_CONFIGURATION_REVIEW_REQUIRED_RULE: AuditRule =
-  authorizationConfigurationRule(
-    "AUDIT-196",
-    "Authorization configuration requires review",
-    "The shipped configuration must require an explicit future review.",
-    ["AUDIT-195"],
-    (rule) =>
-      authorizationConfigurationContains(
-        rule,
-        "src/authorization/registry.ts",
-        ["reviewRequired: true"],
-        "Authorization configuration requires review.",
-      ),
-  );
-
-export const AUTHORIZATION_CONFIGURATION_OPENCLAW_RULE: AuditRule =
-  authorizationConfigurationRule(
-    "AUDIT-197",
-    "OpenClaw authorization configuration exists",
-    "The sole V10.8 configuration must describe OpenClaw review requirements only.",
-    ["AUDIT-196"],
-    (rule) =>
-      authorizationConfigurationContains(
-        rule,
-        "src/authorization/registry.ts",
-        [
-          "OpenClawAuthorizationConfiguration",
-          'id: "openclaw-plan-review"',
-          'mappingId: "openclaw-planning"',
-          'intentId: "openclaw-plan"',
-        ],
-        "OpenClaw authorization configuration exists.",
-      ),
-  );
-
 function noAuthorizationConfigurationSurfaceRule(
   id: string,
   title: string,
@@ -7242,7 +6575,7 @@ export const AUTHORIZATION_CONFIGURATION_NO_COMMAND_RULE: AuditRule =
     "AUDIT-198",
     "Authorization configuration has no command strings",
     "Configuration code may not carry commands, arguments, flags, environments, or process options.",
-    ["AUDIT-197"],
+    [],
     [
       /\bcommand\s*:/,
       /\bargs\s*:/,
@@ -7381,61 +6714,6 @@ const TRANSPORT_REQUEST_FILES = [
   "index.ts",
 ].map((file) => `src/transport-request/${file}`);
 
-export const TRANSPORT_REQUEST_MODULE_RULE: AuditRule = transportRequestRule(
-  "AUDIT-203",
-  "TransportRequest module is present",
-  "V11.1 must expose declarative TransportRequest contracts and Core-only helpers.",
-  ["AUDIT-202"],
-  (rule) => {
-    const files = TRANSPORT_REQUEST_FILES.concat(
-      "src/core/transport-request.ts",
-    );
-    const missing = files.filter((path) => !existsSync(path));
-    return missing.length === 0
-      ? pass(rule, "TransportRequest module is present.", files)
-      : fail(
-          rule,
-          "TransportRequest module is incomplete.",
-          missing,
-          "Restore all V11.1 TransportRequest modules.",
-        );
-  },
-);
-
-export const TRANSPORT_REQUEST_DECLARATIVE_RULE: AuditRule =
-  transportRequestRule(
-    "AUDIT-204",
-    "TransportRequest contracts are declarative",
-    "TransportRequest must reference validated Provider, mapping, authorization, runtime, transport, capability, and policy evidence only.",
-    ["AUDIT-203"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/transport-request/types.ts",
-        [
-          "TransportRequestId",
-          "TransportRequest",
-          "TransportRequestStatus",
-          "TransportRequestValidation",
-          "TransportRequestMetadata",
-          "TransportRequestCapabilityReference",
-          "TransportRequestRuntimeReference",
-          "TransportRequestTransportReference",
-          "TransportRequestPolicyReference",
-          "TransportRequestSummary",
-          "TransportRequestResult",
-          "TransportRequestError",
-          "TransportRequestErrorCode",
-          "active: false",
-          "dispatchable: false",
-          "executable: false",
-          "validationRequired: true",
-          "executionStarted: false",
-        ],
-        "TransportRequest contracts are declarative.",
-      ),
-  );
-
 function noTransportRequestSurfaceRule(
   id: string,
   title: string,
@@ -7468,7 +6746,7 @@ export const TRANSPORT_REQUEST_NO_EXECUTION_FIELDS_RULE: AuditRule =
     "AUDIT-205",
     "TransportRequest contains no execution fields",
     "TransportRequest may not encode execution payloads or dispatch state.",
-    ["AUDIT-204"],
+    [],
     [
       /\bexecute\s*:/,
       /\bdispatch\s*:/,
@@ -7611,72 +6889,12 @@ function noTransportRequestBuilderSurfaceRule(
   );
 }
 
-export const TRANSPORT_REQUEST_BUILDER_SINGLE_FACTORY_RULE: AuditRule =
-  transportRequestBuilderRule(
-    "AUDIT-210",
-    "Single TransportRequestBuilder exists",
-    "V11.2 must expose one builder module as the supported ProviderExecutionPlan to TransportRequest factory.",
-    ["AUDIT-209"],
-    (rule) => {
-      const files = TRANSPORT_REQUEST_BUILDER_FILES.concat(
-        "src/core/transport-request-builder.ts",
-      );
-      const missing = files.filter((path) => !existsSync(path));
-      if (missing.length > 0) {
-        return fail(
-          rule,
-          "TransportRequestBuilder module is incomplete.",
-          missing,
-          "Restore all V11.2 builder files.",
-        );
-      }
-      return transportRequestContains(
-        rule,
-        "src/transport-request/builder.ts",
-        [
-          "TransportRequestBuilder",
-          "TransportRequestBuilderResult",
-          "TransportRequestBuilderError",
-          "TransportRequestBuilderErrorCode",
-          "TransportRequestBuilderValidation",
-          "TransportRequestBuilderSummary",
-          "export const buildTransportRequest",
-        ],
-        "Single TransportRequestBuilder exists.",
-      );
-    },
-  );
-
-export const TRANSPORT_REQUEST_BUILDER_PURE_RULE: AuditRule =
-  transportRequestBuilderRule(
-    "AUDIT-211",
-    "TransportRequestBuilder is pure and deterministic",
-    "The builder must validate references and return structured data without resolving registries or invoking adapters.",
-    ["AUDIT-210"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/transport-request/builder-validation.ts",
-        [
-          "validateTransportRequestBuild",
-          "builder_invalid_plan",
-          "builder_invalid_authorization",
-          "builder_invalid_mapping",
-          "builder_invalid_intent",
-          "builder_invalid_runtime_reference",
-          "builder_invalid_transport_reference",
-          "builder_invalid_capability_reference",
-        ],
-        "TransportRequestBuilder validation is pure and deterministic.",
-      ),
-  );
-
 export const TRANSPORT_REQUEST_BUILDER_NO_RUNTIME_RULE: AuditRule =
   noTransportRequestBuilderSurfaceRule(
     "AUDIT-212",
     "TransportRequestBuilder has no Runtime dependency",
     "Builder code may reference Runtime identities through contracts only and must not consume RuntimeRequest or implementations.",
-    ["AUDIT-211"],
+    [],
     [
       /RuntimeRequest/,
       /RuntimeAdapter/,
@@ -7768,28 +6986,6 @@ export const TRANSPORT_REQUEST_BUILDER_NO_EXECUTION_RULE: AuditRule =
     ],
   );
 
-export const TRANSPORT_REQUEST_BUILDER_IMMUTABLE_OUTPUT_RULE: AuditRule =
-  transportRequestBuilderRule(
-    "AUDIT-217",
-    "TransportRequestBuilder returns immutable TransportRequest output",
-    "The builder must recursively freeze the TransportRequest and preserve non-execution status.",
-    ["AUDIT-216"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/transport-request/builder-support.ts",
-        [
-          "freezeTransportRequestValue",
-          'status: "validation_required"',
-          "active: false",
-          "dispatchable: false",
-          "executable: false",
-          "validationRequired: true",
-        ],
-        "TransportRequestBuilder returns immutable TransportRequest output.",
-      ),
-  );
-
 const EXECUTION_REVIEW_FILES = [
   "types.ts",
   "errors.ts",
@@ -7849,66 +7045,12 @@ function noExecutionReviewSurfaceRule(
   });
 }
 
-export const EXECUTION_REVIEW_GATE_SINGLE_RULE: AuditRule = executionReviewRule(
-  "AUDIT-218",
-  "Single ExecutionReviewGate exists",
-  "V11.3 must expose one review gate module as the supported TransportRequest review mechanism.",
-  ["AUDIT-217"],
-  (rule) => {
-    const files = EXECUTION_REVIEW_FILES.concat("src/core/review.ts");
-    const missing = files.filter((path) => !existsSync(path));
-    if (missing.length > 0) {
-      return fail(
-        rule,
-        "ExecutionReviewGate module is incomplete.",
-        missing,
-        "Restore all V11.3 review files.",
-      );
-    }
-    return transportRequestContains(
-      rule,
-      "src/review/review.ts",
-      [
-        "ExecutionReviewGate",
-        "reviewTransportRequest",
-        "ReviewedTransportRequest",
-        "TransportRequest",
-        "AuthorizationConfiguration",
-      ],
-      "Single ExecutionReviewGate exists.",
-    );
-  },
-);
-
-export const EXECUTION_REVIEW_GATE_PURE_RULE: AuditRule = executionReviewRule(
-  "AUDIT-219",
-  "ExecutionReviewGate is pure and deterministic",
-  "The review gate must validate references and return structured data without resolving registries or invoking adapters.",
-  ["AUDIT-218"],
-  (rule) =>
-    transportRequestContains(
-      rule,
-      "src/review/validation.ts",
-      [
-        "validateTransportReview",
-        "review_missing",
-        "review_required",
-        "review_incomplete",
-        "review_not_approved",
-        "review_version_mismatch",
-        "review_configuration_mismatch",
-        "review_policy_mismatch",
-      ],
-      "ExecutionReviewGate validation is pure and deterministic.",
-    ),
-);
-
 export const EXECUTION_REVIEW_GATE_NO_RUNTIME_RULE: AuditRule =
   noExecutionReviewSurfaceRule(
     "AUDIT-220",
     "ExecutionReviewGate has no Runtime dependency",
     "Review code may reference Runtime identities through contracts only and must not consume RuntimeRequest or implementations.",
-    ["AUDIT-219"],
+    [],
     [
       /RuntimeRequest/,
       /RuntimeAdapter/,
@@ -8001,28 +7143,6 @@ export const EXECUTION_REVIEW_GATE_NO_EXECUTION_RULE: AuditRule =
     ],
   );
 
-export const EXECUTION_REVIEW_GATE_IMMUTABLE_OUTPUT_RULE: AuditRule =
-  executionReviewRule(
-    "AUDIT-225",
-    "ExecutionReviewGate produces immutable ReviewedTransportRequest output",
-    "The review gate must recursively freeze ReviewedTransportRequest and preserve non-execution status.",
-    ["AUDIT-224"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/review/support.ts",
-        [
-          "freezeReviewValue",
-          'status: "not_approved"',
-          "approved: false",
-          "dispatchable: false",
-          "executable: false",
-          "handoffAllowed: false",
-        ],
-        "ExecutionReviewGate produces immutable ReviewedTransportRequest output.",
-      ),
-  );
-
 const APPROVAL_PROVENANCE_FILES = [
   "types.ts",
   "errors.ts",
@@ -8082,63 +7202,12 @@ function noApprovalProvenanceSurfaceRule(
   });
 }
 
-export const APPROVAL_PROVENANCE_MODULE_RULE: AuditRule =
-  approvalProvenanceRule(
-    "AUDIT-226",
-    "ApprovalProvenance module exists",
-    "V11.4 must expose immutable approval provenance contracts and Core integration.",
-    ["AUDIT-225"],
-    (rule) => {
-      const files = APPROVAL_PROVENANCE_FILES.concat("src/core/provenance.ts");
-      const missing = files.filter((path) => !existsSync(path));
-      if (missing.length > 0) {
-        return fail(
-          rule,
-          "ApprovalProvenance module is incomplete.",
-          missing,
-          "Restore all V11.4 provenance files.",
-        );
-      }
-      return pass(rule, "ApprovalProvenance module exists.", files);
-    },
-  );
-
-export const APPROVAL_PROVENANCE_IMMUTABLE_CONTRACT_RULE: AuditRule =
-  approvalProvenanceRule(
-    "AUDIT-227",
-    "ApprovalProvenance contracts are immutable",
-    "ApprovalProvenance must expose stable readonly contracts for evidence, scope, versions, summary, validation, result, and errors.",
-    ["AUDIT-226"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/provenance/types.ts",
-        [
-          "ApprovalProvenanceId",
-          "ApprovalProvenance",
-          "ApprovalProvenanceStatus",
-          "ApprovalProvenanceMetadata",
-          "ApprovalEvidence",
-          "ApprovalScope",
-          "ApprovalVersionSet",
-          "ApprovalSummary",
-          "ApprovalValidation",
-          "ApprovalResult",
-          "ApprovalError",
-          "ApprovalErrorCode",
-          "Readonly",
-          "executionStarted: false",
-        ],
-        "ApprovalProvenance contracts are immutable.",
-      ),
-  );
-
 export const APPROVAL_PROVENANCE_NO_EXECUTION_RULE: AuditRule =
   noApprovalProvenanceSurfaceRule(
     "AUDIT-228",
     "ApprovalProvenance has no execution",
     "Approval provenance may not create adapter requests, runtime requests, dispatch payloads, or executable metadata.",
-    ["AUDIT-227"],
+    [],
     [
       /TransportAdapterRequest/,
       /createTransportAdapterRequest/,
@@ -8217,28 +7286,6 @@ export const APPROVAL_PROVENANCE_NO_NETWORK_RULE: AuditRule =
     [/\bfetch\s*\(/, /node:(http|https|net|tls)/],
   );
 
-export const APPROVAL_PROVENANCE_REFERENCE_ONLY_RULE: AuditRule =
-  approvalProvenanceRule(
-    "AUDIT-233",
-    "ApprovalProvenance is reference-only",
-    "Approval provenance must remain pending, not approved, evidence-only, and tied to RFC version evidence.",
-    ["AUDIT-232"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/provenance/support.ts",
-        [
-          "OpenClawApprovalProvenanceFixture",
-          "reviewPending",
-          "approved: false",
-          "executionStarted: false",
-          "rfc-execution-architecture-v11",
-          "evidenceOnly",
-        ],
-        "ApprovalProvenance is reference-only.",
-      ),
-  );
-
 const HANDOFF_ELIGIBILITY_FILES = [
   "types.ts",
   "errors.ts",
@@ -8300,54 +7347,11 @@ function noHandoffEligibilitySurfaceRule(
   });
 }
 
-export const HANDOFF_ELIGIBILITY_MODULE_RULE: AuditRule =
-  handoffEligibilityRule(
-    "AUDIT-234",
-    "HandoffEligibility module exists",
-    "V11.5 must expose immutable handoff eligibility contracts and Core integration.",
-    ["AUDIT-233"],
-    (rule) => {
-      const files = HANDOFF_ELIGIBILITY_FILES.concat(
-        "src/core/handoff-eligibility.ts",
-      );
-      const missing = files.filter((path) => !existsSync(path));
-      if (missing.length > 0) {
-        return fail(
-          rule,
-          "HandoffEligibility module is incomplete.",
-          missing,
-          "Restore all V11.5 handoff eligibility files.",
-        );
-      }
-      return pass(rule, "HandoffEligibility module exists.", files);
-    },
-  );
-
-export const HANDOFF_ELIGIBILITY_SINGLE_EVALUATOR_RULE: AuditRule =
-  handoffEligibilityRule(
-    "AUDIT-235",
-    "Single HandoffEligibilityEvaluator exists",
-    "Handoff eligibility must be produced through one exported pure evaluator function.",
-    ["AUDIT-234"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/handoff-eligibility/evaluation.ts",
-        [
-          "HandoffEligibilityEvaluator",
-          "export const evaluateHandoffEligibility",
-          "ReviewedTransportRequest",
-          "ApprovalProvenance",
-        ],
-        "Single HandoffEligibilityEvaluator exists.",
-      ),
-  );
-
 export const HANDOFF_ELIGIBILITY_PURE_RULE: AuditRule = handoffEligibilityRule(
   "AUDIT-236",
   "HandoffEligibilityEvaluator is pure",
   "The evaluator must validate declarative evidence and return structured results without classes, dependency injection, registries, or implementations.",
-  ["AUDIT-235"],
+  [],
   (rule) => {
     const source = transportRequestSource(
       "src/handoff-eligibility/evaluation.ts",
@@ -8371,82 +7375,12 @@ export const HANDOFF_ELIGIBILITY_PURE_RULE: AuditRule = handoffEligibilityRule(
   },
 );
 
-export const HANDOFF_ELIGIBILITY_IMMUTABLE_CONTRACT_RULE: AuditRule =
-  handoffEligibilityRule(
-    "AUDIT-237",
-    "HandoffEligibility contracts are immutable",
-    "Handoff eligibility must expose readonly contracts for requirements, evidence, validation, summary, result, and errors.",
-    ["AUDIT-236"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/handoff-eligibility/types.ts",
-        [
-          "HandoffEligibilityId",
-          "HandoffEligibility",
-          "HandoffEligibilityStatus",
-          "HandoffEligibilityDecision",
-          "HandoffEligibilityReason",
-          "HandoffEligibilityRequirement",
-          "HandoffEligibilityEvidence",
-          "HandoffEligibilityMetadata",
-          "HandoffEligibilityValidation",
-          "HandoffEligibilitySummary",
-          "HandoffEligibilityResult",
-          "HandoffEligibilityError",
-          "HandoffEligibilityErrorCode",
-          "HandoffEligibilityEvaluator",
-          "Readonly",
-          "executionStarted: false",
-        ],
-        "HandoffEligibility contracts are immutable.",
-      ),
-  );
-
-export const HANDOFF_ELIGIBILITY_DEFAULT_DENY_RULE: AuditRule =
-  handoffEligibilityRule(
-    "AUDIT-238",
-    "HandoffEligibility defaults to not_eligible",
-    "Default eligibility must be pending, not eligible, not allowed, not dispatchable, and not executable.",
-    ["AUDIT-237"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/handoff-eligibility/support.ts",
-        [
-          "OpenClawHandoffEligibilityFixture",
-          'status: "pending"',
-          'decision: "not_eligible"',
-          "handoffAllowed: false",
-          "dispatchable: false",
-          "executable: false",
-          "executionStarted: false",
-        ],
-        "HandoffEligibility defaults to not_eligible.",
-      ),
-  );
-
-export const HANDOFF_ELIGIBILITY_NO_INFERRED_ELIGIBILITY_RULE: AuditRule =
-  handoffEligibilityRule(
-    "AUDIT-239",
-    "HandoffEligibility is never inferred from missing evidence",
-    "Missing or incomplete evidence must produce not_eligible or indeterminate, never eligible.",
-    ["AUDIT-238"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/handoff-eligibility/support.ts",
-        ["evidence_incomplete", "indeterminate", "unknown", "approval_absent"],
-        "HandoffEligibility is never inferred from missing evidence.",
-      ),
-  );
-
 export const HANDOFF_ELIGIBILITY_NO_RUNTIME_IMPL_RULE: AuditRule =
   noHandoffEligibilitySurfaceRule(
     "AUDIT-240",
     "HandoffEligibility has no Runtime implementation dependency",
     "Handoff eligibility may reference reviewed runtime identity only and must not consume Runtime implementations.",
-    ["AUDIT-239"],
+    [],
     [
       /RuntimeRequest/,
       /RuntimeAdapter/,
@@ -8599,185 +7533,6 @@ export const HANDOFF_ELIGIBILITY_NO_EXECUTION_DISPATCH_RULE: AuditRule =
     ],
   );
 
-const V11_CONSOLIDATION_FILES = [
-  "src/transport-request/support.ts",
-  "src/transport-request/errors.ts",
-  "src/transport-request/builder-errors.ts",
-  "src/review/support.ts",
-  "src/review/errors.ts",
-  "src/review/validation.ts",
-  "src/provenance/support.ts",
-  "src/provenance/errors.ts",
-  "src/handoff-eligibility/support.ts",
-  "src/handoff-eligibility/errors.ts",
-  "src/review-architecture/shared.ts",
-];
-
-const V11_CONSOLIDATION_AUDIT_METADATA = {
-  introducedIn: "V11.6",
-  tags: ["architecture", "execution"] as const,
-  stability: "stable" as const,
-};
-
-function v11ConsolidationRule(
-  id: string,
-  title: string,
-  description: string,
-  dependsOn: readonly string[],
-  check: (rule: AuditRule) => ReturnType<typeof pass>,
-): AuditRule {
-  const rule: AuditRule = {
-    id,
-    category: "architecture",
-    severity: "error",
-    title,
-    description,
-    metadata: { ...V11_CONSOLIDATION_AUDIT_METADATA, dependsOn },
-    check: () => check(rule),
-  };
-  return rule;
-}
-
-export const V11_CONSOLIDATION_SHARED_HELPERS_RULE: AuditRule =
-  v11ConsolidationRule(
-    "AUDIT-251",
-    "V11 declarative layers share technical helpers",
-    "TransportRequest, review, provenance, and eligibility modules should centralize duplicated immutable, metadata, diagnostic, validation, and summary mechanics.",
-    ["AUDIT-250"],
-    (rule) => {
-      const source = transportRequestSource(
-        "src/review-architecture/shared.ts",
-      );
-      const expectations = [
-        "freezeReviewArchitectureValue",
-        "readReviewArchitectureMetadataString",
-        "reviewArchitectureMetadataVersionCompatible",
-        "reviewArchitectureMetadataVersionMismatch",
-        "countReviewArchitectureItems",
-        "createReviewArchitectureError",
-        "diagnosticFromReviewArchitectureError",
-        "createReviewArchitectureValidation",
-      ];
-      const missing = expectations.filter((token) => !source.includes(token));
-      const consumers = V11_CONSOLIDATION_FILES.filter(
-        (path) =>
-          path !== "src/review-architecture/shared.ts" &&
-          !transportRequestSource(path).includes(
-            "../review-architecture/shared.js",
-          ),
-      );
-      const violations = missing
-        .map((token) => `src/review-architecture/shared.ts -> ${token}`)
-        .concat(consumers.map((path) => `${path} -> shared helper import`));
-      return violations.length === 0
-        ? pass(
-            rule,
-            "V11 declarative layers share technical helpers.",
-            V11_CONSOLIDATION_FILES,
-          )
-        : fail(
-            rule,
-            "V11 declarative helper consolidation is incomplete.",
-            violations,
-            "Keep common immutable, metadata, diagnostic, validation, and summary mechanics in src/review-architecture/shared.ts.",
-          );
-    },
-  );
-
-export const V11_CONSOLIDATION_DEPENDENCY_DIRECTION_RULE: AuditRule =
-  v11ConsolidationRule(
-    "AUDIT-252",
-    "V11 consolidation preserves dependency direction",
-    "Consolidated review architecture helpers and declarative modules must not import CLI, LoopRunner, Runtime, Transport, or Provider implementations.",
-    ["AUDIT-251"],
-    (rule) => {
-      const patterns = [
-        /from\s+["'][^"']*\/cli/,
-        /from\s+["'][^"']*\/commands\//,
-        /from\s+["'][^"']*\/loop\//,
-        /from\s+["'][^"']*\/runtime\/(local-process|registry|selector)/,
-        /from\s+["'][^"']*\/transports\/(local-process|registry|selector)/,
-        /from\s+["'][^"']*\/providers\/(openclaw|claude-code|codex|registry|selector)/,
-        /child_process/,
-        /node:child_process/,
-        /process\.env/,
-      ];
-      const violations = V11_CONSOLIDATION_FILES.flatMap((path) =>
-        patterns
-          .filter((pattern) => pattern.test(transportRequestSource(path)))
-          .map((pattern) => `${path}: ${pattern.source}`),
-      );
-      return violations.length === 0
-        ? pass(
-            rule,
-            "V11 consolidation preserves dependency direction.",
-            V11_CONSOLIDATION_FILES,
-          )
-        : fail(
-            rule,
-            "V11 consolidation imports an upper layer or concrete implementation.",
-            violations,
-            "Keep consolidated helpers and declarative modules below Core and away from concrete Runtime, Transport, and Provider implementations.",
-          );
-    },
-  );
-
-export const V11_CONSOLIDATION_MODULE_ISOLATION_RULE: AuditRule =
-  v11ConsolidationRule(
-    "AUDIT-253",
-    "V11 consolidation helper remains domain-neutral",
-    "The shared review architecture helper must remain a technical module and must not absorb TransportRequest, review, provenance, or eligibility responsibilities.",
-    ["AUDIT-252"],
-    (rule) => {
-      const shared = transportRequestSource(
-        "src/review-architecture/shared.ts",
-      );
-      const forbidden = [
-        /TransportRequest/,
-        /ExecutionReview/,
-        /ApprovalProvenance/,
-        /HandoffEligibility/,
-        /AuthorizationConfiguration/,
-        /ProviderExecutionPlan/,
-        /TransportAdapter/,
-        /RuntimeAdapter/,
-      ].filter((pattern) => pattern.test(shared));
-      const docs = transportRequestSource(
-        "docs/architecture/v11-consolidation.md",
-      );
-      const docTokens = [
-        "Responsibility matrix",
-        "Dependency matrix",
-        "Validation matrix",
-        "Ownership matrix",
-        "Security boundary",
-        "Execution boundary",
-        "Review boundary",
-      ];
-      const missingDocs = docTokens.filter((token) => !docs.includes(token));
-      const violations = forbidden
-        .map(
-          (pattern) => `src/review-architecture/shared.ts: ${pattern.source}`,
-        )
-        .concat(
-          missingDocs.map(
-            (token) => `docs/architecture/v11-consolidation.md -> ${token}`,
-          ),
-        );
-      return violations.length === 0
-        ? pass(rule, "V11 consolidation helper remains domain-neutral.", [
-            "src/review-architecture/shared.ts",
-            "docs/architecture/v11-consolidation.md",
-          ])
-        : fail(
-            rule,
-            "V11 consolidation helper absorbed domain responsibilities or docs are incomplete.",
-            violations,
-            "Keep shared helpers technical and document the V11 ownership boundaries.",
-          );
-    },
-  );
-
 const DISPATCH_DESCRIPTOR_FILES = [
   "types.ts",
   "errors.ts",
@@ -8837,81 +7592,12 @@ function noDispatchDescriptorSurfaceRule(
   });
 }
 
-export const DISPATCH_DESCRIPTOR_MODULE_RULE: AuditRule =
-  dispatchDescriptorRule(
-    "AUDIT-254",
-    "DispatchDescriptor module exists",
-    "V12.1 must expose a dedicated dispatch descriptor module and Core integration point.",
-    ["AUDIT-253"],
-    (rule) => {
-      const files = DISPATCH_DESCRIPTOR_FILES.concat("src/core/dispatch.ts");
-      const missing = files.filter((path) => !existsSync(path));
-      return missing.length === 0
-        ? pass(rule, "DispatchDescriptor module exists.", files)
-        : fail(
-            rule,
-            "DispatchDescriptor module files are missing.",
-            missing,
-            "Restore the V12.1 dispatch descriptor contracts and Core integration.",
-          );
-    },
-  );
-
-export const DISPATCH_DESCRIPTOR_IMMUTABLE_CONTRACT_RULE: AuditRule =
-  dispatchDescriptorRule(
-    "AUDIT-255",
-    "DispatchDescriptor contracts are immutable",
-    "DispatchDescriptor must expose readonly contracts for descriptor, evidence, validation, summary, result, errors, and builder.",
-    ["AUDIT-254"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/dispatch/types.ts",
-        [
-          "DispatchDescriptorId",
-          "DispatchDescriptor",
-          "DispatchDescriptorStatus",
-          "DispatchDescriptorMetadata",
-          "DispatchDescriptorEvidence",
-          "DispatchDescriptorValidation",
-          "DispatchDescriptorSummary",
-          "DispatchDescriptorResult",
-          "DispatchDescriptorError",
-          "DispatchDescriptorErrorCode",
-          "DispatchDescriptorBuilder",
-          "Readonly",
-          "executionStarted: false",
-        ],
-        "DispatchDescriptor contracts are immutable.",
-      ),
-  );
-
-export const DISPATCH_DESCRIPTOR_PURE_BUILDER_RULE: AuditRule =
-  dispatchDescriptorRule(
-    "AUDIT-256",
-    "DispatchDescriptor builder is pure",
-    "The descriptor builder must be a deterministic function over HandoffEligibilityResult and ExecutionAuthority only.",
-    ["AUDIT-255"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/dispatch/descriptor.ts",
-        [
-          "DispatchDescriptorBuilder",
-          "export const createDispatchDescriptor",
-          "HandoffEligibilityResult",
-          "ExecutionAuthority",
-        ],
-        "DispatchDescriptor builder is pure.",
-      ),
-  );
-
 export const DISPATCH_DESCRIPTOR_NO_RUNTIME_RULE: AuditRule =
   noDispatchDescriptorSurfaceRule(
     "AUDIT-257",
     "DispatchDescriptor has no Runtime dependency",
     "DispatchDescriptor may reference reviewed runtime contract versions but must not consume Runtime implementations.",
-    ["AUDIT-256"],
+    [],
     [
       /RuntimeAdapter/,
       /LocalProcessRuntime/,
@@ -9054,82 +7740,12 @@ function noBoundaryHandoffSurfaceRule(
   });
 }
 
-export const BOUNDARY_HANDOFF_MODULE_RULE: AuditRule = boundaryHandoffRule(
-  "AUDIT-263",
-  "BoundaryHandoff module exists",
-  "V12.3 must expose a dedicated boundary handoff module and Core integration point.",
-  ["AUDIT-262"],
-  (rule) => {
-    const files = BOUNDARY_HANDOFF_FILES.concat("src/core/boundary.ts");
-    const missing = files.filter((path) => !existsSync(path));
-    return missing.length === 0
-      ? pass(rule, "BoundaryHandoff module exists.", files)
-      : fail(
-          rule,
-          "BoundaryHandoff module files are missing.",
-          missing,
-          "Restore the V12.3 boundary handoff contracts and Core integration.",
-        );
-  },
-);
-
-export const BOUNDARY_HANDOFF_IMMUTABLE_CONTRACT_RULE: AuditRule =
-  boundaryHandoffRule(
-    "AUDIT-264",
-    "BoundaryHandoff contracts are immutable",
-    "BoundaryHandoff must expose readonly contracts for handoff, evidence, validation, summary, result, registry, selector, resolver, errors, and builder.",
-    ["AUDIT-263"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/boundary/types.ts",
-        [
-          "BoundaryHandoffId",
-          "BoundaryHandoff",
-          "BoundaryHandoffStatus",
-          "BoundaryHandoffMetadata",
-          "BoundaryHandoffEvidence",
-          "BoundaryHandoffValidation",
-          "BoundaryHandoffSummary",
-          "BoundaryHandoffResult",
-          "BoundaryHandoffSelection",
-          "BoundaryHandoffResolution",
-          "BoundaryHandoffRegistry",
-          "BoundaryHandoffBuilder",
-          "BoundaryHandoffError",
-          "BoundaryHandoffErrorCode",
-          "Readonly",
-          "executionStarted: false",
-        ],
-        "BoundaryHandoff contracts are immutable.",
-      ),
-  );
-
-export const BOUNDARY_HANDOFF_PURE_BUILDER_RULE: AuditRule =
-  boundaryHandoffRule(
-    "AUDIT-265",
-    "BoundaryHandoff builder is pure",
-    "The boundary handoff builder must be a deterministic function over DispatchDescriptorResult only.",
-    ["AUDIT-264"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/boundary/handoff.ts",
-        [
-          "BoundaryHandoffBuilder",
-          "export const createBoundaryHandoff",
-          "DispatchDescriptorResult",
-        ],
-        "BoundaryHandoff builder is pure.",
-      ),
-  );
-
 export const BOUNDARY_HANDOFF_NO_RUNTIME_RULE: AuditRule =
   noBoundaryHandoffSurfaceRule(
     "AUDIT-266",
     "BoundaryHandoff has no Runtime dependency",
     "BoundaryHandoff may reference reviewed runtime contract versions but must not consume Runtime implementations.",
-    ["AUDIT-265"],
+    [],
     [
       /RuntimeAdapter/,
       /LocalProcessRuntime/,
@@ -9220,30 +7836,6 @@ export const BOUNDARY_HANDOFF_NO_DISPATCH_RULE: AuditRule =
     ],
   );
 
-export const BOUNDARY_HANDOFF_DEFAULT_DENY_RULE: AuditRule =
-  boundaryHandoffRule(
-    "AUDIT-273",
-    "BoundaryHandoff defaults to deny",
-    "Every BoundaryHandoff must remain not ready, not accepted, not dispatchable, not executable, and execution-not-started.",
-    ["AUDIT-272"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/boundary/support.ts",
-        [
-          "OpenClawBoundaryHandoffFixture",
-          "ClaudeBoundaryHandoffFixture",
-          "CodexBoundaryHandoffFixture",
-          "ready: false",
-          "accepted: false",
-          "dispatchable: false",
-          "executable: false",
-          "executionStarted: false",
-        ],
-        "BoundaryHandoff defaults to deny.",
-      ),
-  );
-
 const EXECUTION_BOUNDARY_RFC_FILES = [
   "types.ts",
   "errors.ts",
@@ -9305,106 +7897,12 @@ function noExecutionBoundaryRfcSurfaceRule(
   });
 }
 
-export const EXECUTION_BOUNDARY_RFC_MODULE_RULE: AuditRule =
-  executionBoundaryRfcRule(
-    "AUDIT-274",
-    "ExecutionBoundaryRFC module exists",
-    "V12.4 must expose a dedicated execution boundary RFC module and Core integration point.",
-    ["AUDIT-273"],
-    (rule) => {
-      const files = EXECUTION_BOUNDARY_RFC_FILES.concat(
-        "src/core/boundary-rfc.ts",
-      );
-      const missing = files.filter((path) => !existsSync(path));
-      return missing.length === 0
-        ? pass(rule, "ExecutionBoundaryRFC module exists.", files)
-        : fail(
-            rule,
-            "ExecutionBoundaryRFC module files are missing.",
-            missing,
-            "Restore the V12.4 execution boundary RFC contracts and Core integration.",
-          );
-    },
-  );
-
-export const EXECUTION_BOUNDARY_RFC_IMMUTABLE_CONTRACT_RULE: AuditRule =
-  executionBoundaryRfcRule(
-    "AUDIT-275",
-    "ExecutionBoundaryRFC contracts are immutable",
-    "ExecutionBoundaryRFC must expose readonly contracts for invariants, requirements, constraints, evidence, validation, summary, result, evaluation, errors, and builder.",
-    ["AUDIT-274"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/boundary/rfc/types.ts",
-        [
-          "ExecutionBoundaryId",
-          "ExecutionBoundaryRFC",
-          "ExecutionBoundaryInvariant",
-          "ExecutionBoundaryRequirement",
-          "ExecutionBoundaryConstraint",
-          "ExecutionBoundaryValidation",
-          "ExecutionBoundaryEvidence",
-          "ExecutionBoundarySummary",
-          "ExecutionBoundaryResult",
-          "ExecutionBoundaryEvaluation",
-          "ExecutionBoundaryStatus",
-          "ExecutionBoundaryError",
-          "ExecutionBoundaryErrorCode",
-          "ExecutionBoundaryBuilder",
-          "Readonly",
-          "executionStarted: false",
-        ],
-        "ExecutionBoundaryRFC contracts are immutable.",
-      ),
-  );
-
-export const EXECUTION_BOUNDARY_RFC_PURE_BUILDER_RULE: AuditRule =
-  executionBoundaryRfcRule(
-    "AUDIT-276",
-    "ExecutionBoundaryRFC builder is pure",
-    "The RFC builder must be a deterministic function over BoundaryHandoffResult only.",
-    ["AUDIT-275"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/boundary/rfc/evaluation.ts",
-        [
-          "ExecutionBoundaryBuilder",
-          "export const createExecutionBoundaryRFC",
-          "BoundaryHandoffResult",
-        ],
-        "ExecutionBoundaryRFC builder is pure.",
-      ),
-  );
-
-export const EXECUTION_BOUNDARY_RFC_DETERMINISTIC_VALIDATION_RULE: AuditRule =
-  executionBoundaryRfcRule(
-    "AUDIT-277",
-    "ExecutionBoundaryRFC validation is deterministic",
-    "Validation must inspect declarative handoff evidence and RFC invariants without side effects.",
-    ["AUDIT-276"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/boundary/rfc/validation.ts",
-        [
-          "validateExecutionBoundaryInput",
-          "validateExecutionBoundaryRFC",
-          "boundary_invariant_failed",
-          "boundary_evidence_missing",
-          "boundary_not_ready",
-        ],
-        "ExecutionBoundaryRFC validation is deterministic.",
-      ),
-  );
-
 export const EXECUTION_BOUNDARY_RFC_NO_RUNTIME_RULE: AuditRule =
   noExecutionBoundaryRfcSurfaceRule(
     "AUDIT-278",
     "ExecutionBoundaryRFC has no Runtime dependency",
     "ExecutionBoundaryRFC may reference runtime contract versions but must not consume Runtime implementations.",
-    ["AUDIT-277"],
+    [],
     [
       /RuntimeAdapter/,
       /LocalProcessRuntime/,
@@ -9495,32 +7993,6 @@ export const EXECUTION_BOUNDARY_RFC_NO_DISPATCH_RULE: AuditRule =
     ],
   );
 
-export const EXECUTION_BOUNDARY_RFC_INVARIANT_FAMILIES_RULE: AuditRule =
-  executionBoundaryRfcRule(
-    "AUDIT-285",
-    "ExecutionBoundaryRFC invariant families are complete",
-    "The RFC contract must model authority, eligibility, descriptor, boundary, evidence, policy, review, configuration, transport isolation, and runtime isolation invariants.",
-    ["AUDIT-284"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/boundary/rfc/types.ts",
-        [
-          "authority",
-          "eligibility",
-          "descriptor",
-          "boundary",
-          "evidence",
-          "policy",
-          "review",
-          "configuration",
-          "transport_isolation",
-          "runtime_isolation",
-        ],
-        "ExecutionBoundaryRFC invariant families are complete.",
-      ),
-  );
-
 const EXECUTION_ARCHITECTURE_RFC_PATH =
   "docs/architecture/execution-architecture-rfc.md";
 
@@ -9576,7 +8048,7 @@ export const EXECUTION_ARCHITECTURE_RFC_EXISTS_RULE: AuditRule =
     "architecture",
     "Execution architecture RFC exists",
     "V13.0 must publish the normative execution architecture RFC.",
-    ["AUDIT-285"],
+    [],
     ["# Execution Architecture RFC", "## Status and normative language"],
   );
 
@@ -9808,78 +8280,14 @@ function noOperatorApprovalRfcSurfaceRule(
   });
 }
 
-export const OPERATOR_APPROVAL_RFC_MODULE_RULE: AuditRule =
-  operatorApprovalRfcRule(
-    "AUDIT-294",
-    "architecture",
-    "OperatorApprovalRFC module exists",
-    "V13.1 must expose the operator approval RFC contracts and Core integration point.",
-    ["AUDIT-293"],
-    (rule) => {
-      const files = OPERATOR_APPROVAL_RFC_FILES.concat("src/core/operator-approval.ts");
-      const missing = files.filter((path) => !existsSync(path));
-      return missing.length === 0
-        ? pass(rule, "OperatorApprovalRFC module exists.", files)
-        : fail(rule, "OperatorApprovalRFC module files are missing.", missing, "Restore the V13.1 operator approval RFC contracts.");
-    },
-  );
-
 export const OPERATOR_APPROVAL_RFC_LIFECYCLE_RULE: AuditRule =
   operatorApprovalRfcDocumentRule(
     "AUDIT-295",
     "docs",
     "Operator approval RFC documents the lifecycle",
     "The RFC must document every operator approval lifecycle state and transition.",
-    ["AUDIT-294"],
+    [],
     ["## Lifecycle and state machine", "draft", "submitted", "under_review", "approved", "rejected", "expired", "revoked", "superseded"],
-  );
-
-export const OPERATOR_APPROVAL_RFC_STATE_MACHINE_RULE: AuditRule =
-  operatorApprovalRfcRule(
-    "AUDIT-296",
-    "architecture",
-    "Operator approval state machine is explicit",
-    "OperatorApprovalRFC must expose stable states and validate explicit transitions.",
-    ["AUDIT-295"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/authority/rfc/types.ts",
-        ["OPERATOR_APPROVAL_STATES", "OperatorApprovalState", "draft", "submitted", "under_review", "approved", "rejected", "expired", "revoked", "superseded"],
-        "Operator approval state machine is explicit.",
-      ),
-  );
-
-export const OPERATOR_APPROVAL_RFC_REVIEW_MODEL_RULE: AuditRule =
-  operatorApprovalRfcRule(
-    "AUDIT-297",
-    "architecture",
-    "Operator approval review model is traceable",
-    "The review contract must record reviewer, timestamp, scope, version, evidence, expiry policy, and revocation reason.",
-    ["AUDIT-296"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/authority/rfc/types.ts",
-        ["OperatorApprovalReview", "reviewerId", "reviewedAt", "approvalScope", "approvalVersion", "evidenceReferences", "expiryPolicy", "revocationReason"],
-        "Operator approval review model is traceable.",
-      ),
-  );
-
-export const OPERATOR_APPROVAL_RFC_VALIDATION_RULE: AuditRule =
-  operatorApprovalRfcRule(
-    "AUDIT-298",
-    "architecture",
-    "Operator approval validation is deterministic",
-    "Validation must check evidence, scope, version, review completeness, transition, expiry, and revocation without side effects.",
-    ["AUDIT-297"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/authority/rfc/validation.ts",
-        ["validateOperatorApprovalInput", "validateOperatorApprovalRFC", "operator_approval_transition_invalid", "operator_approval_expired", "operator_approval_revoked"],
-        "Operator approval validation is deterministic.",
-      ),
   );
 
 export const OPERATOR_APPROVAL_RFC_SECURITY_RULE: AuditRule =
@@ -9888,24 +8296,8 @@ export const OPERATOR_APPROVAL_RFC_SECURITY_RULE: AuditRule =
     "docs",
     "Operator approval RFC documents security guarantees",
     "The RFC must document default deny, explicit approval, immutable evidence, review traceability, revocation traceability, and expiry enforcement.",
-    ["AUDIT-298"],
+    [],
     ["## Security guarantees", "default deny", "explicit approval", "immutable approvals", "review traceability", "revocation traceability", "expiry enforcement"],
-  );
-
-export const OPERATOR_APPROVAL_RFC_DEFAULT_DENY_RULE: AuditRule =
-  operatorApprovalRfcRule(
-    "AUDIT-300",
-    "architecture",
-    "Operator approval defaults to deny",
-    "Every operator approval result must keep approval-derived execution disabled and not started.",
-    ["AUDIT-299"],
-    (rule) =>
-      transportRequestContains(
-        rule,
-        "src/authority/rfc/types.ts",
-        ["approved: boolean", "revoked: boolean", "expired: boolean", "executionAllowed: false", "executionStarted: false"],
-        "Operator approval defaults to deny.",
-      ),
   );
 
 export const OPERATOR_APPROVAL_RFC_NO_EXECUTION_RULE: AuditRule =
@@ -9913,7 +8305,7 @@ export const OPERATOR_APPROVAL_RFC_NO_EXECUTION_RULE: AuditRule =
     "AUDIT-301",
     "OperatorApprovalRFC has no execution surface",
     "OperatorApprovalRFC must not depend on runtime, transport, provider, process, filesystem, network, or operational request layers.",
-    ["AUDIT-300"],
+    [],
     [
       /RuntimeRequest/,
       /TransportRequest/,
@@ -9950,53 +8342,24 @@ function noAuthorityVerificationRfcSurfaceRule(id: string, title: string, depend
     return violations.length === 0 ? pass(rule, title + ".", files) : fail(rule, title + ".", violations, "Keep verification pure, declarative, and implementation-isolated.");
   });
 }
-export const AUTHORITY_VERIFICATION_RFC_MODULE_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-302", "architecture", "Authority Verification RFC module exists", "V13.2 must expose verification contracts and the Core integration point.", ["AUDIT-301"], (rule) => { const files = AUTHORITY_VERIFICATION_RFC_FILES.concat("src/core/authority-verification.ts"); const missing = files.filter((path) => !existsSync(path)); return missing.length === 0 ? pass(rule, "Authority Verification RFC module exists.", files) : fail(rule, "Authority Verification RFC module files are missing.", missing, "Restore the V13.2 verification contracts."); });
-export const AUTHORITY_VERIFICATION_RFC_DOCUMENT_RULE: AuditRule = authorityVerificationRfcDocumentRule("AUDIT-303", "Authority Verification RFC documents purpose, lifecycle, and default deny", ["AUDIT-302"], ["# Authority Verification RFC", "## 1. Purpose", "## 5. Lifecycle", "## 9. Default deny and security guarantees", "Verification is consistency assessment"]);
-export const AUTHORITY_VERIFICATION_RFC_CONTRACT_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-304", "architecture", "Authority verification contracts are immutable and deterministic", "Contracts must expose immutable verification state, context, subject, checks, evidence, result and denied execution flags.", ["AUDIT-303"], (rule) => transportRequestContains(rule, "src/authority/verification/types.ts", ["AuthorityVerificationRFC", "AuthorityVerificationContext", "AuthorityVerificationSubject", "AuthorityVerificationCheck", "AuthorityVerificationEvidence", "AuthorityVerificationResult", "executionAllowed: false", "executionStarted: false"], "Authority verification contracts are immutable and deterministic."));
-export const AUTHORITY_VERIFICATION_RFC_CHECKS_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-305", "architecture", "Authority verification evaluates complete governance checks", "Checks must cover authority, approval, scope, versions, references, capabilities, policy, evidence, validity, revocation and supersession.", ["AUDIT-304"], (rule) => transportRequestContains(rule, "src/authority/verification/evaluation.ts", ["authority_active", "approval_lifecycle_state", "approval_scope_consistent", "authority_version_consistent", "approval_version_consistent", "provider_consistent", "protocol_consistent", "mapping_consistent", "intent_consistent", "runtime_capability_consistent", "transport_capability_consistent", "policy_consistent", "evidence_complete", "valid_from_enforced", "expiry_enforced", "revocation_enforced", "supersession_enforced"], "Authority verification evaluates complete governance checks."));
-export const AUTHORITY_VERIFICATION_RFC_TIME_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-306", "architecture", "Authority verification uses explicit time only", "Verification must consume supplied time and never read an ambient clock.", ["AUDIT-305"], (rule) => transportRequestContains(rule, "src/authority/verification/types.ts", ["verificationAt: string", "validFrom?: string", "expiresAt?: string", "revokedAt?: string"], "Authority verification uses explicit time only."));
-export const AUTHORITY_VERIFICATION_RFC_DIAGNOSTICS_RULE: AuditRule = authorityVerificationRfcRule("AUDIT-307", "architecture", "Authority verification emits safe deterministic diagnostics", "Errors must be stable, safe, and non-starting.", ["AUDIT-306"], (rule) => transportRequestContains(rule, "src/authority/verification/types.ts", ["AuthorityVerificationErrorCode", "verification_input_missing", "verification_unsupported", "executionAllowed: false", "executionStarted: false"], "Authority verification emits safe deterministic diagnostics."));
-export const AUTHORITY_VERIFICATION_RFC_DEFAULT_DENY_RULE: AuditRule = authorityVerificationRfcDocumentRule("AUDIT-308", "Authority verification documents non-authorizing default deny", ["AUDIT-307"], ["not verified", "MUST NOT be considered authorization", "executionAllowed: false", "executionStarted: false"]);
+export const AUTHORITY_VERIFICATION_RFC_DOCUMENT_RULE: AuditRule = authorityVerificationRfcDocumentRule("AUDIT-303", "Authority Verification RFC documents purpose, lifecycle, and default deny", [], ["# Authority Verification RFC", "## 1. Purpose", "## 5. Lifecycle", "## 9. Default deny and security guarantees", "Verification is consistency assessment"]);
+export const AUTHORITY_VERIFICATION_RFC_DEFAULT_DENY_RULE: AuditRule = authorityVerificationRfcDocumentRule("AUDIT-308", "Authority verification documents non-authorizing default deny", [], ["not verified", "MUST NOT be considered authorization", "executionAllowed: false", "executionStarted: false"]);
 export const AUTHORITY_VERIFICATION_RFC_NO_EXECUTION_RULE: AuditRule = noAuthorityVerificationRfcSurfaceRule("AUDIT-309", "Authority Verification RFC has no operational surface", ["AUDIT-308"]);
 
 const AUTHORITY_LIFECYCLE_FILES = ["types.ts", "errors.ts", "validation.ts", "evaluation.ts", "support.ts", "index.ts"].map((file) => `src/authority/lifecycle/${file}`);
-function authorityLifecycleRule(id: string, category: AuditRule["category"], title: string, tokens: readonly string[], file: string): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description: "V13.3 lifecycle RFC must remain declarative, deterministic, and default-denied.", metadata: { introducedIn: "V13.3", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: id === "AUDIT-310" ? ["AUDIT-309"] : [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const content = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !content.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required V13.3 lifecycle evidence.") : pass(rule, title + ".", tokens); } }; return rule; }
-export const AUTHORITY_LIFECYCLE_RFC_MODULE_RULE: AuditRule = authorityLifecycleRule("AUDIT-310", "architecture", "Authority lifecycle module exists", ["AuthorityLifecycleId", "AuthorityLifecycleRFC"], "src/authority/lifecycle/types.ts");
-export const AUTHORITY_LIFECYCLE_RFC_CONTRACT_RULE: AuditRule = authorityLifecycleRule("AUDIT-311", "architecture", "Authority lifecycle contracts are immutable and default denied", ["AuthorityLifecycleRFC", "AuthorityLifecycleEvent", "AuthorityLifecycleState", "executionAllowed: false", "executionStarted: false"], "src/authority/lifecycle/types.ts");
-export const AUTHORITY_LIFECYCLE_RFC_EVALUATION_RULE: AuditRule = authorityLifecycleRule("AUDIT-312", "architecture", "Authority lifecycle evaluates expiry, revocation, supersession, replacement and active state", ["expired", "revoked", "superseded", "replaced", "not_yet_valid", "active"], "src/authority/lifecycle/evaluation.ts");
+function authorityLifecycleRule(id: string, category: AuditRule["category"], title: string, tokens: readonly string[], file: string): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description: "V13.3 lifecycle RFC must remain declarative, deterministic, and default-denied.", metadata: { introducedIn: "V13.3", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [] }, check: () => { const content = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !content.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required V13.3 lifecycle evidence.") : pass(rule, title + ".", tokens); } }; return rule; }
 export const AUTHORITY_LIFECYCLE_RFC_DOCUMENT_RULE: AuditRule = authorityLifecycleRule("AUDIT-313", "docs", "Revocation and expiry RFC documents lifecycle semantics and security", ["Revocation & Expiry Lifecycle RFC", "Expiry is a time-based", "Revocation is an explicit", "`active` does not mean approved", "executionAllowed: false"], "docs/architecture/revocation-expiry-rfc.md");
 
-function bridgeContractRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.4", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required V13.4 bridge contract invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
-export const BRIDGE_CONTRACT_MODULE_RULE: AuditRule = bridgeContractRule("AUDIT-314", "architecture", "Bridge contract module exists", "Bridge Contract must expose declarative contracts and Core integration.", "src/bridge/contract/types.ts", ["BridgeContractRFC", "BridgeContractInput"]);
-export const BRIDGE_CONTRACT_IMMUTABLE_RULE: AuditRule = bridgeContractRule("AUDIT-315", "architecture", "Bridge contract contracts are immutable and default denied", "Bridge Contract must retain denied execution flags.", "src/bridge/contract/types.ts", ["executionAllowed: false", "executionStarted: false"]);
-export const BRIDGE_CONTRACT_VALIDATION_RULE: AuditRule = bridgeContractRule("AUDIT-316", "architecture", "Bridge contract validates governance consistency", "Bridge Contract must validate lifecycle, policy, references and evidence.", "src/bridge/contract/validation.ts", ["bridge_lifecycle_inactive", "bridge_reference_inconsistent", "bridge_evidence_incomplete"]);
-export const BRIDGE_CONTRACT_TIME_RULE: AuditRule = bridgeContractRule("AUDIT-317", "architecture", "Bridge contract uses explicit time only", "Bridge Contract must require a supplied evaluation timestamp.", "src/bridge/contract/types.ts", ["evaluationAt: string"]);
-export const BRIDGE_CONTRACT_DIAGNOSTICS_RULE: AuditRule = bridgeContractRule("AUDIT-318", "architecture", "Bridge contract emits deterministic diagnostics", "Bridge Contract diagnostics must be stable and safe.", "src/bridge/contract/types.ts", ["BridgeContractErrorCode", "bridge_not_eligible"]);
+function bridgeContractRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.4", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required V13.4 bridge contract invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
 export const BRIDGE_CONTRACT_DOCUMENT_RULE: AuditRule = bridgeContractRule("AUDIT-319", "docs", "Bridge Contract RFC documents non-operational semantics", "The RFC must state that it cannot authorize or execute.", "docs/architecture/bridge-contract-rfc.md", ["not authorization", "not execution", "executionAllowed` remains false", "executionStarted` remains false"]);
-export const BRIDGE_CONTRACT_NO_SURFACE_RULE: AuditRule = bridgeContractRule("AUDIT-320", "architecture", "Bridge Contract RFC has no executable surface", "The contract must not expose operational primitives.", "src/bridge/contract/evaluation.ts", ["non_operational", "Bridge contract never authorizes execution"]);
 
-function bridgeRequestRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.5", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required Bridge Request invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
-export const BRIDGE_REQUEST_MODULE_RULE: AuditRule = bridgeRequestRule("AUDIT-321", "architecture", "Bridge Request module exists", "Bridge Request must expose declarative contracts.", "src/bridge/request/types.ts", ["BridgeRequestInput", "BridgeRequestResult"]);
-export const BRIDGE_REQUEST_IMMUTABLE_RULE: AuditRule = bridgeRequestRule("AUDIT-322", "architecture", "Bridge Request contracts are immutable and default denied", "Bridge Request must preserve denied execution flags.", "src/bridge/request/types.ts", ["executionAllowed: false", "executionStarted: false"]);
-export const BRIDGE_REQUEST_CONTRACT_RULE: AuditRule = bridgeRequestRule("AUDIT-323", "architecture", "Bridge Request requires eligible Bridge Contract", "Bridge Request must require explicit eligible contract evidence.", "src/bridge/request/validation.ts", ["bridge_request_contract_not_eligible"]);
-export const BRIDGE_REQUEST_VALIDATION_RULE: AuditRule = bridgeRequestRule("AUDIT-324", "architecture", "Bridge Request validates governance consistency", "Bridge Request must validate lifecycle and governance references.", "src/bridge/request/validation.ts", ["bridge_request_lifecycle_inactive"]);
-export const BRIDGE_REQUEST_TIME_RULE: AuditRule = bridgeRequestRule("AUDIT-325", "architecture", "Bridge Request uses explicit identifiers and time", "Bridge Request must use caller-supplied id and time.", "src/bridge/request/types.ts", ["createdAt: string", "id: BridgeRequestId"]);
-export const BRIDGE_REQUEST_PAYLOAD_RULE: AuditRule = bridgeRequestRule("AUDIT-326", "architecture", "Bridge Request payload is inert", "Bridge Request payload must reject operational fields.", "src/bridge/request/validation.ts", ["bridge_request_payload_operational"]);
-export const BRIDGE_REQUEST_DIAGNOSTICS_RULE: AuditRule = bridgeRequestRule("AUDIT-327", "architecture", "Bridge Request diagnostics are deterministic", "Bridge Request diagnostics must be safe and stable.", "src/bridge/request/types.ts", ["BridgeRequestErrorCode"]);
+function bridgeRequestRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.5", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required Bridge Request invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
 export const BRIDGE_REQUEST_DOCUMENT_RULE: AuditRule = bridgeRequestRule("AUDIT-328", "docs", "Bridge Request RFC documents non-authorizing semantics", "RFC must describe a non-operational default-deny request.", "docs/architecture/bridge-request-rfc.md", ["not authorization", "not execution", "executionAllowed` remains false"]);
-export const BRIDGE_REQUEST_NO_SURFACE_RULE: AuditRule = bridgeRequestRule("AUDIT-329", "architecture", "Bridge Request RFC has no operational surface", "Bridge Request must not invoke operational layers.", "src/bridge/request/evaluation.ts", ["Bridge request never authorizes execution"]);
 
-function executionBridgeRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.6", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required Execution Bridge invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
-export const EXECUTION_BRIDGE_MODULE_RULE: AuditRule = executionBridgeRule("AUDIT-330", "architecture", "Execution Bridge module exists", "Execution Bridge must expose declarative contracts.", "src/bridge/execution/types.ts", ["ExecutionBridgeInput", "ExecutionBridgeResult"]);
-export const EXECUTION_BRIDGE_IMMUTABLE_RULE: AuditRule = executionBridgeRule("AUDIT-331", "architecture", "Execution Bridge contracts are immutable and default denied", "Execution Bridge must preserve denied execution flags.", "src/bridge/execution/types.ts", ["executionAllowed: false", "executionStarted: false"]);
-export const EXECUTION_BRIDGE_REQUEST_RULE: AuditRule = executionBridgeRule("AUDIT-332", "architecture", "Execution Bridge requires valid Bridge Request", "Execution Bridge must require constructible Bridge Request evidence.", "src/bridge/execution/validation.ts", ["execution_bridge_request_not_constructible"]);
-export const EXECUTION_BRIDGE_NON_OPERATIONAL_RULE: AuditRule = executionBridgeRule("AUDIT-333", "architecture", "Execution Bridge remains non-operational", "Execution Bridge must not authorize execution.", "src/bridge/execution/evaluation.ts", ["Execution Bridge never authorizes execution"]);
-export const EXECUTION_BRIDGE_DIAGNOSTICS_RULE: AuditRule = executionBridgeRule("AUDIT-334", "architecture", "Execution Bridge diagnostics are deterministic", "Execution Bridge diagnostics must be stable and safe.", "src/bridge/execution/types.ts", ["ExecutionBridgeErrorCode"]);
-export const EXECUTION_BRIDGE_TIME_RULE: AuditRule = executionBridgeRule("AUDIT-335", "architecture", "Execution Bridge uses explicit identifiers and time", "Execution Bridge must use caller-supplied identifiers and time.", "src/bridge/execution/types.ts", ["evaluatedAt: string", "id: string"]);
+function executionBridgeRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.6", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required Execution Bridge invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
 export const EXECUTION_BRIDGE_DOCUMENT_RULE: AuditRule = executionBridgeRule("AUDIT-336", "docs", "Execution Bridge RFC documents execution boundary semantics", "RFC must state the non-operational execution boundary.", "docs/architecture/execution-bridge-rfc.md", ["not authorization", "not execution", "executionAllowed` remains false"]);
-export const EXECUTION_BRIDGE_NO_SURFACE_RULE: AuditRule = executionBridgeRule("AUDIT-337", "architecture", "Execution Bridge exposes no runtime transport or provider implementation", "Execution Bridge must remain implementation-neutral.", "src/bridge/execution/evaluation.ts", ["Execution Bridge never authorizes execution"]);
 
-function runtimeRequestRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.7", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required Runtime Request invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
+function runtimeRequestRule(id: string, category: AuditRule["category"], title: string, description: string, file: string, tokens: readonly string[]): AuditRule { const rule: AuditRule = { id, category, severity: "error", title, description, metadata: { introducedIn: "V13.7", tags: ["architecture", "documentation", "contract"], stability: "stable", dependsOn: id === "AUDIT-338" ? [] : [`AUDIT-${Number(id.slice(6)) - 1}`] }, check: () => { const source = existsSync(file) ? readFileSync(file, "utf8") : ""; const missing = tokens.filter((token) => !source.includes(token)); return missing.length ? fail(rule, title + ".", missing, "Restore the required Runtime Request invariant.") : pass(rule, title + ".", tokens); } }; return rule; }
 export const RUNTIME_REQUEST_MODULE_RULE: AuditRule = runtimeRequestRule("AUDIT-338", "architecture", "Runtime Request module exists", "Runtime Request must expose declarative contracts.", "src/runtime/request/types.ts", ["RuntimeRequestInput", "RuntimeRequestResult"]);
 export const RUNTIME_REQUEST_IMMUTABLE_RULE: AuditRule = runtimeRequestRule("AUDIT-339", "architecture", "Runtime Request contracts are immutable and default denied", "Runtime Request must preserve denied execution flags.", "src/runtime/request/types.ts", ["executionAllowed: false", "executionStarted: false"]);
 export const RUNTIME_REQUEST_BRIDGE_RULE: AuditRule = runtimeRequestRule("AUDIT-340", "architecture", "Runtime Request requires valid Execution Bridge", "Runtime Request must require ready Execution Bridge evidence.", "src/runtime/request/validation.ts", ["runtime_request_bridge_invalid"]);

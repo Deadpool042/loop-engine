@@ -6,7 +6,6 @@ import type {
 } from "../agents/selector.js";
 import {
   classifyRunScopeSize,
-  estimateExpectedRunEfficiency,
   estimateExpectedRunPerformance,
   generateProjectHandoffReport,
   generateProjectReport,
@@ -15,11 +14,6 @@ import {
 } from "../core/index.js";
 import { resolveSelectedLotWritablePaths } from "../core/selected-lot-detail.js";
 import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
-import {
-  applyQuotaReserve,
-  normalizeOpenClawQuotaSnapshot,
-  type OpenClawQuotaSnapshotResult,
-} from "../policy/quota.js";
 import { resolvePolicy } from "../policy/resolver.js";
 import type { AgentPolicyResolution } from "../policy/types.js";
 import {
@@ -28,8 +22,6 @@ import {
   loadAutoSubscriptionModelPortfolioFromEnvironment,
   type AutoSubscriptionModelPortfolio,
 } from "./auto-subscription-execution.js";
-
-export const AUTO_QUOTA_SNAPSHOT_ENV = "LOOP_AUTO_QUOTA_SNAPSHOT_JSON";
 
 export type ChatGptHandoffDecision = Readonly<{
   profileId: "interactive.chatgpt";
@@ -149,79 +141,34 @@ function unknownProjection(reason: string): AutoRouteHandoffProjection {
   });
 }
 
-function parseQuotaSnapshot(
-  environment: NodeJS.ProcessEnv,
-): OpenClawQuotaSnapshotResult {
-  const raw = environment[AUTO_QUOTA_SNAPSHOT_ENV];
-  if (typeof raw !== "string" || raw.trim().length === 0) {
-    return { status: "unknown", reason: "invalid_snapshot" };
-  }
-  try {
-    return normalizeOpenClawQuotaSnapshot(JSON.parse(raw));
-  } catch {
-    return { status: "unknown", reason: "invalid_snapshot" };
-  }
-}
+// The native usage-status snapshot that fed runtime quota evidence belonged to
+// the retired OpenClaw runtime. Until another governed source exists, quota is
+// unknown for every profile, which keeps AUTO routing fail-closed.
+const QUOTA_UNAVAILABLE_REASON = "quota_snapshot_source_retired";
 
-function runtimeQuotaEvidence(
-  provider: string,
-  quota: OpenClawQuotaSnapshotResult,
-): Readonly<{ state: "available" | "exhausted" | "unknown"; source: "runtime_report" | "unavailable" }> {
-  if (quota.status !== "available") {
-    return Object.freeze({ state: "unknown", source: "unavailable" });
-  }
-  const providerQuota = quota.snapshot.providers.find(
-    (entry) => entry.provider === provider,
-  );
-  const window = providerQuota?.constrainingWindow ?? null;
-  if (window === null) {
-    return Object.freeze({ state: "unknown", source: "unavailable" });
-  }
-  const reserve = applyQuotaReserve(
-    window.remainingPercent,
-    DEFAULT_AGENT_POLICY.quotaReserve,
-  );
-  return Object.freeze({
-    state: reserve.usablePercent > 0 ? "available" : "exhausted",
-    source: "runtime_report",
-  });
-}
-
-function withFreshRuntimeQuota(
+function withUnavailableRuntimeQuota(
   portfolio: AutoSubscriptionModelPortfolio,
-  quota: OpenClawQuotaSnapshotResult,
 ): AutoSubscriptionModelPortfolio {
-  const updateProfiles = <T extends Readonly<{ quota: unknown }>>(
+  const markUnavailable = <T extends Readonly<{ quota: unknown }>>(
     profiles: readonly T[] | undefined,
-    provider: string | ((profile: T) => string),
   ): readonly T[] | undefined =>
     profiles?.map((profile) =>
       Object.freeze({
         ...profile,
-        quota: runtimeQuotaEvidence(
-          typeof provider === "function" ? provider(profile) : provider,
-          quota,
-        ),
+        quota: Object.freeze({ state: "unknown", source: "unavailable" }),
       }),
     );
 
   return Object.freeze({
     ...(portfolio.codex === undefined
       ? {}
-      : { codex: Object.freeze(updateProfiles(portfolio.codex, "openai")!) }),
+      : { codex: Object.freeze(markUnavailable(portfolio.codex)!) }),
     ...(portfolio.copilot === undefined
       ? {}
-      : { copilot: Object.freeze(updateProfiles(portfolio.copilot, "github")!) }),
+      : { copilot: Object.freeze(markUnavailable(portfolio.copilot)!) }),
     ...(portfolio.claude_code === undefined
       ? {}
-      : { claude_code: Object.freeze(updateProfiles(portfolio.claude_code, "anthropic")!) }),
-    ...(portfolio.openclaw === undefined
-      ? {}
-      : {
-          openclaw: Object.freeze(
-            updateProfiles(portfolio.openclaw, (profile) => profile.provider)!,
-          ),
-        }),
+      : { claude_code: Object.freeze(markUnavailable(portfolio.claude_code)!) }),
   });
 }
 
@@ -240,8 +187,7 @@ export function generateAutoRouteHandoffProjection(
     return unknownProjection("auto_portfolio_unavailable");
   }
 
-  const quota = parseQuotaSnapshot(environment);
-  portfolio = withFreshRuntimeQuota(portfolio, quota);
+  portfolio = withUnavailableRuntimeQuota(portfolio);
 
   const candidates = buildAutoSubscriptionExecutionCandidates(portfolio);
   if (candidates.length === 0) return unknownProjection("auto_portfolio_empty");
@@ -299,57 +245,13 @@ export function generateAutoRouteHandoffProjection(
     writablePaths === null ? null : classifyRunScopeSize(writablePaths.length);
   const history = generateRunModelEfficiencyReport(project.name, { limit: 20 });
 
-  const signals: AgentEfficiencySignal[] = candidates.map((entry) => {
-    if (scopeSize === null) {
-      return Object.freeze({
-        profileId: entry.profile.id,
-        status: "unknown" as const,
-        reason: "scope_size_unavailable",
-      });
-    }
-    if (quota.status !== "available") {
-      return Object.freeze({
-        profileId: entry.profile.id,
-        status: "unknown" as const,
-        reason: `quota_${quota.reason}`,
-      });
-    }
-    const providerQuota = quota.snapshot.providers.find(
-      (provider) => provider.provider === entry.profile.provider,
-    );
-    const window = providerQuota?.constrainingWindow ?? null;
-    if (window === null) {
-      return Object.freeze({
-        profileId: entry.profile.id,
-        status: "unknown" as const,
-        reason: "quota_window_unavailable",
-      });
-    }
-
-    const estimate = estimateExpectedRunEfficiency(history.observations, {
-      provider: entry.profile.provider,
-      model: entry.profile.model,
-      effort: policy.requirements.minimumEffort,
-      taskCategory: policy.requirements.category,
-      scopeSize,
-      quotaWindowLabel: window.label,
-    });
-    if (estimate.status !== "available") {
-      return Object.freeze({
-        profileId: entry.profile.id,
-        status: "unknown" as const,
-        reason: estimate.reason,
-      });
-    }
-    return Object.freeze({
+  const signals: AgentEfficiencySignal[] = candidates.map((entry) =>
+    Object.freeze({
       profileId: entry.profile.id,
-      status: "available" as const,
-      quotaWindowLabel: estimate.quotaWindowLabel,
-      expectedValuePercent: estimate.expectedValuePercent,
-      expectedQuotaConsumedPercent: estimate.expectedQuotaConsumedPercent,
-      sampleSize: estimate.sampleSize,
-    });
-  });
+      status: "unknown" as const,
+      reason: scopeSize === null ? "scope_size_unavailable" : QUOTA_UNAVAILABLE_REASON,
+    }),
+  );
 
   const performanceSignals: AgentPerformanceSignal[] = candidates.map((entry) => {
     if (scopeSize === null) {
@@ -414,68 +316,15 @@ export function generateAutoRouteHandoffProjection(
     return unknownProjection("no_safe_continuation_route");
   }
 
-  let quotaBefore: AutoRouteHandoffProjection["quotaBefore"] = Object.freeze({
+  const quotaBefore: AutoRouteHandoffProjection["quotaBefore"] = Object.freeze({
     status: "unknown" as const,
-    reason: quota.status === "available" ? "selected_provider_quota_unavailable" : `quota_${quota.reason}`,
+    reason: QUOTA_UNAVAILABLE_REASON,
   });
-  let estimatedImpact: AutoRouteHandoffProjection["estimatedImpact"] = Object.freeze({
-    status: "unknown" as const,
-    reason: "insufficient_run_history_or_quota",
-  });
-
-  if (quota.status === "available") {
-    const providerQuota = quota.snapshot.providers.find(
-      (provider) => provider.provider === route.selected!.provider,
-    );
-    const window = providerQuota?.constrainingWindow ?? null;
-    if (providerQuota && window) {
-      const reserve = applyQuotaReserve(
-        window.remainingPercent,
-        DEFAULT_AGENT_POLICY.quotaReserve,
-      );
-      quotaBefore = Object.freeze({
-        status: "available" as const,
-        provider: providerQuota.provider,
-        plan: providerQuota.plan,
-        updatedAt: quota.snapshot.updatedAt,
-        ageMs: quota.snapshot.ageMs,
-        window: Object.freeze({
-          label: window.label,
-          usedPercent: window.usedPercent,
-          remainingPercent: window.remainingPercent,
-          resetAt: window.resetAt,
-          usablePercent: reserve.usablePercent,
-          reservePercent: reserve.reserve.totalPercent,
-        }),
-      });
-
-      if (
-        route.selected.expectedQuotaConsumedPercent !== null &&
-        route.selected.expectedValuePercent !== null &&
-        route.selected.sampleSize !== null &&
-        route.selected.quotaWindowLabel === window.label
-      ) {
-        const remainingAfterPercent = Math.max(
-          0,
-          window.remainingPercent - route.selected.expectedQuotaConsumedPercent,
-        );
-        const afterReserve = applyQuotaReserve(
-          remainingAfterPercent,
-          DEFAULT_AGENT_POLICY.quotaReserve,
-        );
-        estimatedImpact = Object.freeze({
-          status: "available" as const,
-          quotaWindowLabel: window.label,
-          expectedQuotaConsumedPercent:
-            route.selected.expectedQuotaConsumedPercent,
-          expectedValuePercent: route.selected.expectedValuePercent,
-          sampleSize: route.selected.sampleSize,
-          remainingAfterPercent,
-          usableAfterReservePercent: afterReserve.usablePercent,
-        });
-      }
-    }
-  }
+  const estimatedImpact: AutoRouteHandoffProjection["estimatedImpact"] =
+    Object.freeze({
+      status: "unknown" as const,
+      reason: "insufficient_run_history_or_quota",
+    });
 
   return Object.freeze({
     status: "selected" as const,

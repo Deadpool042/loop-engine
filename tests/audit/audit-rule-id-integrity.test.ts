@@ -71,3 +71,32 @@ test("AUDIT-029 accepts ids supplied through a constant binding", () => {
   assert.deepEqual(report.outOfOrderIds, []);
   assert.deepEqual(report.missingIds, []);
 });
+
+test("AUDIT-029 tolerates a gap only for an explicitly retired id", () => {
+  const rules = [{ id: "AUDIT-001" }, { id: "AUDIT-003" }];
+
+  assert.deepEqual(
+    inspectAuditRuleIdIntegrity(rules, 1, ["AUDIT-002"]).missingIds,
+    [],
+  );
+  assert.deepEqual(
+    inspectAuditRuleIdIntegrity(rules, 1, ["AUDIT-009"]).missingIds,
+    ["AUDIT-002"],
+  );
+});
+
+test("AUDIT-029 rejects the reuse of a retired id", () => {
+  const report = inspectAuditRuleIdIntegrity(
+    [{ id: "AUDIT-001" }, { id: "AUDIT-002" }],
+    1,
+    ["AUDIT-002"],
+  );
+
+  assert.deepEqual(report.reintroducedRetiredIds, ["AUDIT-002"]);
+});
+
+test("AUDIT-029 keeps every retired id out of the registered inventory", () => {
+  const report = inspectAuditRuleIdIntegrity(AUDIT_RULES);
+
+  assert.deepEqual(report.reintroducedRetiredIds, []);
+});

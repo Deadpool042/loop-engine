@@ -1,5 +1,7 @@
 # Execution Boundary RFC contracts
 
+> **Status: retired (G3.6).** The OpenClaw provider and the OpenClaw-only V10 declarative chain this document describes (intent, mapping, authorization, transport request, review, provenance, handoff eligibility, dispatch, boundary, authority and bridge modules) were removed from the source tree. This page is kept as historical design context only; it does not describe code that exists.
+
 V12.4 introduces `ExecutionBoundaryRFC`, the immutable contract layer that
 states which invariants must hold before any future execution boundary could be
 considered. The module is still declarative. It does not implement a boundary

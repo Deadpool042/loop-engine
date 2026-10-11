@@ -1,1 +1,0 @@
-export function freezeExecutionBridgeValue<T>(value: T): T { if (Array.isArray(value)) value.forEach(freezeExecutionBridgeValue); else if (value && typeof value === "object" && !Object.isFrozen(value)) Object.values(value as Record<string, unknown>).forEach(freezeExecutionBridgeValue); if (value && typeof value === "object") Object.freeze(value); return value; }

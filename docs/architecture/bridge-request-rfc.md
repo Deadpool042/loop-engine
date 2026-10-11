@@ -1,5 +1,7 @@
 # Bridge Request RFC
 
+> **Status: retired (G3.6).** The OpenClaw provider and the OpenClaw-only V10 declarative chain this document describes (intent, mapping, authorization, transport request, review, provenance, handoff eligibility, dispatch, boundary, authority and bridge modules) were removed from the source tree. This page is kept as historical design context only; it does not describe code that exists.
+
 ## Purpose and boundary
 
 V13.5 defines the immutable, serializable Bridge Request envelope derived from an explicitly eligible Bridge Contract. It is not authorization, not execution, not dispatch, not transport, not a provider request, and not a runtime request. It causes no side effects.
