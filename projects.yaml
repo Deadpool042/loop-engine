@@ -22,6 +22,8 @@ projects:
 
   - name: creatyss
     path: ../CREATYSS
+    path_aliases:
+      - ../creatyss
     repository: Deadpool042/CREATYSS
     execution_decision: .loop-engine/execution-decision.yaml
     workspace:
@@ -51,6 +53,8 @@ projects:
 
   - name: lp-infra
     path: ../lp-infra-runtime
+    path_aliases:
+      - ../lp-infra
     repository: Deadpool042/LP-INFRA
     workspace:
       mode: source_only

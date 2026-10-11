@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 
 export const WORKSPACE_MATERIALIZATION_MODES = [
@@ -21,6 +22,12 @@ export type WorkspaceDependencyMode =
 export type ProjectConfig = {
   name: string;
   path: string;
+  /**
+   * Optional alternative checkout locations, relative to the process cwd like
+   * `path`. Used only when `path` is not an exact-case directory on this host
+   * (e.g. the VPS layout `../CREATYSS` vs the Mac layout `../creatyss`).
+   */
+  path_aliases?: string[];
   type: string;
   archived?: boolean;
   /** Tombstone: identity burned after a full hard-delete; implies archived, never reusable. */
@@ -52,7 +59,40 @@ export type Config = {
   projects: ProjectConfig[];
 };
 
+/** Exact-case existence: stays true on case-sensitive hosts, and does not trust case-insensitive APFS. */
+function existsExactCase(candidate: string): boolean {
+  const absolute = resolve(candidate);
+  const parent = dirname(absolute);
+  if (parent === absolute) return true;
+  try {
+    return readdirSync(parent).includes(basename(absolute));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Picks the first existing candidate among `path` then `path_aliases`.
+ * Falls back to the declared `path` unchanged so existing failures stay identical.
+ */
+export function resolveProjectPath(
+  project: Pick<ProjectConfig, "path" | "path_aliases">,
+  exists: (candidate: string) => boolean = existsExactCase,
+): string {
+  if (!Array.isArray(project.path_aliases) || project.path_aliases.length === 0) {
+    return project.path;
+  }
+  const candidates = [project.path, ...project.path_aliases];
+  return candidates.find((candidate) => exists(candidate)) ?? project.path;
+}
+
 export function loadConfig(): Config {
   const raw = readFileSync("projects.yaml", "utf8");
-  return parseYaml(raw) as Config;
+  const config = parseYaml(raw) as Config;
+  if (Array.isArray(config?.projects)) {
+    for (const project of config.projects) {
+      project.path = resolveProjectPath(project);
+    }
+  }
+  return config;
 }
