@@ -75,3 +75,7 @@ Single-provider callers receive the same executor and registry semantics as befo
 ## Extension path
 
 A future provider adapter registers and assembles its own executor and agent registry, then passes the resulting `LoopProviderAssembly` into the application composition root. Core and LoopRunner require no provider-specific changes.
+
+## Retrait du chemin Hermes-Copilot — 2026-10-17
+
+Le registre de fournisseurs par défaut ne contient plus que `codex` et `claude_code`. Le chemin d'exécution Hermes-Copilot a été supprimé du code de Loop Engine (exécuteur, enregistrement et export public). Les données de configuration ou de projection Copilot qui subsistent ne constituent **pas** un fournisseur exécutable : une tentative d'assemblage de `copilot` avec le registre par défaut échoue explicitement (`Provider is not registered: copilot`). Aucun remplacement direct Copilot CLI n'est activé. Toute réintroduction nécessite une qualification de confinement indépendante et une décision documentée. Ce retrait ne désinstalle ni ne modifie un éventuel service Hermes externe au dépôt.

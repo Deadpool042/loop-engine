@@ -306,139 +306,27 @@ test("AUTO accepts arbitrary runtime-observed model identifiers without a built-
   );
 });
 
-test("AUTO projects Copilot only from explicit fresh runtime evidence", () => {
+test("AUTO refuses retired Copilot execution even with claimed available quota", () => {
   const portfolio = parseAutoSubscriptionModelPortfolio({
-    copilot: [
-      {
-        id: "luna",
-        model: "gpt-6-luna",
-        economicTier: "economy",
-        availability: "available",
-        quota: { state: "available", source: "runtime_report" },
-        capabilities: ["code_edit"],
-      },
-    ],
-  });
-
-  const [configuration] = buildAutoSubscriptionProviderConfigurations(portfolio);
-  assert.ok(configuration);
-  assert.equal(configuration.id, "copilot");
-  assert.equal(configuration.executable, "hermes");
-  assert.equal("maxTurns" in configuration ? configuration.maxTurns : null, 12);
-  assert.deepEqual(configuration.profiles?.map((profile) => ({
-    id: profile.id,
-    model: profile.model,
-    fundingMode: profile.fundingMode,
-    quota: profile.quota,
-    capabilities: profile.capabilities,
-  })), [
-    {
+    copilot: [{
       id: "luna",
       model: "gpt-6-luna",
-      fundingMode: "included_subscription",
+      availability: "available",
       quota: { state: "available", source: "runtime_report" },
       capabilities: ["code_edit"],
-    },
-  ]);
-
-  const candidates = buildAutoSubscriptionExecutionCandidates(portfolio);
-  assert.deepEqual(candidates.map((candidate) => ({
-    id: candidate.profile.id,
-    runtime: candidate.profile.runtime,
-    provider: candidate.profile.provider,
-    model: candidate.profile.model,
-    permissions: candidate.profile.permissions,
-    path: candidate.executionPath,
-  })), [
-    {
-      id: "configured.copilot.luna",
-      runtime: "copilot",
-      provider: "github",
-      model: "gpt-6-luna",
-      permissions: ["read_only", "write_worktree"],
-      path: "direct_cli",
-    },
-  ]);
-
-  const decision = decideAutoSubscriptionRoute(
-    portfolio,
-    fileOnlyResolvedPolicy(),
-    [],
+    }],
+  });
+  assert.throws(
+    () => buildAutoSubscriptionProviderConfigurations(portfolio),
+    /AUTO Copilot execution is disabled/,
   );
-  assert.equal(decision.outcome, "selected");
-  assert.equal(decision.selected?.runtime, "copilot");
-  assert.equal(decision.selected?.provider, "github");
-  assert.equal(decision.selected?.model, "gpt-6-luna");
-});
-
-test("AUTO rejects Copilot with unknown quota and preserves fail-closed routing", () => {
-  const portfolio: AutoSubscriptionModelPortfolio = {
-    copilot: [
-      {
-        id: "luna-unknown",
-        model: "gpt-6-luna",
-        economicTier: "economy",
-        availability: "available",
-        quota: { state: "unknown", source: "unavailable" },
-        capabilities: ["code_edit"],
-      },
-    ],
-  };
-
-  const decision = decideAutoSubscriptionRoute(
-    portfolio,
-    fileOnlyResolvedPolicy(),
-    [],
+  assert.throws(
+    () => buildAutoSubscriptionExecutionCandidates(portfolio),
+    /AUTO Copilot execution is disabled/,
   );
-
-  assert.equal(decision.outcome, "no_match");
-  assert.equal(decision.selected, null);
-  assert.deepEqual(
-    decision.notSelected.map((candidate) => ({
-      profileId: candidate.profileId,
-      reason: candidate.reason,
-      detail: candidate.detail,
-    })),
-    [
-      {
-        profileId: "configured.copilot.luna-unknown",
-        reason: "hard_gate",
-        detail: "profile quota is not proven available (source: unavailable)",
-      },
-    ],
-  );
-
-  const continuation = decideAutoContinuationRoute(
-    fileOnlyResolvedPolicy(),
-    decision,
-  );
-  assert.equal(continuation?.executionPath, "chatgpt_handoff");
-  assert.equal(continuation?.basis, "no_safe_autonomous_route");
-});
-
-test("AUTO does not pretend file-only Copilot can satisfy shell execution requirements", () => {
-  const portfolio: AutoSubscriptionModelPortfolio = {
-    copilot: [
-      {
-        id: "luna",
-        model: "gpt-6-luna",
-        economicTier: "economy",
-        availability: "available",
-        quota: { state: "available", source: "runtime_report" },
-        capabilities: ["code_edit"],
-      },
-    ],
-  };
-
-  const decision = decideAutoSubscriptionRoute(
-    portfolio,
-    resolvedPolicy("low"),
-    [],
-  );
-  assert.equal(decision.outcome, "no_match");
-  assert.match(
-    decision.notSelected[0]?.detail ?? "",
-    /missing capabilities: shell_exec/,
+  assert.throws(
+    () => decideAutoSubscriptionRoute(portfolio, fileOnlyResolvedPolicy(), []),
+    /AUTO Copilot execution is disabled/,
   );
 });
 
@@ -481,7 +369,6 @@ test("AUTO refuses a mixed legacy OpenClaw portfolio rather than silently fallin
 test("AUTO without OpenClaw keeps explicit direct-CLI candidates and fails closed on unknown quota", () => {
   assert.deepEqual(AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE, [
     "codex",
-    "copilot",
     "claude_code",
   ]);
   const safe = buildAutoSubscriptionExecutionCandidates(observedPortfolio());

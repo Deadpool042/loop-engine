@@ -5,16 +5,16 @@ import { selectAgentProfile } from "../../src/agents/selector.js";
 import {
   assembleLoopProvider,
   codexProviderRegistration,
-  copilotProviderRegistration,
+  claudeCodeProviderRegistration,
   createLoopProviderRegistry,
   defaultLoopProviderRegistry,
 } from "../../src/composition/provider-registry.js";
 
 describe("LoopProviderRegistry", () => {
-  it("does not expose or assemble a retired OpenClaw execution route", () => {
+  it("does not expose retired OpenClaw or unqualified Copilot execution routes", () => {
     assert.deepEqual(
       defaultLoopProviderRegistry.registrations.map(({ id }) => id),
-      ["codex", "claude_code", "copilot"],
+      ["codex", "claude_code"],
     );
     assert.throws(
       () =>
@@ -24,6 +24,17 @@ describe("LoopProviderRegistry", () => {
           model: "openclaw-default",
         } as never),
       /Provider is not registered: openclaw/,
+    );
+  });
+
+  it("fails closed when Copilot is requested from the default registry", () => {
+    assert.throws(
+      () => assembleLoopProvider(defaultLoopProviderRegistry, {
+        id: "copilot",
+        executable: "/usr/local/bin/hermes",
+        model: "gpt-6-luna",
+      }),
+      /Provider is not registered: copilot/,
     );
   });
 
@@ -494,52 +505,6 @@ describe("LoopProviderRegistry", () => {
     });
   });
 
-  it("assembles Copilot through Hermes with the conservative file-only capability envelope", () => {
-    const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
-      id: "copilot",
-      executable: "/home/ubuntu/.local/bin/hermes",
-      profiles: [
-        {
-          id: "luna",
-          model: "gpt-6-luna",
-          economicTier: "economy",
-          availability: "available",
-          fundingMode: "included_subscription",
-          quota: { state: "available", source: "runtime_report" },
-          capabilities: ["code_edit"],
-        },
-      ],
-    });
-
-    const [profile] = assembly.agentRegistry.profiles;
-    assert.ok(profile);
-    assert.equal(assembly.id, "copilot");
-    assert.equal(typeof assembly.executor, "function");
-    assert.equal(profile.id, "configured.copilot.luna");
-    assert.equal(profile.runtime, "copilot");
-    assert.equal(profile.provider, "github");
-    assert.equal(profile.model, "gpt-6-luna");
-    assert.equal(profile.fundingMode, "included_subscription");
-    assert.deepEqual(profile.quota, {
-      state: "available",
-      source: "runtime_report",
-    });
-    assert.deepEqual(profile.capabilities, ["code_edit"]);
-    assert.deepEqual(profile.permissions, ["read_only", "write_worktree"]);
-  });
-
-  it("refuses to invent shell or test capability for the file-only Copilot executor", () => {
-    const assembly = assembleLoopProvider(defaultLoopProviderRegistry, {
-      id: "copilot",
-      executable: "/home/ubuntu/.local/bin/hermes",
-      model: "gpt-6-luna",
-    });
-    const [profile] = assembly.agentRegistry.profiles;
-    assert.ok(profile);
-    assert.deepEqual(profile.capabilities, ["code_edit"]);
-    assert.deepEqual(profile.permissions, ["read_only", "write_worktree"]);
-  });
-
   it("rejects duplicate provider registrations deterministically", () => {
     assert.throws(
       () =>
@@ -554,14 +519,14 @@ describe("LoopProviderRegistry", () => {
   it("keeps registry ordering immutable", () => {
     const registry = createLoopProviderRegistry([
       codexProviderRegistration,
-      copilotProviderRegistration,
+      claudeCodeProviderRegistration,
     ]);
 
     assert.equal(Object.isFrozen(registry), true);
     assert.equal(Object.isFrozen(registry.registrations), true);
     assert.deepEqual(
       registry.registrations.map((registration) => registration.id),
-      ["codex", "copilot"],
+      ["codex", "claude_code"],
     );
   });
 });
