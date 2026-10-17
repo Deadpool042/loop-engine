@@ -36,7 +36,6 @@ export const AUTO_SUBSCRIPTION_PORTFOLIO_ENV =
 
 export const AUTO_SUBSCRIPTION_RUNTIME_PREFERENCE = Object.freeze([
   "codex",
-  "copilot",
   "claude_code",
 ] as const);
 
@@ -391,14 +390,8 @@ export function buildAutoSubscriptionProviderConfigurations(
     );
   }
   if (portfolio.copilot !== undefined) {
-    configurations.push(
-      Object.freeze({
-        id: "copilot" as const,
-        executable: "hermes",
-        timeoutMs: 360_000,
-        maxTurns: 12,
-        profiles: asConfiguredProfiles(portfolio.copilot),
-      }),
+    throw new TypeError(
+      "AUTO Copilot execution is disabled: no qualified executor is registered.",
     );
   }
   if (configurations.length === 0) {

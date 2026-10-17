@@ -44,7 +44,6 @@ export {
   assembleLoopProviders,
   claudeCodeProviderRegistration,
   codexProviderRegistration,
-  copilotProviderRegistration,
   createLoopProviderRegistry,
   defaultLoopProviderRegistry,
   type ClaudeCodeProviderConfiguration,
@@ -73,8 +72,3 @@ export {
   createIsolatedProviderRunExecute,
   type IsolatedProviderExecutionOptions,
 } from "./isolated-provider-execution.js";
-
-export {
-  createHermesCopilotCliLoopExecutor,
-  type HermesCopilotCliLoopExecutorOptions,
-} from "../loop/hermes-copilot-cli-executor.js";

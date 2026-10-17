@@ -17,7 +17,6 @@ import type {
 import type { LoopExecutor } from "../core/index.js";
 import { createClaudeCodeCliLoopExecutor } from "../loop/claude-code-cli-executor.js";
 import { createCodexCliLoopExecutor } from "../loop/codex-cli-executor.js";
-import { createHermesCopilotCliLoopExecutor } from "../loop/hermes-copilot-cli-executor.js";
 export const LOOP_PROVIDER_IDS = ["codex", "claude_code", "copilot"] as const;
 export type LoopProviderId = (typeof LOOP_PROVIDER_IDS)[number];
 
@@ -313,32 +312,6 @@ export const claudeCodeProviderRegistration: LoopProviderRegistration =
     },
   });
 
-export const copilotProviderRegistration: LoopProviderRegistration =
-  Object.freeze({
-    id: "copilot",
-    assemble(configuration): LoopProviderAssembly {
-      if (configuration.id !== "copilot") {
-        throw new TypeError(
-          "Copilot registration received another provider configuration.",
-        );
-      }
-      const profiles = configuredProfiles(configuration);
-      const executor = createHermesCopilotCliLoopExecutor({
-        executable: configuration.executable,
-        ...(configuration.profiles === undefined && configuration.model
-          ? { model: configuration.model }
-          : {}),
-        ...(configuration.timeoutMs ? { timeoutMs: configuration.timeoutMs } : {}),
-        ...(configuration.maxTurns ? { maxTurns: configuration.maxTurns } : {}),
-      });
-      return Object.freeze({
-        id: "copilot",
-        executor,
-        agentRegistry: createAgentRegistry(profiles),
-      });
-    },
-  });
-
 export function createLoopProviderRegistry(
   registrations: readonly LoopProviderRegistration[],
 ): LoopProviderRegistry {
@@ -355,7 +328,6 @@ export function createLoopProviderRegistry(
 export const defaultLoopProviderRegistry = createLoopProviderRegistry([
   codexProviderRegistration,
   claudeCodeProviderRegistration,
-  copilotProviderRegistration,
 ]);
 
 export function assembleLoopProvider(

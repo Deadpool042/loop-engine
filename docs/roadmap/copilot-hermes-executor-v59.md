@@ -1,5 +1,7 @@
 # V59 — Copilot abonnement comme executor Loop gouverné via Hermes
 
+> **Statut : RETIRÉ (2026-10-17).** Ce document est conservé comme trace historique. L'exécuteur Hermes-Copilot a été supprimé de Loop Engine et Copilot est NO-GO tant qu'une intégration directe, sans Hermes, n'a pas été qualifiée en matière de sécurité. Voir [`multi-provider-application-failover.md`](../architecture/multi-provider-application-failover.md). Le burn-in `hermes-copilot-executor.burnin.ts` a été supprimé avec l'exécuteur.
+
 ## Objectif
 
 Qualifier et intégrer GitHub Copilot comme executor autonome réellement prouvé dans Loop Engine, sans créer de second routeur et sans ajouter d'API payante.
