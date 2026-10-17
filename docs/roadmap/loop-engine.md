@@ -6,7 +6,7 @@ Roadmap interne de Loop Engine, lue par son propre roadmap reader (`pnpm loop ne
 
 - **État :** les 80 candidats de cette roadmap sont terminés selon `pnpm loop next loop-engine --json`; aucun candidat sélectionnable ni lot `TODO`/`IN_PROGRESS` ne subsiste.
 - **Prochaine décision :** `roadmap_exhausted_objective_available`. L’objectif canonique est toujours disponible, mais la roadmap doit être renouvelée avant d’ouvrir un nouveau lot. Ne pas inférer ni ajouter un chantier à partir de cette seule recommandation.
-- **V59 — Copilot via Hermes :** clôturé avec burn-in VPS réel et PRs #350–#353 fusionnées; les preuves sont dans [`copilot-hermes-executor-v59.md`](./copilot-hermes-executor-v59.md).
+- **V59 — Copilot via Hermes :** *retiré le 2026-10-17 (Copilot NO-GO, voir l'architecture failover)* ; historique : clôturé avec burn-in VPS réel et PRs #350–#353 fusionnées; les preuves sont dans [`copilot-hermes-executor-v59.md`](./copilot-hermes-executor-v59.md).
 - **PR #319 :** son correctif est explicitement supersédé par #321, déjà fusionnée et documentée en V55.2. #319 reste ouverte, `CI gate` échoue et ne doit pas être fusionnée; elle ne rouvre pas V55.2.
 - Les autres dossiers de version sous `docs/roadmap/` sont des preuves ou décisions de lots clos, ou des workstreams à gate externe explicitement identifiés. Ils ne remplacent pas cette source canonique.
 

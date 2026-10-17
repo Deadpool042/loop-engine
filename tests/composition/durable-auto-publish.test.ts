@@ -82,7 +82,8 @@ test("durable AUTO publish replays the same terminal result without a second exe
       ) {
         publishCalls += 1;
         observedMaxModelAttempts = options.maxModelAttempts ?? null;
-        observedPreferredRuntimes = options.agentPolicy?.preferredRuntimes ?? null;
+        observedPreferredRuntimes =
+          options.agentPolicy?.preferredRuntimes ?? null;
         return completedResult();
       },
       recordLoopRunHistory() {
@@ -114,18 +115,10 @@ test("durable AUTO publish replays the same terminal result without a second exe
     assert.equal(publishCalls, 1);
     assert.equal(historyCalls, 1);
     assert.equal(observedMaxModelAttempts, 2);
-    assert.deepEqual(observedPreferredRuntimes, [
-      "codex",
-      "copilot",
-      "claude_code",
-    ]);
+    assert.deepEqual(observedPreferredRuntimes, ["codex", "claude_code"]);
     assert.equal(
       first.report.idempotencyKey,
-      durableAutoSubscriptionKey(
-        "example",
-        "H1-L1",
-        "a".repeat(40),
-      ),
+      durableAutoSubscriptionKey("example", "H1-L1", "a".repeat(40)),
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -231,7 +224,6 @@ test("durable AUTO publish reports in_progress while preparation holds the lease
   }
 });
 
-
 test("durable AUTO publish terminalizes preparation failure without invoking the provider", async () => {
   const root = mkdtempSync(join(tmpdir(), "loop-durable-auto-publish-"));
   try {
@@ -321,7 +313,6 @@ test("durable AUTO publish retries a failed terminal result only when explicitly
     rmSync(root, { recursive: true, force: true });
   }
 });
-
 
 test("durable AUTO publish forwards canonical execution.progressed events", async () => {
   const root = mkdtempSync(join(tmpdir(), "loop-durable-auto-publish-"));

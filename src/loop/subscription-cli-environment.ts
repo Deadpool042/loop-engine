@@ -27,7 +27,6 @@ const TEST_ONLY_PREFIXES = [
   "FAKE_CODEX_",
   "FAKE_CLAUDE_",
   "FAKE_OPENCLAW_",
-  "FAKE_HERMES_",
 ] as const;
 
 export function buildSubscriptionCliEnvironment(

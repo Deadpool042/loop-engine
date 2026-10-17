@@ -79,3 +79,15 @@ A future provider adapter registers and assembles its own executor and agent reg
 ## Retrait du chemin Hermes-Copilot — 2026-10-17
 
 Le registre de fournisseurs par défaut ne contient plus que `codex` et `claude_code`. Le chemin d'exécution Hermes-Copilot a été supprimé du code de Loop Engine (exécuteur, enregistrement et export public). Les données de configuration ou de projection Copilot qui subsistent ne constituent **pas** un fournisseur exécutable : une tentative d'assemblage de `copilot` avec le registre par défaut échoue explicitement (`Provider is not registered: copilot`). Aucun remplacement direct Copilot CLI n'est activé. Toute réintroduction nécessite une qualification de confinement indépendante et une décision documentée. Ce retrait ne désinstalle ni ne modifie un éventuel service Hermes externe au dépôt.
+
+### Fournisseurs d'exécution disponibles
+
+Seuls Claude Code CLI (`claude_code`) et Codex CLI (`codex`) sont exécutables. Hermes n'est plus un intermédiaire d'exécution et aucun fallback implicite vers Hermes ou vers un fournisseur payant n'existe. Le routage AUTO reste fail-closed : un portfolio contenant `copilot` est rejeté à l'assemblage, y compris si un quota est déclaré disponible.
+
+### Statut Copilot : NO-GO
+
+Copilot reste NO-GO. Conditions minimales à une réintroduction : intégration directe sans Hermes ; confinement du système de fichiers démontré sur un environnement réel (pas seulement via des exécutables simulés) ; périmètre d'outils et d'écriture borné et vérifié ; décision documentée (ADR) ; tests de non-régression dédiés.
+
+### Limites de qualification
+
+Les tests existants utilisent des exécutables simulés : ils prouvent le routage, l'admission et le refus fail-closed, mais **pas** un confinement réel du système de fichiers. Les types, profils et projections Copilot résiduels (`src/agents/`, `provider-registry.ts`, portfolio AUTO) sont des données inertes sans exécuteur.
