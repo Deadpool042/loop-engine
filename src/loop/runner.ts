@@ -159,7 +159,7 @@ export function runLoopPlan(
 
   // R1: the deterministic planning path stops at the bounded project
   // decision. Agent/provider/model selection and agent-specific context
-  // construction belong to the interactive runtime (Hermes), not Loop Engine.
+  // construction belong to the interactive runtime, not Loop Engine.
   // The historical result fields remain present as null for wire compatibility.
   return finalize(
     cycle.candidate,

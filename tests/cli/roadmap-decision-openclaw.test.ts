@@ -140,3 +140,51 @@ test("roadmap decision rejects the retired OpenClaw provider before invoking it"
     fixture.cleanup();
   }
 });
+
+test("roadmap decision rejects the retired Hermes provider before invoking it", () => {
+  const fixture = setupFixture();
+  try {
+    const env = { ...process.env };
+    delete env.ANTHROPIC_API_KEY;
+    env.HOME = join(fixture.root, "home");
+    env.PATH = `${fixture.fakeBin}${delimiter}${env.PATH ?? ""}`;
+    const invocationMarker = join(fixture.root, "hermes-invoked");
+    const localBin = join(env.HOME, ".local", "bin");
+    mkdirSync(localBin, { recursive: true });
+    writeFileSync(
+      join(localBin, "hermes"),
+      `#!/usr/bin/env node\nrequire('node:fs').writeFileSync(${JSON.stringify(invocationMarker)}, 'called');\n`,
+    );
+    chmodSync(join(localBin, "hermes"), 0o755);
+
+    const result = spawnSync(
+      tsxPath,
+      [
+        cliPath,
+        "roadmap",
+        "decision",
+        "example",
+        "--request-proposal",
+        "--provider",
+        "hermes_agent",
+        "--provider-model",
+        "openai/gpt-5.6-sol",
+        "--json",
+      ],
+      { cwd: fixture.root, env, encoding: "utf8", timeout: 15_000 },
+    );
+
+    assert.equal(result.status, 1);
+    const error = JSON.parse(result.stdout) as {
+      error?: { code?: string; message?: string };
+    };
+    assert.equal(error.error?.code, "unsupported_provider");
+    assert.match(
+      error.error?.message ?? "",
+      /Hermes proposal provider is retired/,
+    );
+    assert.equal(existsSync(invocationMarker), false);
+  } finally {
+    fixture.cleanup();
+  }
+});

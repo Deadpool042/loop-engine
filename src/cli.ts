@@ -70,7 +70,6 @@ import {
 import {
   ANTHROPIC_EFFORT_VALUES,
   createAnthropicApiProvider,
-  createHermesInferProvider,
   hasAnthropicApiCredential,
 } from "./text-only-provider/index.js";
 import { ANTHROPIC_SONNET_5_MODEL } from "./text-only-provider/pricing.js";
@@ -542,23 +541,17 @@ else if (command === "workspace" && process.argv[3] === "status") {
         "unsupported_provider",
         "The OpenClaw proposal provider is retired; choose an explicitly configured supported provider.",
       );
-    if (
-      provider !== "anthropic_api" &&
-      provider !== "hermes_agent"
-    )
+    if (provider === "hermes_agent")
       failOption(
         json,
         "unsupported_provider",
-        "--provider must be anthropic_api or hermes_agent with --request-proposal.",
+        "The Hermes proposal provider is retired; use anthropic_api or the deterministic decision without --request-proposal.",
       );
-    if (
-      provider === "hermes_agent" &&
-      model === undefined
-    )
+    if (provider !== "anthropic_api")
       failOption(
         json,
-        "missing_provider_model",
-        `--provider-model is required with --provider ${provider}.`,
+        "unsupported_provider",
+        "--provider must be anthropic_api with --request-proposal.",
       );
     if (hasOption("--provider-timeout-ms") && timeoutValue === undefined)
       failOption(
@@ -608,16 +601,10 @@ else if (command === "workspace" && process.argv[3] === "status") {
         timeoutMs,
       },
     };
-    const proposalApplication =
-      provider === "hermes_agent"
-        ? createLoopApplicationAssembly({
-            textOnlyProvider: createHermesInferProvider(),
-            textOnlyProviderCredentialAvailable: () => true,
-          })
-        : createLoopApplicationAssembly({
-              textOnlyProvider: createAnthropicApiProvider(),
-              textOnlyProviderCredentialAvailable: hasAnthropicApiCredential,
-            });
+    const proposalApplication = createLoopApplicationAssembly({
+      textOnlyProvider: createAnthropicApiProvider(),
+      textOnlyProviderCredentialAvailable: hasAnthropicApiCredential,
+    });
     json
       ? await printRoadmapDecisionJson(proposalApplication, project, input)
       : await printRoadmapDecision(proposalApplication, project, input);
@@ -719,7 +706,7 @@ else if (command === "workspace" && process.argv[3] === "status") {
   else terminal.info("Execution-decision current requires --json.");
 } else if (command === "roadmap") {
   terminal.error(
-    "Usage: pnpm loop roadmap status|overview|objective|proposal-context <project> [--json] | roadmap propose-estimate <project> [--json] | roadmap propose <project> --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>] [--json] | roadmap decision <project> [--request-proposal --provider anthropic_api|hermes_agent [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>]] [--json]",
+    "Usage: pnpm loop roadmap status|overview|objective|proposal-context <project> [--json] | roadmap propose-estimate <project> [--json] | roadmap propose <project> --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>] [--json] | roadmap decision <project> [--request-proposal --provider anthropic_api [--provider-model <model> [--provider-effort <effort>]] [--provider-timeout-ms <ms>]] [--json]",
   );
   process.exit(1);
 } else if (command === "audit") {
