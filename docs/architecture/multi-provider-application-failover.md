@@ -91,3 +91,7 @@ Copilot reste NO-GO. Conditions minimales à une réintroduction : intégration 
 ### Limites de qualification
 
 Les tests existants utilisent des exécutables simulés : ils prouvent le routage, l'admission et le refus fail-closed, mais **pas** un confinement réel du système de fichiers. Les types, profils et projections Copilot résiduels (`src/agents/`, `provider-registry.ts`, portfolio AUTO) sont des données inertes sans exécuteur.
+
+### Retrait du fournisseur texte `hermes_agent` — 2026-10-17
+
+`roadmap decision --request-proposal --provider hermes_agent` (et `createHermesInferProvider`) est supprimé : fonctionnalité optionnelle, non documentée, sans test CLI, redondante avec `anthropic_api` et avec la décision déterministe sans `--request-proposal`, et contraire au principe « Hermes n'est plus un intermédiaire ». La commande refuse désormais `hermes_agent` avant tout lancement de processus. Aucun remplacement par Claude Code ou Codex n'est introduit. Les installations Hermes du Mac ou du VPS ne sont pas modifiées par ce retrait.
