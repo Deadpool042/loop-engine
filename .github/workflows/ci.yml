@@ -48,9 +48,17 @@ jobs:
       - quality
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      LOOP_PROJECTS_ROOT: ${{ github.workspace }}/Projects
+    defaults:
+      run:
+        shell: bash
+        working-directory: Projects/loop-engine
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          path: Projects/loop-engine
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
@@ -66,7 +74,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('Projects/loop-engine/pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
       - name: Install dependencies
@@ -93,7 +101,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ci-diagnostics
-          path: artifacts/ci.log
+          path: Projects/loop-engine/artifacts/ci.log
           if-no-files-found: ignore
           retention-days: 7
       - name: Write summary
