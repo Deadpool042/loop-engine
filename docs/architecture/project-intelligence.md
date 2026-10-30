@@ -69,6 +69,12 @@ Un projet absent en mode `on_demand` ou `none` expose `expectedAbsent: true` et 
 
 ## Project registration
 
+### Résolution des chemins du registre
+
+`path` et `path_aliases` sont des chemins résolus relativement au répertoire courant du processus Loop Engine. Les alias servent aux dispositions hôte-dépendantes déjà déclarées; ils ne sont pas une priorité de migration. Lorsqu'un seul candidat existe avec sa casse exacte, ce candidat est utilisé. Si aucun candidat n'existe, Loop Engine conserve `path` afin que les erreurs d'absence restent visibles aux consommateurs. Si plusieurs candidats existent, le chargement du registre échoue explicitement : le moteur ne compare pas les remotes Git et ne choisit pas silencieusement entre des checkouts concurrents.
+
+Cette résolution ne canonicalise pas les symlinks et ne confine pas les chemins à une racine Projects. Les entrées absolues et les symlinks sont donc acceptés par le résolveur. Les consommateurs qui ont une frontière de racine doivent appliquer et tester leur propre confinement. Cette limite doit être prise en compte avant de modifier les chemins du registre.
+
 Le registre `projects.yaml` est la source de vérité opérationnelle de Loop Engine pour les projets inscrits dans ce moteur. Un nouveau projet n'y entre qu'après création de son enveloppe Git et approbation explicite de son `PROJECT-BRIEF.md`; cette inscription ne remplace pas le manifest ni le statut lifecycle possédés par Project Factory.
 
 La commande `loop project register <project> --type <type> --confirm-brief-approved` ne crée pas de projet, de dépôt distant, de framework ou de roadmap. Elle enregistre uniquement une enveloppe locale déjà approuvée. Elle exige que le projet soit un enfant direct du workspace, sur `main`, propre, et que le type corresponde au brief approuvé.
