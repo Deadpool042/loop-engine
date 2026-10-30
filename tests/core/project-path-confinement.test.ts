@@ -201,6 +201,45 @@ test("operation resolution rechecks a symlink and returns only its verified dest
   });
 });
 
+test("loadConfig pins a symlink target so a later retarget cannot redirect an operation", () => {
+  withFixture(({ root, cwd, outside }) => {
+    const originalTarget = join(root, "sandbox", "creatyss");
+    const outsideTarget = join(outside, "creatyss");
+    const link = join(root, "platform", "creatyss");
+    mkdirSync(originalTarget, { recursive: true });
+    mkdirSync(outsideTarget, { recursive: true });
+    symlinkSync(originalTarget, link, "dir");
+    writeFileSync(
+      join(cwd, "projects.yaml"),
+      ["projects:", "  - name: creatyss", "    path: ../creatyss", ""].join(
+        "\n",
+      ),
+    );
+
+    const previousCwd = process.cwd();
+    try {
+      process.chdir(cwd);
+      const loaded = loadConfig(root);
+      assert.equal(loaded.projects[0]?.path, realpathSync(originalTarget));
+
+      rmSync(link);
+      symlinkSync(outsideTarget, link, "dir");
+
+      assert.equal(
+        resolveProjectPathForOperation(
+          loaded.projects[0]!.path,
+          true,
+          resolveProjectsRoot(root),
+          cwd,
+        ),
+        realpathSync(originalTarget),
+      );
+    } finally {
+      process.chdir(previousCwd);
+    }
+  });
+});
+
 test("outbound, chained outbound, and broken symlinks fail explicitly", () => {
   withFixture(({ root, cwd, outside }) => {
     const outsideTarget = join(outside, "repo");
