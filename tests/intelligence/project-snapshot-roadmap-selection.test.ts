@@ -5,8 +5,15 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { type ProjectConfig } from "../../src/core/config.js";
+import {
+  resolveProjectsRoot,
+  type ProjectConfig,
+} from "../../src/core/config.js";
 import { buildProjectSnapshot } from "../../src/intelligence/project-snapshot.js";
+
+function buildSnapshot(project: ProjectConfig) {
+  return buildProjectSnapshot(project, resolveProjectsRoot(tmpdir()));
+}
 
 function setupProject(roadmap: string): {
   project: ProjectConfig;
@@ -40,7 +47,7 @@ describe("project snapshot roadmap selection", () => {
     );
 
     try {
-      const snapshot = buildProjectSnapshot(project);
+      const snapshot = buildSnapshot(project);
 
       assert.equal(snapshot.roadmap.stats.done, 2);
       assert.equal(snapshot.roadmap.stats.unknown, 0);
@@ -61,7 +68,7 @@ describe("project snapshot roadmap selection", () => {
     );
 
     try {
-      const snapshot = buildProjectSnapshot(project);
+      const snapshot = buildSnapshot(project);
 
       assert.equal(snapshot.roadmap.stats.unknown, 0);
       assert.equal(snapshot.roadmap.summary.selectable, 1);
@@ -85,7 +92,7 @@ describe("project snapshot roadmap selection", () => {
     );
 
     try {
-      const snapshot = buildProjectSnapshot(project);
+      const snapshot = buildSnapshot(project);
 
       assert.equal(snapshot.roadmap.stats.todo, 1);
       assert.equal(snapshot.roadmap.summary.selectable, 0);
@@ -119,13 +126,16 @@ describe("project snapshot roadmap selection", () => {
     );
 
     try {
-      const snapshot = buildProjectSnapshot(project);
+      const snapshot = buildSnapshot(project);
 
       assert.equal(snapshot.roadmap.stats.todo, 2);
       assert.equal(snapshot.roadmap.summary.selectable, 0);
       assert.equal(snapshot.roadmap.selectedCandidate, null);
       assert.equal(snapshot.planning.recommendation, "gated_no_work");
-      assert.equal(snapshot.roadmap.candidates[1]?.admissibility?.state, "admissible");
+      assert.equal(
+        snapshot.roadmap.candidates[1]?.admissibility?.state,
+        "admissible",
+      );
     } finally {
       cleanup();
     }
@@ -141,7 +151,7 @@ describe("project snapshot roadmap selection", () => {
     );
 
     try {
-      const snapshot = buildProjectSnapshot(project);
+      const snapshot = buildSnapshot(project);
 
       assert.equal(snapshot.roadmap.stats.todo, 2);
       assert.equal(snapshot.roadmap.summary.selectable, 0);
@@ -152,7 +162,10 @@ describe("project snapshot roadmap selection", () => {
         reason: "phase_closed",
         blockedBy: "meta-staging-readiness",
       });
-      assert.equal(snapshot.roadmap.candidates[1]?.admissibility?.state, "admissible");
+      assert.equal(
+        snapshot.roadmap.candidates[1]?.admissibility?.state,
+        "admissible",
+      );
     } finally {
       cleanup();
     }
@@ -161,13 +174,19 @@ describe("project snapshot roadmap selection", () => {
   it("selects the first remaining structured-table lot", () => {
     const currentDir = fileURLToPath(new URL(".", import.meta.url));
     const roadmap = readFileSync(
-      join(currentDir, "..", "fixtures", "roadmaps", "structured-lots-table.md"),
+      join(
+        currentDir,
+        "..",
+        "fixtures",
+        "roadmaps",
+        "structured-lots-table.md",
+      ),
       "utf8",
     );
     const { project, cleanup } = setupProject(roadmap);
 
     try {
-      const snapshot = buildProjectSnapshot(project);
+      const snapshot = buildSnapshot(project);
 
       assert.equal(snapshot.roadmap.stats.total, 26);
       assert.equal(snapshot.roadmap.stats.done, 10);

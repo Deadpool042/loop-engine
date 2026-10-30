@@ -1,8 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, statfsSync } from "node:fs";
+import { existsSync, mkdirSync, statfsSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 
-import type { Config, ProjectConfig } from "../core/config.js";
+import {
+  resolveProjectPathForOperation,
+  resolveProjectsRoot,
+  type Config,
+  type ProjectConfig,
+} from "../core/config.js";
 
 const DEFAULT_MIN_FREE_DISK_GIB = 20;
 const GIB = 1024 ** 3;
@@ -16,11 +21,7 @@ export type WorkspaceMaterializationResult = Readonly<{
   path: string;
   repository: string | null;
   status:
-    | "materialized"
-    | "synchronized"
-    | "already_present"
-    | "skipped"
-    | "failed";
+    "materialized" | "synchronized" | "already_present" | "skipped" | "failed";
   reason?:
     | "mode_none"
     | "repository_not_configured"
@@ -57,13 +58,11 @@ function diskFreeGiB(path: string): number {
   return (Number(stats.bavail) * Number(stats.bsize)) / GIB;
 }
 
-function isDirectWorkspaceChild(workspaceRoot: string, target: string): boolean {
+function isWithinWorkspace(workspaceRoot: string, target: string): boolean {
   const rel = relative(workspaceRoot, target);
   return (
-    rel.length > 0 &&
-    !rel.startsWith(`..${sep}`) &&
-    rel !== ".." &&
-    dirname(target) === workspaceRoot
+    rel === "" ||
+    (!rel.startsWith(`..${sep}`) && rel !== ".." && !rel.startsWith(sep))
   );
 }
 
@@ -73,28 +72,44 @@ export function materializeWorkspaceProject(
 ): WorkspaceMaterializationResult {
   const mode = project.workspace?.mode ?? "permanent";
   const dependencies = project.workspace?.dependencies ?? "none";
-  const target = resolve(project.path);
-  const workspaceRoot = resolve(process.cwd(), "..");
   const repository = project.repository ?? null;
-  const base = {
+  const initialBase = {
     schemaVersion: 1 as const,
     project: project.name,
     mode,
     dependencies,
-    path: target,
+    path: resolve(project.path),
     repository,
   };
 
   if (mode === "none") {
-    return { ...base, status: "skipped", reason: "mode_none" };
+    return { ...initialBase, status: "skipped", reason: "mode_none" };
   }
   if (repository === null) {
-    return { ...base, status: "failed", reason: "repository_not_configured" };
+    return {
+      ...initialBase,
+      status: "failed",
+      reason: "repository_not_configured",
+    };
   }
   if (!GITHUB_REPOSITORY.test(repository)) {
-    return { ...base, status: "failed", reason: "invalid_repository" };
+    return { ...initialBase, status: "failed", reason: "invalid_repository" };
   }
-  if (!isDirectWorkspaceChild(workspaceRoot, target)) {
+
+  const projectsRoot = resolveProjectsRoot();
+  let target: string;
+  try {
+    target = resolveProjectPathForOperation(project.path, false, projectsRoot);
+  } catch {
+    return {
+      ...initialBase,
+      status: "failed",
+      reason: "path_outside_workspace",
+    };
+  }
+  const base = { ...initialBase, path: target };
+  const workspaceRoot = projectsRoot.canonicalPath;
+  if (!isWithinWorkspace(workspaceRoot, target) || target === workspaceRoot) {
     return { ...base, status: "failed", reason: "path_outside_workspace" };
   }
 
@@ -103,23 +118,37 @@ export function materializeWorkspaceProject(
       return { ...base, status: "failed", reason: "existing_path_not_git" };
     }
     try {
-      if (command(["status", "--porcelain"], target).length > 0) {
+      const existingTarget = resolveProjectPathForOperation(
+        target,
+        true,
+        projectsRoot,
+      );
+      if (command(["status", "--porcelain"], existingTarget).length > 0) {
         return { ...base, status: "failed", reason: "dirty_worktree" };
       }
-      if (command(["branch", "--show-current"], target) !== "main") {
+      if (command(["branch", "--show-current"], existingTarget) !== "main") {
         return { ...base, status: "failed", reason: "branch_not_main" };
       }
-      const origin = command(["remote", "get-url", "origin"], target);
+      const origin = command(["remote", "get-url", "origin"], existingTarget);
       if (!expectedOrigins(repository).includes(origin)) {
         return { ...base, status: "failed", reason: "origin_mismatch" };
       }
       command(
         ["fetch", "--no-tags", "--no-recurse-submodules", "origin", "main"],
-        target,
+        resolveProjectPathForOperation(target, true, projectsRoot),
       );
-      const before = command(["rev-parse", "HEAD"], target);
-      command(["merge", "--ff-only", "refs/remotes/origin/main"], target);
-      const after = command(["rev-parse", "HEAD"], target);
+      const before = command(
+        ["rev-parse", "HEAD"],
+        resolveProjectPathForOperation(target, true, projectsRoot),
+      );
+      command(
+        ["merge", "--ff-only", "refs/remotes/origin/main"],
+        resolveProjectPathForOperation(target, true, projectsRoot),
+      );
+      const after = command(
+        ["rev-parse", "HEAD"],
+        resolveProjectPathForOperation(target, true, projectsRoot),
+      );
       return {
         ...base,
         status: before === after ? "already_present" : "synchronized",
@@ -143,6 +172,12 @@ export function materializeWorkspaceProject(
   }
 
   try {
+    mkdirSync(dirname(target), { recursive: true });
+    const cloneTarget = resolveProjectPathForOperation(
+      target,
+      false,
+      projectsRoot,
+    );
     command(
       [
         "clone",
@@ -151,7 +186,7 @@ export function materializeWorkspaceProject(
         "--single-branch",
         "--no-tags",
         `git@github.com:${repository}.git`,
-        target,
+        cloneTarget,
       ],
       workspaceRoot,
     );

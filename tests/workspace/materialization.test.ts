@@ -1,14 +1,24 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 
-import type { Config, ProjectConfig } from "../../src/core/config.js";
+import {
+  resolveProjectsRoot,
+  type Config,
+  type ProjectConfig,
+} from "../../src/core/config.js";
 import { buildProjectSnapshot } from "../../src/intelligence/project-snapshot.js";
 import { materializeWorkspaceProject } from "../../src/workspace/materialization.js";
 
 function project(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
   return {
     name: "fixture",
-    path: "/tmp/loop-engine-workspace-fixture-does-not-exist",
+    path: join(
+      resolveProjectsRoot(tmpdir()).canonicalPath,
+      "loop-engine-workspace-fixture-does-not-exist",
+    ),
     type: "fixture",
     required_docs: ["README.md"],
     validation: [],
@@ -18,8 +28,10 @@ function project(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
 }
 
 test("none mode treats an absent project as expected and healthy", () => {
-  const fixture = project({ workspace: { mode: "none", dependencies: "none" } });
-  const snapshot = buildProjectSnapshot(fixture);
+  const fixture = project({
+    workspace: { mode: "none", dependencies: "none" },
+  });
+  const snapshot = buildProjectSnapshot(fixture, resolveProjectsRoot(tmpdir()));
 
   assert.equal(snapshot.workspace.materialized, false);
   assert.equal(snapshot.workspace.expectedAbsent, true);
@@ -33,7 +45,7 @@ test("on_demand mode treats an absent project as expected and healthy", () => {
     repository: "Deadpool042/example",
     workspace: { mode: "on_demand", dependencies: "on_demand" },
   });
-  const snapshot = buildProjectSnapshot(fixture);
+  const snapshot = buildProjectSnapshot(fixture, resolveProjectsRoot(tmpdir()));
 
   assert.equal(snapshot.workspace.expectedAbsent, true);
   assert.equal(snapshot.workspace.repository, "Deadpool042/example");
@@ -45,7 +57,7 @@ test("source_only mode still warns when its source checkout is absent", () => {
     repository: "Deadpool042/example",
     workspace: { mode: "source_only", dependencies: "none" },
   });
-  const snapshot = buildProjectSnapshot(fixture);
+  const snapshot = buildProjectSnapshot(fixture, resolveProjectsRoot(tmpdir()));
 
   assert.equal(snapshot.workspace.expectedAbsent, false);
   assert.deepEqual(snapshot.docs.missing, ["README.md"]);
@@ -53,7 +65,9 @@ test("source_only mode still warns when its source checkout is absent", () => {
 });
 
 test("materialization skips mode none without requiring a repository", () => {
-  const fixture = project({ workspace: { mode: "none", dependencies: "none" } });
+  const fixture = project({
+    workspace: { mode: "none", dependencies: "none" },
+  });
   const config: Config = { projects: [fixture] };
 
   assert.deepEqual(materializeWorkspaceProject(config, fixture), {
@@ -61,7 +75,10 @@ test("materialization skips mode none without requiring a repository", () => {
     project: "fixture",
     mode: "none",
     dependencies: "none",
-    path: "/tmp/loop-engine-workspace-fixture-does-not-exist",
+    path: join(
+      resolveProjectsRoot(tmpdir()).canonicalPath,
+      "loop-engine-workspace-fixture-does-not-exist",
+    ),
     repository: null,
     status: "skipped",
     reason: "mode_none",
@@ -82,4 +99,36 @@ test("materialization rejects repository values outside the bounded GitHub slug 
   const result = materializeWorkspaceProject(config, fixture);
   assert.equal(result.status, "failed");
   assert.equal(result.reason, "invalid_repository");
+});
+
+test("materialization accepts a confined nested destination and checks free space at Projects root", () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-materialization-root-"));
+  const destination = join(root, "apps", "internal", "fixture");
+  mkdirSync(join(root, "apps", "internal"), { recursive: true });
+  const previous = process.env.LOOP_PROJECTS_ROOT;
+  process.env.LOOP_PROJECTS_ROOT = root;
+  try {
+    const fixture = project({
+      path: destination,
+      repository: "Deadpool042/fixture",
+      workspace: { mode: "permanent", dependencies: "none" },
+    });
+    const result = materializeWorkspaceProject(
+      {
+        workspace_policy: { min_free_disk_gib: 100_000 },
+        projects: [fixture],
+      },
+      fixture,
+    );
+
+    assert.equal(result.reason, "low_disk_space");
+    assert.equal(
+      result.path,
+      join(realpathSync(root), "apps", "internal", "fixture"),
+    );
+  } finally {
+    if (previous === undefined) delete process.env.LOOP_PROJECTS_ROOT;
+    else process.env.LOOP_PROJECTS_ROOT = previous;
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -3,7 +3,11 @@ import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "nod
 import { dirname, join } from "node:path";
 import { resolveContextPath } from "../context/path.js";
 import type { ExecutionDecisionCurrent, ExecutionDecisionPublicationFailureCode, ExecutionDecisionPublicationResult } from "./execution-decision-service.js";
-import { loadConfig, type ProjectConfig } from "../core/config.js";
+import {
+  loadConfig,
+  resolveProjectPathForOperation,
+  type ProjectConfig,
+} from "../core/config.js";
 import { findProject } from "../core/project.js";
 import { generateProjectReport } from "../core/reports.js";
 import { getLastCommit } from "../core/git.js";
@@ -12,13 +16,12 @@ import { resolveExecutionAuthorization } from "./execution-authorization.js";
 import type { ExecutionDecisionDraft } from "./execution-decision-draft.js";
 import { createExecutionDecisionService, type ExecutionDecisionProviderProposal } from "./execution-decision-service.js";
 import { createExecutionDecisionDraftStore } from "./execution-decision-approval.js";
-import { resolve } from "node:path";
 
 const SHA = /^[0-9a-f]{40}$/i;
 export type ProductionCurrent = ExecutionDecisionCurrent & Readonly<{ projectConfig: ProjectConfig }>;
 export function getCurrentExecutionDecisionState(projectName: string, dependencies: Readonly<{ loadConfig?: typeof loadConfig; findProject?: typeof findProject; report?: typeof generateProjectReport; lastCommit?: typeof getLastCommit }> = {}): ProductionCurrent | null {
   const project = (dependencies.findProject ?? findProject)((dependencies.loadConfig ?? loadConfig)(), projectName); if (!project || typeof project.execution_decision !== "string" || project.execution_decision.trim().length === 0) return null;
-  const projectPath = resolve(project.path); const decision = resolveContextPath(projectPath, project.execution_decision); if (!decision.insideProject || decision.absolutePath === projectPath) return null;
+  const projectPath = resolveProjectPathForOperation(project.path, true); const decision = resolveContextPath(projectPath, project.execution_decision); if (!decision.insideProject || decision.absolutePath === projectPath) return null;
   const snapshot = (dependencies.report ?? generateProjectReport)(project); const candidate = snapshot.roadmap.selectedCandidate; const head = (dependencies.lastCommit ?? getLastCommit)(projectPath)?.hash;
   if (!candidate?.id || candidate.status === "done" || candidate.admissibility?.state === "not_admissible" || !SHA.test(head ?? "") || !candidate.path) return null;
   const source = resolveContextPath(projectPath, candidate.path); if (!source.insideProject) return null;
@@ -26,11 +29,13 @@ export function getCurrentExecutionDecisionState(projectName: string, dependenci
 }
 
 export function validatePublishedExecutionDecision(current: ExecutionDecisionCurrent, draft: ExecutionDecisionDraft, read: typeof readFileSync = readFileSync): boolean {
-  const destination = resolveContextPath(current.projectPath, current.executionDecisionPath); if (!destination.insideProject) return false;
+  let projectPath: string; try { projectPath = resolveProjectPathForOperation(current.projectPath, true); } catch { return false; }
+  const destination = resolveContextPath(projectPath, current.executionDecisionPath); if (!destination.insideProject) return false;
   let raw: string; try { raw = read(destination.absolutePath, "utf8"); } catch { return false; }
   const parsed = parseExecutionDecisionFile(raw); if (!parsed.ok) return false;
-  const project = (current as ProductionCurrent).projectConfig ?? findProject(loadConfig(), current.project); if (!project || resolve(project.path) !== current.projectPath || project.execution_decision !== current.executionDecisionPath) return false;
-  const authorization = resolveExecutionAuthorization(project, current.projectPath, current.gitHead);
+  const project = (current as ProductionCurrent).projectConfig ?? findProject(loadConfig(), current.project); if (!project || project.execution_decision !== current.executionDecisionPath) return false;
+  try { if (resolveProjectPathForOperation(project.path, true) !== projectPath) return false; } catch { return false; }
+  const authorization = resolveExecutionAuthorization(project, projectPath, current.gitHead);
   return authorization.governed && authorization.authorized && authorization.candidateId === draft.candidateId && JSON.stringify(authorization.allowedPaths) === JSON.stringify(draft.allowedPaths);
 }
 
@@ -53,13 +58,23 @@ function publicationFailure(code: ExecutionDecisionPublicationFailureCode, error
 export function createTransactionalDecisionPublisher(options: Readonly<{ writeFile?: typeof writeFileSync; rename?: typeof renameSync; readFile?: typeof readFileSync; exists?: typeof existsSync; remove?: typeof rmSync }>) {
   const write = options.writeFile ?? writeFileSync, rename = options.rename ?? renameSync, read = options.readFile ?? readFileSync, exists = options.exists ?? existsSync, remove = options.remove ?? rmSync;
   return (projectPath: string, relativePath: string, contents: string): Readonly<{ ok: true; publication: DecisionPublication }> | Extract<ExecutionDecisionPublicationResult, { ok: false }> => {
-    const destination = resolveContextPath(projectPath, relativePath); if (!destination.insideProject) return publicationFailure("decision_draft_write_failed");
+    let safeProjectPath: string; try { safeProjectPath = resolveProjectPathForOperation(projectPath, true); } catch (error) { return publicationFailure("decision_draft_write_failed", error); }
+    let destination = resolveContextPath(safeProjectPath, relativePath); if (!destination.insideProject) return publicationFailure("decision_draft_write_failed");
+    try { safeProjectPath = resolveProjectPathForOperation(safeProjectPath, true); destination = resolveContextPath(safeProjectPath, relativePath); } catch (error) { return publicationFailure("decision_draft_write_failed", error); }
+    if (!destination.insideProject) return publicationFailure("decision_draft_write_failed");
     let previous: string | undefined; if (exists(destination.absolutePath)) { try { previous = read(destination.absolutePath, "utf8"); } catch (error) { return publicationFailure("decision_draft_read_previous_failed", error); } }
+    try { safeProjectPath = resolveProjectPathForOperation(safeProjectPath, true); destination = resolveContextPath(safeProjectPath, relativePath); } catch (error) { return publicationFailure("decision_draft_write_failed", error); }
+    if (!destination.insideProject) return publicationFailure("decision_draft_write_failed");
     const destinationDirectory = dirname(destination.absolutePath);
     const temporary = join(destinationDirectory, `.${randomUUID()}.tmp`);
     try { write(temporary, contents, { mode: 0o600 }); } catch (error) { try { remove(temporary, { force: true }); } catch {} return publicationFailure("decision_draft_write_temp_failed", error); }
-    try { rename(temporary, destination.absolutePath); } catch (error) { try { remove(temporary, { force: true }); } catch {} return publicationFailure("decision_draft_rename_failed", error); }
-    return { ok: true, publication: { commit: () => true, recover: () => { try { if (previous === undefined) remove(destination.absolutePath, { force: true }); else { const rollback = join(dirname(destination.absolutePath), `.${randomUUID()}.tmp`); write(rollback, previous, { mode: 0o600 }); rename(rollback, destination.absolutePath); } return true; } catch { return false; } } } };
+    try {
+      safeProjectPath = resolveProjectPathForOperation(safeProjectPath, true);
+      const verifiedDestination = resolveContextPath(safeProjectPath, relativePath);
+      if (!verifiedDestination.insideProject) throw new Error("Decision destination is outside its project.");
+      rename(temporary, verifiedDestination.absolutePath);
+    } catch (error) { try { remove(temporary, { force: true }); } catch {} return publicationFailure("decision_draft_rename_failed", error); }
+    return { ok: true, publication: { commit: () => true, recover: () => { try { const recoveryRoot = resolveProjectPathForOperation(safeProjectPath, true); const recoveryDestination = resolveContextPath(recoveryRoot, relativePath); if (!recoveryDestination.insideProject) return false; if (previous === undefined) remove(recoveryDestination.absolutePath, { force: true }); else { const rollback = join(dirname(recoveryDestination.absolutePath), `.${randomUUID()}.tmp`); write(rollback, previous, { mode: 0o600 }); rename(rollback, recoveryDestination.absolutePath); } return true; } catch { return false; } } } };
   };
 }
 

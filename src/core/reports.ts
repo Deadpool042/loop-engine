@@ -14,7 +14,11 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 
-import type { Config, ProjectConfig } from "./config.js";
+import {
+  resolveProjectPathForOperation,
+  type Config,
+  type ProjectConfig,
+} from "./config.js";
 import { docExists } from "./docs.js";
 import { isGitRepository } from "./git.js";
 import { LOOP_RUN_STATUSES, type LoopRunResult } from "../loop/types.js";
@@ -143,9 +147,7 @@ function buildRoadmapCompletionEvent(
     (candidate) => candidate.status !== "done",
   );
   const completedIndex =
-    firstOpenIndex === -1
-      ? sequencedCandidates.length - 1
-      : firstOpenIndex - 1;
+    firstOpenIndex === -1 ? sequencedCandidates.length - 1 : firstOpenIndex - 1;
   const completedCandidate = sequencedCandidates[completedIndex];
 
   if (!completedCandidate || completedCandidate.status !== "done") {
@@ -254,7 +256,10 @@ export function generateRoadmapCandidateDetailReport(
   }
 
   const projectedCandidate = projectRoadmapProposalCandidate(candidate);
-  const detail = resolveRoadmapCandidateDetail(snapshot.project.path, candidate);
+  const detail = resolveRoadmapCandidateDetail(
+    snapshot.project.path,
+    candidate,
+  );
 
   if (!detail) {
     return Object.freeze({
@@ -437,10 +442,7 @@ export async function generateRoadmapProposalReport(
 }
 
 export type RoadmapDecisionStatus =
-  | "existing_candidate"
-  | "proposal"
-  | "no_proposal"
-  | "unavailable";
+  "existing_candidate" | "proposal" | "no_proposal" | "unavailable";
 
 export type RoadmapDecisionReport = Readonly<{
   schemaVersion: 1;
@@ -879,11 +881,15 @@ function run(command: string, cwd: string): string {
 
 export function generateReviewReport(project: ProjectConfig) {
   const snapshot = generateProjectReport(project);
+  const projectPath = resolveProjectPathForOperation(
+    snapshot.project.path,
+    true,
+  );
   const diffNameOnly = snapshot.git.requiresGit
-    ? run("git diff --name-only", snapshot.project.path)
+    ? run("git diff --name-only", projectPath)
     : "";
   const gitStatus = snapshot.git.requiresGit
-    ? run("git status --short", snapshot.project.path)
+    ? run("git status --short", projectPath)
     : "";
   const changedPaths = mergeChangedPaths(
     changedPathsFromGitDiff(diffNameOnly),
@@ -896,11 +902,9 @@ export function generateReviewReport(project: ProjectConfig) {
     git: snapshot.git,
     gitStatus,
     diffStat: snapshot.git.requiresGit
-      ? run("git diff --stat", snapshot.project.path)
+      ? run("git diff --stat", projectPath)
       : "",
-    diff: snapshot.git.requiresGit
-      ? run("git diff", snapshot.project.path)
-      : "",
+    diff: snapshot.git.requiresGit ? run("git diff", projectPath) : "",
     documentationImpact: createDocumentationImpactReport(changedPaths),
     validation: snapshot.validation,
     health: snapshot.health,
@@ -920,18 +924,18 @@ export function generateDoctorReport(config: Config) {
   const projects: DoctorProjectReport[] = config.projects
     .filter((project) => project.retired !== true)
     .map((project) => {
-    const path = resolve(project.path);
-    const exists = existsSync(path);
-    return {
-      project,
-      path,
-      exists,
-      isGitRepository: isGitRepository(path),
-      missingRequiredDocs: exists
-        ? project.required_docs.filter((doc) => !docExists(path, doc))
-        : project.required_docs,
-    };
-  });
+      const path = resolveProjectPathForOperation(project.path, false);
+      const exists = existsSync(path);
+      return {
+        project,
+        path,
+        exists,
+        isGitRepository: isGitRepository(path),
+        missingRequiredDocs: exists
+          ? project.required_docs.filter((doc) => !docExists(path, doc))
+          : project.required_docs,
+      };
+    });
 
   return {
     projects,
@@ -961,8 +965,8 @@ export async function runConfiguredValidations(
   exitCode: number;
   diagnostics: readonly string[];
 }> {
-  const projectPath = resolve(project.path);
   for (const command of project.validation) {
+    const projectPath = resolveProjectPathForOperation(project.path, true);
     const observed = await runCommand(command, projectPath);
     const exitCode =
       typeof observed === "number" ? observed : observed.exitCode;
@@ -979,7 +983,7 @@ export async function runConfiguredValidations(
 
 export function generateProjectValidationReport(project: ProjectConfig) {
   return {
-    projectPath: resolve(project.path),
+    projectPath: resolveProjectPathForOperation(project.path, false),
     configured: project.validation.length > 0,
   };
 }

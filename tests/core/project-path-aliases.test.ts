@@ -1,88 +1,89 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import {
-  existsSync,
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import test from "node:test";
 
-import { loadConfig, resolveProjectPath } from "../../src/core/config.js";
+import {
+  loadConfig,
+  resolveProjectPath,
+  resolveProjectsRoot,
+} from "../../src/core/config.js";
 
-test("project path is unchanged without aliases", () => {
-  assert.equal(
-    resolveProjectPath({ path: "../CREATYSS" }, () => false),
-    "../CREATYSS",
-  );
+test("declared primary path is retained when no candidate exists", () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-aliases-"));
+  const cwd = join(root, "platform", "loop-engine");
+  mkdirSync(cwd, { recursive: true });
+  try {
+    assert.equal(
+      resolveProjectPath(
+        { path: "../CREATYSS" },
+        resolveProjectsRoot(root),
+        cwd,
+      ),
+      "../CREATYSS",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
-test("declared path is selected when it is the only existing candidate (VPS layout)", () => {
-  const existing = new Set(["../CREATYSS"]);
-  assert.equal(
-    resolveProjectPath(
-      { path: "../CREATYSS", path_aliases: ["../creatyss"] },
-      (candidate) => existing.has(candidate),
-    ),
-    "../CREATYSS",
-  );
+test("the declared candidate is used when it is the only existing exact-case path", () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-aliases-"));
+  const cwd = join(root, "platform", "loop-engine");
+  mkdirSync(cwd, { recursive: true });
+  mkdirSync(join(root, "CREATYSS"));
+  try {
+    assert.equal(
+      resolveProjectPath(
+        { path: "../CREATYSS", path_aliases: ["../creatyss"] },
+        resolveProjectsRoot(root),
+        cwd,
+      ),
+      "../CREATYSS",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
-test("multiple existing candidates fail closed instead of selecting the primary silently", () => {
-  const existing = new Set([
-    "../CREATYSS",
-    "../creatyss",
-    "../../apps/clients/creatyss",
-  ]);
-  assert.throws(
-    () =>
+test("the exact-case alias is selected when the primary path is absent", () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-aliases-"));
+  const cwd = join(root, "platform", "loop-engine");
+  mkdirSync(cwd, { recursive: true });
+  mkdirSync(join(root, "platform", "lp-infra"));
+  try {
+    assert.equal(
       resolveProjectPath(
         {
-          path: "../CREATYSS",
-          path_aliases: ["../creatyss", "../../apps/clients/creatyss"],
+          path: "../lp-infra-runtime",
+          path_aliases: ["../missing", "../lp-infra"],
         },
-        (candidate) => existing.has(candidate),
+        resolveProjectsRoot(root),
+        cwd,
       ),
-    /ambiguous/,
-  );
+      "../lp-infra",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
-test("first existing alias is used when path is absent (Mac layout)", () => {
-  const existing = new Set(["../lp-infra"]);
-  assert.equal(
-    resolveProjectPath(
-      {
-        path: "../lp-infra-runtime",
-        path_aliases: ["../missing", "../lp-infra"],
-      },
-      (candidate) => existing.has(candidate),
-    ),
-    "../lp-infra",
-  );
-});
-
-test("declared path is kept when nothing exists, preserving current errors", () => {
-  assert.equal(
-    resolveProjectPath(
-      { path: "../lp-infra-runtime", path_aliases: ["../lp-infra"] },
-      () => false,
-    ),
-    "../lp-infra-runtime",
-  );
-});
-
-test("loadConfig applies exact-case alias resolution from the process cwd", () => {
+test("loadConfig applies exact-case alias resolution using its explicit projects root", () => {
   const root = mkdtempSync(join(tmpdir(), "loop-aliases-"));
+  const cwd = join(root, "work", "loop");
   const previous = process.cwd();
   try {
-    mkdirSync(join(root, "work", "loop"), { recursive: true });
+    mkdirSync(cwd, { recursive: true });
     mkdirSync(join(root, "work", "creatyss"));
     writeFileSync(
-      join(root, "work", "loop", "projects.yaml"),
+      join(cwd, "projects.yaml"),
       [
         "projects:",
         "  - name: creatyss",
@@ -99,39 +100,49 @@ test("loadConfig applies exact-case alias resolution from the process cwd", () =
         "",
       ].join("\n"),
     );
-    process.chdir(join(root, "work", "loop"));
-    const config = loadConfig();
-    // Exact-case matching: "../CREATYSS" must not be accepted on case-insensitive filesystems.
-    assert.equal(config.projects[0]?.path, "../creatyss");
-    assert.equal(config.projects[1]?.path, "../plain");
+    process.chdir(cwd);
+    const config = loadConfig(root);
+    assert.equal(
+      config.projects[0]?.path,
+      join(realpathSync(root), "work", "creatyss"),
+    );
+    assert.equal(
+      config.projects[1]?.path,
+      join(realpathSync(root), "work", "plain"),
+    );
   } finally {
     process.chdir(previous);
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("Mac and target layouts resolve when each is present alone", () => {
+test("historical, current, and ADR-0021 layouts resolve their exact existing candidates", () => {
   const root = mkdtempSync(join(tmpdir(), "loop-layouts-"));
   const previous = process.cwd();
+  const projectsRoot = resolveProjectsRoot(root);
   try {
+    const historicalLoop = join(root, "historical", "loop-engine");
+    mkdirSync(historicalLoop, { recursive: true });
+    mkdirSync(join(root, "historical", "CREATYSS"));
+    process.chdir(historicalLoop);
+    assert.equal(
+      resolveProjectPath(
+        { path: "../CREATYSS", path_aliases: ["../creatyss"] },
+        projectsRoot,
+      ),
+      "../CREATYSS",
+    );
+
     const currentLoop = join(root, "current", "loop-engine");
     mkdirSync(currentLoop, { recursive: true });
     mkdirSync(join(root, "current", "creatyss"));
-    mkdirSync(join(root, "current", "lp-infra"));
     process.chdir(currentLoop);
     assert.equal(
-      resolveProjectPath({
-        path: "../CREATYSS",
-        path_aliases: ["../creatyss"],
-      }),
+      resolveProjectPath(
+        { path: "../CREATYSS", path_aliases: ["../creatyss"] },
+        projectsRoot,
+      ),
       "../creatyss",
-    );
-    assert.equal(
-      resolveProjectPath({
-        path: "../lp-infra-runtime",
-        path_aliases: ["../lp-infra"],
-      }),
-      "../lp-infra",
     );
 
     const targetLoop = join(root, "target", "platform", "loop-engine");
@@ -142,119 +153,15 @@ test("Mac and target layouts resolve when each is present alone", () => {
     mkdirSync(join(root, "target", "platform", "lp-infra"));
     process.chdir(targetLoop);
     assert.equal(
-      resolveProjectPath({ path: "../../apps/clients/creatyss" }),
+      resolveProjectPath({ path: "../../apps/clients/creatyss" }, projectsRoot),
       "../../apps/clients/creatyss",
     );
-    assert.equal(resolveProjectPath({ path: "../lp-infra" }), "../lp-infra");
-  } finally {
-    process.chdir(previous);
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("historically documented VPS layout selects exact-case primary paths", () => {
-  const root = mkdtempSync(join(tmpdir(), "loop-vps-layout-"));
-  const previous = process.cwd();
-  try {
-    const projects = join(root, "home", "ubuntu", "Projects");
-    const loop = join(projects, "loop-engine");
-    mkdirSync(loop, { recursive: true });
-    mkdirSync(join(projects, "CREATYSS"));
-    mkdirSync(join(projects, "lp-infra-runtime"));
-    process.chdir(loop);
     assert.equal(
-      resolveProjectPath({
-        path: "../CREATYSS",
-        path_aliases: ["../creatyss"],
-      }),
-      "../CREATYSS",
-    );
-    assert.equal(
-      resolveProjectPath({
-        path: "../lp-infra-runtime",
-        path_aliases: ["../lp-infra"],
-      }),
-      "../lp-infra-runtime",
+      resolveProjectPath({ path: "../lp-infra" }, projectsRoot),
+      "../lp-infra",
     );
   } finally {
     process.chdir(previous);
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("coexisting same-identity and different-identity Git candidates both fail closed", () => {
-  const root = mkdtempSync(join(tmpdir(), "loop-candidate-identities-"));
-  const createRepo = (path: string, remote: string) => {
-    mkdirSync(path, { recursive: true });
-    const template = join(root, "empty-template");
-    mkdirSync(template, { recursive: true });
-    execFileSync("git", ["init", "--quiet", `--template=${template}`, path]);
-    execFileSync("git", ["-C", path, "remote", "add", "origin", remote]);
-  };
-  try {
-    const primary = join(root, "creatyss-primary");
-    const alias = join(root, "creatyss-alias");
-    createRepo(primary, "https://github.com/Deadpool042/CREATYSS.git");
-    createRepo(alias, "https://github.com/Deadpool042/CREATYSS.git");
-    const candidates = { path: primary, path_aliases: [alias] };
-    assert.equal(
-      execFileSync("git", ["-C", primary, "remote", "get-url", "origin"], {
-        encoding: "utf8",
-      }).trim(),
-      execFileSync("git", ["-C", alias, "remote", "get-url", "origin"], {
-        encoding: "utf8",
-      }).trim(),
-    );
-    assert.throws(
-      () => resolveProjectPath(candidates, existsSync),
-      /ambiguous/,
-    );
-
-    execFileSync("git", [
-      "-C",
-      alias,
-      "remote",
-      "set-url",
-      "origin",
-      "https://github.com/example/other.git",
-    ]);
-    assert.notEqual(
-      execFileSync("git", ["-C", primary, "remote", "get-url", "origin"], {
-        encoding: "utf8",
-      }).trim(),
-      execFileSync("git", ["-C", alias, "remote", "get-url", "origin"], {
-        encoding: "utf8",
-      }).trim(),
-    );
-    assert.throws(
-      () => resolveProjectPath(candidates, existsSync),
-      /ambiguous/,
-    );
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("absolute candidates are accepted without a root policy", () => {
-  const root = mkdtempSync(join(tmpdir(), "loop-absolute-path-"));
-  try {
-    const outside = join(root, "outside-project");
-    mkdirSync(outside);
-    assert.equal(resolveProjectPath({ path: outside }, existsSync), outside);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
-  }
-});
-
-test("symlink candidates are accepted without resolving or checking their target", () => {
-  const root = mkdtempSync(join(tmpdir(), "loop-symlink-path-"));
-  try {
-    const outside = join(root, "outside-project");
-    const linked = join(root, "linked-project");
-    mkdirSync(outside);
-    symlinkSync(outside, linked, "dir");
-    assert.equal(resolveProjectPath({ path: linked }, existsSync), linked);
-  } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });

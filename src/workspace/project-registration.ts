@@ -3,7 +3,12 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import * as path from "node:path";
 import { isSeq, parse as parseYaml, parseDocument } from "yaml";
 
-import type { Config, ProjectConfig } from "../core/config.js";
+import {
+  resolveProjectPathForOperation,
+  resolveProjectsRoot,
+  type Config,
+  type ProjectConfig,
+} from "../core/config.js";
 
 const PROJECT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const PROJECT_TYPE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
@@ -34,8 +39,10 @@ function assertRegistrationInput(
   type: string,
   confirmBriefApproved: true,
 ): void {
-  if (!PROJECT_NAME_PATTERN.test(name)) throw new Error("Invalid project identity.");
-  if (!PROJECT_TYPE_PATTERN.test(type)) throw new Error("Invalid project type.");
+  if (!PROJECT_NAME_PATTERN.test(name))
+    throw new Error("Invalid project identity.");
+  if (!PROJECT_TYPE_PATTERN.test(type))
+    throw new Error("Invalid project type.");
   if (confirmBriefApproved !== true) {
     throw new Error("Approved Project Brief must be explicitly confirmed.");
   }
@@ -52,7 +59,9 @@ function assertLoopEngineRegistrationWorktree(loopEngineRoot: string): void {
     );
   }
   if (git(loopEngineRoot, ["status", "--porcelain"]) !== "") {
-    throw new Error("Project registration requires a clean Loop Engine worktree.");
+    throw new Error(
+      "Project registration requires a clean Loop Engine worktree.",
+    );
   }
 }
 
@@ -88,10 +97,14 @@ function assertApprovedEnvelope(
   return target;
 }
 
-function projectConfig(name: string, type: string): ProjectConfig {
+function projectConfig(
+  name: string,
+  type: string,
+  relativePath: string,
+): ProjectConfig {
   return {
     name,
-    path: `../${name}`,
+    path: relativePath,
     type,
     workspace: { mode: "source_only", dependencies: "on_demand" },
     required_docs: [
@@ -118,17 +131,28 @@ export function registerProjectEnvelope(
   confirmBriefApproved: true,
 ): ProjectRegistrationResult {
   assertRegistrationInput(name, type, confirmBriefApproved);
-  const canonicalLoopEngineRoot = path.resolve(loopEngineRoot);
+  const projectsRoot = resolveProjectsRoot();
+  const canonicalLoopEngineRoot = resolveProjectPathForOperation(
+    loopEngineRoot,
+    true,
+    projectsRoot,
+  );
   assertLoopEngineRegistrationWorktree(canonicalLoopEngineRoot);
 
-  const workspaceRoot = path.dirname(canonicalLoopEngineRoot);
+  const workspaceRoot = projectsRoot.canonicalPath;
   const target = assertApprovedEnvelope(workspaceRoot, name, type);
   const registryPath = path.join(canonicalLoopEngineRoot, "projects.yaml");
   const original = readFileSync(registryPath, "utf8");
   const config = parseYaml(original) as Config;
-  const relativePath = `../${name}`;
-  if (config.projects.some((project) => project.name === name && project.retired === true)) {
-    throw new Error("Project identity is retired and can never be registered again.");
+  const relativePath = path.relative(canonicalLoopEngineRoot, target);
+  if (
+    config.projects.some(
+      (project) => project.name === name && project.retired === true,
+    )
+  ) {
+    throw new Error(
+      "Project identity is retired and can never be registered again.",
+    );
   }
   if (config.projects.some((project) => project.name === name)) {
     throw new Error("Project identity is already registered.");
@@ -143,13 +167,19 @@ export function registerProjectEnvelope(
   if (!isSeq(projects)) {
     throw new Error("projects.yaml projects node is not a sequence.");
   }
-  projects.add(projectConfig(name, type));
+  projects.add(projectConfig(name, type, relativePath));
 
   try {
     writeFileSync(registryPath, document.toString({ lineWidth: 0 }), "utf8");
     const reparsed = parseYaml(readFileSync(registryPath, "utf8")) as Config;
-    const registered = reparsed.projects.find((project) => project.name === name);
-    if (!registered || registered.path !== relativePath || registered.type !== type) {
+    const registered = reparsed.projects.find(
+      (project) => project.name === name,
+    );
+    if (
+      !registered ||
+      registered.path !== relativePath ||
+      registered.type !== type
+    ) {
       throw new Error("Registered project failed post-write verification.");
     }
   } catch (error) {

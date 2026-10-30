@@ -1,7 +1,11 @@
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 
-import { type ProjectConfig } from "../core/config.js";
+import {
+  resolveProjectPathForOperation,
+  resolveProjectsRoot,
+  type ProjectConfig,
+  type ProjectsRoot,
+} from "../core/config.js";
 import { docExists } from "../core/docs.js";
 import {
   getGitBranch,
@@ -14,13 +18,21 @@ import { buildObjectiveStatus } from "./objective.js";
 import { buildPlanningStatus, resolvePlanningMode } from "./planning.js";
 import { type ProjectSnapshot } from "./snapshot.js";
 
-export function buildProjectSnapshot(project: ProjectConfig): ProjectSnapshot {
-  const projectPath = resolve(project.path);
+export function buildProjectSnapshot(
+  project: ProjectConfig,
+  projectsRoot: ProjectsRoot = resolveProjectsRoot(),
+): ProjectSnapshot {
+  const projectPath = resolveProjectPathForOperation(
+    project.path,
+    false,
+    projectsRoot,
+  );
   const workspaceMode = project.workspace?.mode ?? "permanent";
   const dependencyMode = project.workspace?.dependencies ?? "none";
   const materialized = existsSync(projectPath);
   const expectedAbsent =
-    !materialized && (workspaceMode === "on_demand" || workspaceMode === "none");
+    !materialized &&
+    (workspaceMode === "on_demand" || workspaceMode === "none");
 
   const missingDocs = expectedAbsent
     ? []
