@@ -72,18 +72,28 @@ function existsExactCase(candidate: string): boolean {
 }
 
 /**
- * Picks the first existing candidate among `path` then `path_aliases`.
- * Falls back to the declared `path` unchanged so existing failures stay identical.
+ * Resolves one existing candidate among `path` then `path_aliases`.
+ * Falls back to the declared `path` unchanged when none exist, but refuses
+ * multiple existing candidates so a stale or duplicate checkout is not chosen silently.
  */
 export function resolveProjectPath(
   project: Pick<ProjectConfig, "path" | "path_aliases">,
   exists: (candidate: string) => boolean = existsExactCase,
 ): string {
-  if (!Array.isArray(project.path_aliases) || project.path_aliases.length === 0) {
+  if (
+    !Array.isArray(project.path_aliases) ||
+    project.path_aliases.length === 0
+  ) {
     return project.path;
   }
   const candidates = [project.path, ...project.path_aliases];
-  return candidates.find((candidate) => exists(candidate)) ?? project.path;
+  const existing = candidates.filter((candidate) => exists(candidate));
+  if (existing.length > 1) {
+    throw new Error(
+      "Project path is ambiguous: multiple configured paths exist.",
+    );
+  }
+  return existing[0] ?? project.path;
 }
 
 export function loadConfig(): Config {
