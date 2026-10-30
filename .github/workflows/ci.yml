@@ -50,6 +50,7 @@ jobs:
     timeout-minutes: 30
     env:
       LOOP_PROJECTS_ROOT: ${{ github.workspace }}/Projects
+      TMPDIR: ${{ github.workspace }}/Projects/.tmp
     defaults:
       run:
         shell: bash
@@ -79,6 +80,8 @@ jobs:
             ${{ runner.os }}-pnpm-store-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Prepare confined test temporary directory
+        run: mkdir -p "$TMPDIR"
       - name: Run reference validation
         run: |
           mkdir -p artifacts
