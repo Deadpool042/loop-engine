@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -28,6 +34,8 @@ function sourceState(cwd: string): readonly string[] {
 
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "loop-v33-candidate-"));
+  const previousProjectsRoot = process.env.LOOP_PROJECTS_ROOT;
+  process.env.LOOP_PROJECTS_ROOT = root;
   const source = join(root, "source");
   const candidate = join(root, "candidate");
   const patchPath = join(root, "validated.patch");
@@ -55,7 +63,12 @@ function setup() {
     candidate,
     patchPath,
     baseSha,
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    cleanup: () => {
+      if (previousProjectsRoot === undefined)
+        delete process.env.LOOP_PROJECTS_ROOT;
+      else process.env.LOOP_PROJECTS_ROOT = previousProjectsRoot;
+      rmSync(root, { recursive: true, force: true });
+    },
   };
 }
 
@@ -209,6 +222,40 @@ describe("V33 governed candidate ref publication", () => {
       );
     } finally {
       fixture.cleanup();
+    }
+  });
+
+  it("revalidates the project destination before publishing after a symlink change", async () => {
+    const fixture = setup();
+    const outside = mkdtempSync(join(tmpdir(), "loop-outbound-project-"));
+    const link = join(fixture.root, "source-link");
+    try {
+      symlinkSync(fixture.source, link, "dir");
+      const candidate = input(fixture, {
+        project: { ...input(fixture).project, path: link },
+      });
+      rmSync(link);
+      symlinkSync(outside, link, "dir");
+
+      const result = await gitCandidatePublisher(candidate);
+
+      assert.deepEqual(result, {
+        published: false,
+        code: "candidate_project_path_invalid",
+        message:
+          "Candidate project path is outside the configured root or unavailable.",
+      });
+      assert.equal(
+        git(fixture.source, [
+          "for-each-ref",
+          "--format=%(refname)",
+          "refs/loop-engine/candidates",
+        ]),
+        "",
+      );
+    } finally {
+      fixture.cleanup();
+      rmSync(outside, { recursive: true, force: true });
     }
   });
 });

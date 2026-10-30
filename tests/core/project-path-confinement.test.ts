@@ -14,6 +14,7 @@ import test from "node:test";
 import {
   loadConfig,
   resolveConfinedProjectPath,
+  resolveProjectPathForOperation,
   resolveProjectPath,
   resolveProjectsRoot,
 } from "../../src/core/config.js";
@@ -168,6 +169,35 @@ test("an internal symlink resolves to its canonical target", () => {
     );
     assert.equal(resolved.exists, true);
     assert.equal(resolved.canonicalPath, realpathSync(target));
+  });
+});
+
+test("operation resolution rechecks a symlink and returns only its verified destination", () => {
+  withFixture(({ root, cwd, outside }) => {
+    const inside = join(root, "platform", "inside-repo");
+    const outsideRepo = join(outside, "repo");
+    const link = join(root, "platform", "repo-link");
+    mkdirSync(inside, { recursive: true });
+    mkdirSync(outsideRepo, { recursive: true });
+    symlinkSync(inside, link, "dir");
+    const allowedRoot = resolveProjectsRoot(root);
+
+    assert.equal(
+      resolveProjectPathForOperation("../repo-link", true, allowedRoot, cwd),
+      realpathSync(inside),
+    );
+    rmSync(link);
+    symlinkSync(outsideRepo, link, "dir");
+    assert.throws(
+      () =>
+        resolveProjectPathForOperation("../repo-link", true, allowedRoot, cwd),
+      /escapes LOOP_PROJECTS_ROOT through a symlink/,
+    );
+    assert.throws(
+      () =>
+        resolveProjectPathForOperation("../missing", true, allowedRoot, cwd),
+      /does not exist/,
+    );
   });
 });
 

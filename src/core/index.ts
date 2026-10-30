@@ -120,7 +120,15 @@ export {
   type ObjectiveStatus,
   MAX_OBJECTIVE_SOURCE_BYTES,
 } from "../intelligence/objective.js";
-export { loadConfig, type Config, type ProjectConfig } from "./config.js";
+export {
+  loadConfig,
+  resolveProjectPathForOperation,
+  resolveConfinedProjectPath,
+  resolveProjectsRoot,
+  type Config,
+  type ProjectConfig,
+  type ProjectsRoot,
+} from "./config.js";
 export { findProject, getRequiredProjectName } from "./project.js";
 export { isAuditProfile } from "../audit/profiles.js";
 export {

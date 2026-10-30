@@ -4,7 +4,10 @@ import { dirname, resolve } from "node:path";
 
 import { resolveContextPath } from "../context/path.js";
 
-import type { ProjectConfig } from "../core/config.js";
+import {
+  resolveProjectPathForOperation,
+  type ProjectConfig,
+} from "../core/config.js";
 import {
   generateProjectReport,
   generateRoadmapOverviewReport,
@@ -17,9 +20,7 @@ import {
   createExecutionDecisionDraft,
   type ExecutionDecisionDraft,
 } from "../governance/execution-decision-draft.js";
-import {
-  serializeReadyExecutionDecision,
-} from "../governance/execution-decision-approval.js";
+import { serializeReadyExecutionDecision } from "../governance/execution-decision-approval.js";
 import { parseExecutionDecisionFile } from "../governance/execution-decision.js";
 import {
   createProductionTransactionPort,
@@ -169,7 +170,8 @@ function parseClaudeStructuredOutput(stdout: string): unknown | null {
     }
     const record = root as Record<string, unknown>;
     if (record.is_error === true) return null;
-    if (record.subtype !== undefined && record.subtype !== "success") return null;
+    if (record.subtype !== undefined && record.subtype !== "success")
+      return null;
     return record.structured_output ?? null;
   } catch {
     return null;
@@ -194,6 +196,7 @@ function buildDecisionContext(
   currentGitHead: string,
   candidateId: string,
 ): AutoDecisionContext {
+  const projectPath = resolveProjectPathForOperation(project.path, true);
   const snapshot = generateProjectReport(project);
   const overview = generateRoadmapOverviewReport(project);
   const candidate = overview.roadmap.selectedCandidate;
@@ -208,7 +211,7 @@ function buildDecisionContext(
     return Object.freeze({ ok: false as const, reason: "brief" as const });
   }
 
-  const detail = resolveRoadmapCandidateDetail(project.path, candidate);
+  const detail = resolveRoadmapCandidateDetail(projectPath, candidate);
   if (detail === null) {
     return Object.freeze({ ok: false as const, reason: "brief" as const });
   }
@@ -237,7 +240,6 @@ function buildDecisionContext(
     return Object.freeze({ ok: false as const, reason: "scope" as const });
   }
 
-  const projectPath = resolve(project.path);
   const context = {
     project: {
       name: project.name,
@@ -341,9 +343,7 @@ function hasCodeWritablePath(paths: readonly string[]): boolean {
       /^(?:app|src|packages|features|entities|prisma|scripts|tests|components|lib|server|client)\//i.test(
         normalized,
       ) ||
-      /\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|swift|rb|php|cs)$/i.test(
-        normalized,
-      )
+      /\.(?:[cm]?[jt]sx?|py|go|rs|java|kt|swift|rb|php|cs)$/i.test(normalized)
     );
   });
 }
@@ -383,9 +383,7 @@ function proposalContradictsConcreteCandidate(
   ) {
     return false;
   }
-  if (
-    !deliverables.some((item) => CONCRETE_CHANGE_PATTERN.test(item))
-  ) {
+  if (!deliverables.some((item) => CONCRETE_CHANGE_PATTERN.test(item))) {
     return true;
   }
   return outOfScope.some((item) =>
@@ -432,7 +430,9 @@ async function prepareDecisionDraft(
   contextJson: string,
   candidateText: string,
   governedAllowedPaths: readonly string[],
-  runClaude: NonNullable<AutoSubscriptionDecisionRenewalDependencies["runClaude"]>,
+  runClaude: NonNullable<
+    AutoSubscriptionDecisionRenewalDependencies["runClaude"]
+  >,
 ): Promise<
   | Readonly<{ ok: true; draft: ExecutionDecisionDraft; model: string }>
   | AutoSubscriptionDecisionFailure
@@ -783,7 +783,7 @@ function isRenewalAllowed(
 ): boolean {
   const authorization = resolveExecutionAuthorization(
     project,
-    resolve(project.path),
+    resolveProjectPathForOperation(project.path, true),
     currentGitHead,
   );
 

@@ -40,6 +40,7 @@ import {
   runLoopCommit,
   runLoopExecuteWithProviderFailoverEvidence,
   runLoopPlan,
+  resolveProjectPathForOperation,
   type AuditProfile,
   type AuditReport,
   type AuditRuleSelection,
@@ -294,7 +295,7 @@ export function createLoopApplicationAssembly(
                   `Unknown project for isolated execution: ${projectId}`,
                 );
               }
-              return project.path;
+              return resolveProjectPathForOperation(project.path, true);
             }),
           ...(options.isolatedProviderExecution ?? {}),
         });

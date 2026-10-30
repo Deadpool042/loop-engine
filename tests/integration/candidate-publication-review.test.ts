@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -29,6 +35,8 @@ function sourceState(cwd: string): readonly string[] {
 
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "loop-v34-review-"));
+  const previousProjectsRoot = process.env.LOOP_PROJECTS_ROOT;
+  process.env.LOOP_PROJECTS_ROOT = root;
   const source = join(root, "source");
   const candidate = join(root, "candidate");
   const patchPath = join(root, "validated.patch");
@@ -52,14 +60,50 @@ function setup() {
   );
   return {
     source,
+    root,
     patchPath,
     baseSha,
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    cleanup: () => {
+      if (previousProjectsRoot === undefined)
+        delete process.env.LOOP_PROJECTS_ROOT;
+      else process.env.LOOP_PROJECTS_ROOT = previousProjectsRoot;
+      rmSync(root, { recursive: true, force: true });
+    },
   };
 }
 
+async function publishCandidate(
+  fixture: ReturnType<typeof setup>,
+  input: Parameters<typeof gitCandidatePublisher>[0],
+) {
+  const previousProjectsRoot = process.env.LOOP_PROJECTS_ROOT;
+  process.env.LOOP_PROJECTS_ROOT = fixture.root;
+  try {
+    return await gitCandidatePublisher(input);
+  } finally {
+    if (previousProjectsRoot === undefined)
+      delete process.env.LOOP_PROJECTS_ROOT;
+    else process.env.LOOP_PROJECTS_ROOT = previousProjectsRoot;
+  }
+}
+
+async function reviewCandidate(
+  fixture: ReturnType<typeof setup>,
+  input: Parameters<typeof gitCandidateReviewer>[0],
+) {
+  const previousProjectsRoot = process.env.LOOP_PROJECTS_ROOT;
+  process.env.LOOP_PROJECTS_ROOT = fixture.root;
+  try {
+    return await gitCandidateReviewer(input);
+  } finally {
+    if (previousProjectsRoot === undefined)
+      delete process.env.LOOP_PROJECTS_ROOT;
+    else process.env.LOOP_PROJECTS_ROOT = previousProjectsRoot;
+  }
+}
+
 async function publish(fixture: ReturnType<typeof setup>) {
-  const result = await gitCandidatePublisher({
+  const result = await publishCandidate(fixture, {
     project: {
       name: "project-a",
       path: fixture.source,
@@ -102,7 +146,8 @@ describe("V34 candidate publication review", () => {
       writeFileSync(join(fixture.source, "dirty.txt"), "user edit\n");
       const publication = await publish(fixture);
       const before = sourceState(fixture.source);
-      const result = await gitCandidateReviewer(
+      const result = await reviewCandidate(
+        fixture,
         reviewInput(fixture, publication),
       );
       assert.equal(result.reviewed, true);
@@ -134,7 +179,8 @@ describe("V34 candidate publication review", () => {
       const publication = await publish(fixture);
       const before = sourceState(fixture.source);
       git(fixture.source, ["update-ref", "-d", publication.ref]);
-      const missing = await gitCandidateReviewer(
+      const missing = await reviewCandidate(
+        fixture,
         reviewInput(fixture, publication),
       );
       assert.deepEqual(missing, {
@@ -144,7 +190,8 @@ describe("V34 candidate publication review", () => {
       });
 
       git(fixture.source, ["update-ref", publication.ref, fixture.baseSha]);
-      const moved = await gitCandidateReviewer(
+      const moved = await reviewCandidate(
+        fixture,
         reviewInput(fixture, publication),
       );
       assert.equal(moved.reviewed, false);
@@ -155,7 +202,8 @@ describe("V34 candidate publication review", () => {
         publication.ref,
         publication.commitSha,
       ]);
-      const differentCommit = await gitCandidateReviewer(
+      const differentCommit = await reviewCandidate(
+        fixture,
         reviewInput(fixture, { ...publication, commitSha: fixture.baseSha }),
       );
       assert.equal(differentCommit.reviewed, false);
@@ -179,7 +227,8 @@ describe("V34 candidate publication review", () => {
         "test: wrong parent",
       ]);
       git(fixture.source, ["update-ref", publication.ref, otherCommit]);
-      const wrongParent = await gitCandidateReviewer(
+      const wrongParent = await reviewCandidate(
+        fixture,
         reviewInput(fixture, { ...publication, commitSha: otherCommit }),
       );
       assert.equal(wrongParent.reviewed, false);
@@ -197,7 +246,8 @@ describe("V34 candidate publication review", () => {
         "test: multiple parents",
       ]);
       git(fixture.source, ["update-ref", publication.ref, mergeCommit]);
-      const multipleParents = await gitCandidateReviewer(
+      const multipleParents = await reviewCandidate(
+        fixture,
         reviewInput(fixture, { ...publication, commitSha: mergeCommit }),
       );
       assert.equal(multipleParents.reviewed, false);
@@ -210,7 +260,8 @@ describe("V34 candidate publication review", () => {
         publication.commitSha,
       ]);
       const afterSetup = sourceState(fixture.source);
-      const badBase = await gitCandidateReviewer(
+      const badBase = await reviewCandidate(
+        fixture,
         reviewInput(fixture, { ...publication, baseSha: "0".repeat(40) }),
       );
       assert.equal(badBase.reviewed, false);
@@ -224,26 +275,38 @@ describe("V34 candidate publication review", () => {
   });
 
   it("fails closed when the configured Git repository cannot be inspected", async () => {
-    const result = await gitCandidateReviewer({
-      project: {
-        name: "project-a",
-        path: join(tmpdir(), "loop-v34-missing-repository"),
-        docs: [],
-        roadmap: "ROADMAP.md",
-        validation: [],
-      },
-      runId: "run-123",
-      publication: {
-        kind: "candidate_ref",
-        ref: "refs/loop-engine/candidates/project-a/run-123",
-        commitSha: "a".repeat(40),
-        baseSha: "b".repeat(40),
-      },
-    });
-    assert.deepEqual(result, {
-      reviewed: false,
-      code: "candidate_git_inspection_failed",
-      message: "Candidate Git repository could not be inspected.",
-    });
+    const root = mkdtempSync(join(tmpdir(), "loop-v34-missing-repository-"));
+    const repositoryPath = join(root, "not-a-repository");
+    const previousProjectsRoot = process.env.LOOP_PROJECTS_ROOT;
+    mkdirSync(repositoryPath);
+    process.env.LOOP_PROJECTS_ROOT = root;
+    try {
+      const result = await gitCandidateReviewer({
+        project: {
+          name: "project-a",
+          path: repositoryPath,
+          docs: [],
+          roadmap: "ROADMAP.md",
+          validation: [],
+        },
+        runId: "run-123",
+        publication: {
+          kind: "candidate_ref",
+          ref: "refs/loop-engine/candidates/project-a/run-123",
+          commitSha: "a".repeat(40),
+          baseSha: "b".repeat(40),
+        },
+      });
+      assert.deepEqual(result, {
+        reviewed: false,
+        code: "candidate_git_inspection_failed",
+        message: "Candidate Git repository could not be inspected.",
+      });
+    } finally {
+      if (previousProjectsRoot === undefined)
+        delete process.env.LOOP_PROJECTS_ROOT;
+      else process.env.LOOP_PROJECTS_ROOT = previousProjectsRoot;
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

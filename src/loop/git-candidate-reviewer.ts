@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
 
+import { resolveProjectPathForOperation } from "../core/config.js";
 import type { ProjectConfig } from "../core/config.js";
 import type { LoopRunPublication } from "./types.js";
 
@@ -158,7 +158,15 @@ export const gitCandidateReviewer: CandidateReviewer = async (input) => {
       "Candidate publication identity is incoherent.",
     );
 
-  const cwd = resolve(input.project.path);
+  let cwd: string;
+  try {
+    cwd = resolveProjectPathForOperation(input.project.path, true);
+  } catch {
+    return failed(
+      "candidate_project_path_invalid",
+      "Candidate project path is outside the configured root or unavailable.",
+    );
+  }
   const repository = await runGit(cwd, ["rev-parse", "--git-dir"]);
   if (repository.code !== 0 || repository.stdout.trim().length === 0)
     return failed(

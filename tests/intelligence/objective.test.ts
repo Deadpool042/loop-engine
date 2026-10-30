@@ -4,16 +4,24 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { type ProjectConfig } from "../../src/core/config.js";
+import {
+  resolveProjectsRoot,
+  type ProjectConfig,
+} from "../../src/core/config.js";
 import {
   buildObjectiveStatus,
   MAX_OBJECTIVE_SOURCE_BYTES,
 } from "../../src/intelligence/objective.js";
 import { buildProjectSnapshot } from "../../src/intelligence/project-snapshot.js";
 
-function setupProject(
-  files: Readonly<Record<string, string>> = {},
-): { path: string; cleanup: () => void } {
+function buildSnapshot(project: ProjectConfig) {
+  return buildProjectSnapshot(project, resolveProjectsRoot(tmpdir()));
+}
+
+function setupProject(files: Readonly<Record<string, string>> = {}): {
+  path: string;
+  cleanup: () => void;
+} {
   const path = join(
     tmpdir(),
     `loop-objective-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -24,7 +32,10 @@ function setupProject(
     mkdirSync(dirname(filePath), { recursive: true });
     writeFileSync(filePath, content);
   }
-  return { path, cleanup: () => rmSync(path, { recursive: true, force: true }) };
+  return {
+    path,
+    cleanup: () => rmSync(path, { recursive: true, force: true }),
+  };
 }
 
 function project(
@@ -189,7 +200,7 @@ for (const [mode, reason] of [
 test("projects objective eligibility into the canonical snapshot", () => {
   const fixture = setupProject({ "objective.md": "Canonical purpose." });
   try {
-    const snapshot = buildProjectSnapshot(
+    const snapshot = buildSnapshot(
       project(fixture.path, {
         planning: { mode: "roadmap", objective_source: "objective.md" },
       }),

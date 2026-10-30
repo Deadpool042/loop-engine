@@ -13,7 +13,10 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { type ProjectConfig } from "../../src/core/config.js";
+import {
+  resolveProjectsRoot,
+  type ProjectConfig,
+} from "../../src/core/config.js";
 import { generateRoadmapPlanningStatusReport } from "../../src/core/reports.js";
 import {
   buildPlanningStatus,
@@ -22,9 +25,23 @@ import {
 } from "../../src/intelligence/planning.js";
 import { buildProjectSnapshot } from "../../src/intelligence/project-snapshot.js";
 
-function setupProject(
-  files: Readonly<Record<string, string>> = {},
-): { path: string; cleanup: () => void } {
+const previousProjectsRoot = process.env.LOOP_PROJECTS_ROOT;
+test.before(() => {
+  process.env.LOOP_PROJECTS_ROOT = tmpdir();
+});
+test.after(() => {
+  if (previousProjectsRoot === undefined) delete process.env.LOOP_PROJECTS_ROOT;
+  else process.env.LOOP_PROJECTS_ROOT = previousProjectsRoot;
+});
+
+function buildSnapshot(project: ProjectConfig) {
+  return buildProjectSnapshot(project, resolveProjectsRoot(tmpdir()));
+}
+
+function setupProject(files: Readonly<Record<string, string>> = {}): {
+  path: string;
+  cleanup: () => void;
+} {
   const path = join(
     tmpdir(),
     `loop-planning-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -96,7 +113,7 @@ test("requires dirty worktree review before presenting roadmap work as actionabl
     });
     writeFileSync(join(fixture.path, "tracked.txt"), "local wip\n");
 
-    const snapshot = buildProjectSnapshot(
+    const snapshot = buildSnapshot(
       project(fixture.path, {
         requires_git: true,
         roadmap: ["roadmap.md"],
@@ -197,15 +214,12 @@ test("detects every conventional unconfigured roadmap in declaration order", () 
     "docs/roadmap/README.md": "# four",
   });
   try {
-    assert.deepEqual(
-      discoverConventionalRoadmaps(fixture.path, []),
-      [
-        "roadmap.md",
-        "roadmap/README.md",
-        "roadmap/workflow-roadmap.md",
-        "docs/roadmap/README.md",
-      ],
-    );
+    assert.deepEqual(discoverConventionalRoadmaps(fixture.path, []), [
+      "roadmap.md",
+      "roadmap/README.md",
+      "roadmap/workflow-roadmap.md",
+      "docs/roadmap/README.md",
+    ]);
   } finally {
     fixture.cleanup();
   }
@@ -270,7 +284,9 @@ test("reports external planning without declaring an absence of work", () => {
 });
 
 test("deferred projects retain configured roadmap information", () => {
-  const fixture = setupProject({ "roadmap.md": "| H1-L1 | Deferred | ⬜ À faire |" });
+  const fixture = setupProject({
+    "roadmap.md": "| H1-L1 | Deferred | ⬜ À faire |",
+  });
   try {
     const status = buildPlanningStatus({
       project: project(fixture.path, {
@@ -291,7 +307,7 @@ test("deferred projects retain configured roadmap information", () => {
 test("reports objective_required when a configured roadmap is exhausted without a canonical objective", () => {
   const fixture = setupProject({ "roadmap.md": "- [x] already done" });
   try {
-    const snapshot = buildProjectSnapshot(
+    const snapshot = buildSnapshot(
       project(fixture.path, { roadmap: ["roadmap.md"] }),
     );
 
@@ -308,7 +324,7 @@ test("reports roadmap_exhausted_objective_available when renewal has a canonical
     "objective.md": "# Objective\nKeep the project useful.",
   });
   try {
-    const snapshot = buildProjectSnapshot(
+    const snapshot = buildSnapshot(
       project(fixture.path, {
         roadmap: ["roadmap.md"],
         planning: { mode: "roadmap", objective_source: "objective.md" },
@@ -333,7 +349,7 @@ test("keeps closed phase-gate candidate admissibility unchanged", () => {
     ].join("\n"),
   });
   try {
-    const snapshot = buildProjectSnapshot(
+    const snapshot = buildSnapshot(
       project(fixture.path, { roadmap: ["roadmap.md"] }),
     );
 

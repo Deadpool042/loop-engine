@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -96,8 +102,14 @@ test("loadConfig applies exact-case alias resolution using its explicit projects
     );
     process.chdir(cwd);
     const config = loadConfig(root);
-    assert.equal(config.projects[0]?.path, "../creatyss");
-    assert.equal(config.projects[1]?.path, "../plain");
+    assert.equal(
+      config.projects[0]?.path,
+      join(realpathSync(root), "work", "creatyss"),
+    );
+    assert.equal(
+      config.projects[1]?.path,
+      join(realpathSync(root), "work", "plain"),
+    );
   } finally {
     process.chdir(previous);
     rmSync(root, { recursive: true, force: true });

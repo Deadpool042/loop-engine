@@ -287,6 +287,20 @@ export function resolveConfinedProjectPath(
   });
 }
 
+/** Revalidates a project destination immediately before a filesystem/Git operation. */
+export function resolveProjectPathForOperation(
+  candidate: string,
+  requireExisting = false,
+  projectsRoot = resolveProjectsRoot(),
+  cwd = process.cwd(),
+): string {
+  const inspected = resolveConfinedProjectPath(candidate, projectsRoot, cwd);
+  if (requireExisting && !inspected.exists) {
+    throw new Error("Project path does not exist with exact casing.");
+  }
+  return inspected.canonicalPath;
+}
+
 /**
  * Resolves one existing candidate among `path` then `path_aliases`.
  * Falls back to the declared `path` unchanged when none exist, but refuses
@@ -334,7 +348,11 @@ export function loadConfig(
   const config = parseYaml(raw) as Config;
   if (Array.isArray(config?.projects)) {
     for (const project of config.projects) {
-      project.path = resolveProjectPath(project, allowedRoot);
+      const selected = resolveProjectPath(project, allowedRoot);
+      project.path = resolveConfinedProjectPath(
+        selected,
+        allowedRoot,
+      ).canonicalPath;
     }
   }
   return config;

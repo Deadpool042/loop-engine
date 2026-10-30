@@ -2,8 +2,9 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
+import { resolveProjectPathForOperation } from "../core/config.js";
 import type { ProjectConfig } from "../core/config.js";
 import type { LoopRunPublication } from "./types.js";
 
@@ -110,7 +111,15 @@ export const gitCandidatePublisher: CandidatePublisher = async (input) => {
       "Candidate publication identity is invalid.",
     );
   }
-  const cwd = resolve(input.project.path);
+  let cwd: string;
+  try {
+    cwd = resolveProjectPathForOperation(input.project.path, true);
+  } catch {
+    return failed(
+      "candidate_project_path_invalid",
+      "Candidate project path is outside the configured root or unavailable.",
+    );
+  }
   const refCheck = await runGit(cwd, ["check-ref-format", "--normalize", ref]);
   if (refCheck.code !== 0 || refCheck.stdout !== ref) {
     return failed(
@@ -235,8 +244,17 @@ export const gitCandidatePublisher: CandidatePublisher = async (input) => {
         "candidate_commit_failed",
         "Candidate commit could not be created with the repository identity.",
       );
+    let publishCwd: string;
+    try {
+      publishCwd = resolveProjectPathForOperation(cwd, true);
+    } catch {
+      return failed(
+        "candidate_project_path_invalid",
+        "Candidate project path changed before publication.",
+      );
+    }
     const published = await runGit(
-      cwd,
+      publishCwd,
       ["update-ref", "--stdin"],
       undefined,
       [
