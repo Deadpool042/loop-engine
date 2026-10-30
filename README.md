@@ -86,6 +86,8 @@ La roadmap canonique est [`docs/roadmap/loop-engine.md`](docs/roadmap/loop-engin
 
 Les projets sont déclarés dans `projects.yaml`.
 
+Toute commande CLI qui charge ce registre exige `LOOP_PROJECTS_ROOT`, chemin absolu vers la racine Projects autorisée sur l'hôte. Loop Engine ne déduit pas cette racine du `cwd` et refuse une valeur absente ou invalide. Development Workspace transmet cette valeur depuis `DW_FILESYSTEM_ROOT`; les lanceurs directs (CLI, GUI et services) doivent fournir explicitement la racine autorisée de leur hôte. Exemple local uniquement : `LOOP_PROJECTS_ROOT="$HOME/Projects" pnpm loop summary --json`. Ne pas réutiliser cette valeur sur un VPS.
+
 Champs optionnels :
 
 - `optional: true`
