@@ -149,7 +149,13 @@ function resolveCandidateComponents(
 
   let baseComponents: string[];
   let candidateComponents: string[];
-  if (!isAbsolute(candidate)) {
+  // Explicit opt-in: resolve from LOOP_PROJECTS_ROOT, not from the checkout cwd.
+  // Keep legacy relative and absolute path semantics unchanged.
+  const rootRelativePrefix = "@projects/";
+  if (candidate.startsWith(rootRelativePrefix)) {
+    baseComponents = [];
+    candidateComponents = candidate.slice(rootRelativePrefix.length).split(sep);
+  } else if (!isAbsolute(candidate)) {
     if (!isWithinRoot(projectsRoot.canonicalPath, canonicalCwd)) {
       throw new Error(
         "Loop Engine working directory is outside LOOP_PROJECTS_ROOT.",
