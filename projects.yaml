@@ -3,9 +3,9 @@ workspace_policy:
 
 projects:
   - name: development-workspace
-    path: ../platform/development-workspace
+    path: "@projects/platform/development-workspace"
     path_aliases:
-      - ../development-workspace
+      - "@projects/development-workspace"
     repository: Deadpool042/development-workspace
     workspace:
       mode: permanent
@@ -23,9 +23,9 @@ projects:
       - roadmap/workflow-roadmap.md
 
   - name: creatyss
-    path: ../CREATYSS
+    path: "@projects/CREATYSS"
     path_aliases:
-      - ../creatyss
+      - "@projects/creatyss"
     repository: Deadpool042/CREATYSS
     execution_decision: .loop-engine/execution-decision.yaml
     workspace:
@@ -54,10 +54,10 @@ projects:
       - docs/roadmap/editorial-marketing-intents/README.md
 
   - name: lp-infra
-    path: ../platform/lp-infra
+    path: "@projects/platform/lp-infra"
     path_aliases:
-      - ../lp-infra-runtime
-      - ../lp-infra
+      - "@projects/lp-infra-runtime"
+      - "@projects/lp-infra"
     repository: Deadpool042/LP-INFRA
     workspace:
       mode: source_only
@@ -82,7 +82,7 @@ projects:
       - docs/roadmap/projet-lp-infra.md
 
   - name: n8n
-    path: ../n8n
+    path: "@projects/n8n"
     workspace:
       mode: none
       dependencies: none
@@ -96,7 +96,9 @@ projects:
       mode: maintenance
 
   - name: loop-engine
-    path: .
+    path: "@projects/loop-engine"
+    path_aliases:
+      - "@projects/platform/loop-engine"
     repository: Deadpool042/loop-engine
     execution_decision: .loop-engine/execution-decision.yaml
     workspace:
