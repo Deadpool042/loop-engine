@@ -5,7 +5,7 @@ projects:
   - name: development-workspace
     path: "@projects/platform/development-workspace"
     path_aliases:
-      - @projects/development-workspace
+      - "@projects/development-workspace"
     repository: Deadpool042/development-workspace
     workspace:
       mode: permanent
@@ -25,7 +25,7 @@ projects:
   - name: creatyss
     path: "@projects/CREATYSS"
     path_aliases:
-      - @projects/creatyss
+      - "@projects/creatyss"
     repository: Deadpool042/CREATYSS
     execution_decision: .loop-engine/execution-decision.yaml
     workspace:
@@ -56,8 +56,8 @@ projects:
   - name: lp-infra
     path: "@projects/platform/lp-infra"
     path_aliases:
-      - @projects/lp-infra-runtime
-      - @projects/lp-infra
+      - "@projects/lp-infra-runtime"
+      - "@projects/lp-infra"
     repository: Deadpool042/LP-INFRA
     workspace:
       mode: source_only
@@ -98,7 +98,7 @@ projects:
   - name: loop-engine
     path: "@projects/loop-engine"
     path_aliases:
-      - @projects/platform/loop-engine
+      - "@projects/platform/loop-engine"
     repository: Deadpool042/loop-engine
     execution_decision: .loop-engine/execution-decision.yaml
     workspace:
