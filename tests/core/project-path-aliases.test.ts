@@ -75,6 +75,38 @@ test("the exact-case alias is selected when the primary path is absent", () => {
   }
 });
 
+test("optional n8n keeps its VPS fallback and permits the Mac platform relocation", () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-n8n-m3-"));
+  const cwd = join(root, "loop-engine");
+  const historical = join(root, "n8n");
+  const target = join(root, "platform", "n8n");
+  const project = { path: "../n8n", path_aliases: ["../platform/n8n"] };
+  mkdirSync(cwd, { recursive: true });
+  try {
+    const projectsRoot = resolveProjectsRoot(root);
+    // On VPS the optional checkout may be absent: keep its historical target.
+    assert.equal(resolveProjectPath(project, projectsRoot, cwd), "../n8n");
+
+    mkdirSync(historical);
+    assert.equal(resolveProjectPath(project, projectsRoot, cwd), "../n8n");
+
+    mkdirSync(target, { recursive: true });
+    assert.throws(
+      () => resolveProjectPath(project, projectsRoot, cwd),
+      /Project path is ambiguous/,
+    );
+
+    rmSync(historical, { recursive: true });
+    assert.equal(resolveProjectPath(project, projectsRoot, cwd), "../platform/n8n");
+
+    rmSync(target, { recursive: true });
+    mkdirSync(historical);
+    assert.equal(resolveProjectPath(project, projectsRoot, cwd), "../n8n");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("DW path transition selects the sole existing path and rejects coexistence", () => {
   const root = mkdtempSync(join(tmpdir(), "loop-dw-m3-"));
   const cwd = join(root, "loop-engine");
