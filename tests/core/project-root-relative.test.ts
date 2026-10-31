@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -18,7 +18,7 @@ test("root-relative project paths are independent of Loop checkout depth", () =>
     const cwd = join(root, "platform", "loop-engine");
     assert.equal(
       resolveConfinedProjectPath("@projects/platform/development-workspace", projectsRoot, cwd).canonicalPath,
-      join(root, "platform", "development-workspace"),
+      realpathSync(join(root, "platform", "development-workspace")),
     );
     assert.equal(
       resolveProjectPath({ path: "@projects/platform/development-workspace" }, projectsRoot, cwd),
@@ -29,7 +29,7 @@ test("root-relative project paths are independent of Loop checkout depth", () =>
     assert.throws(() => resolveConfinedProjectPath("@projects/outside", projectsRoot, cwd), /escapes/);
     assert.equal(
       resolveConfinedProjectPath("../development-workspace", projectsRoot, cwd).canonicalPath,
-      join(root, "platform", "development-workspace"),
+      realpathSync(join(root, "platform", "development-workspace")),
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -47,7 +47,7 @@ test("Mac and VPS layouts resolve root-relative paths without cwd dependence", (
       const cwd = join(root, "platform", "loop-engine");
       assert.equal(
         resolveConfinedProjectPath("@projects/platform/development-workspace", projectsRoot, cwd).canonicalPath,
-        join(root, "platform", "development-workspace"),
+        realpathSync(join(root, "platform", "development-workspace")),
       );
       assert.equal(
         resolveProjectPath({
