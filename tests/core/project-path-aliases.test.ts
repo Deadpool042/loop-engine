@@ -75,6 +75,38 @@ test("the exact-case alias is selected when the primary path is absent", () => {
   }
 });
 
+test("DW path transition selects the sole existing path and rejects coexistence", () => {
+  const root = mkdtempSync(join(tmpdir(), "loop-dw-m3-"));
+  const cwd = join(root, "loop-engine");
+  const previous = join(root, "development-workspace");
+  const target = join(root, "platform", "development-workspace");
+  const project = {
+    path: "../platform/development-workspace",
+    path_aliases: ["../development-workspace"],
+  };
+  mkdirSync(cwd, { recursive: true });
+  try {
+    const projectsRoot = resolveProjectsRoot(root);
+    mkdirSync(previous);
+    assert.equal(resolveProjectPath(project, projectsRoot, cwd), "../development-workspace");
+
+    mkdirSync(target, { recursive: true });
+    assert.throws(
+      () => resolveProjectPath(project, projectsRoot, cwd),
+      /Project path is ambiguous/,
+    );
+
+    rmSync(previous, { recursive: true });
+    assert.equal(resolveProjectPath(project, projectsRoot, cwd), "../platform/development-workspace");
+
+    rmSync(target, { recursive: true });
+    mkdirSync(previous);
+    assert.equal(resolveProjectPath(project, projectsRoot, cwd), "../development-workspace");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("loadConfig applies exact-case alias resolution using its explicit projects root", () => {
   const root = mkdtempSync(join(tmpdir(), "loop-aliases-"));
   const cwd = join(root, "work", "loop");
