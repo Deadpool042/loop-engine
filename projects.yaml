@@ -52,8 +52,9 @@ projects:
       - docs/roadmap/editorial-marketing-intents/README.md
 
   - name: lp-infra
-    path: ../lp-infra-runtime
+    path: ../platform/lp-infra
     path_aliases:
+      - ../lp-infra-runtime
       - ../lp-infra
     repository: Deadpool042/LP-INFRA
     workspace:
