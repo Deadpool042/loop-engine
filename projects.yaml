@@ -3,7 +3,9 @@ workspace_policy:
 
 projects:
   - name: development-workspace
-    path: ../development-workspace
+    path: ../platform/development-workspace
+    path_aliases:
+      - ../development-workspace
     repository: Deadpool042/development-workspace
     workspace:
       mode: permanent
