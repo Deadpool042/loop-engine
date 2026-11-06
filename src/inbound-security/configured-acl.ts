@@ -1,4 +1,4 @@
-import type { LoopRuntimePublicRequest } from "../core/loop-runtime-public-request.js";
+import { isInboundOperation, type InboundOperation } from "./inbound-operation.js";
 import type { InboundPrincipal } from "./types.js";
 
 export const CONFIGURED_INBOUND_ACL_DENY_REASONS = [
@@ -18,7 +18,7 @@ export type ConfiguredInboundAclRule = Readonly<{
   tenantId: string | null;
   requiredRoles: readonly string[];
   projects: readonly string[];
-  operations: readonly LoopRuntimePublicRequest["mode"][];
+  operations: readonly InboundOperation[];
 }>;
 
 export type ConfiguredInboundAclDecision =
@@ -81,11 +81,11 @@ function isUniqueNonEmptyStringArray(value: unknown): value is readonly string[]
 
 function isOperationArray(
   value: unknown,
-): value is readonly LoopRuntimePublicRequest["mode"][] {
+): value is readonly InboundOperation[] {
   return (
     Array.isArray(value) &&
     value.length > 0 &&
-    value.every((operation) => operation === "dry-run" || operation === "execute") &&
+    value.every(isInboundOperation) &&
     new Set(value).size === value.length
   );
 }
@@ -140,7 +140,7 @@ function denied(reason: ConfiguredInboundAclDenyReason): ConfiguredInboundAclDec
 export function evaluateConfiguredInboundAcl(input: Readonly<{
   principal: InboundPrincipal | null;
   project: string;
-  operation: LoopRuntimePublicRequest["mode"];
+  operation: InboundOperation;
   rules: readonly ConfiguredInboundAclRule[];
 }>): ConfiguredInboundAclDecision {
   if (!validateConfiguredInboundAclRules(input.rules)) {
