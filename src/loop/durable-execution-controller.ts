@@ -190,13 +190,15 @@ export async function runDurableLoopExecution(
   ) {
     return Object.freeze({ status: "replayed" as const, record: existing });
   }
+  // An active lease excludes every requester, including one presenting the same
+  // owner string: two live processes may share a label, so the label alone is
+  // not an identity. Only expiry (or termination) releases the lease.
   if (
     existing !== null &&
     existing.status === "running" &&
-    !leaseExpired(existing, observedAt) &&
-    existing.leaseOwner !== request.owner
+    !leaseExpired(existing, observedAt)
   ) {
-    return reject("execution_in_progress", existing, "Another owner holds the active execution lease.");
+    return reject("execution_in_progress", existing, "An active execution lease is held.");
   }
 
   const leased = leaseRecord(existing, request, observedAt);
@@ -217,17 +219,22 @@ export async function runDurableLoopExecution(
 
   const key = request.idempotencyKey;
   const owner = request.owner;
+  // Holder identity is (owner, attempt): the attempt counter is incremented by
+  // every acquisition, so a former holder that shares an owner label with its
+  // successor still cannot act on the successor's lease.
+  const attempt = leased.attempt;
+  const isHolder = (record: DurableExecutionRecord | null): record is DurableExecutionRecord =>
+    record !== null &&
+    record.status === "running" &&
+    record.leaseOwner === owner &&
+    record.attempt === attempt;
   let progressWrites: Promise<void> = Promise.resolve();
 
   const observeProgress = (progress: DurableExecutionProgress): void => {
     progressWrites = progressWrites
       .then(async () => {
         const current = await store.load(key);
-        if (
-          current === null ||
-          current.status !== "running" ||
-          current.leaseOwner !== owner
-        ) {
+        if (!isHolder(current)) {
           return;
         }
         const progressEvents = Object.freeze([
@@ -257,12 +264,7 @@ export async function runDurableLoopExecution(
   } catch {
     await progressWrites;
     const latest = await store.load(key);
-    const base =
-      latest !== null &&
-      latest.status === "running" &&
-      latest.leaseOwner === owner
-        ? latest
-        : leased;
+    const base = isHolder(latest) ? latest : leased;
     const failed = finish(
       base,
       now(),
@@ -285,12 +287,7 @@ export async function runDurableLoopExecution(
   }
 
   const latest = await store.load(key);
-  const base =
-    latest !== null &&
-    latest.status === "running" &&
-    latest.leaseOwner === owner
-      ? latest
-      : leased;
+  const base = isHolder(latest) ? latest : leased;
   const cancelledAfterRun = base.cancellationRequested === true;
   const completed = finish(
     base,
