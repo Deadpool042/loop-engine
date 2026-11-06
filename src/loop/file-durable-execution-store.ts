@@ -134,11 +134,25 @@ async function writeRecordDurably(
     await rm(temporaryPath, { force: true });
     throw error;
   }
-  const directoryHandle = await open(directory, "r");
+  await syncDirectory(directory);
+}
+
+// The record is already published when the directory is flushed. Only the
+// errors meaning "this platform cannot fsync a directory" are tolerated (the
+// durability of the rename is then not guaranteed); any other failure is
+// surfaced rather than hidden.
+const DIRECTORY_SYNC_UNSUPPORTED = new Set(["EISDIR", "EINVAL", "ENOTSUP", "EPERM"]);
+
+async function syncDirectory(directory: string): Promise<void> {
+  let handle;
   try {
-    await directoryHandle.sync();
+    handle = await open(directory, "r");
+    await handle.sync();
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === undefined || !DIRECTORY_SYNC_UNSUPPORTED.has(code)) throw error;
   } finally {
-    await directoryHandle.close();
+    await handle?.close();
   }
 }
 

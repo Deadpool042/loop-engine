@@ -11,9 +11,13 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
 
-import { runDurableLoopExecution } from "../../src/loop/durable-execution-controller.js";
+import {
+  requestDurableExecutionCancellation,
+  runDurableLoopExecution,
+} from "../../src/loop/durable-execution-controller.js";
+import { superviseActiveExecutionCancellation } from "../../src/loop/durable-execution-active-cancellation.js";
 import { recoverDurableExecution } from "../../src/loop/durable-execution-recovery.js";
 import { renewDurableExecutionLease } from "../../src/loop/durable-execution-heartbeat.js";
 import { createFileDurableExecutionStore } from "../../src/loop/file-durable-execution-store.js";
@@ -31,6 +35,17 @@ type Child = Readonly<{
   result: Promise<Record<string, unknown>>;
 }>;
 
+const spawned: ChildProcess[] = [];
+const tempDirs: string[] = [];
+
+after(() => {
+  for (const proc of spawned) {
+    if (proc.exitCode === null && proc.signalCode === null)
+      proc.kill("SIGKILL");
+  }
+  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+});
+
 function child(
   args: readonly string[],
   env: Record<string, string> = {},
@@ -39,6 +54,7 @@ function child(
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "ignore"],
   });
+  spawned.push(proc);
   let output = "";
   proc.stdout!.on("data", (chunk) => {
     output += String(chunk);
@@ -57,7 +73,9 @@ function child(
 }
 
 function tmp(): string {
-  return mkdtempSync(join(tmpdir(), "le-durable-"));
+  const dir = mkdtempSync(join(tmpdir(), "le-durable-"));
+  tempDirs.push(dir);
+  return dir;
 }
 
 async function waitFor(condition: () => boolean, ms = 15_000): Promise<void> {
@@ -517,4 +535,59 @@ test("T11 — un successeur portant la même étiquette de détenteur n'est pas 
   assert.equal(record?.status, "running");
   assert.equal(record?.attempt, 2);
   rmSync(dir, { recursive: true, force: true });
+});
+
+test("T12 — un superviseur d'annulation d'une ancienne tentative ne peut pas annuler le bail de son successeur", async () => {
+  const dir = tmp();
+  const store = createFileDurableExecutionStore({ directory: dir });
+  const t0 = "2026-01-01T00:00:00.000Z";
+  const later = "2026-01-01T01:00:00.000Z";
+  let release: (() => void) | undefined;
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const old = runDurableLoopExecution(
+    store,
+    leaseRequest("worker-same", 1_000),
+    async () => {
+      await hold;
+      return completed();
+    },
+    () => t0,
+  );
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  await recoverDurableExecution(
+    store,
+    {
+      idempotencyKey: "cycle:k",
+      owner: "worker-same",
+      leaseDurationMs: 600_000,
+    },
+    () => later,
+  );
+  await requestDurableExecutionCancellation(
+    store,
+    "cycle:k",
+    "operator",
+    () => later,
+  );
+  const supervised = await superviseActiveExecutionCancellation(
+    store,
+    {
+      idempotencyKey: "cycle:k",
+      owner: "worker-same",
+      attempt: 1,
+      pollIntervalMs: 5,
+    },
+    { cancel: async () => {}, completed: new Promise<void>(() => {}) },
+    { now: () => later, sleep: async () => {} },
+  );
+  assert.equal(supervised.status, "rejected");
+  assert.equal(
+    supervised.status === "rejected" ? supervised.code : null,
+    "lease_lost",
+  );
+  assert.equal((await store.load("cycle:k"))?.status, "running");
+  release?.();
+  await old;
 });

@@ -12,6 +12,12 @@ export type ActiveExecutionCancellationHandle = Readonly<{
 export type ActiveExecutionCancellationRequest = Readonly<{
   idempotencyKey: string;
   owner: string;
+  /**
+   * Acquisition counter observed when the lease was taken. When provided, a
+   * supervisor from an earlier acquisition cannot cancel its successor's lease.
+   * Wiring this module into a production path must provide it.
+   */
+  attempt?: number;
   pollIntervalMs: number;
 }>;
 
@@ -136,7 +142,7 @@ export async function superviseActiveExecutionCancellation(
     if (record.status !== "running") {
       return Object.freeze({ status: "completed" as const, record });
     }
-    if (record.leaseOwner !== owner) {
+    if (record.leaseOwner !== owner || (request.attempt !== undefined && record.attempt !== request.attempt)) {
       return rejected(
         "lease_lost",
         record,
@@ -162,7 +168,7 @@ export async function superviseActiveExecutionCancellation(
       if (latest.status !== "running") {
         return Object.freeze({ status: "completed" as const, record: latest });
       }
-      if (latest.leaseOwner !== owner) {
+      if (latest.leaseOwner !== owner || (request.attempt !== undefined && latest.attempt !== request.attempt)) {
         return rejected(
           "lease_lost",
           latest,

@@ -26,8 +26,8 @@ L'exclusion mutuelle reposait sur **une hypothèse de temps** (un verrou plus vi
 ## 3. Correctif
 
 1. **Verrou du magasin** : remplacement du verrou `mtime` par le gestionnaire de verrous de répertoire existant (`createLocalProjectLockManager`, déjà testé, notamment le cas « un récupérateur retardé ne peut pas mettre en quarantaine un verrou de remplacement ») : métadonnées de détenteur (PID, hôte, identifiant de verrou), reprise **seulement si le détenteur est mort sur le même hôte**, mise en quarantaine nommée par l'identifiant du verrou mort (une seule reprise possible par verrou), libération conditionnée à l'identifiant. Un détenteur **vivant** n'est jamais dépossédé : la contention aboutit à un refus borné (`lockTimeoutMs`), jamais à une écriture. Aucune dépendance nouvelle.
-2. **Identité du détenteur** : `(owner, attempt)`. Un bail actif exclut tout demandeur, quelle que soit son étiquette. Les écritures de progression et de fin du contrôleur, et le renouvellement (champ optionnel `attempt`), vérifient la tentative : un ancien détenteur ne peut ni terminer, ni renouveler, ni libérer le bail d'un successeur portant la même étiquette.
-3. **Persistance** : écriture par descripteur, `fsync` du fichier, `rename` atomique, `fsync` du répertoire, avant le retour de `save` (donc avant tout accusé). Répertoire d'état et répertoire de verrous créés en `0700`, fichiers en `0600`.
+2. **Identité du détenteur** : `(owner, attempt)`. Un bail actif exclut tout demandeur, quelle que soit son étiquette. Les écritures de progression et de fin du contrôleur vérifient la tentative ; le renouvellement et la supervision d'annulation (modules non raccordés) la vérifient **lorsque le champ optionnel `attempt` est fourni** (le raccordement devra le rendre obligatoire) : un ancien détenteur ne peut ni terminer, ni renouveler, ni libérer le bail d'un successeur portant la même étiquette.
+3. **Persistance** : écriture par descripteur, `fsync` du fichier, `rename` atomique, `fsync` du répertoire, avant le retour de `save` (donc avant tout accusé). Seules les erreurs signifiant « cette plateforme ne sait pas synchroniser un répertoire » (`EISDIR`, `EINVAL`, `ENOTSUP`, `EPERM`) sont tolérées après publication ; toute autre erreur est remontée. Le résultat « écrit mais non acquitté » reste indistinguable de « non écrit » pour l'appelant lorsqu'une telle erreur survient. Répertoire d'état et répertoire de verrous créés en `0700`, fichiers en `0600`.
 
 ## 4. Garanties démontrées (tests `tests/loop/durable-execution-concurrency.test.ts`)
 
@@ -47,7 +47,13 @@ L'exclusion mutuelle reposait sur **une hypothèse de temps** (un verrou plus vi
 - **Hôtes multiples ou systèmes de fichiers partagés** : la reprise d'un verrou exige le même hôte ; un verrou d'un autre hôte n'est jamais repris (refus après `lockTimeoutMs`).
 - **Réutilisation d'un PID** : un verrou orphelin dont le PID a été réattribué à un processus vivant n'est pas repris (échec fermé, intervention manuelle).
 - **Déploiement mixte** : un ancien processus utilisant l'ancien verrou `<digest>.lock` n'est pas exclu mutuellement avec le nouveau code ; ne pas faire coexister les deux versions sur un même répertoire d'état.
-- Les répertoires de quarantaine `.locks/*.recovered-*` ne sont pas purgés.
+- **Espaces de PID distincts** (conteneurs partageant hostname et volume) : le PID d'un autre espace de noms paraît « mort » ; exiger **une seule instance par répertoire d'état**.
+- **Changement de hostname** : un verrou orphelin d'un ancien hostname n'est jamais repris (le magasin échoue après `lockTimeoutMs` pour cette clé) ; régression de disponibilité par rapport à l'ancien verrou. Procédure manuelle : après vérification qu'aucun processus ne l'utilise, supprimer `.locks/<segment>`. Aucun diagnostic dédié n'est fourni (tranche suivante).
+- Ne sont **pas purgés** : `.locks/*.recovered-*`, `.locks/.candidate-*`, `*.tmp` d'un arrêt entre écriture et publication.
+- **Non testés** (affirmations sur le code) : verrou d'un autre hôte, PID réutilisé, erreur de synchronisation du répertoire. Le test D4 (course à huit processus) **ne distingue pas** l'ancien code du nouveau : il passait avant correctif ; la protection contre cette course vient du nommage de quarantaine par identifiant de verrou, déjà testé dans `local-project-lock-manager.test.ts`.
+- Les tests de concurrence reposent en partie sur des délais réels (D2, D3, D4) : ils peuvent être sensibles à une machine chargée.
+- `list` et `verify` créent le répertoire d'état et `.locks` (comme avant pour le répertoire principal) ; seul `readFileDurableExecutionRecords` est sans effet de bord.
+- Dépendance nouvelle `src/loop` → `src/execution/adapters` (non interdite par les audits d'architecture existants).
 
 ## 6. Pourquoi renouvellement et reprise restent désactivés
 
