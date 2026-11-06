@@ -8,6 +8,7 @@ import {
   readdirSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -172,7 +173,7 @@ test("D2 — un détenteur vivant bloqué dans la section critique n'est pas dé
   const dir = tmp();
   const marker = join(dir, "marker");
   const holder = child(
-    ["stall-save", dir, "cycle:k", "holder-a", marker, "900"],
+    ["stall-save", dir, "cycle:k", "holder-a", marker, "release"],
     {
       TEST_LOCK_TIMEOUT_MS: "200",
     },
@@ -183,10 +184,9 @@ test("D2 — un détenteur vivant bloqué dans la section critique n'est pas dé
   const challenger = child(["save", dir, "cycle:k", "challenger-b"], {
     TEST_LOCK_TIMEOUT_MS: "200",
   });
-  const [heldResult, challengerResult] = await Promise.all([
-    holder.result,
-    challenger.result,
-  ]);
+  const challengerResult = await challenger.result;
+  writeFileSync(`${marker}.release`, "release");
+  const heldResult = await holder.result;
   const successes = [heldResult, challengerResult].filter(
     (r) => r.saved === true,
   );
@@ -233,16 +233,15 @@ test("D4 — huit processus se disputent un verrou orphelin : une seule écritur
   const dead = child(
     ["stall-save", dir, "cycle:k", "dead-holder", marker, "60000"],
     {
-      TEST_LOCK_TIMEOUT_MS: "100",
+      TEST_LOCK_TIMEOUT_MS: "3000",
     },
   );
   await waitFor(() => existsSync(marker));
   dead.proc.kill("SIGKILL");
   await dead.result;
-  await new Promise((resolve) => setTimeout(resolve, 250));
   const racers = Array.from({ length: 8 }, (_, index) =>
     child(["save", dir, "cycle:k", `racer-${index}`], {
-      TEST_LOCK_TIMEOUT_MS: "100",
+      TEST_LOCK_TIMEOUT_MS: "3000",
     }),
   );
   const results = await Promise.all(racers.map((r) => r.result));
@@ -459,7 +458,7 @@ test("T10 — un verrou occupé par un détenteur vivant entraîne un refus born
   const dir = tmp();
   const marker = join(dir, "marker");
   const holder = child(
-    ["stall-save", dir, "cycle:k", "holder", marker, "700"],
+    ["stall-save", dir, "cycle:k", "holder", marker, "release"],
     {
       TEST_LOCK_TIMEOUT_MS: "5000",
     },
@@ -477,6 +476,7 @@ test("T10 — un verrou occupé par un détenteur vivant entraîne un refus born
     ),
   );
   assert.ok(Date.now() - begin < 2500);
+  writeFileSync(`${marker}.release`, "release");
   assert.equal((await holder.result).saved, true);
   rmSync(dir, { recursive: true, force: true });
 });

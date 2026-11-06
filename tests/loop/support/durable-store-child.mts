@@ -1,5 +1,5 @@
 // Processus enfant des tests de concurrence du magasin durable (données synthétiques).
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 
 import { runDurableLoopExecution } from "../../../src/loop/durable-execution-controller.js";
 import type { DurableExecutionRecord } from "../../../src/loop/durable-execution.js";
@@ -39,7 +39,18 @@ if (mode === "save") {
       if (!stalled) {
         stalled = true;
         writeFileSync(markerFile!, "in-critical-section");
-        sleepSync(Number(stallMs));
+        if (stallMs === "release") {
+          // Bloqué jusqu'à la création du fichier <marqueur>.release (60 s au plus).
+          for (
+            let waited = 0;
+            !existsSync(`${markerFile}.release`) && waited < 60_000;
+            waited += 20
+          ) {
+            sleepSync(20);
+          }
+        } else {
+          sleepSync(Number(stallMs));
+        }
       }
       return "synthetic";
     },

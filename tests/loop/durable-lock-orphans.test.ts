@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { after, test } from "node:test";
 
 import { createLocalProjectLockManager } from "../../src/execution/adapters/local-project-lock-manager.js";
+import { createDurableExecutionEnvelope } from "../../src/loop/durable-execution-envelope.js";
 import { createFileDurableExecutionStore } from "../../src/loop/file-durable-execution-store.js";
 import { syntheticRecord } from "./support/synthetic.js";
 
@@ -96,15 +97,21 @@ const quarantines = (dir: string): string[] =>
     name.includes(".recovered-"),
   );
 
+type Outcome = "saved" | "conflict" | "lock_refused" | `error:${string}`;
+
+/** « lock_refused » = refus borné du verrou (timeout) ; toute autre exception est distincte. */
 async function saveOutcome(
   store: ReturnType<typeof storeWith>,
-): Promise<"saved" | "conflict" | "refused"> {
+): Promise<Outcome> {
   try {
     return (await store.save(syntheticRecord(KEY, "w"), null))
       ? "saved"
       : "conflict";
-  } catch {
-    return "refused";
+  } catch (error) {
+    const message = (error as Error).message;
+    return /storage lock timed out/.test(message)
+      ? "lock_refused"
+      : `error:${message}`;
   }
 }
 
@@ -144,7 +151,7 @@ test("O2 — PID réutilisé par un processus vivant : reprise interdite, verrou
       inspectProcess: () => "alive",
     }),
   );
-  assert.equal(await saveOutcome(store), "refused");
+  assert.equal(await saveOutcome(store), "lock_refused");
   assert.equal(existsSync(join(lockPath, "owner.json")), true);
   assert.deepEqual(quarantines(dir), []);
 });
@@ -160,7 +167,7 @@ test("O3 — inspection impossible (EPERM / inconnu) : reprise interdite", async
       inspectProcess: () => "unknown",
     }),
   );
-  assert.equal(await saveOutcome(store), "refused");
+  assert.equal(await saveOutcome(store), "lock_refused");
   assert.deepEqual(quarantines(dir), []);
 });
 
@@ -178,81 +185,62 @@ test("O4 — hostname modifié ou verrou d'un autre hôte, même avec un PID mor
     );
     assert.equal(
       await saveOutcome(store),
-      "refused",
+      "lock_refused",
       `hostname courant: "${currentHost}"`,
     );
     assert.deepEqual(quarantines(dir), []);
   }
 });
 
-test("O5 — métadonnées malformées, absentes ou incohérentes : reprise interdite", async () => {
-  const variants: Record<
-    string,
-    (ownerFile: string, lockPath: string) => void
-  > = {
+test("O4b — hostname vide des deux côtés : métadonnées invalides, reprise interdite", async () => {
+  const dir = tmp();
+  await plantLock(dir, { hostname: "", pid: 4242 });
+  const store = storeWith(
+    dir,
+    createLocalProjectLockManager({
+      lockRoot: join(dir, ".locks"),
+      hostname: "",
+      inspectProcess: () => "dead",
+    }),
+  );
+  assert.equal(await saveOutcome(store), "lock_refused");
+  assert.deepEqual(quarantines(dir), []);
+});
+
+test("O5 — métadonnées malformées, absentes ou incohérentes : reprise interdite (un seul défaut par variante)", async () => {
+  const valid = {
+    version: 1,
+    projectId: digest(KEY),
+    attemptId: "a",
+    lockId: "l",
+    pid: 4242,
+    hostname: "host-a",
+    createdAt: new Date().toISOString(),
+  };
+  const withOwner = (override: Record<string, unknown>) => (file: string) =>
+    writeFileSync(file, JSON.stringify({ ...valid, ...override }));
+  const variants: Record<string, (ownerFile: string) => void> = {
     "JSON invalide": (file) => writeFileSync(file, "{not json"),
     "fichier vide": (file) => writeFileSync(file, ""),
-    "version inconnue": (file) =>
-      writeFileSync(
-        file,
-        JSON.stringify({
-          version: 99,
-          projectId: digest(KEY),
-          attemptId: "a",
-          lockId: "l",
-          pid: 1,
-          hostname: "host-a",
-          createdAt: "x",
-        }),
-      ),
-    "pid non numérique": (file) =>
-      writeFileSync(
-        file,
-        JSON.stringify({
-          version: 1,
-          projectId: digest(KEY),
-          attemptId: "a",
-          lockId: "l",
-          pid: "4242",
-          hostname: "host-a",
-          createdAt: "x",
-        }),
-      ),
-    "projet différent": (file) =>
-      writeFileSync(
-        file,
-        JSON.stringify({
-          version: 1,
-          projectId: "autre",
-          attemptId: "a",
-          lockId: "l",
-          pid: 4242,
-          hostname: "host-a",
-          createdAt: "x",
-        }),
-      ),
-    "chaîne démesurée": (file) =>
-      writeFileSync(
-        file,
-        JSON.stringify({
-          version: 1,
-          projectId: digest(KEY),
-          attemptId: "a",
-          lockId: "x".repeat(5000),
-          pid: 4242,
-          hostname: "host-a",
-          createdAt: "x",
-        }),
-      ),
+    "version inconnue": withOwner({ version: 99 }),
+    "pid non numérique": withOwner({ pid: "4242" }),
+    "pid nul": withOwner({ pid: 0 }),
+    "pid négatif": withOwner({ pid: -1 }),
+    "pid non entier": withOwner({ pid: 42.5 }),
+    "pid hors int32": withOwner({ pid: 2 ** 32 + 4242 }),
+    "projet différent": withOwner({ projectId: "autre" }),
+    "chaîne démesurée": withOwner({ lockId: "x".repeat(5000) }),
+    "date invalide": withOwner({ createdAt: "pas une date" }),
     "propriétaire absent": (file) => rmSync(file, { force: true }),
   };
-  for (const [name, corrupt] of Object.entries(variants)) {
+  // Contrôle : les métadonnées valides, détenteur mort, sont bien reprises (le refus ne vient donc pas d'ailleurs).
+  {
     const dir = tmp();
     const { lockPath } = await plantLock(dir, {
       hostname: "host-a",
       pid: 4242,
     });
-    corrupt(join(lockPath, "owner.json"), lockPath);
+    withOwner({})(join(lockPath, "owner.json"));
     const store = storeWith(
       dir,
       createLocalProjectLockManager({
@@ -261,7 +249,27 @@ test("O5 — métadonnées malformées, absentes ou incohérentes : reprise inte
         inspectProcess: () => "dead",
       }),
     );
-    assert.equal(await saveOutcome(store), "refused", name);
+    assert.equal(await saveOutcome(store), "saved", "témoin valide");
+  }
+  for (const [name, corrupt] of Object.entries(variants)) {
+    const dir = tmp();
+    const { lockPath } = await plantLock(dir, {
+      hostname: "host-a",
+      pid: 4242,
+    });
+    corrupt(join(lockPath, "owner.json"));
+    // Inspection par défaut pour les pid hors norme : aucun signal ne doit partir.
+    const store = storeWith(
+      dir,
+      createLocalProjectLockManager({
+        lockRoot: join(dir, ".locks"),
+        hostname: "host-a",
+        ...(name.startsWith("pid")
+          ? {}
+          : { inspectProcess: () => "dead" as const }),
+      }),
+    );
+    assert.equal(await saveOutcome(store), "lock_refused", name);
     assert.deepEqual(quarantines(dir), [], name);
     assert.equal(
       existsSync(lockPath),
@@ -271,26 +279,34 @@ test("O5 — métadonnées malformées, absentes ou incohérentes : reprise inte
   }
 });
 
-test("O6 — quarantaine déjà présente pour ce verrou : reprise interdite", async () => {
-  const dir = tmp();
-  const { lockId } = await plantLock(dir, { hostname: "host-a", pid: 4242 });
-  mkdirSync(join(dir, ".locks", `${segment(KEY)}.recovered-${encode(lockId)}`));
-  writeFileSync(
-    join(dir, ".locks", `${segment(KEY)}.recovered-${encode(lockId)}`, "x"),
-    "occupied",
-  );
-  const store = storeWith(
-    dir,
-    createLocalProjectLockManager({
-      lockRoot: join(dir, ".locks"),
-      hostname: "host-a",
-      inspectProcess: () => "dead",
-    }),
-  );
-  assert.equal(await saveOutcome(store), "refused");
+test("O6 — quarantaine déjà présente (vide ou occupée) pour ce verrou : reprise interdite", async () => {
+  for (const occupied of [false, true]) {
+    const dir = tmp();
+    const { lockId } = await plantLock(dir, { hostname: "host-a", pid: 4242 });
+    const quarantine = join(
+      dir,
+      ".locks",
+      `${segment(KEY)}.recovered-${encode(lockId)}`,
+    );
+    mkdirSync(quarantine);
+    if (occupied) writeFileSync(join(quarantine, "x"), "occupied");
+    const store = storeWith(
+      dir,
+      createLocalProjectLockManager({
+        lockRoot: join(dir, ".locks"),
+        hostname: "host-a",
+        inspectProcess: () => "dead",
+      }),
+    );
+    assert.equal(
+      await saveOutcome(store),
+      "lock_refused",
+      `occupée: ${occupied}`,
+    );
+  }
 });
 
-test("O7 — permissions du répertoire de verrous incorrectes : jamais d'écriture ni de suppression silencieuse", async () => {
+test("O7 — permissions du répertoire de verrous incorrectes : échec fermé par erreur d'accès (la logique de reprise n'est pas atteinte), verrou intact", async () => {
   for (const mode of [0o500, 0o000]) {
     const dir = tmp();
     const { lockPath } = await plantLock(dir, {
@@ -308,7 +324,11 @@ test("O7 — permissions du répertoire de verrous incorrectes : jamais d'écrit
     );
     const outcome = await saveOutcome(store);
     chmodSync(join(dir, ".locks"), 0o700);
-    assert.equal(outcome, "refused", `mode ${mode.toString(8)}`);
+    assert.match(
+      outcome,
+      /^error:.*(EACCES|EPERM)/,
+      `mode ${mode.toString(8)}`,
+    );
     assert.equal(existsSync(join(lockPath, "owner.json")), true);
     assert.deepEqual(quarantines(dir), []);
   }
@@ -387,4 +407,20 @@ test("C2 — fichiers résiduels (*.tmp, .candidate-*, quarantaines) ne sont jam
   assert.equal(listed.length, 1);
   assert.equal((await store.load(KEY))?.idempotencyKey, KEY);
   assert.equal(await store.verify(KEY), true);
+});
+
+test("C3 — un enregistrement écrit à la manière de l'ancien code (fichier temporaire puis rename, sans fsync) est lu et mis à jour par le nouveau", async () => {
+  const dir = tmp();
+  mkdirSync(dir, { recursive: true });
+  const record = syntheticRecord(KEY, "legacy");
+  writeFileSync(
+    join(dir, `${digest(KEY)}.json`),
+    `${JSON.stringify(createDurableExecutionEnvelope(record))}\n`,
+    { mode: 0o600 },
+  );
+  const store = createFileDurableExecutionStore({ directory: dir });
+  assert.equal((await store.load(KEY))?.leaseOwner, "legacy");
+  assert.equal(await store.save(syntheticRecord(KEY, "next", 2), 1), true);
+  assert.equal((await store.load(KEY))?.leaseOwner, "next");
+  assert.equal(await store.save(syntheticRecord(KEY, "stale", 3), 1), false);
 });

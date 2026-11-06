@@ -16,7 +16,12 @@ import { syntheticRecord } from "./support/synthetic.js";
 const events: string[] = [];
 let directorySyncFailure: string | null = null;
 const dir = mkdtempSync(join(tmpdir(), "le-persist-"));
-after(() => rmSync(dir, { recursive: true, force: true }));
+after(() => {
+  fsp.rename = originalRename;
+  handlePrototype.sync = originalSync;
+  syncBuiltinESMExports();
+  rmSync(dir, { recursive: true, force: true });
+});
 
 const originalRename = fsp.rename;
 fsp.rename = (async (...args: Parameters<typeof fsp.rename>) => {
