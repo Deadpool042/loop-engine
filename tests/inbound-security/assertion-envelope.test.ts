@@ -389,3 +389,44 @@ test("every refusal is uniform: no detail about what was wrong", () => {
   }
   assert.equal(reasons.size, 1);
 });
+
+test("an unpaired surrogate is refused in the signature, in text fields and in keys", () => {
+  const base = wire();
+  assert.deepEqual(
+    parse(base.replace('"signature":"c2ln"', '"signature":"\\ud800"')),
+    MALFORMED,
+  );
+  assert.deepEqual(
+    parse(base.replace('"signature":"c2ln"', '"signature":"a\\udc00b"')),
+    MALFORMED,
+  );
+  assert.deepEqual(parse(base.replace("lp-control", "lp-\\ud800")), MALFORMED);
+  assert.deepEqual(
+    parse(base.replace('"issuer"', '"iss\\ud800uer"')),
+    MALFORMED,
+  );
+  // a raw lone surrogate in the input text is refused as well
+  assert.deepEqual(parse(base.replace("lp-control", "lp-\ud800")), MALFORMED);
+});
+
+test("very deep nesting is refused quickly and without a stack overflow", () => {
+  const deep = `{"payload":${'{"a":'.repeat(100_000)}1${"}".repeat(100_000)},"signature":"s"}`;
+  const started = Date.now();
+  assert.deepEqual(parse(deep, { maxBytes: 10_000_000 }), MALFORMED);
+  assert.ok(Date.now() - started < 2000);
+});
+
+test("equivalent JSON spellings decode to the same assertion", () => {
+  // the signature covers the decoded payload, so the replay key must be `jti`,
+  // never the raw bytes: this documents the malleability of the textual form
+  const escaped = wire().replace("lp-control", "lp-\\u0063ontrol");
+  const a = parse(wire());
+  const b = parse(escaped);
+  assert.equal(a.parsed && b.parsed, true);
+  if (a.parsed && b.parsed)
+    assert.deepEqual(a.envelope, {
+      ...b.envelope,
+      payload: { ...b.envelope.payload, issuer: "lp-control" },
+    });
+  assert.notEqual(wire(), escaped);
+});

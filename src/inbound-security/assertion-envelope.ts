@@ -258,9 +258,9 @@ function hasOnlyKeys(value: object, keys: readonly string[]): boolean {
 export function readInboundAssertionPayload(
   value: unknown,
 ): InboundAssertionPayload | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value))
-    return null;
   try {
+    if (typeof value !== "object" || value === null || Array.isArray(value))
+      return null;
     if (!hasOnlyKeys(value, INBOUND_ASSERTION_PAYLOAD_FIELDS)) return null;
     const field = (name: string): unknown => {
       const descriptor = Object.getOwnPropertyDescriptor(value, name);

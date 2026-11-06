@@ -222,3 +222,39 @@ test("injectivity: distinct payloads never share a message, and the message deco
     });
   }
 });
+
+test("payloads with accessors or hostile proxies never produce a message", () => {
+  const withGetter = Object.defineProperty(payload(), "sub", {
+    enumerable: true,
+    get: () => "p-alice",
+  });
+  assert.equal(buildInboundAssertionSigningMessage(withGetter).built, false);
+  const throwing = new Proxy(payload(), {
+    getOwnPropertyDescriptor() {
+      throw new Error("boom");
+    },
+  });
+  assert.equal(buildInboundAssertionSigningMessage(throwing).built, false);
+  const revoked = Proxy.revocable(payload(), {});
+  revoked.revoke();
+  assert.equal(buildInboundAssertionSigningMessage(revoked.proxy).built, false);
+  // a proxy whose descriptors change between reads is read once per field
+  let reads = 0;
+  const shifting = new Proxy(payload(), {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === "sub") {
+        reads += 1;
+        return {
+          value: reads === 1 ? "p-alice" : "p-mallory",
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        };
+      }
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  const built = buildInboundAssertionSigningMessage(shifting);
+  assert.equal(reads, 1);
+  assert.equal(built.built && built.message.includes("sub=p-alice"), true);
+});
