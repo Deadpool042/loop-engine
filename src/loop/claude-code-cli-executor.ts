@@ -162,6 +162,8 @@ function runProcess(
       );
     };
     const consume = (chunk: Buffer, channel: "stdout" | "stderr"): void => {
+      // While a cancellation terminates the group only its outcome may settle.
+      if (watch.isCancelling()) return;
       observedBytes += chunk.byteLength;
       if (observedBytes > maxOutputBytes) {
         child.kill("SIGTERM");
@@ -307,6 +309,20 @@ export function createClaudeCodeCliLoopExecutor(
     const modifiedFiles = await readModifiedWorktreeFiles(cwd);
 
     if (modifiedFiles === null) {
+      // A failed inventory must never eclipse the cancellation outcome, above
+      // all a cleanup failure.
+      if (result.killedReason === "cancel_cleanup_failed") {
+        return failure(
+          CANCELLATION_CLEANUP_FAILED_CODE,
+          "Claude Code processes could not be proven terminated after the cancellation.",
+        );
+      }
+      if (result.killedReason === "cancelled") {
+        return failure(
+          EXECUTION_CANCELLED_CODE,
+          "Claude Code execution was cancelled and its process group terminated.",
+        );
+      }
       return failure(
         "worktree_status_failed",
         "Unable to inspect provider modifications.",

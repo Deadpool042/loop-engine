@@ -60,6 +60,12 @@ export type LoopValidatorInput = Readonly<{
 }>;
 
 export type LoopValidatorResult = Readonly<{
+  /**
+   * Set when a cancellation could not be proven to have terminated the
+   * validation process group. The runner surfaces it as
+   * `cancellation_cleanup_failed` instead of a clean cancellation.
+   */
+  cancellationCleanupFailed?: true;
   status: "passed" | "failed";
   failedCommand: string | null;
   exitCode: number;
@@ -135,6 +141,7 @@ function runValidationCommand(
   command: string,
   cwd: string,
   signal?: AbortSignal,
+  onCleanupFailed?: () => void,
 ): Promise<Readonly<{ exitCode: number; diagnostics: readonly string[] }>> {
   return new Promise((resolvePromise) => {
     if (signal?.aborted === true) {
@@ -162,6 +169,7 @@ function runValidationCommand(
       ownGroup,
       (outcome) => {
         if (outcome === "cleanup_failed") {
+          onCleanupFailed?.();
           output +=
             "\nValidation process group could not be proven terminated.";
         }
@@ -202,12 +210,17 @@ function runValidationCommand(
 export async function validateLoopExecution(
   input: LoopValidatorInput,
 ): Promise<LoopValidatorResult> {
+  let cleanupFailed = false;
   const result = await runConfiguredValidations(
     input.project,
-    (command, cwd) => runValidationCommand(command, cwd, input.signal),
+    (command, cwd) =>
+      runValidationCommand(command, cwd, input.signal, () => {
+        cleanupFailed = true;
+      }),
   );
 
   return Object.freeze({
+    ...(cleanupFailed ? { cancellationCleanupFailed: true as const } : {}),
     status: result.failedCommand === null ? "passed" : "failed",
     failedCommand: result.failedCommand,
     exitCode: result.exitCode,

@@ -344,10 +344,12 @@ export async function runLoopExecute(
    */
   function observeCancellation(
     phase: string,
-    outcome?: LoopExecutorResult | LoopRepairerResult,
+    outcome?: LoopExecutorResult | LoopRepairerResult | LoopValidatorResult,
   ): LoopRunResult | null {
     if (signal?.aborted !== true) return null;
-    if (outcome !== undefined) addModifiedFiles(modifiedFiles, outcome.modifiedFiles);
+    if (outcome !== undefined && "modifiedFiles" in outcome) {
+      addModifiedFiles(modifiedFiles, outcome.modifiedFiles);
+    }
     const cause = cancellationReasonOf(signal);
     const details = Object.freeze([
       `Cancellation cause: ${cause}`,
@@ -355,11 +357,22 @@ export async function runLoopExecute(
       "Cooperative cancellation does not stop or roll back external effects that were already committed; inspect the worktree.",
     ]);
     transition("cancelled", "cancelled", "failed", details);
-    const cleanupFailure =
-      outcome?.status === "failed" &&
-      outcome.failure.code === CANCELLATION_CLEANUP_FAILED_CODE
-        ? outcome.failure
-        : null;
+    const cleanupFailure: LoopRunFailure | null =
+      outcome === undefined
+        ? null
+        : "cancellationCleanupFailed" in outcome
+          ? Object.freeze({
+              code: CANCELLATION_CLEANUP_FAILED_CODE,
+              message:
+                "Validation processes could not be proven terminated after the cancellation.",
+              details: Object.freeze([
+                "The validation process group may still be running.",
+              ]),
+            })
+          : "failure" in outcome &&
+              outcome.failure.code === CANCELLATION_CLEANUP_FAILED_CODE
+            ? outcome.failure
+            : null;
     return finalize(
       cancellationCandidate,
       cleanupFailure !== null
@@ -630,6 +643,8 @@ export async function runLoopExecute(
   }
 
   async function failForContentPolicyViolation(): Promise<LoopRunResult | null> {
+    const cancelledBeforeInspection = observeCancellation("content_policy");
+    if (cancelledBeforeInspection !== null) return cancelledBeforeInspection;
     const inspection = await inspectWorktreeContentPolicy(
       executionPlan,
       executionProject.path,
@@ -657,6 +672,8 @@ export async function runLoopExecute(
   }
 
   async function refreshModifiedFilesFromWorktree(): Promise<LoopRunResult | null> {
+    const cancelledBeforeInventory = observeCancellation("worktree_inventory");
+    if (cancelledBeforeInventory !== null) return cancelledBeforeInventory;
     const actualModifiedFiles = await dependencies.readModifiedWorktreeFiles(
       executionProject.path,
     );
@@ -665,6 +682,9 @@ export async function runLoopExecute(
       addModifiedFiles(modifiedFiles, actualModifiedFiles);
       return null;
     }
+    // A failed inventory under cancellation is a cancellation, not a failure.
+    const cancelledByFailure = observeCancellation("worktree_inventory");
+    if (cancelledByFailure !== null) return cancelledByFailure;
 
     transition("failed", "failed", "failed", [
       "Unable to determine the provider worktree state.",
@@ -685,6 +705,8 @@ export async function runLoopExecute(
     try {
       await dependencies.resetExecutionWorkspace(executionProject.path);
     } catch (error) {
+      const cancelledByResetFailure = observeCancellation("workspace_reset");
+      if (cancelledByResetFailure !== null) return cancelledByResetFailure;
       const diagnostic = safeWorkspaceResetDiagnostic(error);
       transition("failed", "failed", "failed", [
         "Unable to restore the isolated worktree before model escalation.",
@@ -861,7 +883,10 @@ export async function runLoopExecute(
 
     // A validation result obtained under cancellation is discarded: it is
     // neither success evidence nor a trigger for a repair attempt.
-    const cancelledAfterValidation = observeCancellation("validating");
+    const cancelledAfterValidation = observeCancellation(
+      "validating",
+      validationAttempt,
+    );
     if (cancelledAfterValidation !== null) return cancelledAfterValidation;
 
     validation = createValidationResult(

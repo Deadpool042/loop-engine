@@ -479,4 +479,65 @@ describe("runLoopExecute — cooperative cancellation (L7)", () => {
     assert.equal(result.status, "cancelled");
     assert.equal(result.failure?.code, "cancellation_cleanup_failed");
   });
+
+  it("surfaces a validation process group that could not be terminated", async () => {
+    const controller = new AbortController();
+    const { result } = await run(
+      {
+        executor: completedExecution,
+        validator: (async () => {
+          controller.abort();
+          return {
+            status: "failed" as const,
+            failedCommand: "fixture-validation",
+            exitCode: 1,
+            details: ["synthetic validation failed"],
+            cancellationCleanupFailed: true as const,
+          };
+        }) satisfies LoopValidator,
+      },
+      controller.signal,
+    );
+
+    assert.equal(result.status, "cancelled");
+    assert.equal(result.failure?.code, "cancellation_cleanup_failed");
+  });
+
+  it("a worktree inventory failing under cancellation is cancelled, not worktree_status_failed", async () => {
+    const controller = new AbortController();
+    const { result } = await run(
+      {
+        executor: completedExecution,
+        readModifiedWorktreeFiles: async () => {
+          controller.abort();
+          return null;
+        },
+      },
+      controller.signal,
+    );
+
+    assert.equal(result.status, "cancelled");
+    assert.equal(result.failure?.code, "execution_cancelled");
+  });
+
+  it("a worktree inventory is not started once the cancellation was observed", async () => {
+    const controller = new AbortController();
+    let inventories = 0;
+    const { result } = await run(
+      {
+        executor: (async () => {
+          controller.abort();
+          return completedExecution();
+        }) satisfies LoopExecutor,
+        readModifiedWorktreeFiles: async () => {
+          inventories += 1;
+          return [] as readonly string[];
+        },
+      },
+      controller.signal,
+    );
+
+    assert.equal(result.status, "cancelled");
+    assert.equal(inventories, 0);
+  });
 });

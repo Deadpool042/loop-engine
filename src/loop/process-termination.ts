@@ -140,7 +140,8 @@ export function watchChildForCancellation(
     const groupId = child.pid;
     if (!ownGroup || groupId === undefined) {
       child.kill("SIGKILL");
-      onTerminated("terminated");
+      // Never synchronous: callers declare their `settle` after the watch.
+      queueMicrotask(() => onTerminated("terminated"));
       return;
     }
     void terminateProcessGroup(groupId, {

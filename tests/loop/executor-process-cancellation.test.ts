@@ -41,6 +41,18 @@ writeFileSync(process.env.FAKE_CODEX_PID_PATH, String(grandchild.pid));
 setInterval(() => {}, 1000);
 `;
 
+// Synthetic provider that ignores SIGTERM and floods stdout when it receives
+// it, to prove the output limit cannot short-circuit a cancellation. With
+// FAKE_CODEX_FLOOD=0 it simply ignores SIGTERM.
+const STUBBORN_SOURCE = `#!/usr/bin/env node
+import { writeFileSync } from "node:fs";
+process.on("SIGTERM", () => {
+  if (process.env.FAKE_CODEX_FLOOD !== "0") process.stdout.write("x".repeat(200_000));
+});
+writeFileSync(process.env.FAKE_CODEX_STUBBORN_PID_PATH, String(process.pid));
+setInterval(() => {}, 1000);
+`;
+
 function plan(provider: "anthropic" | "openai"): LoopExecutionPlan {
   return Object.freeze({
     schemaVersion: 1 as const,
@@ -234,6 +246,68 @@ describe(
           rmSync(root, { recursive: true, force: true });
         }
       });
+    }
+
+    for (const name of ["claude", "codex"] as const) {
+      for (const scenario of ["output-limit", "inventory-failure"] as const) {
+        it(`${name}: ${scenario} during a cancellation never short-circuits or masks it`, async () => {
+          const { root, cwd, executable, pidPath } = setup(name);
+          writeFileSync(executable, STUBBORN_SOURCE);
+          chmodSync(executable, 0o755);
+          let pid: number | null = null;
+          const previousPid = process.env.FAKE_CODEX_STUBBORN_PID_PATH;
+          const previousFlood = process.env.FAKE_CODEX_FLOOD;
+          const previousGitDir = process.env.GIT_DIR;
+          process.env.FAKE_CODEX_STUBBORN_PID_PATH = pidPath;
+          process.env.FAKE_CODEX_FLOOD =
+            scenario === "output-limit" ? "1" : "0";
+          try {
+            const options = {
+              executable,
+              timeoutMs: 60_000,
+              maxOutputBytes: scenario === "output-limit" ? 1_000 : 1_000_000,
+            };
+            const executor =
+              name === "claude"
+                ? createClaudeCodeCliLoopExecutor(options)
+                : createCodexCliLoopExecutor(options);
+            const controller = new AbortController();
+            const pending = executor(
+              plan(name === "claude" ? "anthropic" : "openai"),
+              cwd,
+              { signal: controller.signal },
+            );
+            pid = await waitForPid(pidPath);
+            // The inventory runs after the termination: make it fail.
+            if (scenario === "inventory-failure")
+              process.env.GIT_DIR = join(root, "does-not-exist");
+            controller.abort();
+            const result = await pending;
+
+            assert.equal(result.status, "failed");
+            assert.equal(
+              result.status === "failed" ? result.failure.code : null,
+              "execution_cancelled",
+            );
+            assert.equal(
+              alive(pid),
+              false,
+              "the provider must be dead when the executor resolves",
+            );
+          } finally {
+            killQuietly(pid);
+            if (previousPid === undefined)
+              delete process.env.FAKE_CODEX_STUBBORN_PID_PATH;
+            else process.env.FAKE_CODEX_STUBBORN_PID_PATH = previousPid;
+            if (previousFlood === undefined)
+              delete process.env.FAKE_CODEX_FLOOD;
+            else process.env.FAKE_CODEX_FLOOD = previousFlood;
+            if (previousGitDir === undefined) delete process.env.GIT_DIR;
+            else process.env.GIT_DIR = previousGitDir;
+            rmSync(root, { recursive: true, force: true });
+          }
+        });
+      }
     }
   },
 );

@@ -194,6 +194,8 @@ function runProcess(
       );
     };
     const consume = (chunk: Buffer, channel: "stdout" | "stderr"): void => {
+      // While a cancellation terminates the group only its outcome may settle.
+      if (watch.isCancelling()) return;
       observedBytes += chunk.byteLength;
       if (observedBytes > maxOutputBytes) {
         child.kill("SIGTERM");
@@ -310,11 +312,24 @@ export function createCodexCliLoopExecutor(
     // Read-only inventory so that a cancelled run still reports the effects it
     // may have produced before the process was terminated.
     const modifiedFiles = await readModifiedWorktreeFiles(cwd);
-    if (modifiedFiles === null)
+    if (modifiedFiles === null) {
+      // A failed inventory must never eclipse the cancellation outcome, above
+      // all a cleanup failure.
+      if (result.limitReason === "cancel_cleanup_failed")
+        return failure(
+          CANCELLATION_CLEANUP_FAILED_CODE,
+          "Codex processes could not be proven terminated after the cancellation.",
+        );
+      if (result.limitReason === "cancelled")
+        return failure(
+          EXECUTION_CANCELLED_CODE,
+          "Codex execution was cancelled and its process group terminated.",
+        );
       return failure(
         "worktree_status_failed",
         "Unable to inspect provider modifications.",
       );
+    }
     if (result.limitReason === "cancelled")
       return failure(
         EXECUTION_CANCELLED_CODE,
