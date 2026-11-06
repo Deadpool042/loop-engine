@@ -85,8 +85,48 @@ test("a non-canonical identifier is refused, never normalized", () => {
 test("a prototype-looking identifier resolves only when it is declared", () => {
   const entries = [entry({ principalId: "__proto__" })];
   const result = resolveConfiguredInboundPrincipal(entries, "__proto__");
-  assert.equal(result.resolved, true);
-  assert.equal(({} as Record<string, unknown>).tenantId, undefined);
+  assert.equal(result.resolved && result.principal.tenantId, "tenant-a");
+  assert.equal(
+    resolveConfiguredInboundPrincipal(directory(), "__proto__").resolved,
+    false,
+  );
+});
+
+test("hostile arrays and objects are refused or read once, never trusted", () => {
+  // accessor element inside roles
+  const roles = ["operator"];
+  Object.defineProperty(roles, 0, { enumerable: true, get: () => "operator" });
+  assert.equal(
+    validateConfiguredInboundPrincipalDirectory([entry({ roles })]),
+    false,
+  );
+  // a revoked proxy and a proxy that throws never escape as exceptions
+  const revoked = Proxy.revocable([entry()], {});
+  revoked.revoke();
+  assert.equal(
+    validateConfiguredInboundPrincipalDirectory(revoked.proxy),
+    false,
+  );
+  const throwing = new Proxy([entry()], {
+    get() {
+      throw new Error("boom");
+    },
+  });
+  assert.equal(validateConfiguredInboundPrincipalDirectory(throwing), false);
+  assert.deepEqual(resolveConfiguredInboundPrincipal(throwing, "p-alice"), {
+    resolved: false,
+    reason: "principal_directory_invalid",
+  });
+  // one roles array shared by two entries: mutation afterwards leaks nowhere
+  const shared = ["r"];
+  const port = createConfiguredInboundPrincipalDirectory([
+    entry({ principalId: "p-1", roles: shared }),
+    entry({ principalId: "p-2", roles: shared }),
+  ]);
+  shared.push("admin");
+  assert.deepEqual(port.resolve("p-1")?.roles, ["r"]);
+  assert.deepEqual(port.resolve("p-2")?.roles, ["r"]);
+  assert.notEqual(port.resolve("p-1")?.roles, port.resolve("p-2")?.roles);
 });
 
 test("empty, malformed or ambiguous configurations are refused as a whole", () => {

@@ -13,6 +13,12 @@
  *
  * No I/O, no environment, no authentication: this module creates no account
  * and grants no right by itself (rights stay in the ACL and the service ceiling).
+ *
+ * WIRING NOTE: the existing API-key verifier accepts any `trim().length > 0`
+ * string for principal id, type, tenant and roles, whereas this directory
+ * requires the canonical rule. A principal declared there with surrounding
+ * whitespace is therefore UNKNOWN here (closed by default). Align the two, or
+ * document the asymmetry, before any wiring.
  */
 
 import { isCanonicalInput } from "../core/canonical-input.js";
@@ -67,9 +73,9 @@ function dataValue(
   if (
     descriptor === undefined ||
     descriptor.enumerable !== true ||
-    !("value" in descriptor) ||
-    "get" in descriptor ||
-    "set" in descriptor
+    !Object.hasOwn(descriptor, "value") ||
+    Object.hasOwn(descriptor, "get") ||
+    Object.hasOwn(descriptor, "set")
   ) {
     return { ok: false };
   }
@@ -87,7 +93,7 @@ function readRoleList(value: unknown): readonly string[] | null {
     const descriptor = Object.getOwnPropertyDescriptor(value, index);
     if (
       descriptor === undefined ||
-      !("value" in descriptor) ||
+      !Object.hasOwn(descriptor, "value") ||
       !isCanonicalInput(descriptor.value)
     ) {
       return null;
@@ -162,9 +168,14 @@ function readDirectory(
   }
 }
 
+/**
+ * Returns a plain boolean on purpose: it does NOT narrow the source, which may
+ * be a Proxy or hold mutable arrays. Use `createConfiguredInboundPrincipalDirectory`,
+ * which works on a validated, frozen copy.
+ */
 export function validateConfiguredInboundPrincipalDirectory(
   entries: unknown,
-): entries is readonly InboundPrincipal[] {
+): boolean {
   return readDirectory(entries) !== null;
 }
 
