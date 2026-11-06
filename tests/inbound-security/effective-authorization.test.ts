@@ -214,3 +214,155 @@ test("nothing is allowed by default", () => {
   assert.equal(evaluate({ ceilingRules: undefined }).allowed, false);
   assert.equal(evaluate({ ceilingRules: "svc-key-1" }).allowed, false);
 });
+
+// ---- hardening after independent review ----
+
+test("a non-canonical or non-string principalId never reaches a permissive port", () => {
+  let calls = 0;
+  const permissive = {
+    resolve: (id: unknown) => {
+      calls += 1;
+      return {
+        principalId: id,
+        principalType: "user",
+        tenantId: "tenant-a",
+        roles: ["operator"],
+      };
+    },
+  } as unknown as InboundPrincipalDirectory;
+  for (const principalId of [
+    1,
+    null,
+    undefined,
+    {},
+    "",
+    " p",
+    "p ",
+    "p\n",
+  ] as unknown[]) {
+    assert.deepEqual(
+      evaluate({ directory: permissive, principalId: principalId as string }),
+      {
+        allowed: false,
+        source: "principal_directory",
+        reason: "principal_unknown",
+      },
+      JSON.stringify(principalId),
+    );
+  }
+  assert.equal(calls, 0);
+});
+
+test("a port answering with getters, holes or throwing accessors fails closed", () => {
+  const base = {
+    principalId: "p-alice",
+    principalType: "user",
+    tenantId: "tenant-a",
+    roles: ["operator"],
+  };
+  const getterId = Object.defineProperty({ ...base }, "principalId", {
+    enumerable: true,
+    get: () => "p-alice",
+  });
+  const throwingId = Object.defineProperty({ ...base }, "principalId", {
+    enumerable: true,
+    get: () => {
+      throw new Error("boom");
+    },
+  });
+  const holeyRoles = { ...base, roles: ["operator", , "x"] };
+  const nonArrayRoles = { ...base, roles: "operator" };
+  for (const answer of [
+    getterId,
+    throwingId,
+    holeyRoles,
+    nonArrayRoles,
+    5,
+    "p-alice",
+    [base],
+  ]) {
+    const port = {
+      resolve: () => answer,
+    } as unknown as InboundPrincipalDirectory;
+    assert.deepEqual(evaluate({ directory: port }), {
+      allowed: false,
+      source: "principal_directory",
+      reason: "principal_unknown",
+    });
+  }
+});
+
+test("a principal returned by the port is copied once: later mutation is irrelevant", () => {
+  const roles = ["operator"];
+  const live = {
+    principalId: "p-alice",
+    principalType: "user",
+    tenantId: "tenant-a",
+    roles,
+  };
+  const port = {
+    resolve: () => {
+      const answer = { ...live, roles: [...roles] };
+      roles.length = 0; // the live source changes right after the answer
+      return answer;
+    },
+  } as unknown as InboundPrincipalDirectory;
+  assert.equal(evaluate({ directory: port }).allowed, true);
+});
+
+test("ACL rules are read once: a rule list that changes between reads is not trusted", () => {
+  let reads = 0;
+  const shifting = new Proxy([aclRule()], {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === "0") {
+        reads += 1;
+        return {
+          value: reads === 1 ? aclRule() : aclRule({ requiredRoles: [] }),
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        };
+      }
+      return Reflect.getOwnPropertyDescriptor(target, key);
+    },
+  });
+  const decision = evaluate({ aclRules: shifting as never });
+  // the rule list is read exactly once; the decision is made on that one snapshot
+  assert.equal(reads, 1);
+  assert.equal(decision.allowed, true);
+  // a second, different read can never turn a denial into an authorization
+  reads = 1;
+  assert.equal(
+    evaluate({ aclRules: shifting as never, principalId: "p-ghost" }).allowed,
+    false,
+  );
+  const accessor = [aclRule()];
+  Object.defineProperty(accessor, 0, {
+    enumerable: true,
+    get: () => aclRule(),
+  });
+  assert.deepEqual(evaluate({ aclRules: accessor as never }), {
+    allowed: false,
+    source: "principal_acl",
+    reason: "acl_configuration_invalid",
+  });
+  assert.equal(evaluate({ aclRules: "rules" as never }).allowed, false);
+});
+
+test("the principal ACL is evaluated before the ceiling and reported first", () => {
+  assert.deepEqual(evaluate({ aclRules: [], ceilingRules: [] }), {
+    allowed: false,
+    source: "principal_acl",
+    reason: "acl_configuration_invalid",
+  });
+});
+
+test("prototype-looking service keys are plain unknown keys", () => {
+  for (const keyId of ["__proto__", "constructor", "toString"]) {
+    assert.deepEqual(evaluate({ keyId }), {
+      allowed: false,
+      source: "service_ceiling",
+      reason: "service_unknown",
+    });
+  }
+});
