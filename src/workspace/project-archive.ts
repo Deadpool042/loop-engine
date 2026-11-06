@@ -4,8 +4,7 @@ import * as path from "node:path";
 import { isMap, isSeq, parse as parseYaml, parseDocument } from "yaml";
 
 import type { Config } from "../core/config.js";
-
-const PROJECT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
+import { PROJECT_NAME_PATTERN } from "../core/project-identity.js";
 
 export type ProjectArchiveResult = Readonly<{
   schemaVersion: 1;

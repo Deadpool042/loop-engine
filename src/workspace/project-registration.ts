@@ -9,8 +9,8 @@ import {
   type Config,
   type ProjectConfig,
 } from "../core/config.js";
+import { PROJECT_NAME_PATTERN } from "../core/project-identity.js";
 
-const PROJECT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const PROJECT_TYPE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const APPROVED_LINE = "- Statut : approved";
 

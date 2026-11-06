@@ -4,8 +4,8 @@ import * as path from "node:path";
 import { isMap, isSeq, parse as parseYaml, parseDocument } from "yaml";
 
 import type { Config } from "../core/config.js";
+import { PROJECT_NAME_PATTERN } from "../core/project-identity.js";
 
-const PROJECT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const GITHUB_REPOSITORY_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
 export type ProjectSetRepositoryResult = Readonly<{

@@ -15,6 +15,8 @@ import {
 } from "node:path";
 import { parse as parseYaml } from "yaml";
 
+import { assertValidProjectRegistry } from "./project-identity.js";
+
 export const WORKSPACE_MATERIALIZATION_MODES = [
   "permanent",
   "source_only",
@@ -353,6 +355,7 @@ export function loadConfig(
   const raw = readFileSync("projects.yaml", "utf8");
   const config = parseYaml(raw) as Config;
   if (Array.isArray(config?.projects)) {
+    assertValidProjectRegistry(config.projects);
     for (const project of config.projects) {
       const selected = resolveProjectPath(project, allowedRoot);
       project.path = resolveConfinedProjectPath(
