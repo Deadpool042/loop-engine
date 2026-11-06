@@ -78,6 +78,20 @@ function tmp(): string {
   return dir;
 }
 
+// Attend que le bail soit réellement persisté (et non un délai arbitraire).
+async function waitForLease(
+  store: ReturnType<typeof createFileDurableExecutionStore>,
+  key = "cycle:k",
+): Promise<void> {
+  const start = Date.now();
+  for (;;) {
+    const record = await store.load(key);
+    if (record?.status === "running") return;
+    if (Date.now() - start > 15_000) throw new Error("bail non persisté");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 async function waitFor(condition: () => boolean, ms = 15_000): Promise<void> {
   const start = Date.now();
   while (!condition()) {
@@ -311,7 +325,7 @@ test("T6 — un renouvellement concurrent d'une reprise : exactement un des deux
       },
       () => t0,
     );
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    await waitForLease(store);
     const [renewal, recovery] = await Promise.all([
       renewDurableExecutionLease(
         store,
@@ -338,7 +352,7 @@ test("T6 — un renouvellement concurrent d'une reprise : exactement un des deux
     assert.equal(
       winners,
       1,
-      `round ${round}: ${renewal.status}/${recovery.status}`,
+      `round ${round}: ${JSON.stringify([renewal, recovery].map((r) => (r.status === "rejected" ? r.code : r.status)))}`,
     );
     release?.();
     await running;
@@ -364,7 +378,7 @@ test("T7 — un ancien détenteur ne peut ni terminer ni libérer le bail d'un n
     },
     () => t0,
   );
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  await waitForLease(store);
   const recovered = await recoverDurableExecution(
     store,
     {
@@ -502,7 +516,7 @@ test("T11 — un successeur portant la même étiquette de détenteur n'est pas 
     },
     () => t0,
   );
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  await waitForLease(store);
   const recovered = await recoverDurableExecution(
     store,
     {
@@ -555,7 +569,7 @@ test("T12 — un superviseur d'annulation d'une ancienne tentative ne peut pas a
     },
     () => t0,
   );
-  await new Promise((resolve) => setTimeout(resolve, 30));
+  await waitForLease(store);
   await recoverDurableExecution(
     store,
     {

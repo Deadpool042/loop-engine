@@ -66,3 +66,65 @@ Raccorder `runDurableExecutionHeartbeat` ou `recoverDurableExecution` au chemin 
 3. Commande de reprise autorisée (E4), jamais automatique.
 4. Vérification de la tentative par chaque opération à effet externe, ou preuve qu'aucun effet n'est possible après perte du bail.
 5. Purge bornée des quarantaines de verrous.
+
+## 8. Qualification des verrous orphelins
+
+Règle : un verrou n'est repris que si son détenteur est **prouvé mort**, **sur le même hôte**, avec des métadonnées **valides et cohérentes** ; dans tous les autres cas la reprise reste interdite et la contention aboutit à un refus borné (`lockTimeoutMs`), jamais à une suppression. Essais : `tests/loop/durable-lock-orphans.test.ts` (données synthétiques, gestionnaire de verrous à `hostname` et inspection de processus injectés ; O8 avec de vrais processus).
+
+| Situation                                                                                                                       | Récupération                                                                        | Preuve                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Détenteur tué (`SIGKILL`), même hôte, PID mort                                                                                  | **Sûre** : mise en quarantaine nommée par l'identifiant du verrou, puis acquisition | O1, O8 (huit récupérateurs réels, une écriture, une quarantaine, 3 tours), D3 |
+| Plusieurs récupérateurs simultanés                                                                                              | Un seul réussit (le nom de quarantaine ne peut être pris qu'une fois)               | O8 ; D4 (ne distingue pas l'ancien code)                                      |
+| PID réutilisé par un processus vivant                                                                                           | **Interdite** (indistinguable d'un détenteur vivant) ; intervention manuelle        | O2                                                                            |
+| Inspection impossible (`EPERM`, inconnu)                                                                                        | **Interdite**                                                                       | O3                                                                            |
+| Hostname modifié ou verrou d'un autre hôte (même PID mort)                                                                      | **Interdite**                                                                       | O4 (hostnames `host-b`, casse différente, vide)                               |
+| Métadonnées malformées, version inconnue, PID non numérique, projet différent, chaîne démesurée, fichier de propriétaire absent | **Interdite**, verrou intact                                                        | O5 (7 variantes)                                                              |
+| Quarantaine déjà occupée pour ce verrou                                                                                         | **Interdite**                                                                       | O6                                                                            |
+| Répertoire de verrous en `0500` ou `0000`                                                                                       | **Interdite** : aucune écriture, aucune suppression silencieuse                     | O7                                                                            |
+| Détenteur vivant bloqué                                                                                                         | **Interdite** : refus borné                                                         | D2, T10                                                                       |
+
+Limites : l'inspection de processus est `kill(pid, 0)` ; elle ne distingue pas un PID réattribué, ni un autre espace de noms de PID. Aucun test n'a porté sur un système de fichiers partagé entre hôtes ni sur un `hostname` qui change réellement.
+
+## 9. Compatibilité, transition et retour arrière
+
+Constats **[D]** (script jetable comparant le module de `main` au nouveau, répertoire temporaire) :
+
+- **Format des enregistrements : identique.** Le nouveau code lit un enregistrement écrit par l'ancien et inversement (écritures croisées, révisions 1 → 2) ; le contenu du répertoire est `<digest>.json` plus `.locks/`. Aucune migration de données.
+- **Format des verrous : incompatible.** L'ancien code utilise `<digest>.lock` (fichier, PID en clair) ; le nouveau utilise `.locks/<segment>/owner.json`. Chacun **ignore** l'autre.
+- **Coexistence de deux versions : aucune exclusion mutuelle.** Un ancien verrou `<digest>.lock` tenu n'empêche pas une écriture du nouveau code (acceptée en 11 ms, C1) : deux versions actives sur le même répertoire d'état peuvent produire deux acquéreurs.
+- **Retour arrière :** l'ancien code ignore `.locks/` et fonctionne sur les enregistrements existants ; les quarantaines et `.locks/` restent inertes.
+- **Fichiers résiduels** (`*.tmp`, `.candidate-*`, quarantaines) : jamais lus comme enregistrements (C2) ; non purgés.
+
+**Procédure de transition proposée (non exécutée ; à faire par le propriétaire)**, répertoire d'état `durable-executions` sous l'état de Loop Engine :
+
+1. Arrêter tous les exécutants : CLI `run --durable`, passerelle d'orchestration, GUI de Loop Engine. La lecture de statut (`execution-status`) est sans écriture et peut rester.
+2. Vérifier l'absence d'activité : aucun processus Loop Engine ; aucun fichier `*.lock` dans le répertoire d'état ; aucun enregistrement `running` dont le bail n'est pas expiré (consulter le statut en lecture).
+3. Déployer le nouveau code ; la première écriture crée `.locks/` en `0700`. Les anciens `*.lock` sont inertes et peuvent être supprimés après confirmation qu'aucun ancien processus ne tourne.
+4. Retour arrière : arrêter les exécutants, redéployer l'ancien code, vérifier l'absence de verrou `.locks/*/owner.json` dont le PID est vivant ; `.locks/` peut rester.
+   Aucun exécutant ne doit tourner pendant le changement de version.
+
+## 10. Persistance par scénario
+
+| Scénario                         | Ce qui est démontré                                                                                                                                                                                    | Ce qui ne l'est pas                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Arrêt d'un processus (`SIGKILL`) | Enregistrement soit absent soit complet (écriture par fichier temporaire puis `rename`) ; bail actif conservé ; verrou repris (D3, T5, T8, O8)                                                         | —                                                                                              |
+| Ordre des appels                 | `fsync` fichier → `rename` → `fsync` répertoire → retour de `save` (P2, par instrumentation) ; erreur de synchronisation de répertoire non supportée tolérée, autre erreur remontée (P3, P4)           | —                                                                                              |
+| Redémarrage du système           | Rien                                                                                                                                                                                                   | Aucun test                                                                                     |
+| Coupure électrique               | Rien : `fsync` sous macOS n'émet pas `F_FULLFSYNC`                                                                                                                                                     | Aucune garantie revendiquée                                                                    |
+| Erreur de stockage               | Échec fermé si le répertoire est illisible ou inscriptible nulle part (T9, O7) ; erreur `EIO` du `fsync` du répertoire remonte alors que l'enregistrement est publié (« écrit mais non acquitté », P4) | Comportement d'un disque défaillant                                                            |
+| Stockage partagé entre hôtes     | Reprise de verrou interdite si l'hôte diffère (O4)                                                                                                                                                     | Cohérence des `rename`/`fsync` sur un système de fichiers réseau : non testée, non revendiquée |
+
+## 11. Suite de tests : caractérisation des échecs
+
+Les « 144 échecs préexistants » rapportés précédemment provenaient d'un environnement local **différent de la CI** : sans `LOOP_PROJECTS_ROOT` (obligatoire depuis ADR-0023), 114 échecs avaient pour message `LOOP_PROJECTS_ROOT is required.` et 28 `Unexpected end of JSON input` (sortie vide du CLI en erreur). Aucun ne touchait le stockage durable, les verrous ou la reprise (fichiers concernés : sorties JSON des commandes, rapports de feuille de route, gouvernance de décision d'exécution, renouvellement de décision, validation).
+
+Comparaison **dans des conditions identiques** (`LOOP_PROJECTS_ROOT` et `TMPDIR` confiné comme dans `.github/workflows/ci.yml`, mêmes globs, reporter `spec`, comparaison par nom ET par fichier) :
+
+|                    | Tests | Réussis | Échecs |
+| ------------------ | ----- | ------- | ------ |
+| `main` (`f446075`) | 2 435 | 2 431   | 4      |
+| #409               | 2 462 | 2 458   | 4      |
+
+Les 4 échecs sont **identiques** sur `main` et #409 (aucune régression masquée) : `roadmap objective --json …`, `roadmap proposal-context --json …`, `review --json …` et `keeps the stable report payloads identical to their CLI adapters` ; cause : « Project path does not exist with exact casing », le projet auto-hébergé `loop-engine` (chemin `.`) étant exécuté depuis un répertoire de travail nommé `le-durable-lease` au lieu de `…/loop-engine` comme dans la CI. Ils n'ont aucun lien avec le stockage durable. Les 27 tests supplémentaires de #409 réussissent.
+
+Limites : la CI exécute `pnpm run ci` sous Linux (typecheck, tests, contrats JSON, audit strict, profils) ; cette comparaison locale porte sur les tests macOS seulement.
