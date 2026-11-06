@@ -96,6 +96,8 @@ Constats obtenus par un **script jetable non versionné** comparant le module de
 - **Retour arrière :** l'ancien code ignore `.locks/` et fonctionne sur les enregistrements existants ; les quarantaines et `.locks/` restent inertes.
 - **Fichiers résiduels** (`*.tmp`, `.candidate-*`, quarantaines) : jamais lus comme enregistrements (C2) ; non purgés.
 
+**Prérequis bloquant d'activation.** Aucune activation d'une voie durable (levée de G3.2/B5, décision qui appartient à Loop Engine et que cette PR ne prend pas ; raccordement d'E4 ou d'E12 ; nouvel appelant de la passerelle) ne peut être autorisée tant que la transition ci-dessous n'a pas été réalisée **et vérifiée**, preuves conservées. Deux versions du magasin (ancien verrou `<digest>.lock`, nouveau `.locks/`) ne doivent **jamais** être autorisées simultanément sur un même répertoire d'état : aucun mécanisme technique ne l'empêche (C1), c'est donc une condition de la décision d'activation, à reprendre telle quelle dans cette décision. La présente PR n'active rien et n'exécute pas la transition.
+
 **Procédure de transition proposée (non exécutée ; à faire par le propriétaire)**, répertoire d'état `durable-executions` sous l'état de Loop Engine :
 
 0. Sauvegarder (copie hors ligne) le répertoire d'état `durable-executions` avant tout changement.
