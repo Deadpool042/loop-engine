@@ -1,3 +1,4 @@
+import { isCanonicalInput, isCanonicalProject } from "../core/canonical-input.js";
 import type { LoopRunExecuteOptions } from "../loop/execute-runner.js";
 import type {
   DurableExecutionFingerprint,
@@ -96,13 +97,14 @@ function decodeRequest(value: unknown): OrchestrationGatewayRequest | null {
   }
   if (value.operation === "execute") {
     if (!isRecord(value.request)) return null;
-    const request = value.request;
+    // Each field is read once: the validated value is the value forwarded.
+    const { idempotencyKey, project, owner, leaseDurationMs } = value.request;
     if (
-      !nonEmpty(request.idempotencyKey) ||
-      !nonEmpty(request.project) ||
-      !nonEmpty(request.owner) ||
-      !Number.isInteger(request.leaseDurationMs) ||
-      Number(request.leaseDurationMs) <= 0
+      !isCanonicalInput(idempotencyKey) ||
+      !isCanonicalProject(project) ||
+      !isCanonicalInput(owner) ||
+      !Number.isInteger(leaseDurationMs) ||
+      Number(leaseDurationMs) <= 0
     ) {
       return null;
     }
@@ -110,15 +112,15 @@ function decodeRequest(value: unknown): OrchestrationGatewayRequest | null {
       schemaVersion: ORCHESTRATION_GATEWAY_SCHEMA_VERSION,
       operation: "execute" as const,
       request: Object.freeze({
-        idempotencyKey: request.idempotencyKey,
-        project: request.project,
-        owner: request.owner,
-        leaseDurationMs: Number(request.leaseDurationMs),
+        idempotencyKey,
+        project,
+        owner,
+        leaseDurationMs: Number(leaseDurationMs),
       }),
     });
   }
   if (value.operation === "status" || value.operation === "verify") {
-    if (!nonEmpty(value.idempotencyKey)) return null;
+    if (!isCanonicalInput(value.idempotencyKey)) return null;
     return Object.freeze({
       schemaVersion: ORCHESTRATION_GATEWAY_SCHEMA_VERSION,
       operation: value.operation,
@@ -126,7 +128,10 @@ function decodeRequest(value: unknown): OrchestrationGatewayRequest | null {
     });
   }
   if (value.operation === "cancel") {
-    if (!nonEmpty(value.idempotencyKey) || !nonEmpty(value.requestedBy)) {
+    if (
+      !isCanonicalInput(value.idempotencyKey) ||
+      !isCanonicalInput(value.requestedBy)
+    ) {
       return null;
     }
     return Object.freeze({
@@ -137,7 +142,9 @@ function decodeRequest(value: unknown): OrchestrationGatewayRequest | null {
     });
   }
   if (value.operation === "list") {
-    if (value.project !== undefined && !nonEmpty(value.project)) return null;
+    if (value.project !== undefined && !isCanonicalProject(value.project)) {
+      return null;
+    }
     return Object.freeze({
       schemaVersion: ORCHESTRATION_GATEWAY_SCHEMA_VERSION,
       operation: "list" as const,
@@ -163,7 +170,7 @@ export function createOrchestrationGateway(
       const request = decodeRequest(input);
       if (request === null) {
         return response("status", "rejected", "invalid_request", {
-          details: ["Gateway request does not match schema version 1."],
+          details: ["Gateway request does not match schema version 1 or carries a non-canonical identifier."],
         });
       }
 

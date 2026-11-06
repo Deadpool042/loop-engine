@@ -1,3 +1,4 @@
+import { isCanonicalInput, isCanonicalProject } from "../core/canonical-input.js";
 import type { LoopRunFailure, LoopRunResult } from "./types.js";
 import {
   DURABLE_EXECUTION_SCHEMA_VERSION,
@@ -49,15 +50,13 @@ function emitProgressed(
   }
 }
 
-function nonEmpty(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
+// Inputs are refused, never normalized (L7.1 E5): the string that is validated
+// is the string that is stored, looked up and compared.
 function validRequest(request: DurableExecutionRequest): boolean {
   return (
-    nonEmpty(request.idempotencyKey) &&
-    nonEmpty(request.project) &&
-    nonEmpty(request.owner) &&
+    isCanonicalInput(request.idempotencyKey) &&
+    isCanonicalProject(request.project) &&
+    isCanonicalInput(request.owner) &&
     Number.isInteger(request.leaseDurationMs) &&
     request.leaseDurationMs > 0
   );
@@ -116,11 +115,11 @@ function leaseRecord(
   const base: DurableExecutionRecord = Object.freeze({
     schemaVersion: DURABLE_EXECUTION_SCHEMA_VERSION,
     revision: (existing?.revision ?? 0) + 1,
-    idempotencyKey: request.idempotencyKey.trim(),
-    project: request.project.trim(),
+    idempotencyKey: request.idempotencyKey,
+    project: request.project,
     status: "running",
     attempt: (existing?.attempt ?? 0) + 1,
-    leaseOwner: request.owner.trim(),
+    leaseOwner: request.owner,
     leaseExpiresAt: new Date(
       Date.parse(now) + request.leaseDurationMs,
     ).toISOString(),
@@ -137,7 +136,7 @@ function leaseRecord(
     ...base,
     events: Object.freeze([
       ...baseEvents,
-      event(base, now, recovered ? "lease_recovered" : "lease_acquired", request.owner.trim()),
+      event(base, now, recovered ? "lease_recovered" : "lease_acquired", request.owner),
     ]),
   });
 }
@@ -176,12 +175,12 @@ export async function runDurableLoopExecution(
   onProgressed?: DurableExecutionProgressedSink,
 ): Promise<DurableExecutionResult> {
   if (!validRequest(request)) {
-    return reject("invalid_request", null, "Expected a valid idempotency key, project, owner and positive lease duration.");
+    return reject("invalid_request", null, "Expected a canonical idempotency key, project and owner and a positive lease duration.");
   }
 
   const observedAt = now();
-  const existing = await store.load(request.idempotencyKey.trim());
-  if (existing !== null && existing.project !== request.project.trim()) {
+  const existing = await store.load(request.idempotencyKey);
+  if (existing !== null && existing.project !== request.project) {
     return reject("project_mismatch", existing, "The idempotency key is already bound to another project.");
   }
   if (
@@ -195,7 +194,7 @@ export async function runDurableLoopExecution(
     existing !== null &&
     existing.status === "running" &&
     !leaseExpired(existing, observedAt) &&
-    existing.leaseOwner !== request.owner.trim()
+    existing.leaseOwner !== request.owner
   ) {
     return reject("execution_in_progress", existing, "Another owner holds the active execution lease.");
   }
@@ -203,21 +202,21 @@ export async function runDurableLoopExecution(
   const leased = leaseRecord(existing, request, observedAt);
   const acquired = await store.save(leased, existing?.revision ?? null);
   if (!acquired) {
-    return reject("record_conflict", await store.load(request.idempotencyKey.trim()), "The durable execution record changed while acquiring its lease.");
+    return reject("record_conflict", await store.load(request.idempotencyKey), "The durable execution record changed while acquiring its lease.");
   }
   emitProgressed(onProgressed, leased);
 
   if (leased.cancellationRequested) {
     const cancelled = finish(leased, now(), "cancelled", null, internalFailure("execution_cancelled", "Execution was cancelled before provider invocation."));
     if (!(await store.save(cancelled, leased.revision))) {
-      return reject("record_conflict", await store.load(request.idempotencyKey.trim()), "The durable execution record changed while finalizing cancellation.");
+      return reject("record_conflict", await store.load(request.idempotencyKey), "The durable execution record changed while finalizing cancellation.");
     }
     emitProgressed(onProgressed, cancelled);
     return Object.freeze({ status: "executed" as const, record: cancelled });
   }
 
-  const key = request.idempotencyKey.trim();
-  const owner = request.owner.trim();
+  const key = request.idempotencyKey;
+  const owner = request.owner;
   let progressWrites: Promise<void> = Promise.resolve();
 
   const observeProgress = (progress: DurableExecutionProgress): void => {
@@ -327,10 +326,10 @@ export async function requestDurableExecutionCancellation(
   now: () => string = () => new Date().toISOString(),
   onProgressed?: DurableExecutionProgressedSink,
 ): Promise<DurableExecutionCancellationResult> {
-  if (!nonEmpty(idempotencyKey) || !nonEmpty(requestedBy)) {
-    return Object.freeze({ status: "rejected" as const, code: "invalid_request" as const, details: Object.freeze(["Expected a non-empty idempotency key and requester."]) });
+  if (!isCanonicalInput(idempotencyKey) || !isCanonicalInput(requestedBy)) {
+    return Object.freeze({ status: "rejected" as const, code: "invalid_request" as const, details: Object.freeze(["Expected a canonical idempotency key and requester."]) });
   }
-  const existing = await store.load(idempotencyKey.trim());
+  const existing = await store.load(idempotencyKey);
   if (existing === null) {
     return Object.freeze({ status: "rejected" as const, code: "not_found" as const, details: Object.freeze(["No durable execution record exists for this key."]) });
   }
@@ -345,7 +344,7 @@ export async function requestDurableExecutionCancellation(
     updatedAt: at,
     events: Object.freeze([
       ...existing.events,
-      event(existing, at, "cancellation_requested", requestedBy.trim()),
+      event(existing, at, "cancellation_requested", requestedBy),
     ]),
   });
   if (!(await store.save(updated, existing.revision))) {
