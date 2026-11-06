@@ -91,7 +91,7 @@ file lookup, network request, retry, fallback or credential discovery.
 - exact tenant id, including explicit `null` tenancy;
 - all required roles;
 - an explicit project list;
-- an explicit operation list (`dry-run` and/or `execute`).
+- an explicit operation list (`dry-run` and/or `execute`; the ACL vocabulary also accepts `read` and `cancel`, added by L7.2 E3, which are inert on this adapter because the public request only carries `dry-run` and `execute`).
 
 Evaluation is deterministic and declaration-order stable. There is no wildcard,
 implicit role inheritance or default allow. The decision fails closed with one
