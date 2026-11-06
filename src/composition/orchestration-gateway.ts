@@ -97,13 +97,14 @@ function decodeRequest(value: unknown): OrchestrationGatewayRequest | null {
   }
   if (value.operation === "execute") {
     if (!isRecord(value.request)) return null;
-    const request = value.request;
+    // Each field is read once: the validated value is the value forwarded.
+    const { idempotencyKey, project, owner, leaseDurationMs } = value.request;
     if (
-      !isCanonicalInput(request.idempotencyKey) ||
-      !isCanonicalProject(request.project) ||
-      !isCanonicalInput(request.owner) ||
-      !Number.isInteger(request.leaseDurationMs) ||
-      Number(request.leaseDurationMs) <= 0
+      !isCanonicalInput(idempotencyKey) ||
+      !isCanonicalProject(project) ||
+      !isCanonicalInput(owner) ||
+      !Number.isInteger(leaseDurationMs) ||
+      Number(leaseDurationMs) <= 0
     ) {
       return null;
     }
@@ -111,10 +112,10 @@ function decodeRequest(value: unknown): OrchestrationGatewayRequest | null {
       schemaVersion: ORCHESTRATION_GATEWAY_SCHEMA_VERSION,
       operation: "execute" as const,
       request: Object.freeze({
-        idempotencyKey: request.idempotencyKey,
-        project: request.project,
-        owner: request.owner,
-        leaseDurationMs: Number(request.leaseDurationMs),
+        idempotencyKey,
+        project,
+        owner,
+        leaseDurationMs: Number(leaseDurationMs),
       }),
     });
   }

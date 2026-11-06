@@ -31,9 +31,9 @@ test("non-canonical text is refused, never normalized", () => {
     "\tk",
     "k\n",
     "k\r\n",
-    "k ", // no-break space (removed by trim)
-    "﻿k", // BOM (removed by trim)
-    "k ", // line separator (removed by trim)
+    "k\u00a0", // no-break space (removed by trim)
+    "\ufeffk", // BOM (removed by trim)
+    "k\u2028", // line separator (removed by trim)
     "a\tb",
     "a\nb",
     "a\u0000b",

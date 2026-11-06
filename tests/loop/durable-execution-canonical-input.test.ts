@@ -88,7 +88,7 @@ const NON_CANONICAL: ReadonlyArray<readonly [string, unknown]> = [
   ["tab inside", "x\ty"],
   ["newline", "x\n"],
   ["NUL", "x\u0000y"],
-  ["no-break space", "x "],
+  ["no-break space", "x\u00a0"],
   ["non-string", 7],
 ];
 

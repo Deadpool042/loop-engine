@@ -70,12 +70,14 @@ Response codes include:
 - `replayed`: a terminal record already existed and no provider was called;
 - `execution_in_progress`: another unexpired owner holds the lease;
 - `record_conflict`: compare-and-swap rejected a concurrent update;
-- `project_mismatch`: the idempotency key is already bound to another project.
+- `project_mismatch`: the idempotency key is already bound to another project;
 - `invalid_request`: the request does not match the schema, or an identifier is not canonical.
 
 ### Canonical identifiers
 
 `idempotencyKey`, `owner` and `requestedBy` must be non-empty, equal to their own `trim()` and free of control characters (Unicode category Cc). `project` must satisfy the registry name rule (`^[a-z0-9][a-z0-9-]{0,62}$`), also on `list`. A non-canonical value is **refused, never normalized**, before any store access: the string that is validated is the string that is stored and looked up, so `execute`, `status`, `verify`, `cancel` and `list` always designate the same record. Length bounds and character-set restrictions beyond control characters are not part of this rule.
+
+Compatibility with existing records: records are not rewritten. A legacy record whose project is not a registry name stays readable through `status` and `verify` by its key, but `execute` and `list` refuse that project. Only inspection can detect such records; none exists on the audited workstation.
 
 ### Status
 

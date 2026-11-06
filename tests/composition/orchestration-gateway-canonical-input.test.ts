@@ -60,7 +60,7 @@ function untouchable() {
   };
 }
 
-const BAD = ["", " k", "k ", "k\n", "k\tk", "k\u0000", "k ", 5, null];
+const BAD = ["", " k", "k ", "k\n", "k\tk", "k\u0000", "k\u00a0", 5, null];
 
 const exec = (request: Record<string, unknown>) => ({
   schemaVersion: 1,
