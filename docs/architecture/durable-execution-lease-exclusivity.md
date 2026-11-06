@@ -42,7 +42,7 @@ L'exclusion mutuelle reposait sur **une hypothèse de temps** (un verrou plus vi
 
 ## 5. Garanties **non** démontrées
 
-- **Exécution exactement une fois** : non démontrée et non revendiquée. Le compteur de tentative protège l'**enregistrement**, pas les **effets externes** (Git, publication, fournisseur) : un détenteur dont le bail a expiré mais dont le processus est vivant peut encore produire des effets. Un jeton de génération n'a de valeur que si chaque opération à effet externe le vérifie ; ce n'est pas le cas, et l'exécuteur ne reçoit aucun signal d'annulation.
+- **Exécution exactement une fois** : non démontrée et non revendiquée. Le compteur de tentative protège l'**enregistrement**, pas les **effets externes** (Git, publication, fournisseur) : un détenteur dont le bail a expiré mais dont le processus est vivant peut encore produire des effets. Un jeton de génération n'a de valeur que si chaque opération à effet externe le vérifie ; ce n'est pas le cas. Depuis L7 (§12) l'exécuteur reçoit un signal d'annulation coopératif, mais ce signal est une **demande**, pas une preuve d'arrêt, et il n'annule aucun effet déjà engagé.
 - **Survie à une coupure de courant** : `fsync` ≠ `F_FULLFSYNC` sur macOS ; les tests `SIGKILL` ne prouvent rien sur ce point.
 - **Hôtes multiples ou systèmes de fichiers partagés** : la reprise d'un verrou exige le même hôte ; un verrou d'un autre hôte n'est jamais repris (refus après `lockTimeoutMs`).
 - **Réutilisation d'un PID** : un verrou orphelin dont le PID a été réattribué à un processus vivant n'est pas repris (échec fermé, intervention manuelle).
@@ -57,11 +57,11 @@ L'exclusion mutuelle reposait sur **une hypothèse de temps** (un verrou plus vi
 
 ## 6. Pourquoi renouvellement et reprise restent désactivés
 
-Raccorder `runDurableExecutionHeartbeat` ou `recoverDurableExecution` au chemin opérationnel exigerait, en plus de l'exclusivité de l'enregistrement (désormais démontrée) : (a) un signal d'annulation propagé à l'exécuteur lorsque le bail est perdu (`lease_lost`), faute de quoi l'ancien détenteur continue d'agir ; (b) une commande de reprise autorisée (E4) ; (c) une décision sur le modèle de supervision (processus détaché, E12). Ces éléments modifient le modèle d'exécution et relèvent d'une tranche distincte.
+Raccorder `runDurableExecutionHeartbeat` ou `recoverDurableExecution` au chemin opérationnel exigerait, en plus de l'exclusivité de l'enregistrement (désormais démontrée) : (a) un signal d'annulation propagé à l'exécuteur lorsque le bail est perdu (`lease_lost`), faute de quoi l'ancien détenteur continue d'agir — **propagation réalisée par L7 (§12)**, mais la _détection_ fiable de la perte du bail pendant un appel long reste à raccorder (renouvellement) ; (b) une commande de reprise autorisée (E4) ; (c) une décision sur le modèle de supervision (processus détaché, E12). Ces éléments modifient le modèle d'exécution et relèvent d'une tranche distincte.
 
 ## 7. Tranche suivante recommandée
 
-1. Propager l'annulation à l'exécuteur et l'arrêter à la perte du bail.
+1. ~~Propager l'annulation à l'exécuteur et l'arrêter à la perte du bail.~~ Propagation faite (L7, §12) ; reste la détection de la perte du bail pendant un appel (point 2).
 2. Câbler le renouvellement avec `attempt`, intervalle nettement inférieur au bail, arrêt de l'exécution sur `lease_lost`.
 3. Commande de reprise autorisée (E4), jamais automatique.
 4. Vérification de la tentative par chaque opération à effet externe, ou preuve qu'aucun effet n'est possible après perte du bail.
@@ -132,3 +132,62 @@ Comparaison **dans des conditions identiques** (`LOOP_PROJECTS_ROOT` et `TMPDIR`
 Les 4 échecs sont **identiques** sur `main` et #409 (aucune régression masquée) : `roadmap objective --json …`, `roadmap proposal-context --json …`, `review --json …` et `keeps the stable report payloads identical to their CLI adapters` ; cause : « Project path does not exist with exact casing », le projet auto-hébergé `loop-engine` (chemin `.`) étant exécuté depuis un répertoire de travail nommé `le-durable-lease` au lieu de `…/loop-engine` comme dans la CI. Ils n'ont aucun lien avec le stockage durable. Les 27 tests supplémentaires de #409 réussissent.
 
 Limites : la CI exécute `pnpm run ci` sous Linux (typecheck, tests, contrats JSON, audit strict, profils) ; cette comparaison locale porte sur les tests macOS seulement.
+
+## 12. Propagation de l'annulation à l'exécuteur (L7)
+
+**Statut :** propagation coopérative du signal ; **aucun** renouvellement, **aucune** reprise, **aucune** modification de `cli.ts`, G3.2/B5 inchangée. La détection de la perte du bail n'est pas rendue plus fiable : seule la propagation d'une demande d'annulation est ajoutée.
+
+### 12.1 Cartographie avant L7
+
+| Question                       | Constat sur `main` (`c8a19ce`)                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Où l'annulation est demandée   | `requestDurableExecutionCancellation` (drapeau `cancellationRequested` dans l'enregistrement), GUI (arrêt du **groupe de processus** de la CLI, `src/gui/desktop/process-group.ts`), `superviseActiveExecutionCancellation` (non raccordé)                                                                                                                                    |
+| Comment elle atteint le runner | Elle ne l'atteignait **pas** : le contrôleur ne lisait le drapeau qu'avant le lancement et après la fin du run ; `runLoopExecute` n'avait aucun `AbortSignal`                                                                                                                                                                                                                 |
+| `AbortSignal` existant         | Aucun dans `LoopExecutor`, `LoopValidator`, `LoopRepairer`, runner ni contrôleur                                                                                                                                                                                                                                                                                              |
+| Exécuteurs concrets            | `claude-code-cli-executor`, `codex-cli-executor` (sous-processus, `SIGTERM` direct sur le fils, résolution **sans** attendre la sortie), validateur par défaut (`spawn(..., shell: true)`)                                                                                                                                                                                    |
+| Sites d'appel de l'exécuteur   | **5** dans `execute-runner.ts` (premier appel, escalade de modèle après échec, réparation de complétion, escalade après validation, réparation par l'exécuteur), bornés à 1–5 par AUDIT-495 (le test fige 5). L'invariant « un seul site d'appel » du `CLAUDE.md` désigne en réalité _au plus un appel par cycle logique_ ; L7 conserve les 5 sites et ne crée pas de sixième |
+| Erreurs d'annulation           | Une exception d'exécuteur devenait `executor_failed`, un échec de validation déclenchait une réparation ; rien ne distinguait une annulation                                                                                                                                                                                                                                  |
+
+### 12.2 Contrat
+
+- `LoopExecutor(plan, cwd, context?)` : troisième paramètre **optionnel et additif** `{ signal? }` (`src/loop/cancellation.ts`). Un exécuteur qui l'ignore reste valide. Le signal n'est **pas** dans le plan (immuable, empreint).
+- `LoopValidatorInput.signal?` et `LoopRepairerInput.signal?` : champs optionnels.
+- `LoopRunExecuteOptions.signal?` : seule entrée d'annulation du runner. Les enveloppes (`runLoopExecuteWithProviderFailoverEvidence`, `createEvidenceAwareProviderFailoverLoopExecutor`, `createProviderFailoverLoopExecutor`, `executeLoopProviderFailover`, isolation de worktree par propagation d'options) transmettent le troisième argument ; un test par maillon prouve que le signal atteint l'exécuteur de bout de chaîne.
+- Raisons fermées (`cancellation_requested`, `lease_lost`, `caller_aborted`) : une raison d'abandon brute (chemin, jeton, sortie fournisseur) n'atteint **jamais** un résultat public. `AbortController.abort` est idempotent : la première cause est conservée.
+- Résultat : `status: "cancelled"`, `failure.code = "execution_cancelled"` (ou `cancellation_cleanup_failed` si un exécuteur signale qu'un processus n'a pas pu être prouvé terminé : l'échec de nettoyage n'est **pas** masqué), `commit: null`, `publication: null`. Les fichiers listés sont ceux **rapportés** par le dernier port appelé, non vérifiés. `schemaVersion` inchangé, statut `cancelled` préexistant ; transitions ajoutées : `planning`, `validating`, `repairing` → `cancelled`.
+
+### 12.3 Règles du runner
+
+Le runner observe le signal **avant** chaque nouveau pas (planification, exécution, escalade, réinitialisation d'espace de travail, validation, réparation) et **après** chaque retour d'exécuteur, de validateur ou de réparateur, avant toute transition, escalade, failover, réinitialisation ou inventaire Git. Une fois l'annulation observée, plus aucune opération n'est lancée. Le dernier contrôle précède immédiatement `transition("completed")`.
+
+Conséquences démontrées par les tests : un exécuteur qui ignore le signal et rend `completed` produit `cancelled` ; une exception sous annulation est `cancelled` et non `executor_failed` ; un résultat de validation obtenu sous annulation est écarté (ni preuve de succès, ni déclencheur de réparation) ; le failover ne bascule jamais vers un autre fournisseur après annulation ; une annulation concurrente d'une fin normale n'est jamais rapportée comme succès.
+
+### 12.4 Sous-processus
+
+`AbortSignal` ne suffit pas : `child.kill()` n'atteint que le fils direct. Quand un signal est fourni, le fournisseur et les commandes de validation sont lancés dans leur **propre groupe de processus** (`detached`, POSIX), le groupe reçoit `SIGTERM`, puis `SIGKILL` après un délai borné (2 s), et l'appel ne se termine qu'une fois le groupe **observé disparu** (`kill(-pgid, 0)` → `ESRCH`), jamais sur la simple émission du signal ni sur `close` (un petit-fils qui garde les tubes ouverts bloquerait `close`). Un groupe qui survit à `SIGKILL` donne `cancellation_cleanup_failed`.
+
+Limites : sans signal le comportement est identique à avant (même groupe, `Ctrl-C` atteint toujours le fils) ; **avec** un signal, le fils est détaché et ne reçoit plus les signaux du terminal (`Ctrl-C`) — c'est à l'appelant d'annuler. Pas de groupes de processus sous Windows (terminaison du seul fils). Un processus qui change de groupe (`setsid`) échappe à la terminaison. Les timeouts et limites de sortie existants continuent de ne tuer que le fils direct (inchangé). Un zombie non récolté paraît vivant jusqu'à sa récolte.
+
+### 12.5 Contrôleur durable et perte du bail
+
+`runDurableLoopExecution` possède un `AbortController` et passe `{ signal, requestAbort(reason) }` au callback d'exécution. Il abort avec `lease_lost` lorsque l'écriture de progression constate que le détenteur n'est plus `(owner, attempt)`, et avec `cancellation_requested` lorsque le drapeau est observé. Le plan de contrôle combine ce signal avec celui de l'appelant. Un run `cancelled` est persisté `cancelled` (jamais `completed`, ni un `failed` anonyme), avec sa cause et un éventuel échec de nettoyage ; un ancien détenteur ne peut écrire aucun état terminal (CAS, test 8).
+
+**`requestAbort` est le point d'accroche** que la tranche de renouvellement appellera sur `lease_lost`. Rien n'est raccordé : ni heartbeat, ni supervision d'annulation, ni reprise.
+
+**Limite essentielle :** la détection actuelle n'a lieu qu'aux **transitions** du runner (persistance de progression). Pendant un appel long d'exécuteur il n'existe aucun renouvellement ni sondage : un exécuteur dont le bail a expiré **continue d'agir** jusqu'à sa prochaine transition. La propagation n'est donc **pas** une garantie d'arrêt à la perte du bail.
+
+### 12.6 Garanties démontrées / non démontrées
+
+Démontré (tests `execute-runner-cancellation`, `executor-process-cancellation`, `validator-cancellation`, `process-termination`, `provider-failover-cancellation`, `durable-execution-cancellation`, `state-machine`) : annulation avant lancement, pendant un appel asynchrone, entre deux étapes, pendant une réparation (réparateur et exécuteur), pendant une erreur, répétée, concurrente d'une fin normale ; exécuteur ignorant le signal ; descendant ignorant `SIGTERM` terminé (Claude, Codex, validateur) ; écriture externe déjà engagée rapportée et non annulée ; aucune opération nouvelle après observation ; perte de bail simulée.
+
+Non démontré / hors périmètre : arrêt d'un exécuteur arbitraire (il doit coopérer) ; retour arrière d'effets externes (Git, fichiers, réseau, fournisseur) ; opérations **non interruptibles** : inventaire Git en lecture (`readModifiedWorktreeFiles`), inspection de politique de contenu, réinitialisation d'espace de travail, création/préparation de l'espace isolé (`platform.execute`, `prepareWorkspaceDependencies`) avant l'entrée dans le runner, commit/publication (`git-committer`, `git-candidate-publisher`, hors chemin d'exécution) ; atomicité entre l'inventaire post-arrêt et un effet tardif d'un processus évadé du groupe. Un effet externe produit par un ancien détenteur après perte du bail reste possible (§5).
+
+### 12.7 Prérequis de la tranche de renouvellement
+
+1. Heartbeat avec `attempt` obligatoire, intervalle nettement inférieur au bail, appel de `requestAbort("lease_lost")` sur `lease_lost` ; sans cela la perte du bail n'est détectée qu'aux transitions.
+2. Décision sur le modèle de supervision (E12) et sur l'autorisation de reprise (E4) ; aucune n'est prise ici.
+3. Vérification de la tentative par chaque opération à effet externe, ou preuve qu'aucun effet n'est possible après perte du bail.
+4. Décision sur `detached` pour les enfants lancés par la voie durable (comportement de `Ctrl-C`).
+5. Adaptateurs d'exécuteurs futurs : respecter `context.signal` et terminer **tout** leur arbre de processus avant de résoudre.
+
+Aucun ADR n'est créé : aucune décision d'architecture nouvelle (extension additive d'un port, transitions d'état déjà prévues par le statut `cancelled`). ADR-0022 n'est pas présent dans `docs/architecture/adr/` (0001–0006) ni dans l'historique de `origin/main` ; sa contrainte (merge commit conforme au ruleset `Protect Main`) est appliquée telle qu'énoncée dans le brief.

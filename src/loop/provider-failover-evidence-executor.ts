@@ -39,7 +39,7 @@ export function createEvidenceAwareProviderFailoverLoopExecutor(
     createWorkspaceReset?: LoopProviderWorkspaceResetFactory;
   }>,
 ): LoopExecutor {
-  return async (primaryPlan, cwd) => {
+  return async (primaryPlan, cwd, context) => {
     const attempts = resolveAttempts(primaryPlan);
     if (attempts[0]?.plan !== primaryPlan) return primaryMismatch();
 
@@ -47,6 +47,7 @@ export function createEvidenceAwareProviderFailoverLoopExecutor(
       attempts,
       maxAttempts: options.maxAttempts,
       cwd,
+      ...(context?.signal === undefined ? {} : { signal: context.signal }),
       ...(options.isRecoverableFailure === undefined
         ? {}
         : { isRecoverableFailure: options.isRecoverableFailure }),

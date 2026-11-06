@@ -1,4 +1,8 @@
 import { isCanonicalInput, isCanonicalProject } from "../core/canonical-input.js";
+import {
+  abortWithReason,
+  type LoopCancellationReason,
+} from "./cancellation.js";
 import type { LoopRunFailure, LoopRunResult } from "./types.js";
 import {
   DURABLE_EXECUTION_SCHEMA_VERSION,
@@ -14,6 +18,21 @@ import {
 } from "./durable-execution.js";
 
 const MAX_PROGRESS_EVENTS = 32;
+
+/**
+ * Handed to the execute callback. `signal` aborts when the controller observes
+ * that the lease was lost or that a cancellation was requested; `requestAbort`
+ * is the hook a future lease-renewal supervisor calls on `lease_lost`.
+ *
+ * Detection today happens only when a progress event is persisted, i.e. at run
+ * transitions, not during a long executor call: without a renewal heartbeat an
+ * executor can keep acting after its lease expired until its next transition.
+ * Aborting the signal is a request, not proof that the executor stopped.
+ */
+export type DurableExecutionRunContext = Readonly<{
+  signal: AbortSignal;
+  requestAbort(reason: LoopCancellationReason): void;
+}>;
 
 function progressedEvent(
   record: DurableExecutionRecord,
@@ -170,6 +189,7 @@ export async function runDurableLoopExecution(
   request: DurableExecutionRequest,
   execute: (
     onProgress: (progress: DurableExecutionProgress) => void,
+    context: DurableExecutionRunContext,
   ) => Promise<LoopRunResult>,
   now: () => string = () => new Date().toISOString(),
   onProgressed?: DurableExecutionProgressedSink,
@@ -229,13 +249,26 @@ export async function runDurableLoopExecution(
     record.leaseOwner === owner &&
     record.attempt === attempt;
   let progressWrites: Promise<void> = Promise.resolve();
+  const abortController = new AbortController();
+  const runContext: DurableExecutionRunContext = Object.freeze({
+    signal: abortController.signal,
+    requestAbort(reason: LoopCancellationReason): void {
+      abortWithReason(abortController, reason);
+    },
+  });
 
   const observeProgress = (progress: DurableExecutionProgress): void => {
     progressWrites = progressWrites
       .then(async () => {
         const current = await store.load(key);
         if (!isHolder(current)) {
+          // Another worker holds the lease (or the record is gone): the
+          // executor must stop acting under a lease it no longer owns.
+          runContext.requestAbort("lease_lost");
           return;
+        }
+        if (current.cancellationRequested) {
+          runContext.requestAbort("cancellation_requested");
         }
         const progressEvents = Object.freeze([
           ...(current.progressEvents ?? []),
@@ -259,7 +292,7 @@ export async function runDurableLoopExecution(
 
   let result: LoopRunResult;
   try {
-    result = await execute(observeProgress);
+    result = await execute(observeProgress, runContext);
     await progressWrites;
   } catch {
     await progressWrites;
@@ -289,21 +322,30 @@ export async function runDurableLoopExecution(
   const latest = await store.load(key);
   const base = isHolder(latest) ? latest : leased;
   const cancelledAfterRun = base.cancellationRequested === true;
+  // A run that observed a cancellation is persisted as cancelled, with its
+  // redacted cause and any cleanup failure, and is never recorded as completed.
+  const runCancelled = result.status === "cancelled";
   const completed = finish(
     base,
     now(),
-    cancelledAfterRun
+    cancelledAfterRun || runCancelled
       ? "cancelled"
       : result.status === "completed"
         ? "completed"
         : "failed",
-    cancelledAfterRun ? null : result,
-    cancelledAfterRun
-      ? internalFailure(
+    runCancelled || !cancelledAfterRun ? result : null,
+    runCancelled
+      ? (result.failure ??
+        internalFailure(
           "execution_cancelled",
-          "Cancellation was observed before terminal persistence.",
-        )
-      : result.failure,
+          "Execution was cancelled before completion.",
+        ))
+      : cancelledAfterRun
+        ? internalFailure(
+            "execution_cancelled",
+            "Cancellation was observed before terminal persistence.",
+          )
+        : result.failure,
   );
   if (!(await store.save(completed, base.revision))) {
     return reject(

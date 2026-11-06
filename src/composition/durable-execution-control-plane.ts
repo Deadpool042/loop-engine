@@ -1,3 +1,4 @@
+import { combineAbortSignals } from "../loop/cancellation.js";
 import type { LoopRunExecuteOptions } from "../loop/execute-runner.js";
 import {
   requestDurableExecutionCancellation,
@@ -45,11 +46,16 @@ export function createDurableExecutionControlPlane(
       const outcome = await runDurableLoopExecution(
         store,
         request,
-        (persistProgress) =>
+        (persistProgress, context) =>
           runLoopExecute(
             request.project,
             Object.freeze({
               ...options,
+              // The durable signal (lease lost / cancellation requested) and
+              // the caller's own signal both reach the single runner.
+              signal:
+                combineAbortSignals([options.signal, context.signal]) ??
+                context.signal,
               onProgress(event) {
                 try {
                   options.onProgress?.(event);

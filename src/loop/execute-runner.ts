@@ -9,6 +9,12 @@ import { findProject } from "../core/project.js";
 import { DEFAULT_AGENT_POLICY } from "../policy/defaults.js";
 import { resolvePolicy } from "../policy/resolver.js";
 import type { AgentPolicy, AgentPolicyResolution } from "../policy/types.js";
+import {
+  CANCELLATION_CLEANUP_FAILED_CODE,
+  EXECUTION_CANCELLED_CODE,
+  cancellationReasonOf,
+  type LoopExecutorContext,
+} from "./cancellation.js";
 import { createLoopExecutionPlan } from "./execution-plan.js";
 import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import { findOutOfScopeFiles } from "./file-scope.js";
@@ -26,7 +32,9 @@ import {
   unavailableLoopExecutor,
   validateLoopExecution,
   type LoopExecutor,
+  type LoopExecutorResult,
   type LoopRepairer,
+  type LoopRepairerResult,
   type LoopValidator,
   type LoopValidatorResult,
 } from "./execution.js";
@@ -71,6 +79,14 @@ export type LoopRunExecuteOptions = LoopRunPlanOptions &
     resetExecutionWorkspace?: (executionProjectPath: string) => Promise<void>;
     /** Optional, public-safe observation hook for real runner transitions. */
     onProgress?: (event: LoopRunExecuteProgressEvent) => void;
+    /**
+     * Cooperative cancellation request (L7). It is handed to the executor,
+     * repairer and validator and re-checked by the runner before every new step
+     * and after every call, so a cancelled run can never end as `completed`.
+     * It cannot stop an operation that does not honour it and never rolls back
+     * external effects already committed.
+     */
+    signal?: AbortSignal;
   }>;
 
 export type LoopRunExecuteProgressEvent = Readonly<{
@@ -312,9 +328,59 @@ export async function runLoopExecute(
     });
   }
 
+  const signal = options.signal;
+  const executorContext: LoopExecutorContext = Object.freeze(
+    signal === undefined ? {} : { signal },
+  );
+  let cancellationCandidate: LoopRunResult["candidate"] = null;
+
+  /**
+   * Single observation point of the cooperative cancellation. Returns the final
+   * deterministic, redacted `cancelled` result once the signal is aborted, and
+   * `null` otherwise. It performs no I/O: after a cancellation has been
+   * observed the runner starts no executor, validator, repair, escalation,
+   * failover, workspace reset or Git inventory. `outcome` is what the last
+   * called port reported; its files are listed as reported, unverified.
+   */
+  function observeCancellation(
+    phase: string,
+    outcome?: LoopExecutorResult | LoopRepairerResult,
+  ): LoopRunResult | null {
+    if (signal?.aborted !== true) return null;
+    if (outcome !== undefined) addModifiedFiles(modifiedFiles, outcome.modifiedFiles);
+    const cause = cancellationReasonOf(signal);
+    const details = Object.freeze([
+      `Cancellation cause: ${cause}`,
+      `Cancelled during: ${phase}`,
+      "Cooperative cancellation does not stop or roll back external effects that were already committed; inspect the worktree.",
+    ]);
+    transition("cancelled", "cancelled", "failed", details);
+    const cleanupFailure =
+      outcome?.status === "failed" &&
+      outcome.failure.code === CANCELLATION_CLEANUP_FAILED_CODE
+        ? outcome.failure
+        : null;
+    return finalize(
+      cancellationCandidate,
+      cleanupFailure !== null
+        ? Object.freeze({
+            code: CANCELLATION_CLEANUP_FAILED_CODE,
+            message: cleanupFailure.message,
+            details: Object.freeze([...cleanupFailure.details, ...details]),
+          })
+        : Object.freeze({
+            code: EXECUTION_CANCELLED_CODE,
+            message: "Execution was cancelled before completion.",
+            details,
+          }),
+    );
+  }
+
   transition("planning", "planning", "completed", [
     `Resolving project: ${projectName}`,
   ]);
+  const cancelledBeforeLaunch = observeCancellation("planning");
+  if (cancelledBeforeLaunch !== null) return cancelledBeforeLaunch;
 
   if (
     options.maxModelAttempts !== undefined &&
@@ -391,6 +457,7 @@ export async function runLoopExecute(
     );
   }
 
+  cancellationCandidate = cycle.candidate;
   const governedExecution = cycle.authorizedBy === "execution_decision";
   decomposition = cycle.decomposition ?? null;
 
@@ -493,12 +560,17 @@ export async function runLoopExecute(
 
   let completedModelAttempts = 1;
   let executionResult;
+  const cancelledBeforeExecutor = observeCancellation("executing");
+  if (cancelledBeforeExecutor !== null) return cancelledBeforeExecutor;
   try {
     executionResult = await dependencies.executor(
       executionPlan,
       executionProject.path,
+      executorContext,
     );
   } catch {
+    const cancelledByError = observeCancellation("executing");
+    if (cancelledByError !== null) return cancelledByError;
     transition("failed", "failed", "failed", [
       "The injected LoopExecutor threw an error.",
     ]);
@@ -511,6 +583,12 @@ export async function runLoopExecute(
       ),
     );
   }
+
+  const cancelledAfterExecutor = observeCancellation(
+    "executing",
+    executionResult,
+  );
+  if (cancelledAfterExecutor !== null) return cancelledAfterExecutor;
 
   function detectScopeViolation(): LoopRunFailure | null {
     if (writableFileScope === null) return null;
@@ -680,15 +758,22 @@ export async function runLoopExecute(
         `Attempt ${completedModelAttempts}/${modelAttemptBudget}`,
       ]);
 
+      const cancelledBeforeReset = observeCancellation("model_escalation");
+      if (cancelledBeforeReset !== null) return cancelledBeforeReset;
       const escalationResetFailure = await resetWorkspaceForModelEscalation();
       if (escalationResetFailure !== null) return escalationResetFailure;
 
+      const cancelledBeforeEscalation = observeCancellation("model_escalation");
+      if (cancelledBeforeEscalation !== null) return cancelledBeforeEscalation;
       try {
         executionResult = await dependencies.executor(
           executionPlan,
           executionProject.path,
+          executorContext,
         );
       } catch {
+        const cancelledByError = observeCancellation("model_escalation");
+        if (cancelledByError !== null) return cancelledByError;
         transition("failed", "failed", "failed", [
           "The escalated LoopExecutor threw an error.",
         ]);
@@ -701,6 +786,11 @@ export async function runLoopExecute(
           ),
         );
       }
+      const cancelledAfterEscalation = observeCancellation(
+        "model_escalation",
+        executionResult,
+      );
+      if (cancelledAfterEscalation !== null) return cancelledAfterEscalation;
 
       const escalatedWorktreeFailure = await refreshModifiedFilesFromWorktree();
       if (escalatedWorktreeFailure !== null) return escalatedWorktreeFailure;
@@ -729,6 +819,8 @@ export async function runLoopExecute(
   let completionRepairAttempts = 0;
 
   while (true) {
+    const cancelledBeforeValidation = observeCancellation("validating");
+    if (cancelledBeforeValidation !== null) return cancelledBeforeValidation;
     validationAttempts += 1;
     let validationAttempt: LoopValidatorResult;
 
@@ -740,9 +832,12 @@ export async function runLoopExecute(
           candidate: cycle.candidate,
           modifiedFiles: Object.freeze([...modifiedFiles].sort()),
           attempt: validationAttempts,
+          ...(signal === undefined ? {} : { signal }),
         }),
       );
     } catch {
+      const cancelledByError = observeCancellation("validating");
+      if (cancelledByError !== null) return cancelledByError;
       validation = Object.freeze({
         status: "failed",
         attempts: validationAttempts,
@@ -763,6 +858,11 @@ export async function runLoopExecute(
         ),
       );
     }
+
+    // A validation result obtained under cancellation is discarded: it is
+    // neither success evidence nor a trigger for a repair attempt.
+    const cancelledAfterValidation = observeCancellation("validating");
+    if (cancelledAfterValidation !== null) return cancelledAfterValidation;
 
     validation = createValidationResult(
       project,
@@ -943,12 +1043,20 @@ export async function runLoopExecute(
           });
 
           let completionRepairResult;
+          const cancelledBeforeCompletionRepair =
+            observeCancellation("completion_repair");
+          if (cancelledBeforeCompletionRepair !== null) {
+            return cancelledBeforeCompletionRepair;
+          }
           try {
             completionRepairResult = await dependencies.executor(
               completionRepairPlan,
               executionProject.path,
+              executorContext,
             );
           } catch {
+            const cancelledByError = observeCancellation("completion_repair");
+            if (cancelledByError !== null) return cancelledByError;
             transition("failed", "failed", "failed", [
               "The bounded completion repair threw an error.",
             ]);
@@ -962,6 +1070,13 @@ export async function runLoopExecute(
             );
           }
 
+          const cancelledAfterCompletionRepair = observeCancellation(
+            "completion_repair",
+            completionRepairResult,
+          );
+          if (cancelledAfterCompletionRepair !== null) {
+            return cancelledAfterCompletionRepair;
+          }
           const completionRepairWorktreeFailure =
             await refreshModifiedFilesFromWorktree();
           if (completionRepairWorktreeFailure !== null) {
@@ -1019,6 +1134,10 @@ export async function runLoopExecute(
         }
       }
 
+      // Last control before success: nothing after this line may be observed
+      // as cancelled, and nothing before it may escape the check.
+      const cancelledBeforeCompletion = observeCancellation("completing");
+      if (cancelledBeforeCompletion !== null) return cancelledBeforeCompletion;
       transition(
         "completed",
         "completed",
@@ -1049,15 +1168,22 @@ export async function runLoopExecute(
           `Attempt ${completedModelAttempts}/${modelAttemptBudget}`,
         ]);
 
+        const cancelledBeforeReset = observeCancellation("model_escalation");
+        if (cancelledBeforeReset !== null) return cancelledBeforeReset;
         const escalationResetFailure = await resetWorkspaceForModelEscalation();
         if (escalationResetFailure !== null) return escalationResetFailure;
 
+        const cancelledBeforeEscalation = observeCancellation("model_escalation");
+        if (cancelledBeforeEscalation !== null) return cancelledBeforeEscalation;
         try {
           executionResult = await dependencies.executor(
             executionPlan,
             executionProject.path,
+            executorContext,
           );
         } catch {
+          const cancelledByError = observeCancellation("model_escalation");
+          if (cancelledByError !== null) return cancelledByError;
           transition("failed", "failed", "failed", [
             "The escalated LoopExecutor threw an error.",
           ]);
@@ -1070,6 +1196,11 @@ export async function runLoopExecute(
             ),
           );
         }
+        const cancelledAfterEscalation = observeCancellation(
+          "model_escalation",
+          executionResult,
+        );
+        if (cancelledAfterEscalation !== null) return cancelledAfterEscalation;
 
         const escalatedWorktreeFailure =
           await refreshModifiedFilesFromWorktree();
@@ -1138,6 +1269,8 @@ export async function runLoopExecute(
     );
 
     let repairResult;
+    const cancelledBeforeRepair = observeCancellation("repairing");
+    if (cancelledBeforeRepair !== null) return cancelledBeforeRepair;
     try {
       if (dependencies.repairer !== null) {
         repairResult = await dependencies.repairer(
@@ -1151,6 +1284,7 @@ export async function runLoopExecute(
             validation: validationAttempt,
             attempt: repairAttempts,
             maxRepairs: effectiveMaxRepairs,
+            ...(signal === undefined ? {} : { signal }),
           }),
         );
       } else {
@@ -1185,9 +1319,12 @@ export async function runLoopExecute(
         repairResult = await dependencies.executor(
           repairPlan,
           executionProject.path,
+          executorContext,
         );
       }
     } catch {
+      const cancelledByError = observeCancellation("repairing");
+      if (cancelledByError !== null) return cancelledByError;
       transition("failed", "failed", "failed", [
         "The bounded repair execution threw an error.",
       ]);
@@ -1201,6 +1338,8 @@ export async function runLoopExecute(
       );
     }
 
+    const cancelledAfterRepair = observeCancellation("repairing", repairResult);
+    if (cancelledAfterRepair !== null) return cancelledAfterRepair;
     const repairWorktreeFailure = await refreshModifiedFilesFromWorktree();
     if (repairWorktreeFailure !== null) return repairWorktreeFailure;
     const repairScopeFailure = failForScopeViolation();

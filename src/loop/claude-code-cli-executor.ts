@@ -1,6 +1,14 @@
 import { spawn } from "node:child_process";
 import { basename, resolve } from "node:path";
 
+import {
+  CANCELLATION_CLEANUP_FAILED_CODE,
+  EXECUTION_CANCELLED_CODE,
+} from "./cancellation.js";
+import {
+  usesOwnProcessGroup,
+  watchChildForCancellation,
+} from "./process-termination.js";
 import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
 import { buildAutoMicroLotPlanningInstructions } from "./micro-lot-decomposition.js";
@@ -93,7 +101,12 @@ type RunProcessOutcome = Readonly<{
   exitCode: number;
   stdout: string;
   stderr: string;
-  killedReason: "timeout" | "output_limit" | null;
+  killedReason:
+    | "timeout"
+    | "output_limit"
+    | "cancelled"
+    | "cancel_cleanup_failed"
+    | null;
 }>;
 
 function runProcess(
@@ -102,12 +115,21 @@ function runProcess(
   cwd: string,
   timeoutMs: number,
   maxOutputBytes: number,
+  signal?: AbortSignal,
 ): Promise<RunProcessOutcome> {
   return new Promise((resolvePromise) => {
+    if (signal?.aborted === true) {
+      resolvePromise(
+        Object.freeze({ exitCode: 1, stdout: "", stderr: "", killedReason: "cancelled" }),
+      );
+      return;
+    }
+    const ownGroup = usesOwnProcessGroup(signal);
     const child = spawn(executable, [...args], {
       cwd,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
+      ...(ownGroup ? { detached: true } : {}),
       env: buildSubscriptionCliEnvironment(process.env, {
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       }),
@@ -117,12 +139,23 @@ function runProcess(
     let observedBytes = 0;
     let settled = false;
     let timer: NodeJS.Timeout | null = null;
+    const watch = watchChildForCancellation(
+      child,
+      signal,
+      ownGroup,
+      (outcome) =>
+        settle(
+          1,
+          outcome === "terminated" ? "cancelled" : "cancel_cleanup_failed",
+        ),
+    );
     const settle = (
       exitCode: number,
       killedReason: RunProcessOutcome["killedReason"] = null,
     ): void => {
       if (settled) return;
       settled = true;
+      watch.dispose();
       if (timer !== null) clearTimeout(timer);
       resolvePromise(
         Object.freeze({ exitCode, stdout, stderr, killedReason }),
@@ -140,9 +173,16 @@ function runProcess(
     };
     child.stdout.on("data", (chunk: Buffer) => consume(chunk, "stdout"));
     child.stderr.on("data", (chunk: Buffer) => consume(chunk, "stderr"));
-    child.once("error", () => settle(127));
-    child.once("close", (code) => settle(code ?? 1));
+    // While a cancellation is terminating the process group, only its outcome
+    // may settle the call: a natural exit or timeout must not mask it.
+    child.once("error", () => {
+      if (!watch.isCancelling()) settle(127);
+    });
+    child.once("close", (code) => {
+      if (!watch.isCancelling()) settle(code ?? 1);
+    });
     timer = setTimeout(() => {
+      if (watch.isCancelling()) return;
       child.kill("SIGTERM");
       settle(124, "timeout");
     }, timeoutMs);
@@ -198,7 +238,14 @@ export function createClaudeCodeCliLoopExecutor(
     throw new TypeError("Claude Code maxTurns must be a positive integer.");
   }
 
-  return async (plan, executionCwd): Promise<LoopExecutorResult> => {
+  return async (plan, executionCwd, context): Promise<LoopExecutorResult> => {
+    const signal = context?.signal;
+    if (signal?.aborted === true) {
+      return failure(
+        EXECUTION_CANCELLED_CODE,
+        "Claude Code execution was cancelled before it started.",
+      );
+    }
     if (plan.provider !== "anthropic" || plan.runtime !== "claude_code") {
       return failure(
         "execution_plan_provider_mismatch",
@@ -252,8 +299,11 @@ export function createClaudeCodeCliLoopExecutor(
       cwd,
       timeoutMs,
       maxOutputBytes,
+      signal,
     );
 
+    // Read-only inventory so that a cancelled run still reports the effects it
+    // may have produced before the process was terminated.
     const modifiedFiles = await readModifiedWorktreeFiles(cwd);
 
     if (modifiedFiles === null) {
@@ -263,6 +313,20 @@ export function createClaudeCodeCliLoopExecutor(
       );
     }
 
+    if (result.killedReason === "cancelled") {
+      return failure(
+        EXECUTION_CANCELLED_CODE,
+        "Claude Code execution was cancelled and its process group terminated.",
+        modifiedFiles,
+      );
+    }
+    if (result.killedReason === "cancel_cleanup_failed") {
+      return failure(
+        CANCELLATION_CLEANUP_FAILED_CODE,
+        "Claude Code processes could not be proven terminated after the cancellation.",
+        modifiedFiles,
+      );
+    }
     if (result.killedReason === "timeout") {
       return failure(
         "provider_timeout",

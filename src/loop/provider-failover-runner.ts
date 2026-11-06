@@ -21,8 +21,8 @@ export async function runLoopExecuteWithProviderFailoverEvidence(
   const evidenceAwareExecutor: LoopExecutor | undefined =
     executor === undefined
       ? undefined
-      : async (plan, cwd) => {
-          const result = await executor(plan, cwd);
+      : async (plan, cwd, context) => {
+          const result = await executor(plan, cwd, context);
           evidence = result.providerFailoverEvidence ?? null;
           return result;
         };

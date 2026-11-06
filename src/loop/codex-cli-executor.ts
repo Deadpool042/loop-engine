@@ -1,6 +1,14 @@
 import { spawn } from "node:child_process";
 import { basename, resolve } from "node:path";
 
+import {
+  CANCELLATION_CLEANUP_FAILED_CODE,
+  EXECUTION_CANCELLED_CODE,
+} from "./cancellation.js";
+import {
+  usesOwnProcessGroup,
+  watchChildForCancellation,
+} from "./process-termination.js";
 import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
 import { inspectWorktreeContentPolicy } from "./content-policy.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
@@ -124,19 +132,33 @@ function runProcess(
   cwd: string,
   timeoutMs: number,
   maxOutputBytes: number,
+  signal?: AbortSignal,
 ): Promise<
   Readonly<{
     exitCode: number;
     stdout: string;
     stderr: string;
-    limitReason: "timeout" | "output" | null;
+    limitReason:
+      | "timeout"
+      | "output"
+      | "cancelled"
+      | "cancel_cleanup_failed"
+      | null;
   }>
 > {
   return new Promise((resolvePromise) => {
+    if (signal?.aborted === true) {
+      resolvePromise(
+        Object.freeze({ exitCode: 1, stdout: "", stderr: "", limitReason: "cancelled" }),
+      );
+      return;
+    }
+    const ownGroup = usesOwnProcessGroup(signal);
     const child = spawn(executable, [...args], {
       cwd,
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
+      ...(ownGroup ? { detached: true } : {}),
       env: buildSubscriptionCliEnvironment(),
     });
     let stdout = "";
@@ -144,12 +166,28 @@ function runProcess(
     let observedBytes = 0;
     let settled = false;
     let timer: NodeJS.Timeout | null = null;
+    const watch = watchChildForCancellation(
+      child,
+      signal,
+      ownGroup,
+      (outcome) =>
+        settle(
+          1,
+          outcome === "terminated" ? "cancelled" : "cancel_cleanup_failed",
+        ),
+    );
     const settle = (
       exitCode: number,
-      limitReason: "timeout" | "output" | null = null,
+      limitReason:
+        | "timeout"
+        | "output"
+        | "cancelled"
+        | "cancel_cleanup_failed"
+        | null = null,
     ): void => {
       if (settled) return;
       settled = true;
+      watch.dispose();
       if (timer !== null) clearTimeout(timer);
       resolvePromise(
         Object.freeze({ exitCode, stdout, stderr, limitReason }),
@@ -167,9 +205,16 @@ function runProcess(
     };
     child.stdout.on("data", (chunk: Buffer) => consume(chunk, "stdout"));
     child.stderr.on("data", (chunk: Buffer) => consume(chunk, "stderr"));
-    child.once("error", () => settle(127));
-    child.once("close", (code) => settle(code ?? 1));
+    // While a cancellation is terminating the process group, only its outcome
+    // may settle the call: a natural exit or timeout must not mask it.
+    child.once("error", () => {
+      if (!watch.isCancelling()) settle(127);
+    });
+    child.once("close", (code) => {
+      if (!watch.isCancelling()) settle(code ?? 1);
+    });
     timer = setTimeout(() => {
+      if (watch.isCancelling()) return;
       child.kill("SIGTERM");
       settle(124, "timeout");
     }, timeoutMs);
@@ -199,7 +244,14 @@ export function createCodexCliLoopExecutor(
     throw new TypeError("Codex output limit must be a positive integer.");
   }
 
-  return async (plan, executionCwd): Promise<LoopExecutorResult> => {
+  return async (plan, executionCwd, context): Promise<LoopExecutorResult> => {
+    const signal = context?.signal;
+    if (signal?.aborted === true) {
+      return failure(
+        EXECUTION_CANCELLED_CODE,
+        "Codex execution was cancelled before it started.",
+      );
+    }
     if (plan.provider !== "openai" || plan.runtime !== "codex") {
       return failure(
         "execution_plan_provider_mismatch",
@@ -253,12 +305,27 @@ export function createCodexCliLoopExecutor(
       cwd,
       resolveCodexExecutionTimeoutMs(plan.effort, configuredTimeoutMs),
       maxOutputBytes,
+      signal,
     );
+    // Read-only inventory so that a cancelled run still reports the effects it
+    // may have produced before the process was terminated.
     const modifiedFiles = await readModifiedWorktreeFiles(cwd);
     if (modifiedFiles === null)
       return failure(
         "worktree_status_failed",
         "Unable to inspect provider modifications.",
+      );
+    if (result.limitReason === "cancelled")
+      return failure(
+        EXECUTION_CANCELLED_CODE,
+        "Codex execution was cancelled and its process group terminated.",
+        modifiedFiles,
+      );
+    if (result.limitReason === "cancel_cleanup_failed")
+      return failure(
+        CANCELLATION_CLEANUP_FAILED_CODE,
+        "Codex processes could not be proven terminated after the cancellation.",
+        modifiedFiles,
       );
     if (result.exitCode === 124 && result.limitReason === "timeout")
       return failure(
