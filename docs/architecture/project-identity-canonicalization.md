@@ -23,7 +23,7 @@ Dépôt Loop Engine, `main` au commit `0e22b45`. Tout ce qui suit provient du co
 | F9 | Aucun magasin d'exécutions durables n'a été trouvé sur le poste d'audit (ni emplacement d'état utilisateur, ni emplacement historique du dépôt) : aucune donnée locale à migrer. Les autres hôtes ne sont pas vérifiés. | lecture du système de fichiers |
 | F10 | Aucune correspondance Project Factory ↔ Loop Engine n'existe (hors L7.1 : évolution E9). | — |
 | F11 | Tests existants à préserver : `tests/loop/durable-execution-*.test.ts`, `tests/commands/project-{register,archive,retire,set-repository}.test.ts`, `tests/core/project-*.test.ts`, `tests/composition/production-orchestration-gateway.test.ts`. | `tests/` |
-| F12 | Intégration : ruleset `Protect Main` actif, merge commit seul autorisé, contrôle requis `CI gate`, aucun bypass (ADR-0022). Le dépôt est public. | GitHub |
+| F12 | Intégration : ruleset `Protect Main` actif, merge commit seul autorisé, contrôle requis `CI gate`, aucun bypass. Le dépôt est public. | GitHub |
 
 ## Proposition E6 — registre validé au chargement
 
