@@ -8,6 +8,12 @@ import type {
 export type DurableExecutionHeartbeatRequest = Readonly<{
   idempotencyKey: string;
   owner: string;
+  /**
+   * Acquisition counter observed when the lease was taken. When provided, a
+   * renewal is refused if a later acquisition (same owner label or not) has
+   * replaced the holder. Callers that wire renewal must provide it.
+   */
+  attempt?: number;
   leaseDurationMs: number;
   heartbeatIntervalMs: number;
 }>;
@@ -70,7 +76,7 @@ export async function renewDurableExecutionLease(
   store: DurableExecutionStore,
   request: Pick<
     DurableExecutionHeartbeatRequest,
-    "idempotencyKey" | "owner" | "leaseDurationMs"
+    "idempotencyKey" | "owner" | "leaseDurationMs" | "attempt"
   >,
   now: () => string = () => new Date().toISOString(),
 ): Promise<DurableExecutionLeaseRenewalResult> {
@@ -99,7 +105,10 @@ export async function renewDurableExecutionLease(
       "Only a running durable execution lease can be renewed.",
     );
   }
-  if (existing.leaseOwner !== owner) {
+  if (
+    existing.leaseOwner !== owner ||
+    (request.attempt !== undefined && existing.attempt !== request.attempt)
+  ) {
     return reject(
       "lease_lost",
       existing,

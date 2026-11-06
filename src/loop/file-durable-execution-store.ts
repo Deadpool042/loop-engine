@@ -6,10 +6,11 @@ import {
   readdir,
   rename,
   rm,
-  stat,
-  writeFile,
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
+
+import { createLocalProjectLockManager } from "../execution/adapters/local-project-lock-manager.js";
+import type { ProjectLockManager } from "../execution/project-lock-manager.js";
 
 import type {
   DurableExecutionRecord,
@@ -40,6 +41,12 @@ export type FileDurableExecutionStoreOptions = Readonly<{
   lockTimeoutMs?: number;
   lockRetryMs?: number;
   nowMs?: () => number;
+  /**
+   * Cross-process mutual exclusion per record key. Defaults to the local
+   * directory lock manager (owner metadata, dead-owner quarantine by lock id).
+   * A live owner is never dispossessed: contention ends in a bounded refusal.
+   */
+  lockManager?: ProjectLockManager;
 }>;
 
 /**
@@ -81,6 +88,8 @@ export async function readFileDurableExecutionRecords(
   );
 }
 
+const LOCK_DIRECTORY = ".locks";
+
 function positiveInteger(value: number, name: string): number {
   if (!Number.isInteger(value) || value <= 0) {
     throw new TypeError(`${name} must be a positive integer.`);
@@ -96,47 +105,40 @@ function recordPath(directory: string, key: string): string {
   return join(directory, `${keyDigest(key)}.json`);
 }
 
-function lockPath(directory: string, key: string): string {
-  return join(directory, `${keyDigest(key)}.lock`);
-}
-
 async function sleep(durationMs: number): Promise<void> {
   await new Promise((resolvePromise) => setTimeout(resolvePromise, durationMs));
 }
 
-async function acquireLock(
+/**
+ * Writes through a file handle, flushes the file, publishes it atomically and
+ * flushes the parent directory so that the rename itself survives a crash.
+ * Synchronization is fsync(2): it does not prove survival of a power loss on
+ * every storage stack (macOS fsync does not issue F_FULLFSYNC).
+ */
+async function writeRecordDurably(
+  directory: string,
   path: string,
-  timeoutMs: number,
-  retryMs: number,
-  nowMs: () => number,
-): Promise<() => Promise<void>> {
-  const startedAt = nowMs();
-  while (true) {
-    try {
-      const handle = await open(path, "wx");
-      await handle.writeFile(`${process.pid}\n`, "utf8");
-      await handle.close();
-      return async () => {
-        await rm(path, { force: true });
-      };
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code !== "EEXIST") throw error;
-      try {
-        const lockStat = await stat(path);
-        if (nowMs() - lockStat.mtimeMs > timeoutMs) {
-          await rm(path, { force: true });
-          continue;
-        }
-      } catch (statError) {
-        if ((statError as NodeJS.ErrnoException).code === "ENOENT") continue;
-        throw statError;
-      }
-      if (nowMs() - startedAt >= timeoutMs) {
-        throw new Error("Durable execution storage lock timed out.");
-      }
-      await sleep(retryMs);
-    }
+  serialized: string,
+): Promise<void> {
+  const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  const handle = await open(temporaryPath, "wx", 0o600);
+  try {
+    await handle.writeFile(serialized, "utf8");
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  try {
+    await rename(temporaryPath, path);
+  } catch (error) {
+    await rm(temporaryPath, { force: true });
+    throw error;
+  }
+  const directoryHandle = await open(directory, "r");
+  try {
+    await directoryHandle.sync();
+  } finally {
+    await directoryHandle.close();
   }
 }
 
@@ -173,9 +175,38 @@ export function createFileDurableExecutionStore(
   );
   const lockRetryMs = positiveInteger(options.lockRetryMs ?? 25, "lockRetryMs");
   const nowMs = options.nowMs ?? Date.now;
+  const lockRoot = join(directory, LOCK_DIRECTORY);
+  const lockManager =
+    options.lockManager ?? createLocalProjectLockManager({ lockRoot });
 
   async function ready(): Promise<void> {
-    await mkdir(directory, { recursive: true });
+    // Explicit mode: the state directory must not depend on the caller's umask.
+    await mkdir(directory, { recursive: true, mode: 0o700 });
+    await mkdir(lockRoot, { recursive: true, mode: 0o700 });
+  }
+
+  async function withKeyLock<T>(
+    key: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const startedAt = nowMs();
+    for (;;) {
+      const acquisition = await lockManager.acquire({
+        projectId: keyDigest(key),
+        attemptId: randomUUID(),
+      });
+      if (acquisition.acquired) {
+        try {
+          return await operation();
+        } finally {
+          await lockManager.release(acquisition.handle);
+        }
+      }
+      if (nowMs() - startedAt >= lockTimeoutMs) {
+        throw new Error("Durable execution storage lock timed out.");
+      }
+      await sleep(lockRetryMs);
+    }
   }
 
   return Object.freeze({
@@ -186,13 +217,7 @@ export function createFileDurableExecutionStore(
 
     async save(record, expectedRevision) {
       await ready();
-      const release = await acquireLock(
-        lockPath(directory, record.idempotencyKey),
-        lockTimeoutMs,
-        lockRetryMs,
-        nowMs,
-      );
-      try {
+      return withKeyLock(record.idempotencyKey, async () => {
         const path = recordPath(directory, record.idempotencyKey);
         const existing = await readRecord(path);
         const observedRevision = existing?.revision ?? null;
@@ -204,18 +229,10 @@ export function createFileDurableExecutionStore(
           throw new Error("Durable execution key digest collision detected.");
         }
 
-        const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
         const envelope = createDurableExecutionEnvelope(record);
-        await writeFile(temporaryPath, `${JSON.stringify(envelope)}\n`, {
-          encoding: "utf8",
-          mode: 0o600,
-          flag: "wx",
-        });
-        await rename(temporaryPath, path);
+        await writeRecordDurably(directory, path, `${JSON.stringify(envelope)}\n`);
         return true;
-      } finally {
-        await release();
-      }
+      });
     },
 
     async list(project) {
