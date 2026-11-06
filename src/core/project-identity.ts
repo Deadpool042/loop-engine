@@ -19,10 +19,15 @@ export function isValidProjectName(value: unknown): value is string {
 function describeValue(value: unknown): string {
   if (typeof value !== "string") return `<${typeof value}>`;
   const shown =
-    value.length > MAX_REPORTED_VALUE_LENGTH
-      ? `${value.slice(0, MAX_REPORTED_VALUE_LENGTH)}…`
+    [...value].length > MAX_REPORTED_VALUE_LENGTH
+      ? `${[...value].slice(0, MAX_REPORTED_VALUE_LENGTH).join("")}…`
       : value;
-  return JSON.stringify(shown);
+  // Escape everything outside printable ASCII so the message cannot carry
+  // bidirectional, zero-width or line-separator characters into logs.
+  return JSON.stringify(shown).replace(
+    /[^\x20-\x7e]/g,
+    (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
 }
 
 /**

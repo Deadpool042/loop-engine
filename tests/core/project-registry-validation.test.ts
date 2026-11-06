@@ -52,7 +52,7 @@ test("non-conforming names are refused", () => {
     "p ",
     "p\n",
     "café",
-    "a​b",
+    "a\u200bb",
     "a".repeat(64),
     undefined,
     null,
@@ -204,7 +204,34 @@ test("loadConfig fails closed on a non-conforming name before touching paths", (
 });
 
 test("the committed registry is accepted", () => {
-  const raw = readFileSync(join(process.cwd(), "projects.yaml"), "utf8");
+  const raw = readFileSync(
+    new URL("../../projects.yaml", import.meta.url),
+    "utf8",
+  );
   const parsed = parseYaml(raw) as { projects: unknown[] };
   assert.doesNotThrow(() => assertValidProjectRegistry(parsed.projects));
+});
+
+test("YAML scalars that are not strings are refused", () => {
+  withRegistry(["projects:", yamlEntry("123"), ""].join("\n"), (root) => {
+    assert.throws(
+      () => loadConfig(root),
+      /non-conforming project names: #0 <number>/,
+    );
+  });
+  withRegistry(["projects:", yamlEntry("null"), ""].join("\n"), (root) => {
+    assert.throws(() => loadConfig(root), /non-conforming project names: #0 /);
+  });
+});
+
+test("non-ASCII and control characters are escaped in the error message", () => {
+  assert.throws(
+    () => assertValidProjectRegistry([entry("a\u202eb\u2028c\u0007")]),
+    (error: unknown) => {
+      const message = (error as Error).message;
+      assert.match(message, /\\u202e/i);
+      assert.doesNotMatch(message, /[\u202e\u2028\u0007]/);
+      return true;
+    },
+  );
 });
