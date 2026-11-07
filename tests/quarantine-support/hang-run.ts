@@ -1,6 +1,6 @@
 // Processus enfant des tests rouges L7.2-0 : prend le verrou de projet réel,
 // signale « running » puis ne se termine jamais (le parent le tue avec SIGKILL).
-import { createIsolatedProviderRunExecute } from "../../../src/composition/isolated-provider-execution.js";
+import { createIsolatedProviderRunExecute } from "../../src/composition/isolated-provider-execution.js";
 
 const [repositoryPath, lockRoot, workspaceRoot] = process.argv.slice(2) as [
   string,
