@@ -8,7 +8,9 @@
  * group is signalled, escalated to `SIGKILL` after a bounded grace period, and
  * only reported as terminated once the group is observed gone.
  *
- * Limits: POSIX only (no process groups on Windows); `kill(-pgid, 0)` cannot
+ * Limits: POSIX only (no process groups on Windows, where a started child is
+ * reported `cleanup_failed` because nothing proves its termination);
+ * `kill(-pgid, 0)` cannot
  * distinguish a zombie from a live member until it is reaped; a process that
  * changes its own process group (`setsid`) escapes the group.
  */
@@ -141,7 +143,13 @@ export function watchChildForCancellation(
     if (!ownGroup || groupId === undefined) {
       child.kill("SIGKILL");
       // Never synchronous: callers declare their `settle` after the watch.
-      queueMicrotask(() => onTerminated("terminated"));
+      // Without a process group neither the descendants nor the disappearance
+      // of the direct child are observed, so a started child is reported as
+      // unconfirmed; only a child that never started (no pid) has nothing left
+      // to terminate.
+      const outcome: ProcessTerminationOutcome =
+        groupId === undefined ? "terminated" : "cleanup_failed";
+      queueMicrotask(() => onTerminated(outcome));
       return;
     }
     void terminateProcessGroup(groupId, {
