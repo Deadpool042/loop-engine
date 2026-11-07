@@ -137,7 +137,12 @@ export async function runDurableAutoSubscriptionPublish(
   );
 
   if (response.outcome.status === "rejected") {
-    const inProgress = response.outcome.code === "execution_in_progress";
+    // A refusal caused by an unconfirmed cancellation is not "in progress": the
+    // state is unknown, the exit code must not read as success.
+    const inProgress =
+      response.outcome.code === "execution_in_progress" &&
+      cleanupUnconfirmed(response.outcome.record).cancellationCleanup ===
+        undefined;
     return Object.freeze({
       exitCode: inProgress ? 0 : 1,
       report: Object.freeze({
@@ -168,7 +173,11 @@ export async function runDurableAutoSubscriptionPublish(
   }
 
   const record = response.outcome.record;
-  const result = record.result;
+  const result =
+    record.result ??
+    (response.outcome.status === "executed"
+      ? (response.outcome.runResult ?? null)
+      : null);
   let historyRecorded: boolean | null = null;
   if (response.outcome.status === "executed" && result !== null) {
     historyRecorded = application.recordLoopRunHistory(result).ok;

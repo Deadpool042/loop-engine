@@ -361,10 +361,13 @@ export async function runDurableLoopExecution(
           "Execution was cancelled before completion.",
         ))
       : cancelledAfterRun
-        ? internalFailure(
-            "execution_cancelled",
-            "Cancellation was observed before terminal persistence.",
-          )
+        ? // A cleanup failure is never eclipsed by the late cancellation flag.
+          result.failure?.code === CANCELLATION_CLEANUP_FAILED_CODE
+          ? result.failure
+          : internalFailure(
+              "execution_cancelled",
+              "Cancellation was observed before terminal persistence.",
+            )
         : result.failure,
   );
   if (!(await store.save(completed, base.revision))) {
@@ -375,7 +378,11 @@ export async function runDurableLoopExecution(
     );
   }
   emitProgressed(onProgressed, completed);
-  return Object.freeze({ status: "executed" as const, record: completed });
+  return Object.freeze({
+    status: "executed" as const,
+    record: completed,
+    ...(runCancelled ? { runResult: result } : {}),
+  });
 }
 
 export async function requestDurableExecutionCancellation(

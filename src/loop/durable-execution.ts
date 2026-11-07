@@ -98,6 +98,13 @@ export type DurableExecutionResult =
   | Readonly<{
       status: "executed" | "replayed";
       record: DurableExecutionRecord;
+      /**
+       * The in-memory result of a run that observed a cancellation. A durable
+       * `cancelled` record is persisted with `result = null` (envelope contract),
+       * so this is the only place the reported evidence survives for the caller
+       * (run history); it is never persisted in the record.
+       */
+      runResult?: LoopRunResult;
     }>
   | Readonly<{
       status: "rejected";

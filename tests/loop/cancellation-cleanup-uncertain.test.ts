@@ -9,7 +9,10 @@ import {
   CANCELLATION_CLEANUP_FAILED_CODE,
   EXECUTION_CANCELLED_CODE,
 } from "../../src/loop/cancellation.js";
-import { runDurableLoopExecution } from "../../src/loop/durable-execution-controller.js";
+import {
+  requestDurableExecutionCancellation,
+  runDurableLoopExecution,
+} from "../../src/loop/durable-execution-controller.js";
 import {
   createFileDurableExecutionStore,
   readFileDurableExecutionRecords,
@@ -215,7 +218,7 @@ describe("arrêt incertain après annulation (cancellation_cleanup_failed)", () 
     }
   });
 
-  it("U8 — le rapport d'un nouvel essai refusé sur un arrêt incertain porte aussi la marque et ne démarre rien", async () => {
+  it("U8 — le rapport d'un nouvel essai refusé sur un arrêt incertain porte aussi la marque, sort en code 1 et ne démarre rien", async () => {
     const root = mkdtempSync(join(tmpdir(), "loop-cleanup-retry-"));
     try {
       let publishCalls = 0;
@@ -245,7 +248,12 @@ describe("arrêt incertain après annulation (cancellation_cleanup_failed)", () 
         },
       );
       assert.equal(publishCalls, 1, "aucune seconde exécution");
-      assert.equal(retry.report.status, "in_progress");
+      assert.equal(retry.report.status, "rejected");
+      assert.equal(
+        retry.exitCode,
+        1,
+        "l'état est inconnu : jamais un code de sortie 0",
+      );
       assert.equal(retry.report.rejectionCode, "execution_in_progress");
       assert.equal(retry.report.cancellationCleanup, "unconfirmed");
     } finally {
@@ -282,4 +290,74 @@ describe("arrêt incertain après annulation (cancellation_cleanup_failed)", () 
       }
     });
   }
+
+  it("U10 — le run annulé reste inscrit à l'historique et son runId figure au rapport malgré result = null", async () => {
+    const root = mkdtempSync(join(tmpdir(), "loop-cancelled-history-"));
+    try {
+      const recorded: LoopRunResult[] = [];
+      const application = {
+        async runLoopPublish() {
+          return cancelled(CANCELLATION_CLEANUP_FAILED_CODE);
+        },
+        recordLoopRunHistory(result: LoopRunResult) {
+          recorded.push(result);
+          return Object.freeze({ written: true, ok: true });
+        },
+      };
+      const result = await runDurableAutoSubscriptionPublish(
+        application as never,
+        {
+          project: "example",
+          candidateId: "H1-L4",
+          expectedGitHead: "a".repeat(40),
+          maxRepairs: 0,
+          storeDirectory: root,
+        },
+      );
+      assert.equal(recorded.length, 1);
+      assert.equal(recorded[0]?.status, "cancelled");
+      assert.equal(
+        recorded[0]?.failure?.code,
+        CANCELLATION_CLEANUP_FAILED_CODE,
+      );
+      assert.equal(result.report.historyRecorded, true);
+      assert.equal(result.report.runId, recorded[0]?.runId);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("U11 — un drapeau d'annulation vu après le run n'éclipse pas un échec de nettoyage", async () => {
+    const store = createInMemoryDurableExecutionStore();
+    const outcome = await runDurableLoopExecution(
+      store,
+      request("worker-a"),
+      async () => {
+        await requestDurableExecutionCancellation(
+          store,
+          "idem-cleanup-uncertain",
+          "operator",
+        );
+        return Object.freeze({
+          ...completedResult(),
+          status: "failed" as const,
+          failure: Object.freeze({
+            code: CANCELLATION_CLEANUP_FAILED_CODE,
+            message: "Processes could not be proven terminated.",
+            details: Object.freeze([]),
+          }),
+        }) as LoopRunResult;
+      },
+    );
+    assert.equal(outcome.status, "executed");
+    const record = outcome.status === "executed" ? outcome.record : null;
+    assert.equal(record?.status, "cancelled");
+    assert.equal(record?.failure?.code, CANCELLATION_CLEANUP_FAILED_CODE);
+    const retry = await runDurableLoopExecution(
+      store,
+      request("worker-b", true),
+      async () => completedResult(),
+    );
+    assert.equal(retry.status, "rejected");
+  });
 });
