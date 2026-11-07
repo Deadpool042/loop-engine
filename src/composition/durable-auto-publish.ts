@@ -5,7 +5,11 @@ import { resolveLoopEngineStatePath } from "../core/runtime-state.js";
 import type { LoopRunHistoryWriteOutcome } from "../core/run-history.js";
 import { createFileDurableExecutionStore } from "../loop/file-durable-execution-store.js";
 import type { LoopExecutor } from "../loop/execution.js";
-import type { DurableExecutionProgressedSink } from "../loop/durable-execution.js";
+import { CANCELLATION_CLEANUP_FAILED_CODE } from "../loop/cancellation.js";
+import type {
+  DurableExecutionProgressedSink,
+  DurableExecutionRecord,
+} from "../loop/durable-execution.js";
 import { createDurableExecutionControlPlane } from "./durable-execution-control-plane.js";
 import type { IsolatedProviderRunPublish } from "./isolated-provider-publication.js";
 import { AUTO_SUBSCRIPTION_AGENT_POLICY } from "./auto-subscription-execution.js";
@@ -44,12 +48,26 @@ export type DurableAutoPublishReport = Readonly<{
   fingerprint: Readonly<{ algorithm: "sha256"; digest: string }> | null;
   historyRecorded: boolean | null;
   rejectionCode?: string;
+  /**
+   * Present only when a cancellation could not be proven to have terminated its
+   * processes: `cancelled` then does NOT mean the work stopped. Absent otherwise.
+   */
+  cancellationCleanup?: "unconfirmed";
 }>;
 
 export type DurableAutoPublishResult = Readonly<{
   exitCode: number;
   report: DurableAutoPublishReport;
 }>;
+
+function cleanupUnconfirmed(
+  record: DurableExecutionRecord | null | undefined,
+): { cancellationCleanup: "unconfirmed" } | Record<string, never> {
+  return record?.failure?.code === CANCELLATION_CLEANUP_FAILED_CODE ||
+    record?.result?.failure?.code === CANCELLATION_CLEANUP_FAILED_CODE
+    ? { cancellationCleanup: "unconfirmed" as const }
+    : {};
+}
 
 export function durableAutoSubscriptionKey(
   project: string,
@@ -144,6 +162,7 @@ export async function runDurableAutoSubscriptionPublish(
         fingerprint: response.fingerprint,
         historyRecorded: null,
         rejectionCode: response.outcome.code,
+        ...cleanupUnconfirmed(response.outcome.record),
       }),
     });
   }
@@ -185,6 +204,7 @@ export async function runDurableAutoSubscriptionPublish(
             }),
       fingerprint: response.fingerprint,
       historyRecorded,
+      ...cleanupUnconfirmed(record),
     }),
   });
 }

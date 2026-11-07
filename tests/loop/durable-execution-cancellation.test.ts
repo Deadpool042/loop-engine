@@ -175,7 +175,7 @@ describe("runDurableLoopExecution — abort propagation (L7)", () => {
     const record = outcome.status === "executed" ? outcome.record : null;
     assert.equal(record?.status, "cancelled");
     assert.equal(record?.failure?.code, "execution_cancelled");
-    assert.equal(record?.result?.status, "cancelled");
+    assert.equal(record?.result, null);
     assert.equal(record?.leaseOwner, null);
   });
 

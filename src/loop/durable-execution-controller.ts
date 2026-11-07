@@ -1,5 +1,6 @@
 import { isCanonicalInput, isCanonicalProject } from "../core/canonical-input.js";
 import {
+  CANCELLATION_CLEANUP_FAILED_CODE,
   abortWithReason,
   type LoopCancellationReason,
 } from "./cancellation.js";
@@ -210,6 +211,22 @@ export async function runDurableLoopExecution(
   ) {
     return Object.freeze({ status: "replayed" as const, record: existing });
   }
+  // A cancellation whose process termination could not be proven leaves a
+  // possibly live process: the state `cancelled` alone does not make a new
+  // execution safe. Even an explicit `retryTerminal` is refused; only a
+  // confirmed cancellation (or a failure) can be retried on explicit request.
+  if (
+    existing !== null &&
+    terminal(existing) &&
+    (existing.failure?.code === CANCELLATION_CLEANUP_FAILED_CODE ||
+      existing.result?.failure?.code === CANCELLATION_CLEANUP_FAILED_CODE)
+  ) {
+    return reject(
+      "execution_in_progress",
+      existing,
+      "A previous cancellation could not be proven to have terminated its processes.",
+    );
+  }
   // An active lease excludes every requester, including one presenting the same
   // owner string: two live processes may share a label, so the label alone is
   // not an identity. Only expiry (or termination) releases the lease.
@@ -333,7 +350,10 @@ export async function runDurableLoopExecution(
       : result.status === "completed"
         ? "completed"
         : "failed",
-    runCancelled || !cancelledAfterRun ? result : null,
+    // The durable envelope requires `result = null` for a cancelled record
+    // (anything else is unreadable on the next load). The redacted cause, the
+    // cleanup failure and the "inspect the worktree" notice travel in `failure`.
+    cancelledAfterRun || runCancelled ? null : result,
     runCancelled
       ? (result.failure ??
         internalFailure(
