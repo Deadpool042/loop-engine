@@ -7,6 +7,11 @@
  * un NOUVEAU fichier apparaît ou qu'un fichier du registre disparaît, afin qu'un
  * humain le classe (barrière / autre protection / hors garantie) dans
  * `docs/roadmap/l7-2-plan-quarantaine.md` et dans l'ADR-0027 de LP-INFRA.
+ * Volontairement HORS de l'inventaire `pnpm run test` (extension `.char.ts`) : en CI
+ * il couplerait les PR entre elles (chaque PR ajoutant un écrivain casserait les
+ * autres). Commande :
+ *   pnpm exec tsx --test tests/quarantine-baseline/write-path-tripwire.char.ts
+ * Vérifié le 2026-11-07 : #410 (`48a37da`) n'ajoute aucun fichier détecté.
  * Il ne voit pas : écritures via `fs` importé sous un autre nom, via une
  * dépendance, via un binaire externe lancé par un chemin dynamique.
  */
@@ -21,7 +26,10 @@ const WRITE_PATTERN =
   /(writeFile(Sync)?\(|appendFile(Sync)?\(|rename(Sync)?\(|rmSync\(|\brm\(|unlink(Sync)?\(|mkdir(Sync)?\(|copyFile|symlink)/;
 const PROCESS_PATTERN = /(spawn\(|execFile(Sync)?\(|execSync\(|\bexec\(|shell: true)/;
 
-/** Registre au 2026-11-07 (HEAD `c8a19ce`). Classification : voir le plan L7.2 §3bis. */
+/**
+ * Registre au 2026-11-07 (HEAD `c8a19ce`). Classification : plan L7.2 §3bis.
+ * Faux positifs connus : `RegExp.exec(` (ex. `gui/desktop/patch-review.ts`).
+ */
 const EXPECTED_FS_WRITERS: readonly string[] = [
   "src/audit/rules/audit.ts",
   "src/audit/rules/configured-inbound-security-adapter.ts",

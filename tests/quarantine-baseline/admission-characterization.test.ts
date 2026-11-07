@@ -132,6 +132,77 @@ describe("L7.2-0 — caractérisation de l'admission existante", () => {
     await first;
   });
 
+  it("[à préserver] N admissions simultanées sur un même projet : une seule atteint le fournisseur, les autres sont refusées (project_locked)", async () => {
+    const lockRoot = join(root, "locks-n");
+    const workspaceRoot = join(root, "ws-n");
+    let reached = 0;
+    let releaseGate: () => void = () => undefined;
+    const gate = new Promise<void>((resolveGate) => {
+      releaseGate = resolveGate;
+    });
+    const contenders = Array.from({ length: 6 }, (_, index) =>
+      buildIsolatedRun({
+        repositoryPath,
+        lockRoot,
+        workspaceRoot,
+        attemptPrefix: `n-${index}`,
+        runLoopExecute: async () => {
+          reached += 1;
+          await gate;
+          return toLoopRunResult({ code: null });
+        },
+      })(PROJECT_NAME, runOptionsFor(repositoryPath)),
+    );
+
+    for (let i = 0; i < 100 && reached < 1; i += 1) {
+      await new Promise((resolveTick) => setTimeout(resolveTick, 10));
+    }
+    await new Promise((resolveTick) => setTimeout(resolveTick, 300));
+    releaseGate();
+    const results = await Promise.all(contenders);
+
+    assert.equal(reached, 1);
+    assert.equal(results.filter((r) => r.status === "completed").length, 1);
+    assert.equal(
+      results.filter((r) => r.failure?.code === "project_locked").length,
+      5,
+    );
+  });
+
+  it("[à préserver, couche verrou] deux concurrents sur un verrou mort : un seul le reprend (entrelacement forcé par les crochets)", async () => {
+    const lockRoot = join(root, "locks-dead-race");
+    const child = await spawnHangingRun({
+      repositoryPath,
+      lockRoot,
+      workspaceRoot: join(root, "ws-dead-race"),
+      children,
+    });
+    await killAndWait(child);
+
+    let observed = 0;
+    let bothObserved: () => void = () => undefined;
+    const barrier = new Promise<void>((resolveBarrier) => {
+      bothObserved = resolveBarrier;
+    });
+    const hook = async () => {
+      observed += 1;
+      if (observed === 2) bothObserved();
+      await barrier;
+    };
+    const managerA = createLocalProjectLockManager({ lockRoot, onStaleOwnerObserved: hook });
+    const managerB = createLocalProjectLockManager({ lockRoot, onStaleOwnerObserved: hook });
+
+    const [a, b] = await Promise.all([
+      managerA.acquire({ projectId: PROJECT_NAME, attemptId: "racer-a" }),
+      managerB.acquire({ projectId: PROJECT_NAME, attemptId: "racer-b" }),
+    ]);
+
+    assert.equal(observed >= 2, true, "contrôle : les deux ont observé le propriétaire mort");
+    assert.equal([a, b].filter((r) => r.acquired).length, 1);
+    if (a.acquired) await managerA.release(a.handle);
+    if (b.acquired) await managerB.release(b.handle);
+  });
+
   it("[à préserver, couche verrou] le verrou d'un propriétaire mort est repris par l'admission suivante (ADR §4 : inchangé)", async () => {
     const lockRoot = join(root, "locks-dead");
     const child = await spawnHangingRun({
