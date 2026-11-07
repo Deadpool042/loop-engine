@@ -5,11 +5,11 @@ import type { LoopRunStatus } from "./types.js";
 // executing/validating. It is a first-class transition, not a runner bypass.
 const TRANSITIONS: Readonly<Record<LoopRunStatus, readonly LoopRunStatus[]>> = {
   idle: ["planning"],
-  planning: ["ready", "blocked", "failed"],
+  planning: ["ready", "blocked", "failed", "cancelled"],
   ready: ["executing", "completed", "cancelled"],
   executing: ["executing", "validating", "failed", "cancelled"],
-  validating: ["executing", "completed", "repairing", "failed"],
-  repairing: ["executing", "validating", "failed"],
+  validating: ["executing", "completed", "repairing", "failed", "cancelled"],
+  repairing: ["executing", "validating", "failed", "cancelled"],
   completed: ["idle"],
   blocked: [],
   failed: [],

@@ -301,5 +301,6 @@ export async function runLoopRunCommand(
   if (json) {
     console.log(JSON.stringify(application.generateExecutionReport(result)));
   } else printLoopRunResult(result);
-  return result.status === "failed" ? 1 : 0;
+  // A cancelled run is never a success: it exits non-zero like a failure.
+  return result.status === "failed" || result.status === "cancelled" ? 1 : 0;
 }

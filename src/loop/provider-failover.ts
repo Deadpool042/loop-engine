@@ -1,3 +1,7 @@
+import {
+  CANCELLATION_CLEANUP_FAILED_CODE,
+  EXECUTION_CANCELLED_CODE,
+} from "./cancellation.js";
 import type { LoopExecutionPlan } from "./execution-plan.js";
 import type { LoopExecutor, LoopExecutorResult } from "./execution.js";
 import type { LoopRunFailure } from "./types.js";
@@ -49,6 +53,12 @@ export type LoopProviderFailoverOptions = Readonly<{
   cwd: string;
   isRecoverableFailure?: LoopProviderFailureClassifier;
   createWorkspaceReset?: LoopProviderWorkspaceResetFactory;
+  /**
+   * Cooperative cancellation request (L7). Once aborted no further provider is
+   * attempted and no workspace reset is run: failover never turns a
+   * cancellation into a fallback.
+   */
+  signal?: AbortSignal;
 }>;
 
 const DEFAULT_RECOVERABLE_FAILURE_CODES = new Set([
@@ -183,12 +193,35 @@ export async function executeLoopProviderFailover(
     }
   }
 
+  // A function call, not a property read: TypeScript would otherwise narrow
+  // `signal.aborted` to `false` after the first check although it can change
+  // while an executor is awaited.
+  const isAborted = (): boolean => options.signal?.aborted === true;
+  const cancelled = (): LoopProviderFailoverResult =>
+    Object.freeze({
+      result: Object.freeze({
+        status: "failed" as const,
+        modifiedFiles: Object.freeze([...modifiedFiles].sort()),
+        failure: Object.freeze({
+          code: EXECUTION_CANCELLED_CODE,
+          message: "Provider failover was cancelled.",
+          details: Object.freeze(["No further provider attempt was started."]),
+        }),
+      }),
+      evidence: freezeEvidence(options.maxAttempts, evidence, null),
+    });
+
   for (const [index, attempt] of boundedAttempts.entries()) {
     const attemptNumber = index + 1;
     let result: LoopExecutorResult;
 
+    if (isAborted()) return cancelled();
     try {
-      result = await attempt.executor(attempt.plan, options.cwd);
+      result = await attempt.executor(
+        attempt.plan,
+        options.cwd,
+        options.signal === undefined ? {} : { signal: options.signal },
+      );
     } catch {
       result = fail(
         "provider_executor_exception",
@@ -200,6 +233,39 @@ export async function executeLoopProviderFailover(
     for (const file of result.modifiedFiles) {
       const normalized = file.trim();
       if (normalized.length > 0) modifiedFiles.add(normalized);
+    }
+
+    if (isAborted()) {
+      // Cancelled attempts are recorded as non-recoverable failures; a cleanup
+      // failure reported by the provider is surfaced, never masked.
+      evidence.push(
+        Object.freeze({
+          attempt: attemptNumber,
+          provider: attempt.plan.provider,
+          runtime: attempt.plan.runtime,
+          profileId: attempt.plan.profileId,
+          model: attempt.plan.model,
+          status: "failed" as const,
+          failureCode:
+            result.status === "failed"
+              ? result.failure.code
+              : EXECUTION_CANCELLED_CODE,
+          recoverable: false,
+        }),
+      );
+      if (
+        result.status === "failed" &&
+        result.failure.code === CANCELLATION_CLEANUP_FAILED_CODE
+      ) {
+        return Object.freeze({
+          result: Object.freeze({
+            ...result,
+            modifiedFiles: Object.freeze([...modifiedFiles].sort()),
+          }),
+          evidence: freezeEvidence(options.maxAttempts, evidence, null),
+        });
+      }
+      return cancelled();
     }
 
     if (result.status === "completed") {
@@ -327,7 +393,7 @@ export function createProviderFailoverLoopExecutor(
     createWorkspaceReset?: LoopProviderWorkspaceResetFactory;
   }>,
 ): LoopExecutor {
-  return async (primaryPlan, cwd) => {
+  return async (primaryPlan, cwd, context) => {
     const attempts = resolveAttempts(primaryPlan);
     if (attempts[0]?.plan !== primaryPlan) {
       return fail(
@@ -341,6 +407,7 @@ export function createProviderFailoverLoopExecutor(
       attempts,
       maxAttempts: options.maxAttempts,
       cwd,
+      ...(context?.signal === undefined ? {} : { signal: context.signal }),
       ...(options.isRecoverableFailure === undefined
         ? {}
         : { isRecoverableFailure: options.isRecoverableFailure }),

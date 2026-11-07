@@ -14,7 +14,9 @@ const ARCHITECTURE_FILE =
 
 const REQUIRED_PROVIDER_TOKENS = Object.freeze([
   'basename(options.executable.trim()) !== "codex"',
-  "return async (plan, executionCwd)",
+  // Prefix match: the executor now also accepts the optional L7 `context`
+  // (cooperative cancellation) as a third parameter; plan and cwd stay first.
+  "return async (plan, executionCwd",
   '"--ignore-user-config"',
   '"--ignore-rules"',
   '"--ephemeral"',
